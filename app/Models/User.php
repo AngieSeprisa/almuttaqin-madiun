@@ -20,6 +20,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'foto',
         'password',
         'role',
         'jabatan',
@@ -212,6 +213,33 @@ class User extends Authenticatable
 
         $field = 'can_' . $action;
         return (bool) ($perm->{$field} ?? false);
+    }
+
+    /**
+     * URL publik foto profil (null bila belum diunggah atau file tidak ada).
+     */
+    public function getFotoUrlAttribute(): ?string
+    {
+        if ($this->foto && \Illuminate\Support\Facades\Storage::disk('public')->exists($this->foto)) {
+            return asset('storage/' . $this->foto);
+        }
+        return null;
+    }
+
+    /**
+     * Inisial nama pengguna (misal "Fulan Santri" => "FS", "Yayasan" => "YA" / "Y").
+     */
+    public function getInitialsAttribute(): string
+    {
+        $name = trim($this->name ?? '');
+        if ($name === '') {
+            return 'U';
+        }
+        $words = preg_split('/\s+/', $name);
+        if (count($words) >= 2) {
+            return strtoupper(mb_substr($words[0], 0, 1) . mb_substr($words[1], 0, 1));
+        }
+        return strtoupper(mb_substr($name, 0, min(2, mb_strlen($name))));
     }
 
 }

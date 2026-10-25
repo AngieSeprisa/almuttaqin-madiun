@@ -21,6 +21,17 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  function updateBrandTooltip() {
+    if (brandWrapper) {
+      if (window.innerWidth > 768 && body.classList.contains('sidebar-collapsed')) {
+        brandWrapper.setAttribute('title', 'Buka Menu Sidebar');
+      } else {
+        const origTitle = brandWrapper.getAttribute('data-original-title') || 'Beranda';
+        brandWrapper.setAttribute('title', origTitle);
+      }
+    }
+  }
+
   // Restore sidebar state from localStorage for desktop
   const isDesktop = window.innerWidth > 768;
   const savedSidebar = localStorage.getItem('sidebar_collapsed');
@@ -28,6 +39,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (isDesktop && savedSidebar === 'true') {
     body.classList.add('sidebar-collapsed');
   }
+  updateBrandTooltip();
 
   // Toggle button click handler
   sidebarToggleBtns.forEach(btn => {
@@ -39,6 +51,7 @@ document.addEventListener('DOMContentLoaded', function () {
       } else {
         body.classList.toggle('sidebar-collapsed');
         localStorage.setItem('sidebar_collapsed', body.classList.contains('sidebar-collapsed'));
+        updateBrandTooltip();
       }
     });
   });
@@ -50,6 +63,7 @@ document.addEventListener('DOMContentLoaded', function () {
         e.preventDefault();
         body.classList.remove('sidebar-collapsed');
         localStorage.setItem('sidebar_collapsed', 'false');
+        updateBrandTooltip();
       }
     });
   }

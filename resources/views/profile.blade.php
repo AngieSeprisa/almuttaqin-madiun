@@ -2,6 +2,16 @@
 
 @section('title', 'Profil Pengguna')
 
+@section('header-actions')
+<a href="{{ route('user') }}" class="btn btn-secondary">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+    <span>Keamanan & Password</span>
+</a>
+@endsection
+
 @section('content')
 <div class="page-full-container">
 
@@ -37,8 +47,12 @@
     <div class="profile-card-clean">
         <div class="profile-hero-top">
             <div class="profile-user-left">
-                <div class="profile-avatar-box {{ $theme['kode'] }}">
-                    {{ strtoupper(substr($user->name, 0, 1)) }}
+                <div class="profile-avatar-box {{ $theme['kode'] }}" style="overflow:hidden; display:flex; align-items:center; justify-content:center;">
+                    @if($user->foto_url)
+                        <img src="{{ $user->foto_url }}" alt="{{ $user->name }}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;">
+                    @else
+                        {{ $user->initials }}
+                    @endif
                 </div>
                 <div>
                     <h2 class="profile-name-text">{{ $user->name }}</h2>
@@ -327,9 +341,34 @@
 
     {{-- Form Biodata Diri & Kontak (Dapat Diedit Mandiri) --}}
     <div class="profile-card-clean">
-        <form action="{{ route('profile.update') }}" method="POST" style="display:flex; flex-direction:column; gap:24px;">
+        <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:24px;">
             @csrf
             @method('PUT')
+
+            {{-- Bagian Foto Profil --}}
+            <div style="padding:16px 20px; border-radius:12px; border:1px solid var(--border-light); background:var(--bg-page); display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+                <div style="width:68px; height:68px; border-radius:50%; overflow:hidden; background:#0F172A; color:#FFFFFF; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:22px; flex-shrink:0; border:2px solid var(--border-medium);">
+                    @if($user->foto_url)
+                        <img id="previewFotoProfil" src="{{ $user->foto_url }}" alt="{{ $user->name }}" style="width:100%; height:100%; object-fit:cover;">
+                    @else
+                        <span id="initialsFotoProfil">{{ $user->initials }}</span>
+                        <img id="previewFotoProfil" src="" alt="{{ $user->name }}" style="width:100%; height:100%; object-fit:cover; display:none;">
+                    @endif
+                </div>
+                <div style="flex:1; min-width:220px;">
+                    <label for="fotoInput" style="font-weight:700; font-size:13.5px; color:var(--text-primary); display:block; margin-bottom:4px;">Foto Profil</label>
+                    <p style="font-size:12px; color:var(--text-muted); margin:0 0 10px 0;">Format JPG, PNG, atau WEBP (maks. 5MB). Otomatis dikompresi agar ringan dan cepat.</p>
+                    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                        <input type="file" name="foto" id="fotoInput" accept="image/*" class="clean-input-control" style="font-size:12.5px; padding:6px 10px; max-width:280px;" onchange="previewAvatar(event)">
+                        @if($user->foto)
+                            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:#EF4444; cursor:pointer;">
+                                <input type="checkbox" name="hapus_foto" value="1" id="hapusFotoCheckbox">
+                                <span>Hapus foto (gunakan inisial)</span>
+                            </label>
+                        @endif
+                    </div>
+                </div>
+            </div>
 
             {{-- Bagian 1: Biodata Diri --}}
             <div>
@@ -420,4 +459,17 @@
     </div>
 
 </div>
+
+<script>
+function previewAvatar(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const preview = document.getElementById('previewFotoProfil');
+        const initials = document.getElementById('initialsFotoProfil');
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+        if (initials) initials.style.display = 'none';
+    }
+}
+</script>
 @endsection

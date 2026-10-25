@@ -12,6 +12,7 @@ use App\Http\Controllers\PlottingMapelController;
 use App\Http\Controllers\PerizinanController;
 use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\QuickSearchController;
 use App\Http\Controllers\RekapAbsensiController;
 use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\SiswaController;
@@ -44,6 +45,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/profile/batal-mapel', [ProfileController::class, 'batalAjukanMapel'])->name('profile.batal-mapel');
     Route::get('/user', [ProfileController::class, 'security'])->name('user');
     Route::put('/user', [ProfileController::class, 'updatePassword'])->name('user.password.update');
+    Route::get('/quick-search', [QuickSearchController::class, 'search'])->name('quick-search');
 
     // Menu Data Santri & Siswa
     Route::middleware('permission:siswa,view')->group(function () {

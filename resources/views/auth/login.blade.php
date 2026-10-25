@@ -12,7 +12,7 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="{{ asset('css/style.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/style.css') }}?v={{ filemtime(public_path('css/style.css')) }}">
     <style>
         .login-page {
             min-height: 100vh;

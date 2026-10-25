@@ -15,10 +15,6 @@
 @section('content')
 <div class="form-container" style="width: 100%;">
 
-    <h1 style="font-size: 26px; font-weight: 800; color: var(--text-primary); margin: 0 0 20px 0; letter-spacing: -0.02em;">
-        Pendaftaran
-    </h1>
-
     {{-- Error Banner --}}
     @if ($errors->any())
     <div class="alert-banner alert-error" style="margin-bottom: 20px;">

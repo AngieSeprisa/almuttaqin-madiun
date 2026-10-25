@@ -35,6 +35,8 @@ class ProfileController extends Controller
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
             'email'         => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'foto'          => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'hapus_foto'    => 'nullable|boolean',
             'nip'           => 'nullable|string|max:50',
             'jenis_kelamin' => 'nullable|in:Laki-laki,Perempuan',
             'tempat_lahir'  => 'nullable|string|max:100',
@@ -47,13 +49,31 @@ class ProfileController extends Controller
             'email.required'     => 'Email wajib diisi.',
             'email.unique'       => 'Email sudah digunakan akun lain.',
             'email.email'        => 'Format email tidak valid.',
+            'foto.image'         => 'File foto profil harus berupa gambar.',
+            'foto.max'           => 'Ukuran foto profil maksimal 5MB.',
             'tanggal_lahir.date' => 'Format tanggal lahir tidak valid.',
         ]);
 
+        if ($request->boolean('hapus_foto')) {
+            if ($user->foto && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->foto)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->foto);
+            }
+            $user->foto = null;
+        }
+
+        if ($request->hasFile('foto')) {
+            if ($user->foto && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->foto)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->foto);
+            }
+            $compressor = new \App\Services\ImageCompressor(maxDimension: 800, quality: 80);
+            $user->foto = $compressor->store($request->file('foto'), 'avatars');
+        }
+
+        unset($validated['foto'], $validated['hapus_foto']);
         $user->fill($validated);
         $user->save();
 
-        return redirect()->route('profile')->with('success', 'Biodata diri dan kontak Anda berhasil diperbarui.');
+        return redirect()->route('profile')->with('success', 'Biodata diri dan profil Anda berhasil diperbarui.');
     }
 
     /**

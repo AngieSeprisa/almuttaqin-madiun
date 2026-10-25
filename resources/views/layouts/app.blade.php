@@ -6,6 +6,8 @@
     $brandLogo = $currentLembaga ? $currentLembaga->logo_url : asset('images/logo.png');
     $brandTitle = $currentLembaga ? $currentLembaga->brand_title : 'PONDOK PESANTREN AL MUTTAQIN';
     $brandAlt = $brandTitle;
+
+    $isBeranda = request()->routeIs('beranda*') || request()->is('beranda*') || request()->routeIs('dashboard*') || request()->is('dashboard*') || request()->is('/');
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -21,7 +23,7 @@
             }
         })();
     </script>
-    <link rel="stylesheet" href="{{ asset('css/style.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/style.css') }}?v={{ filemtime(public_path('css/style.css')) }}">
     @stack('styles')
 </head>
 <body>
@@ -31,7 +33,7 @@
         <!-- Floating Sidebar -->
         <aside class="app-sidebar" id="appSidebar">
             <div class="sidebar-header">
-                <a href="{{ route('beranda') }}" class="brand-wrapper" title="{{ $brandAlt }}">
+                <a href="{{ route('beranda') }}" class="brand-wrapper" title="{{ $brandAlt }}" data-original-title="{{ $brandAlt }}">
                     <div class="brand-logo-wrap">
                         <img src="{{ $brandLogo }}" alt="Logo {{ $brandAlt }}" class="brand-logo-img">
                     </div>
@@ -320,8 +322,12 @@
             <div class="sidebar-footer">
                 @if($authUser)
                 <a href="{{ route('profile') }}" class="sidebar-profile-card {{ request()->routeIs('profile*') ? 'active' : '' }}" title="Lihat Profil Pengguna: {{ $authUser->name }}">
-                    <div class="sidebar-profile-avatar">
-                        {{ strtoupper(substr($authUser->name, 0, 1)) }}
+                    <div class="sidebar-profile-avatar" style="overflow:hidden;">
+                        @if($authUser->foto_url)
+                            <img src="{{ $authUser->foto_url }}" alt="{{ $authUser->name }}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;">
+                        @else
+                            {{ $authUser->initials }}
+                        @endif
                     </div>
                     <div class="sidebar-profile-info">
                         <span class="sidebar-profile-name">{{ $authUser->name }}</span>
@@ -341,48 +347,130 @@
         <div class="main-wrapper">
             <header class="app-header">
                 <div class="header-left">
-                    <!-- Mobile Hamburger Button -->
-                    <button type="button" class="mobile-sidebar-toggle js-sidebar-toggle" aria-label="Buka Menu Sidebar" title="Buka Menu">
+                    <!-- Clean Hamburger Button (Minimalist like Image 2) -->
+                    <button type="button" class="topbar-toggle-btn js-sidebar-toggle" aria-label="Buka/Tutup Menu" title="Buka/Tutup Menu">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="3" y1="12" x2="21" y2="12"></line>
                             <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
                             <line x1="3" y1="18" x2="21" y2="18"></line>
                         </svg>
                     </button>
-                    <h1 class="page-title">@yield('title', 'Beranda')</h1>
                 </div>
 
                 <div class="header-right">
-                    @yield('header-actions')
-
-                    {{-- User Profile Pill & Logout (Simplified for topbar) --}}
-                    @if($authUser)
-                    <div class="user-menu-wrap">
-                        <button type="button" class="user-profile-btn" id="userDropdownToggle" aria-label="Menu Akun">
-                            <div class="user-avatar">
-                                {{ strtoupper(substr($authUser->name, 0, 1)) }}
-                            </div>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:var(--text-muted);">
-                                <polyline points="6 9 12 15 18 9"></polyline>
+                    <!-- Kolom Pencarian Cerdas (Cari) -->
+                    <div class="topbar-search-wrap" id="topbarSearchWrap">
+                        <div class="topbar-search-input-box">
+                            <svg class="topbar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                             </svg>
+                            <input type="text"
+                                   id="topbarSearchInput"
+                                   class="topbar-search-input"
+                                   placeholder="Cari"
+                                   autocomplete="off"
+                                   aria-label="Cari data atau halaman">
+                            <span class="topbar-search-spinner" id="topbarSearchSpinner" style="display:none;"></span>
+                        </div>
+                        {{-- Dropdown Hasil Pencarian Interaktif --}}
+                        <div class="topbar-search-dropdown" id="topbarSearchDropdown" style="display:none;">
+                            <div class="topbar-search-results" id="topbarSearchResults"></div>
+                        </div>
+                    </div>
+
+                    <!-- Notifikasi Bell -->
+                    <div class="topbar-notif-wrap" id="topbarNotifWrap">
+                        @php
+                            $pendingGuruCount = \App\Models\User::where('mapel_status', 'menunggu')->count();
+                        @endphp
+                        <button type="button" class="topbar-icon-btn" id="topbarNotifToggle" aria-label="Notifikasi" title="Notifikasi">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                            @if($pendingGuruCount > 0)
+                                <span class="topbar-notif-badge"></span>
+                            @endif
                         </button>
-                        <div class="user-dropdown" id="userDropdownMenu">
+                        <div class="topbar-notif-menu" id="topbarNotifMenu" style="display:none;">
+                            <div class="topbar-notif-header">
+                                <span style="font-weight:700; font-size:13px; color:var(--text-primary);">Notifikasi</span>
+                                @if($pendingGuruCount > 0)
+                                    <span class="topbar-notif-count">{{ $pendingGuruCount }} Baru</span>
+                                @endif
+                            </div>
+                            <div class="topbar-notif-body">
+                                @if($pendingGuruCount > 0)
+                                    <a href="{{ route('guru-sekolah.index') }}" class="topbar-notif-link">
+                                        <div class="topbar-notif-dot"></div>
+                                        <div>
+                                            <div style="font-weight:600; font-size:12.5px; color:var(--text-primary);">Persetujuan Guru Sekolah</div>
+                                            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Ada {{ $pendingGuruCount }} pengajuan mapel menunggu verifikasi.</div>
+                                        </div>
+                                    </a>
+                                @else
+                                    <div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12.5px;">
+                                        Tidak ada notifikasi baru saat ini.
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Profile Avatar (Circle Foto / Inisial jika belum) -->
+                    @if($authUser)
+                    <div class="user-menu-wrap" id="userMenuWrap">
+                        <button type="button" class="user-avatar-btn" id="userDropdownToggle" aria-label="Menu Akun: {{ $authUser->name }}" title="{{ $authUser->name }}">
+                            @if($authUser->foto_url)
+                                <img src="{{ $authUser->foto_url }}" alt="{{ $authUser->name }}" class="topbar-avatar-circle topbar-avatar-img">
+                            @else
+                                <div class="topbar-avatar-circle topbar-avatar-initials">
+                                    {{ $authUser->initials }}
+                                </div>
+                            @endif
+                        </button>
+                        <div class="user-dropdown" id="userDropdownMenu" style="display:none;">
                             <div class="user-dropdown-info">
                                 <div style="font-weight:700;font-size:13.5px;color:var(--text-primary);">{{ $authUser->name }}</div>
                                 <div class="user-dropdown-email">{{ $authUser->email }}</div>
-                                <div style="margin-top:4px;">
+                                <div style="margin-top:6px;">
                                     <span class="badge-lembaga badge-lembaga-{{ $authUser->role === 'yayasan' ? 'yayasan' : 'smp' }}">
                                         {{ str_replace('_', ' ', $authUser->role) }}
                                     </span>
                                 </div>
                             </div>
-                            <a href="{{ route('profile') }}" class="user-dropdown-item" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13px;font-weight:500;color:var(--text-primary);text-decoration:none;">
+                            <a href="{{ route('profile') }}" class="user-dropdown-item">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--text-muted);">
                                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                                     <circle cx="12" cy="7" r="4"></circle>
                                 </svg>
                                 <span>Profil Pengguna</span>
                             </a>
+                            <a href="{{ route('user') }}" class="user-dropdown-item">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--text-muted);">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                                <span>Keamanan & Sandi</span>
+                            </a>
+                            <div class="user-dropdown-item js-theme-toggle" id="themeToggleBtn" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;color:var(--text-muted);">
+                                        <circle cx="12" cy="12" r="5"></circle>
+                                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                                    </svg>
+                                    <span>Mode Gelap / Terang</span>
+                                </div>
+                                <span id="themeToggleStatus" style="font-size:11px; padding:2px 8px; border-radius:10px; background:var(--bg-page); border:1px solid var(--border-light); font-weight:600; color:var(--text-secondary);">Siang</span>
+                            </div>
                             <form action="{{ route('logout') }}" method="POST" style="margin:0;">
                                 @csrf
                                 <button type="submit" class="user-dropdown-logout-btn">
@@ -397,33 +485,22 @@
                         </div>
                     </div>
                     @endif
-
-                    <!-- Theme Toggle -->
-                    <button type="button" class="theme-toggle" id="themeToggleBtn" aria-label="Ganti Mode Siang/Malam">
-                        <span class="theme-toggle-icon theme-icon-moon">
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                            </svg>
-                        </span>
-                        <span class="theme-toggle-knob"></span>
-                        <span class="theme-toggle-icon theme-icon-sun">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                                <circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor"></circle>
-                                <line x1="12" y1="2" x2="12" y2="4.5"></line>
-                                <line x1="12" y1="19.5" x2="12" y2="22"></line>
-                                <line x1="4.93" y1="4.93" x2="6.7" y2="6.7"></line>
-                                <line x1="17.3" y1="17.3" x2="19.07" y2="19.07"></line>
-                                <line x1="2" y1="12" x2="4.5" y2="12"></line>
-                                <line x1="19.5" y1="12" x2="22" y2="12"></line>
-                                <line x1="4.93" y1="19.07" x2="6.7" y2="17.3"></line>
-                                <line x1="17.3" y1="6.7" x2="19.07" y2="4.93"></line>
-                            </svg>
-                        </span>
-                    </button>
                 </div>
             </header>
 
             <main class="app-content">
+                {{-- Standardized Page Header untuk seluruh modul, KECUALI Beranda (Dashboard) --}}
+                @if(!$isBeranda)
+                    @if(trim($__env->yieldContent('page_header')))
+                        @yield('page_header')
+                    @else
+                        <x-page-header :title="$__env->yieldContent('page-title', $__env->yieldContent('title'))">
+                            <x-slot:actions>
+                                @yield('header-actions')
+                            </x-slot:actions>
+                        </x-page-header>
+                    @endif
+                @endif
                 @if($authUser && $authUser->must_change_password && !request()->routeIs('user*'))
                 <div class="alert-banner-warning" style="margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 18px; border-radius:12px; background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.3); color:#B45309; flex-wrap:wrap;">
                     <div style="display:flex; align-items:center; gap:10px;">
@@ -448,38 +525,199 @@
 
     <!-- SweetAlert2 & App Scripts -->
     <script src="{{ asset('js/sweetalert2.all.min.js') }}"></script>
-    <script src="{{ asset('js/app.js') }}"></script>
+    <script src="{{ asset('js/app.js') }}?v={{ filemtime(public_path('js/app.js')) }}"></script>
 
     <script>
-        // Dropdown toggles
         document.addEventListener('DOMContentLoaded', function() {
+            // Dropdown Elements
             var roomBtn = document.getElementById('sidebarRoomToggle');
             var roomMenu = document.getElementById('sidebarRoomMenu');
             var userBtn = document.getElementById('userDropdownToggle');
             var userMenu = document.getElementById('userDropdownMenu');
+            var notifBtn = document.getElementById('topbarNotifToggle');
+            var notifMenu = document.getElementById('topbarNotifMenu');
 
+            // Search Elements
+            var searchWrap = document.getElementById('topbarSearchWrap');
+            var searchInput = document.getElementById('topbarSearchInput');
+            var searchDropdown = document.getElementById('topbarSearchDropdown');
+            var searchResults = document.getElementById('topbarSearchResults');
+            var searchSpinner = document.getElementById('topbarSearchSpinner');
+
+            // Theme indicator sync
+            var themeStatus = document.getElementById('themeToggleStatus');
+            var themeBtn = document.getElementById('themeToggleBtn');
+            function updateThemeIndicator() {
+                if (themeStatus) {
+                    var isDark = document.documentElement.classList.contains('dark-mode') || document.body.classList.contains('dark-mode');
+                    themeStatus.textContent = isDark ? 'Malam' : 'Siang';
+                }
+            }
+            updateThemeIndicator();
+            if (themeBtn) {
+                themeBtn.addEventListener('click', function() {
+                    setTimeout(updateThemeIndicator, 60);
+                });
+            }
+
+            // Close all dropdowns helper
+            function closeAllDropdowns(except) {
+                if (roomMenu && except !== roomMenu) roomMenu.classList.remove('show');
+                if (userMenu && except !== userMenu) userMenu.style.display = 'none';
+                if (notifMenu && except !== notifMenu) notifMenu.style.display = 'none';
+                if (searchDropdown && except !== searchDropdown) searchDropdown.style.display = 'none';
+            }
+
+            // Room Switcher toggle
             if (roomBtn && roomMenu) {
                 roomBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    roomMenu.classList.toggle('show');
-                    if (userMenu) userMenu.classList.remove('show');
+                    var willOpen = !roomMenu.classList.contains('show');
+                    closeAllDropdowns();
+                    if (willOpen) roomMenu.classList.add('show');
                 });
             }
 
+            // User dropdown toggle
             if (userBtn && userMenu) {
                 userBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    userMenu.classList.toggle('show');
-                    if (roomMenu) roomMenu.classList.remove('show');
+                    var willOpen = userMenu.style.display === 'none' || !userMenu.style.display;
+                    closeAllDropdowns();
+                    if (willOpen) userMenu.style.display = 'block';
                 });
             }
 
+            // Notification dropdown toggle
+            if (notifBtn && notifMenu) {
+                notifBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var willOpen = notifMenu.style.display === 'none' || !notifMenu.style.display;
+                    closeAllDropdowns();
+                    if (willOpen) notifMenu.style.display = 'block';
+                });
+            }
+
+            // Quick Search Interactive Logic
+            var searchDebounceTimer = null;
+            var searchCache = {};
+
+            function getCategoryIcon(catKey) {
+                switch(catKey) {
+                    case 'menu':
+                        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>';
+                    case 'siswa':
+                        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
+                    case 'guru':
+                        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+                    case 'pendaftaran':
+                        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>';
+                    default:
+                        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
+                }
+            }
+
+            function escapeHtml(text) {
+                if (!text) return '';
+                var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+                return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+            }
+
+            function renderSearchResults(categories, query) {
+                if (!searchResults) return;
+                var totalItems = 0;
+                var html = '';
+
+                categories.forEach(function(cat) {
+                    if (cat.items && cat.items.length > 0) {
+                        totalItems += cat.items.length;
+                        html += '<div class="topbar-search-category">' + escapeHtml(cat.category) + '</div>';
+                        cat.items.forEach(function(item) {
+                            var iconHtml = getCategoryIcon(item.icon);
+                            html += '<a href="' + escapeHtml(item.url) + '" class="topbar-search-item">' +
+                                        '<div class="topbar-search-item-icon">' + iconHtml + '</div>' +
+                                        '<div class="topbar-search-item-content">' +
+                                            '<div class="topbar-search-item-title">' + escapeHtml(item.title) + '</div>' +
+                                            (item.subtitle ? '<div class="topbar-search-item-meta">' + escapeHtml(item.subtitle) + '</div>' : '') +
+                                        '</div>' +
+                                        (item.badge ? '<span class="topbar-search-item-badge">' + escapeHtml(item.badge) + '</span>' : '') +
+                                    '</a>';
+                        });
+                    }
+                });
+
+                if (totalItems === 0) {
+                    html = '<div class="topbar-search-empty">Tidak ada data yang sesuai dengan "' + escapeHtml(query) + '"</div>';
+                }
+
+                searchResults.innerHTML = html;
+                searchDropdown.style.display = 'block';
+            }
+
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    var q = searchInput.value.trim();
+                    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+
+                    if (q.length === 0) {
+                        if (searchSpinner) searchSpinner.style.display = 'none';
+                        if (searchDropdown) searchDropdown.style.display = 'none';
+                        return;
+                    }
+
+                    if (searchCache[q]) {
+                        renderSearchResults(searchCache[q], q);
+                        return;
+                    }
+
+                    if (searchSpinner) searchSpinner.style.display = 'block';
+
+                    searchDebounceTimer = setTimeout(function() {
+                        fetch('{{ route("quick-search") }}?q=' + encodeURIComponent(q), {
+                            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                        })
+                        .then(function(res) { return res.json(); })
+                        .then(function(data) {
+                            if (searchSpinner) searchSpinner.style.display = 'none';
+                            var categories = data.results || [];
+                            searchCache[q] = categories;
+                            renderSearchResults(categories, q);
+                        })
+                        .catch(function(err) {
+                            if (searchSpinner) searchSpinner.style.display = 'none';
+                            console.error('Quick search error:', err);
+                        });
+                    }, 220);
+                });
+
+                searchInput.addEventListener('focus', function() {
+                    var q = searchInput.value.trim();
+                    if (q.length > 0 && searchResults && searchResults.innerHTML) {
+                        closeAllDropdowns(searchDropdown);
+                        searchDropdown.style.display = 'block';
+                    }
+                });
+
+                searchInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        if (searchDropdown) searchDropdown.style.display = 'none';
+                    }
+                });
+            }
+
+            // Global Click Outside handler
             document.addEventListener('click', function(e) {
-                if (roomMenu && !roomMenu.contains(e.target) && e.target !== roomBtn) {
+                if (roomMenu && !roomMenu.contains(e.target) && e.target !== roomBtn && !roomBtn?.contains(e.target)) {
                     roomMenu.classList.remove('show');
                 }
-                if (userMenu && !userMenu.contains(e.target) && e.target !== userBtn) {
-                    userMenu.classList.remove('show');
+                if (userMenu && !userMenu.contains(e.target) && e.target !== userBtn && !userBtn?.contains(e.target)) {
+                    userMenu.style.display = 'none';
+                }
+                if (notifMenu && !notifMenu.contains(e.target) && e.target !== notifBtn && !notifBtn?.contains(e.target)) {
+                    notifMenu.style.display = 'none';
+                }
+                if (searchWrap && !searchWrap.contains(e.target)) {
+                    if (searchDropdown) searchDropdown.style.display = 'none';
                 }
             });
         });

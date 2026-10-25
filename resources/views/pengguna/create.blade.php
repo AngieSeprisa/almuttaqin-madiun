@@ -2,6 +2,16 @@
 
 @section('title', 'Tambah Pengguna')
 
+@section('header-actions')
+<a href="{{ route('pengguna.index') }}" class="btn btn-secondary">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+    </svg>
+    <span>Kembali ke Daftar</span>
+</a>
+@endsection
+
 @section('content')
 <div style="width: 100%; display: flex; flex-direction: column; gap: 20px;">
 
