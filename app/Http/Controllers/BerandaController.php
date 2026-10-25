@@ -15,7 +15,7 @@ class BerandaController extends Controller
      */
     public function index()
     {
-        $activeRoom = session('active_lembaga');
+        $activeRoom = session('active_lembaga') ?? session('active_room');
 
         $query = Siswa::query()->forLembaga($activeRoom);
 
@@ -37,7 +37,7 @@ class BerandaController extends Controller
 
         $currentLembaga = Lembaga::where('kode', $activeRoom)->first();
 
-        // Siapkan daftar pengumuman (Jadwal Mengajar & Agenda Guru Hari Ini)
+        // Siapkan daftar pengumuman (Jadwal Mengajar & Agenda Hari Ini)
         $authUser = auth()->user();
         $hariMap = [
             0 => 'Minggu',
@@ -48,7 +48,11 @@ class BerandaController extends Controller
             5 => 'Jumat',
             6 => 'Sabtu',
         ];
-        $hariIni = $hariMap[(int)date('w')];
+
+        // Pastikan penentuan hari ini akurat sesuai timezone Indonesia (Asia/Jakarta)
+        $tz = config('app.timezone') ?: 'Asia/Jakarta';
+        $nowInTz = now()->timezone($tz);
+        $hariIni = $hariMap[(int) $nowInTz->dayOfWeek];
         $pengumumanList = [];
 
         if ($authUser) {
@@ -60,39 +64,82 @@ class BerandaController extends Controller
                     ->whereHas('timeSlot', function ($q) use ($hariIni) {
                         $q->where('hari', $hariIni);
                     })
-                    ->get();
+                    ->get()
+                    ->sortBy(fn ($s) => $s->timeSlot?->jam_ke ?? 99);
 
-                if ($teacherSchedules->isEmpty() && ($authUser->isYayasan() || $authUser->role === 'admin_lembaga')) {
-                    $schQuery = Schedule::with(['classroom', 'subject', 'timeSlot', 'teacher'])
-                        ->activePeriod()
-                        ->whereHas('timeSlot', function ($q) use ($hariIni) {
-                            $q->where('hari', $hariIni);
-                        });
-                    if ($activeRoom && in_array($activeRoom, ['smp', 'sma'])) {
-                        $schQuery->forJenjang($activeRoom);
-                    }
-                    $schoolSchedules = $schQuery->orderBy('time_slot_id')->take(5)->get();
-                    foreach ($schoolSchedules as $sch) {
+                if ($teacherSchedules->isNotEmpty()) {
+                    foreach ($teacherSchedules as $sch) {
+                        $jenjang = $sch->classroom?->jenjang ? "[{$sch->classroom->jenjang}] " : '';
                         $jam = $sch->timeSlot ? "Jam ke-{$sch->timeSlot->jam_ke} ({$sch->timeSlot->rentang_waktu})" : '';
                         $kelas = $sch->classroom?->nama_kelas ?? '-';
                         $mapel = $sch->subject?->mata_pelajaran ?? 'Mata Pelajaran';
-                        $guru = $sch->teacher?->name ? " • {$sch->teacher->name}" : '';
                         $pengumumanList[] = [
                             'tipe'  => 'jadwal',
                             'badge' => 'Jadwal Mengajar',
-                            'text'  => "{$jam} • Kelas {$kelas} ({$mapel}){$guru}",
+                            'text'  => "{$jenjang}{$jam} • Kelas {$kelas} ({$mapel})",
+                            'url'   => route('jadwal-pelajaran.saya'),
                         ];
                     }
                 } else {
-                    foreach ($teacherSchedules as $sch) {
-                        $jam = $sch->timeSlot ? "Jam ke-{$sch->timeSlot->jam_ke} ({$sch->timeSlot->rentang_waktu})" : '';
-                        $kelas = $sch->classroom?->nama_kelas ?? '-';
-                        $mapel = $sch->subject?->mata_pelajaran ?? 'Mata Pelajaran';
-                        $pengumumanList[] = [
-                            'tipe'  => 'jadwal',
-                            'badge' => 'Jadwal Mengajar',
-                            'text'  => "{$jam} • Kelas {$kelas} ({$mapel})",
-                        ];
+                    // Cek apakah user guru ini memiliki jadwal mengajar di semester ini tapi bukan hari ini
+                    $allMySchedules = Schedule::with(['classroom', 'subject', 'timeSlot'])
+                        ->activePeriod()
+                        ->where('teacher_id', $authUser->id)
+                        ->get();
+
+                    if ($allMySchedules->isNotEmpty()) {
+                        // Tampilkan info jadwal KBM berikutnya agar guru tahu jadwal mendatang
+                        $dayOrder = ['Minggu' => 0, 'Senin' => 1, 'Selasa' => 2, 'Rabu' => 3, 'Kamis' => 4, 'Jumat' => 5, 'Sabtu' => 6];
+                        $todayIdx = (int) $nowInTz->dayOfWeek;
+
+                        $nextSchedule = $allMySchedules->sortBy(function ($sch) use ($dayOrder, $todayIdx) {
+                            $schDay = $sch->timeSlot?->hari ?? 'Minggu';
+                            $schIdx = $dayOrder[$schDay] ?? 0;
+                            $diff = ($schIdx - $todayIdx + 7) % 7;
+                            if ($diff === 0) {
+                                $diff = 7;
+                            }
+                            return ($diff * 100) + ($sch->timeSlot?->jam_ke ?? 99);
+                        })->first();
+
+                        if ($nextSchedule) {
+                            $nextHari = $nextSchedule->timeSlot?->hari ?? '-';
+                            $nextJam = $nextSchedule->timeSlot ? "Jam ke-{$nextSchedule->timeSlot->jam_ke}" : '';
+                            $nextKelas = $nextSchedule->classroom?->nama_kelas ?? '-';
+                            $nextMapel = $nextSchedule->subject?->mata_pelajaran ?? 'Mata Pelajaran';
+                            $nextJenjang = $nextSchedule->classroom?->jenjang ? "[{$nextSchedule->classroom->jenjang}] " : '';
+
+                            $pengumumanList[] = [
+                                'tipe'  => 'jadwal',
+                                'badge' => 'Jadwal Berikutnya',
+                                'text'  => "Hari ini tidak ada KBM • {$nextHari}: {$nextJenjang}{$nextJam} Kelas {$nextKelas} ({$nextMapel})",
+                                'url'   => route('jadwal-pelajaran.saya'),
+                            ];
+                        }
+                    } elseif ($authUser->isYayasan() || $authUser->role === 'admin_lembaga') {
+                        // Untuk pimpinan / admin yang tidak mengajar langsung, tampilkan jadwal KBM sekolah hari ini
+                        $schQuery = Schedule::with(['classroom', 'subject', 'timeSlot', 'teacher'])
+                            ->activePeriod()
+                            ->whereHas('timeSlot', function ($q) use ($hariIni) {
+                                $q->where('hari', $hariIni);
+                            });
+                        if ($activeRoom && in_array($activeRoom, ['smp', 'sma'])) {
+                            $schQuery->forJenjang($activeRoom);
+                        }
+                        $schoolSchedules = $schQuery->orderBy('time_slot_id')->take(5)->get();
+                        foreach ($schoolSchedules as $sch) {
+                            $jenjang = $sch->classroom?->jenjang ? "[{$sch->classroom->jenjang}] " : '';
+                            $jam = $sch->timeSlot ? "Jam ke-{$sch->timeSlot->jam_ke} ({$sch->timeSlot->rentang_waktu})" : '';
+                            $kelas = $sch->classroom?->nama_kelas ?? '-';
+                            $mapel = $sch->subject?->mata_pelajaran ?? 'Mata Pelajaran';
+                            $guru = $sch->teacher?->name ? " • {$sch->teacher->name}" : '';
+                            $pengumumanList[] = [
+                                'tipe'  => 'jadwal',
+                                'badge' => 'Jadwal Mengajar',
+                                'text'  => "{$jenjang}{$jam} • Kelas {$kelas} ({$mapel}){$guru}",
+                                'url'   => route('jadwal-pelajaran.index'),
+                            ];
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -101,11 +148,16 @@ class BerandaController extends Controller
 
             // 2. Agenda Guru / Kegiatan Sekolah Hari Ini (Slot non-KBM seperti Upacara, Istirahat, Sholat Dhuhur)
             try {
-                $agendas = TimeSlot::active()
+                $agendaQuery = TimeSlot::active()
                     ->hari($hariIni)
                     ->where('is_break', true)
-                    ->orderBy('urutan')
-                    ->get();
+                    ->orderBy('urutan');
+
+                if ($activeRoom && in_array($activeRoom, ['smp', 'sma'])) {
+                    $agendaQuery->forJenjang($activeRoom);
+                }
+
+                $agendas = $agendaQuery->get();
 
                 foreach ($agendas as $ag) {
                     $pengumumanList[] = [

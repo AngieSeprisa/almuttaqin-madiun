@@ -5,9 +5,11 @@
 @section('content')
 @php
     $authUser = auth()->user();
-    $hariIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][(int)date('w')];
-    $bulanIndo = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][(int)date('n')];
-    $tanggalFormatted = $hariIndo . ', ' . date('j') . ' ' . $bulanIndo . ' ' . date('Y');
+    $tz = config('app.timezone') ?: 'Asia/Jakarta';
+    $nowInTz = now()->timezone($tz);
+    $hariIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][(int)$nowInTz->dayOfWeek];
+    $bulanIndo = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][(int)$nowInTz->format('n')];
+    $tanggalFormatted = $hariIndo . ', ' . $nowInTz->format('j') . ' ' . $bulanIndo . ' ' . $nowInTz->format('Y');
     $firstName = explode(' ', trim($authUser->name ?? 'Pengguna'))[0];
 @endphp
 
@@ -16,11 +18,14 @@
     {{-- Hero Welcome Card untuk Mobile & Desktop --}}
     <div class="beranda-hero-card">
         <div class="beranda-hero-content" style="width: 100%;">
-            <h1 class="beranda-hero-title">
-                Halo, {{ $firstName }} 👋
-            </h1>
+            <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <h1 class="beranda-hero-title" style="margin: 0;">
+                    Halo, {{ $firstName }} 👋
+                </h1>
+                <span style="font-size: 13px; font-weight: 500; color: var(--text-muted, #64748b);">{{ $tanggalFormatted }}</span>
+            </div>
 
-            <div class="beranda-ticker-wrapper" id="berandaTickerWrapper">
+            <div class="beranda-ticker-wrapper" id="berandaTickerWrapper" style="margin-top: 10px;">
                 @if(!empty($pengumumanList) && count($pengumumanList) > 0)
                     <div class="beranda-ticker-carousel" id="berandaTickerCarousel">
                         @foreach($pengumumanList as $idx => $item)
@@ -33,7 +38,14 @@
                                     @endif
                                     {{ $item['badge'] }}
                                 </span>
-                                <span class="ticker-text">{{ $item['text'] }}</span>
+                                @if(!empty($item['url']))
+                                    <a href="{{ $item['url'] }}" class="ticker-text ticker-link" style="color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Buka jadwal">
+                                        <span>{{ $item['text'] }}</span>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6; flex-shrink: 0;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                                    </a>
+                                @else
+                                    <span class="ticker-text">{{ $item['text'] }}</span>
+                                @endif
                             </div>
                         @endforeach
                     </div>
@@ -53,6 +65,12 @@
                             <line x1="12" y1="16" x2="12.01" y2="16"></line>
                         </svg>
                         <span class="ticker-empty-text">tidak ada jadwal mengajar / tidak ada agenda hari ini</span>
+                        @if(Route::has('jadwal-pelajaran.saya'))
+                            <a href="{{ route('jadwal-pelajaran.saya') }}" style="margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--electric-blue, #0052FF); text-decoration: none; display: inline-flex; align-items: center; gap: 3px;">
+                                <span>Lihat Jadwal Saya</span>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                            </a>
+                        @endif
                     </div>
                 @endif
             </div>
