@@ -54,9 +54,8 @@ class BannerHeaderTest extends TestCase
         // Bold title
         $response->assertSee('page-header-title text-2xl font-bold text-gray-900', false);
 
-        // Action button placed on the right
-        $response->assertSee('page-header-actions', false);
-        $response->assertSee('Tambah Siswa', false);
+        // Tambah Siswa button is removed per requirements
+        $response->assertDontSee('Tambah Siswa', false);
     }
 
     public function test_page_header_structure_on_pendaftaran(): void

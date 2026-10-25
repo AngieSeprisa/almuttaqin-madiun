@@ -37,6 +37,41 @@ class MataPelajaran extends Model
     }
 
     /**
+     * Scope filter per jenjang sekolah (SMP / SMA).
+     */
+    public function scopeForJenjang($query, string $jenjang)
+    {
+        $kode = strtolower($jenjang);
+        return $query->whereHas('lembaga', function ($q) use ($kode) {
+            $q->where('kode', $kode);
+        });
+    }
+
+    /**
+     * Scope aktif (kompatibilitas filter).
+     */
+    public function scopeActive($query)
+    {
+        return $query;
+    }
+
+    /**
+     * Jenjang uppercase (SMP atau SMA).
+     */
+    public function getJenjangAttribute(): string
+    {
+        return strtoupper($this->lembaga?->kode ?? 'SMP');
+    }
+
+    /**
+     * Relasi ke Jadwal Pelajaran
+     */
+    public function schedules()
+    {
+        return $this->hasMany(Schedule::class, 'subject_id');
+    }
+
+    /**
      * Accessor & Mutator alias: nama_pelajaran <-> mata_pelajaran
      */
     public function getNamaPelajaranAttribute(): ?string

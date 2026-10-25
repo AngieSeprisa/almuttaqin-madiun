@@ -19,7 +19,8 @@ class PendaftaranRequest extends FormRequest
      */
     public function rules(): array
     {
-        $id = $this->route('pendaftaran') ? $this->route('pendaftaran')->id : null;
+        $routeParam = $this->route('pendaftaran') ?? $this->route('id');
+        $id = $routeParam instanceof \App\Models\Pendaftaran ? $routeParam->id : $routeParam;
 
         return [
             // Pilihan Jenjang Pendidikan

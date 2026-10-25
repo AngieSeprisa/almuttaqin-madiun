@@ -23,7 +23,16 @@ class CheckPermission
 
         $user = Auth::user();
 
-        if (!$user->canDo($menuCode, $action)) {
+        $menus = preg_split('/[,|]/', $menuCode);
+        $allowed = false;
+        foreach ($menus as $m) {
+            if ($user->canDo(trim($m), $action)) {
+                $allowed = true;
+                break;
+            }
+        }
+
+        if (!$allowed) {
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['message' => 'Anda tidak memiliki hak akses untuk tindakan ini.'], 403);
             }

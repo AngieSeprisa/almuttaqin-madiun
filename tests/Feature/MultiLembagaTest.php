@@ -94,7 +94,7 @@ class MultiLembagaTest extends TestCase
         $response->assertDontSee('room-switcher-wrap');
     }
 
-    public function test_sidebar_has_user_profile_card_linking_to_profile_page(): void
+    public function test_user_profile_linking_to_profile_page(): void
     {
         $user = User::where('email', 'yayasan@almuttaqin.id')->first();
         $this->assertNotNull($user);
@@ -102,9 +102,9 @@ class MultiLembagaTest extends TestCase
         $response = $this->actingAs($user)->get(route('beranda'));
         $response->assertStatus(200);
 
-        // Sidebar footer contains profile card with user name and profile route
-        $response->assertSee('sidebar-profile-card');
-        $response->assertSee($user->name);
+        // Profile link is present in topbar user menu, sidebar card is removed
+        $response->assertDontSee('sidebar-profile-card');
+        $response->assertSee('userDropdownToggle');
         $response->assertSee(route('profile'));
 
         // Profile page itself loads cleanly

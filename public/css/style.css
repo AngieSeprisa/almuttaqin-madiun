@@ -1159,11 +1159,19 @@ html.dark-mode .topbar-search-item-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  max-width: 36px;
+  max-height: 36px;
   border: none;
   background: transparent;
   padding: 0;
   cursor: pointer;
   border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
   transition: transform 0.15s ease;
 }
 
@@ -1174,11 +1182,16 @@ html.dark-mode .topbar-search-item-icon {
 .topbar-avatar-circle {
   width: 36px;
   height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  max-width: 36px;
+  max-height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  flex-shrink: 0;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 
@@ -1199,10 +1212,16 @@ html.dark-mode .topbar-avatar-initials {
 
 /* Uploaded Profile Photo */
 .topbar-avatar-img {
-  width: 100%;
-  height: 100%;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  max-width: 36px;
+  max-height: 36px;
   object-fit: cover;
   border-radius: 50%;
+  display: block;
+  flex-shrink: 0;
 }
 
 /* User Dropdown Menu */
@@ -1590,6 +1609,375 @@ body.dark-mode .theme-icon-sun {
 .app-content {
   padding-top: 20px;
   flex: 1;
+}
+
+/* ========================================================
+   BERANDA / DASHBOARD HERO & QUICK ACTIONS
+   ======================================================== */
+.beranda-hero-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 22px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-default);
+}
+
+.beranda-hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--electric-blue) 0%, #3B82F6 100%);
+}
+
+.beranda-hero-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.beranda-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--electric-blue);
+  background: rgba(0, 82, 255, 0.08);
+  padding: 3px 10px;
+  border-radius: 9999px;
+  width: fit-content;
+  margin-bottom: 2px;
+}
+
+html.dark-mode .beranda-hero-badge {
+  color: #60A5FA;
+  background: rgba(0, 82, 255, 0.16);
+}
+
+.beranda-hero-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10B981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+  display: inline-block;
+}
+
+.beranda-hero-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 10px 0;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+/* Ticker & Pengumuman Jadwal/Agenda */
+.beranda-ticker-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-page);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 8px 14px;
+  min-height: 42px;
+  box-sizing: border-box;
+  width: 100%;
+  overflow: hidden;
+}
+
+html.dark-mode .beranda-ticker-wrapper {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.beranda-ticker-carousel {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  overflow: hidden;
+}
+
+.beranda-ticker-item {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.beranda-ticker-item.active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.ticker-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ticker-badge-jadwal {
+  background: rgba(0, 82, 255, 0.1);
+  color: var(--electric-blue);
+}
+
+html.dark-mode .ticker-badge-jadwal {
+  background: rgba(0, 82, 255, 0.22);
+  color: #60A5FA;
+}
+
+.ticker-badge-agenda {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+}
+
+html.dark-mode .ticker-badge-agenda {
+  background: rgba(16, 185, 129, 0.22);
+  color: #34D399;
+}
+
+.ticker-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.ticker-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticker-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ticker-counter {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ticker-btn {
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.ticker-btn:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text-primary);
+}
+
+/* Empty state */
+.beranda-ticker-empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ticker-empty-svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.ticker-empty-text {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.beranda-hero-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  font-weight: 500;
+}
+
+.beranda-hero-role {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Quick Actions Shortcut Row */
+.beranda-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.quick-action-item {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  gap: 8px;
+  box-shadow: var(--card-shadow);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.quick-action-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--electric-blue);
+  box-shadow: 0 6px 16px rgba(0, 82, 255, 0.12);
+}
+
+.quick-action-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.quick-action-item:hover .quick-action-icon {
+  transform: scale(1.08);
+}
+
+.quick-action-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.quick-icon-siswa {
+  background-color: rgba(0, 82, 255, 0.1);
+  color: var(--electric-blue);
+}
+
+.quick-icon-jadwal {
+  background-color: rgba(139, 92, 246, 0.1);
+  color: #8B5CF6;
+}
+
+.quick-icon-presensi {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+}
+
+.quick-icon-pendaftaran {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #F59E0B;
+}
+
+html.dark-mode .quick-icon-siswa {
+  background-color: rgba(0, 82, 255, 0.2);
+  color: #60A5FA;
+}
+
+html.dark-mode .quick-icon-jadwal {
+  background-color: rgba(139, 92, 246, 0.2);
+  color: #A78BFA;
+}
+
+html.dark-mode .quick-icon-presensi {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #34D399;
+}
+
+html.dark-mode .quick-icon-pendaftaran {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #FBBF24;
+}
+
+.quick-action-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Lembaga Summary Grid */
+.lembaga-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.lembaga-summary-item {
+  background: var(--bg-page);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lembaga-summary-count {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 6px;
+  letter-spacing: -0.02em;
+}
+
+.lembaga-summary-unit {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
 /* Cards Grid */
@@ -2019,17 +2407,101 @@ html.dark-mode .status-badge.status-sakit {
     box-sizing: border-box;
   }
 
+  /* Beranda Mobile Responsive Enhancements */
+  .beranda-hero-card {
+    padding: 16px !important;
+    border-radius: 14px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .beranda-hero-title {
+    font-size: 18px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .beranda-ticker-wrapper {
+    padding: 7px 10px !important;
+    min-height: 38px !important;
+  }
+
+  .ticker-badge {
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+
+  .ticker-text {
+    font-size: 12px !important;
+  }
+
+  .beranda-ticker-empty {
+    font-size: 12px !important;
+  }
+
+  .ticker-empty-text {
+    font-size: 12px !important;
+  }
+
+  .quick-action-icon {
+    width: 38px !important;
+    height: 38px !important;
+    border-radius: 10px !important;
+  }
+
+  .quick-action-icon svg {
+    width: 19px !important;
+    height: 19px !important;
+  }
+
+  .quick-action-label {
+    font-size: 11px !important;
+  }
+
   .stats-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
   }
 
   .stat-card {
-    padding: 20px;
+    padding: 14px 14px !important;
+    border-radius: 14px !important;
+    gap: 10px !important;
+  }
+
+  .stat-card-title {
+    font-size: 10.5px !important;
+    line-height: 1.25 !important;
+    letter-spacing: 0.02em !important;
+  }
+
+  .stat-icon-wrapper {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 10px !important;
+  }
+
+  .stat-icon-wrapper svg {
+    width: 17px !important;
+    height: 17px !important;
   }
 
   .stat-number {
-    font-size: 28px;
+    font-size: 24px !important;
+    font-weight: 800 !important;
+  }
+
+  .lembaga-summary-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .lembaga-summary-item {
+    padding: 12px 14px !important;
+  }
+
+  .lembaga-summary-count {
+    font-size: 18px !important;
   }
 }
 

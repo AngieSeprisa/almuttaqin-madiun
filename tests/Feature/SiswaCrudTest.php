@@ -102,4 +102,103 @@ class SiswaCrudTest extends TestCase
             'id' => $siswa->id,
         ]);
     }
+
+    public function test_tombol_tambah_siswa_tidak_ditampilkan_pada_menu_siswa(): void
+    {
+        $response = $this->actingAs($this->admin)->get(route('siswa'));
+        $response->assertStatus(200);
+        $response->assertDontSee('Tambah Siswa');
+    }
+
+    public function test_klik_tombol_edit_pada_siswa_mengalihkan_ke_formulir_pendaftaran(): void
+    {
+        $siswa = Siswa::create([
+            'nama_lengkap' => 'Santri Uji Edit',
+            'jenjang'      => 'SMP',
+            'kamar'        => 'Kamar A1',
+            'status'       => 'aktif',
+        ]);
+
+        // Cek halaman siswa memuat link menuju route('siswa.edit', $siswa->id)
+        $response = $this->actingAs($this->admin)->get(route('siswa'));
+        $response->assertStatus(200);
+        $response->assertSee(route('siswa.edit', $siswa->id));
+
+        // Mengakses edit siswa mengalihkan ke halaman formulir pendaftaran edit
+        $responseEdit = $this->actingAs($this->admin)->get(route('siswa.edit', $siswa->id));
+        $responseEdit->assertRedirect();
+        $this->assertStringContainsString('/pendaftaran/', $responseEdit->headers->get('Location'));
+        $this->assertStringContainsString('/edit?from=siswa', $responseEdit->headers->get('Location'));
+
+        // Halaman formulir edit pendaftaran dapat dibuka
+        $responseForm = $this->actingAs($this->admin)->get($responseEdit->headers->get('Location'));
+        $responseForm->assertStatus(200);
+        $responseForm->assertSee('Edit Formulir Pendaftaran');
+        $responseForm->assertSee('Santri Uji Edit');
+        $responseForm->assertSee('Kembali ke Siswa');
+    }
+
+    public function test_update_formulir_pendaftaran_dari_menu_siswa_mensinkronkan_siswa(): void
+    {
+        $siswa = Siswa::create([
+            'nama_lengkap' => 'Santri Awal',
+            'jenjang'      => 'SMP',
+            'kamar'        => 'Kamar C2',
+            'status'       => 'aktif',
+        ]);
+
+        // Trigger edit untuk inisialisasi / link pendaftaran
+        $this->actingAs($this->admin)->get(route('siswa.edit', $siswa->id));
+        $siswa->refresh();
+        $this->assertNotNull($siswa->pendaftaran_id);
+
+        $pendaftaran = $siswa->pendaftaran;
+
+        $updateData = [
+            'from'                => 'siswa',
+            'jenjang'             => 'SMA',
+            'nik'                 => $pendaftaran->nik,
+            'nama_lengkap'        => 'Santri Berubah Nama',
+            'nama_panggilan'      => 'Berubah',
+            'tempat_lahir'        => 'Kota Madiun',
+            'tanggal_lahir'       => '2008-01-01',
+            'jenis_kelamin'       => 'Laki-laki',
+            'anak_ke'             => 1,
+            'jumlah_saudara'      => 2,
+            'tinggal_bersama'     => 'Orang Tua Kandung',
+            'alamat_jalan'        => 'Jl. Uji No. 1',
+            'rt_rw'               => '01/01',
+            'desa_kelurahan'      => 'Josenan',
+            'kecamatan'           => 'Taman',
+            'kab_kota'            => 'Kota Madiun',
+            'kode_pos'            => '63134',
+            'provinsi'            => 'Jawa Timur',
+            'warga_negara'        => 'Indonesia',
+            'kelompok'            => 'Bina Syarekah',
+            'desa'                => 'Mentawai',
+            'daerah'              => 'Madiun Kota',
+            'pendidikan_terakhir' => 'SMP/MTs',
+            'status_mondok'       => 'Person',
+            'pj_biaya_nama'       => 'Orang Tua',
+            'pj_biaya_hp'         => '081234567890',
+            'ayah_nama'           => 'Bapak Santri',
+            'ayah_status'         => 'Hidup',
+            'ibu_nama'            => 'Ibu Santri',
+            'ibu_status'          => 'Hidup',
+        ];
+
+        $response = $this->actingAs($this->admin)->put(route('pendaftaran.update', $pendaftaran->id), $updateData);
+
+        $response->assertRedirect(route('siswa'));
+        $this->assertDatabaseHas('pendaftarans', [
+            'id'           => $pendaftaran->id,
+            'nama_lengkap' => 'Santri Berubah Nama',
+            'jenjang'      => 'SMA',
+        ]);
+        $this->assertDatabaseHas('siswas', [
+            'id'           => $siswa->id,
+            'nama_lengkap' => 'Santri Berubah Nama',
+            'jenjang'      => 'SMA',
+        ]);
+    }
 }

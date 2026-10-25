@@ -191,4 +191,84 @@ class PendaftaranController extends Controller
 
         return redirect()->back()->with('success', 'Status pendaftaran berhasil diperbarui menjadi ' . $newStatus . '.');
     }
+
+    /**
+     * Menampilkan form edit formulir pendaftaran santri.
+     */
+    public function edit($id)
+    {
+        $pendaftaran = Pendaftaran::findOrFail($id);
+        $activeRoom = session('active_lembaga');
+
+        return view('pendaftaran.edit', compact('pendaftaran', 'activeRoom'));
+    }
+
+    /**
+     * Memperbarui data formulir pendaftaran santri.
+     */
+    public function update(PendaftaranRequest $request, $id, ImageCompressor $compressor)
+    {
+        $pendaftaran = Pendaftaran::findOrFail($id);
+        $data = $request->validated();
+
+        $stored = [];
+        $oldFilesToDelete = [];
+
+        try {
+            foreach (Pendaftaran::FOTO_BERKAS as $field => [$flag]) {
+                unset($data[$field]);
+
+                if ($request->hasFile($field)) {
+                    $stored[$field] = $compressor->store($request->file($field), 'berkas');
+                    $data[$field] = $stored[$field];
+                    $data[$flag] = true;
+
+                    if ($pendaftaran->{$field}) {
+                        $oldFilesToDelete[] = $pendaftaran->{$field};
+                    }
+                }
+            }
+        } catch (RuntimeException $e) {
+            foreach ($stored as $path) {
+                $compressor->delete($path);
+            }
+
+            return back()->withInput()->withErrors(['foto_berkas' => $e->getMessage()]);
+        }
+
+        try {
+            $pendaftaran->update($data);
+
+            // Hapus file lama yang berhasil digantikan
+            foreach ($oldFilesToDelete as $oldFile) {
+                $compressor->delete($oldFile);
+            }
+
+            // Sinkronkan data ke tabel Siswa jika pendaftaran ini sudah terhubung dengan siswa
+            $siswa = Siswa::where('pendaftaran_id', $pendaftaran->id)
+                ->orWhere('nama_lengkap', $pendaftaran->nama_lengkap)
+                ->first();
+
+            if ($siswa) {
+                $siswa->update([
+                    'nama_lengkap'   => $pendaftaran->nama_lengkap,
+                    'jenjang'        => $pendaftaran->jenjang,
+                    'pendaftaran_id' => $pendaftaran->id,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            foreach ($stored as $path) {
+                $compressor->delete($path);
+            }
+            throw $e;
+        }
+
+        if ($request->input('from') === 'siswa') {
+            return redirect()->route('siswa')
+                ->with('success', 'Formulir pendaftaran santri atas nama ' . $pendaftaran->nama_lengkap . ' berhasil diperbarui.');
+        }
+
+        return redirect()->route('pendaftaran.show', $pendaftaran->id)
+            ->with('success', 'Formulir pendaftaran santri atas nama ' . $pendaftaran->nama_lengkap . ' berhasil diperbarui.');
+    }
 }

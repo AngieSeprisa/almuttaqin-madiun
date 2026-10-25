@@ -43,11 +43,9 @@ class SidebarUntitledUiTest extends TestCase
         // 3. Dropdown pindah lembaga di topbar kanan telah dihilangkan
         $response->assertDontSee('room-switcher-wrap');
 
-        // 4. Bagian bawah menampilkan profile user dan link ke profile
-        $response->assertSee('sidebar-footer');
-        $response->assertSee('sidebar-profile-card');
-        $response->assertSee('Pimpinan Yayasan');
-        $response->assertSee('yayasan@almuttaqin.id');
+        // 4. Menu profile user berada di pojok kanan atas topbar (userDropdownToggle) dan sidebar-profile-card bawah telah dihilangkan
+        $response->assertDontSee('sidebar-profile-card');
+        $response->assertSee('userDropdownToggle');
         $response->assertSee(route('profile'));
     }
 

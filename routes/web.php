@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\GuruSekolahController;
+use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\PendaftaranController;
 use App\Http\Controllers\PengaturanAbsensiController;
 use App\Http\Controllers\PlottingKelasController;
@@ -83,6 +84,11 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:pendaftaran,edit')
         ->name('pendaftaran.updateStatus');
 
+    Route::middleware('permission:pendaftaran|siswa,edit')->prefix('pendaftaran')->name('pendaftaran.')->group(function () {
+        Route::get('/{id}/edit', [PendaftaranController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::put('/{id}', [PendaftaranController::class, 'update'])->whereNumber('id')->name('update');
+    });
+
     // Menu Perizinan: Sambang
     Route::middleware('permission:perizinan_sambang,view')->prefix('perizinan')->name('perizinan.')->group(function () {
         Route::get('/sambang', [PerizinanController::class, 'sambang'])->name('sambang');
@@ -156,6 +162,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/rekap-jurnal', [SekolahController::class, 'rekapJurnal'])->name('rekap-jurnal');
         Route::delete('/rekap-jurnal/{jurnal}', [SekolahController::class, 'destroyJurnal'])->name('jurnal.destroy');
         Route::get('/rekap-absensi', [SekolahController::class, 'rekapAbsensi'])->name('rekap-absensi');
+    });
+
+    // Menu Jadwal Pelajaran Multi-Jenjang (SMP & SMA)
+    Route::middleware('permission:jadwal_pelajaran|sekolah,view')->prefix('jadwal-pelajaran')->name('jadwal-pelajaran.')->group(function () {
+        Route::get('/', [JadwalPelajaranController::class, 'index'])->name('index');
+        Route::get('/saya', [JadwalPelajaranController::class, 'saya'])->name('saya');
+        Route::post('/saya', [JadwalPelajaranController::class, 'storeSaya'])->name('saya.store');
+        Route::delete('/{id}', [JadwalPelajaranController::class, 'destroy'])->name('destroy');
+        Route::post('/toggle-lock', [JadwalPelajaranController::class, 'toggleLock'])->name('toggle-lock');
+        Route::get('/cetak', [JadwalPelajaranController::class, 'cetak'])->name('cetak');
+        Route::get('/ajax/classes-and-subjects', [JadwalPelajaranController::class, 'ajaxClassesAndSubjects'])->name('ajax-classes-subjects');
     });
 
     // Menu Pengaturan Sekolah: Absensi Guru

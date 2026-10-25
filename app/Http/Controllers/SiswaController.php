@@ -252,17 +252,91 @@ class SiswaController extends Controller
     }
 
     /**
-     * Menampilkan form edit data siswa.
+     * Menampilkan form edit data siswa (mengalihkan ke formulir pendaftaran).
      */
     public function edit($id)
     {
-        $item = Siswa::findOrFail($id);
+        $siswa = Siswa::findOrFail($id);
 
         if (request()->wantsJson()) {
-            return response()->json($item);
+            return response()->json($siswa);
         }
 
-        return redirect()->route('siswa');
+        // Cari atau hubungkan data pendaftaran
+        $pendaftaran = $siswa->pendaftaran;
+        if (!$pendaftaran && !empty($siswa->pendaftaran_id)) {
+            $pendaftaran = Pendaftaran::find($siswa->pendaftaran_id);
+        }
+
+        if (!$pendaftaran) {
+            $pendaftaran = Pendaftaran::where('nama_lengkap', $siswa->nama_lengkap)->first();
+            if ($pendaftaran) {
+                $siswa->update(['pendaftaran_id' => $pendaftaran->id]);
+            }
+        }
+
+        if (!$pendaftaran) {
+            $tahun = date('Y');
+            $count = Pendaftaran::whereYear('created_at', $tahun)->count() + 1;
+            $urut = str_pad($count, 4, '0', STR_PAD_LEFT);
+            $panggilan = explode(' ', trim($siswa->nama_lengkap))[0] ?? 'Santri';
+
+            $pendaftaran = Pendaftaran::create([
+                'jenjang' => $siswa->jenjang ?? 'Reguler',
+                'no_induk' => "PSB-{$tahun}-{$urut}",
+                'nik' => '3519' . str_pad($siswa->id % 99, 2, '0', STR_PAD_LEFT) . date('dmy') . rand(1000, 9999),
+                'nama_lengkap' => $siswa->nama_lengkap,
+                'nama_panggilan' => $panggilan,
+                'tempat_lahir' => 'Kota Madiun',
+                'tanggal_lahir' => '2008-01-01',
+                'jenis_kelamin' => 'Laki-laki',
+                'anak_ke' => 1,
+                'jumlah_saudara' => 2,
+                'tinggal_bersama' => 'Orang Tua',
+                'mulai_pengajian' => 'sejak kecil',
+                'alamat_jalan' => 'Jl. Nogososro No. 26',
+                'rt_rw' => '001/001',
+                'desa_kelurahan' => 'Josenan',
+                'kecamatan' => 'Taman',
+                'kab_kota' => 'Kota Madiun',
+                'kode_pos' => '63134',
+                'provinsi' => 'Jawa Timur',
+                'warga_negara' => 'Indonesia',
+                'kelompok' => 'Bina Syarekah',
+                'desa' => 'Mentawai',
+                'daerah' => 'Madiun Kota',
+                'pendidikan_terakhir' => 'SMP/MTs',
+                'status_mondok' => 'Person',
+                'pj_biaya_nama' => 'Orang Tua',
+                'pj_biaya_hp' => '-',
+                'penyakit_diderita' => 'Tidak Ada',
+                'alergi' => '-',
+                'gol_darah' => 'O',
+                'ayah_nama' => 'Bapak ' . $panggilan,
+                'ayah_status' => 'Hidup',
+                'ayah_agama' => 'Islam',
+                'ayah_wn' => 'Indonesia',
+                'ayah_daerah' => 'Madiun Kota',
+                'ayah_desa' => 'Mentawai',
+                'ayah_kelompok' => 'Bina Syarekah',
+                'ibu_nama' => 'Ibu ' . $panggilan,
+                'ibu_status' => 'Hidup',
+                'ibu_agama' => 'Islam',
+                'ibu_wn' => 'Indonesia',
+                'ibu_daerah' => 'Madiun Kota',
+                'ibu_desa' => 'Mentawai',
+                'ibu_kelompok' => 'Bina Syarekah',
+                'berkas_akta' => true,
+                'berkas_kk' => true,
+                'berkas_ktp_ortu' => true,
+                'berkas_surat_pernyataan' => true,
+                'status_pendaftaran' => 'Diterima',
+            ]);
+
+            $siswa->update(['pendaftaran_id' => $pendaftaran->id]);
+        }
+
+        return redirect()->route('pendaftaran.edit', ['id' => $pendaftaran->id, 'from' => 'siswa']);
     }
 
     /**

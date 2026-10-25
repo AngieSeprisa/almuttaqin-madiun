@@ -3,9 +3,63 @@
 @section('title', 'Beranda')
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:24px;">
+@php
+    $authUser = auth()->user();
+    $hariIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][(int)date('w')];
+    $bulanIndo = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'][(int)date('n')];
+    $tanggalFormatted = $hariIndo . ', ' . date('j') . ' ' . $bulanIndo . ' ' . date('Y');
+    $firstName = explode(' ', trim($authUser->name ?? 'Pengguna'))[0];
+@endphp
 
-    {{-- Kartu Statistik Utama --}}
+<div style="display:flex; flex-direction:column; gap:18px;">
+
+    {{-- Hero Welcome Card untuk Mobile & Desktop --}}
+    <div class="beranda-hero-card">
+        <div class="beranda-hero-content" style="width: 100%;">
+            <h1 class="beranda-hero-title">
+                Halo, {{ $firstName }} 👋
+            </h1>
+
+            <div class="beranda-ticker-wrapper" id="berandaTickerWrapper">
+                @if(!empty($pengumumanList) && count($pengumumanList) > 0)
+                    <div class="beranda-ticker-carousel" id="berandaTickerCarousel">
+                        @foreach($pengumumanList as $idx => $item)
+                            <div class="beranda-ticker-item {{ $idx === 0 ? 'active' : '' }}" data-index="{{ $idx }}">
+                                <span class="ticker-badge ticker-badge-{{ $item['tipe'] }}">
+                                    @if($item['tipe'] === 'jadwal')
+                                        <svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                                    @else
+                                        <svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                    @endif
+                                    {{ $item['badge'] }}
+                                </span>
+                                <span class="ticker-text">{{ $item['text'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    @if(count($pengumumanList) > 1)
+                        <div class="ticker-controls">
+                            <span class="ticker-counter" id="tickerCounter">1/{{ count($pengumumanList) }}</span>
+                            <button type="button" class="ticker-btn" id="tickerPrev" title="Sebelumnya" aria-label="Sebelumnya">‹</button>
+                            <button type="button" class="ticker-btn" id="tickerNext" title="Selanjutnya" aria-label="Selanjutnya">›</button>
+                        </div>
+                    @endif
+                @else
+                    <div class="beranda-ticker-empty">
+                        <svg class="ticker-empty-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <span class="ticker-empty-text">tidak ada jadwal mengajar / tidak ada agenda hari ini</span>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    {{-- Kartu Statistik Utama (2x2 Grid Rapi di Mobile, 4 Kolom di Desktop) --}}
     <div class="stats-grid">
         <!-- Siswa Keseluruhan -->
         <div class="stat-card">
@@ -77,60 +131,77 @@
         </div>
     </div>
 
-    {{-- Ringkasan Antar Lembaga (Khusus Ruang Kerja Yayasan / Super Admin) --}}
-    @if($lembagaSummary)
-    <div class="form-section-card">
-        <div class="form-section-header">
-            <div class="form-section-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                </svg>
-            </div>
-            <div class="form-section-title-wrap">
-                <h2 class="form-section-title">Distribusi Santri Antar Lembaga</h2>
-            </div>
-        </div>
-
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
-            <div style="padding:16px 20px; border-radius:12px; border:1px solid var(--border-light); background:var(--bg-surface); display:flex; align-items:center; justify-content:space-between;">
-                <div>
-                    <span class="badge-lembaga badge-lembaga-pondok">Pondok Pesantren</span>
-                    <div style="font-size:24px; font-weight:800; color:var(--text-primary); margin-top:8px;">
-                        {{ $lembagaSummary['pondok'] }} <span style="font-size:13px; font-weight:500; color:var(--text-muted);">Santri Mukim</span>
-                    </div>
-                </div>
-                <a href="{{ route('switch-lembaga', ['kode' => 'pondok']) }}" class="btn btn-sm btn-secondary" style="text-decoration:none; font-size:12px;">
-                    Buka Room
-                </a>
-            </div>
-
-            <div style="padding:16px 20px; border-radius:12px; border:1px solid var(--border-light); background:var(--bg-surface); display:flex; align-items:center; justify-content:space-between;">
-                <div>
-                    <span class="badge-lembaga badge-lembaga-smp">SMP Al-Muttaqin</span>
-                    <div style="font-size:24px; font-weight:800; color:var(--text-primary); margin-top:8px;">
-                        {{ $lembagaSummary['smp'] }} <span style="font-size:13px; font-weight:500; color:var(--text-muted);">Siswa</span>
-                    </div>
-                </div>
-                <a href="{{ route('switch-lembaga', ['kode' => 'smp']) }}" class="btn btn-sm btn-secondary" style="text-decoration:none; font-size:12px;">
-                    Buka Room
-                </a>
-            </div>
-
-            <div style="padding:16px 20px; border-radius:12px; border:1px solid var(--border-light); background:var(--bg-surface); display:flex; align-items:center; justify-content:space-between;">
-                <div>
-                    <span class="badge-lembaga badge-lembaga-sma">SMA Al-Muttaqin</span>
-                    <div style="font-size:24px; font-weight:800; color:var(--text-primary); margin-top:8px;">
-                        {{ $lembagaSummary['sma'] }} <span style="font-size:13px; font-weight:500; color:var(--text-muted);">Siswa</span>
-                    </div>
-                </div>
-                <a href="{{ route('switch-lembaga', ['kode' => 'sma']) }}" class="btn btn-sm btn-secondary" style="text-decoration:none; font-size:12px;">
-                    Buka Room
-                </a>
-            </div>
-        </div>
-    </div>
-    @endif
-
 </div>
+
+@if(!empty($pengumumanList) && count($pengumumanList) > 1)
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const items = document.querySelectorAll('.beranda-ticker-item');
+    if (items.length <= 1) return;
+
+    let currentIndex = 0;
+    const total = items.length;
+    const counter = document.getElementById('tickerCounter');
+    let timer = null;
+
+    function showItem(index) {
+        items.forEach((item, idx) => {
+            item.classList.toggle('active', idx === index);
+        });
+        if (counter) {
+            counter.textContent = (index + 1) + '/' + total;
+        }
+        currentIndex = index;
+    }
+
+    function nextItem() {
+        showItem((currentIndex + 1) % total);
+    }
+
+    function prevItem() {
+        showItem((currentIndex - 1 + total) % total);
+    }
+
+    function startTimer() {
+        if (!timer) {
+            timer = setInterval(nextItem, 4000);
+        }
+    }
+
+    function stopTimer() {
+        if (timer) {
+            clearInterval(timer);
+            timer = null;
+        }
+    }
+
+    const prevBtn = document.getElementById('tickerPrev');
+    const nextBtn = document.getElementById('tickerNext');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', function () {
+            prevItem();
+            stopTimer();
+            startTimer();
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', function () {
+            nextItem();
+            stopTimer();
+            startTimer();
+        });
+    }
+
+    const wrapper = document.getElementById('berandaTickerWrapper');
+    if (wrapper) {
+        wrapper.addEventListener('mouseenter', stopTimer);
+        wrapper.addEventListener('mouseleave', startTimer);
+    }
+
+    startTimer();
+});
+</script>
+@endif
 @endsection
+
+

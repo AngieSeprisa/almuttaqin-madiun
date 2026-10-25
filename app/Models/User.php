@@ -196,13 +196,13 @@ class User extends Authenticatable
             return true;
         }
 
-        // Admin Lembaga & Guru memiliki akses default ke modul sekolah (jurnal & absensi)
-        if (in_array($this->role, ['admin_lembaga', 'guru']) && $menuCode === 'sekolah') {
+        // Admin Lembaga & Guru memiliki akses default ke modul sekolah & jadwal pelajaran
+        if (in_array($this->role, ['admin_lembaga', 'guru']) && in_array($menuCode, ['sekolah', 'jadwal_pelajaran'])) {
             return true;
         }
 
         // Admin Lembaga memiliki akses default ke modul absensi, guru sekolah, & plotting sekolah
-        if ($this->role === 'admin_lembaga' && in_array($menuCode, ['presensi', 'rekap_absensi', 'pengaturan_absensi', 'guru_sekolah', 'plotting_mapel', 'plotting_kelas'])) {
+        if ($this->role === 'admin_lembaga' && in_array($menuCode, ['presensi', 'rekap_absensi', 'pengaturan_absensi', 'guru_sekolah', 'plotting_mapel', 'plotting_kelas', 'jadwal_pelajaran'])) {
             return true;
         }
 
@@ -213,6 +213,14 @@ class User extends Authenticatable
 
         $field = 'can_' . $action;
         return (bool) ($perm->{$field} ?? false);
+    }
+
+    /**
+     * Relasi jadwal mengajar yang diampu guru ini.
+     */
+    public function schedules()
+    {
+        return $this->hasMany(Schedule::class, 'teacher_id');
     }
 
     /**

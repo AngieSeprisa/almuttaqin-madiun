@@ -112,10 +112,10 @@
                 </a>
                 @endif
 
-                {{-- Menu Sekolah dengan Submenu Jurnal & Rekap Jurnal --}}
-                @if(!$authUser || $authUser->canDo('sekolah', 'view'))
-                <div class="nav-group {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') ? 'open' : '' }}" id="navGroupSekolah">
-                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') ? 'active' : '' }}" id="toggleSekolah" title="Sekolah">
+                {{-- Menu Sekolah dengan Submenu Jurnal, Rekap Jurnal, Jadwal Pelajaran & Jadwal Mengajar Saya --}}
+                @if(!$authUser || $authUser->canDo('sekolah', 'view') || $authUser->canDo('jadwal_pelajaran', 'view'))
+                <div class="nav-group {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') ? 'open' : '' }}" id="navGroupSekolah">
+                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') ? 'active' : '' }}" id="toggleSekolah" title="Sekolah">
                         <span class="nav-item-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
@@ -137,6 +137,14 @@
                         <a href="{{ route('sekolah.rekap-jurnal') }}" class="subnav-item {{ request()->routeIs('sekolah.rekap-jurnal*') ? 'active' : '' }}" title="Rekap Jurnal Pembelajaran">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Rekap Jurnal</span>
+                        </a>
+                        <a href="{{ route('jadwal-pelajaran.index') }}" class="subnav-item {{ request()->routeIs('jadwal-pelajaran.index') || request()->routeIs('jadwal-pelajaran.cetak') ? 'active' : '' }}" title="Master Jadwal Pelajaran (SMP & SMA)">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Jadwal Pelajaran</span>
+                        </a>
+                        <a href="{{ route('jadwal-pelajaran.saya') }}" class="subnav-item {{ request()->routeIs('jadwal-pelajaran.saya*') ? 'active' : '' }}" title="Jadwal Mengajar Saya">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Jadwal Mengajar Saya</span>
                         </a>
                     </div>
                 </div>
@@ -317,30 +325,6 @@
                 </a>
                 @endif
             </nav>
-
-            {{-- User Profile Card (Bottom Section - Untitled UI Style) --}}
-            <div class="sidebar-footer">
-                @if($authUser)
-                <a href="{{ route('profile') }}" class="sidebar-profile-card {{ request()->routeIs('profile*') ? 'active' : '' }}" title="Lihat Profil Pengguna: {{ $authUser->name }}">
-                    <div class="sidebar-profile-avatar" style="overflow:hidden;">
-                        @if($authUser->foto_url)
-                            <img src="{{ $authUser->foto_url }}" alt="{{ $authUser->name }}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;">
-                        @else
-                            {{ $authUser->initials }}
-                        @endif
-                    </div>
-                    <div class="sidebar-profile-info">
-                        <span class="sidebar-profile-name">{{ $authUser->name }}</span>
-                        <span class="sidebar-profile-email">{{ $authUser->email }}</span>
-                    </div>
-                    <div class="sidebar-profile-action">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sidebar-profile-chevron">
-                            <path d="M7 15l5 5 5-5M7 9l5-5 5 5"/>
-                        </svg>
-                    </div>
-                </a>
-                @endif
-            </div>
         </aside>
 
         <!-- Main Content Area -->
@@ -421,11 +405,11 @@
                     <!-- User Profile Avatar (Circle Foto / Inisial jika belum) -->
                     @if($authUser)
                     <div class="user-menu-wrap" id="userMenuWrap">
-                        <button type="button" class="user-avatar-btn" id="userDropdownToggle" aria-label="Menu Akun: {{ $authUser->name }}" title="{{ $authUser->name }}">
+                        <button type="button" class="user-avatar-btn" id="userDropdownToggle" aria-label="Menu Akun: {{ $authUser->name }}" title="{{ $authUser->name }}" style="width:36px; height:36px; min-width:36px; min-height:36px; max-width:36px; max-height:36px; border-radius:50%; overflow:hidden; padding:0; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;">
                             @if($authUser->foto_url)
-                                <img src="{{ $authUser->foto_url }}" alt="{{ $authUser->name }}" class="topbar-avatar-circle topbar-avatar-img">
+                                <img src="{{ $authUser->foto_url }}" alt="{{ $authUser->name }}" class="topbar-avatar-circle topbar-avatar-img" style="width:36px; height:36px; min-width:36px; min-height:36px; max-width:36px; max-height:36px; border-radius:50%; object-fit:cover; display:block; flex-shrink:0;">
                             @else
-                                <div class="topbar-avatar-circle topbar-avatar-initials">
+                                <div class="topbar-avatar-circle topbar-avatar-initials" style="width:36px; height:36px; min-width:36px; min-height:36px; max-width:36px; max-height:36px; border-radius:50%;">
                                     {{ $authUser->initials }}
                                 </div>
                             @endif

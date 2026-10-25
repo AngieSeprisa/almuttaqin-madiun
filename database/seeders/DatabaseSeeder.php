@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             SiswaSeeder::class,
             LembagaAndUserSeeder::class,
             PlottingMapelSeeder::class,
+            JadwalPelajaranSeeder::class,
         ]);
     }
 }

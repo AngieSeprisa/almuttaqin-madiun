@@ -2,17 +2,6 @@
 
 @section('title', 'Siswa')
 
-@section('header-actions')
-@if(!auth()->check() || auth()->user()->canDo('siswa', 'create'))
-<button type="button" class="btn btn-primary" data-modal-target="modalAddSiswa">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
-    </svg>
-    Tambah Siswa
-</button>
-@endif
-@endsection
 
 @section('content')
 <div style="display:flex; flex-direction:column; gap:20px;">
@@ -191,14 +180,14 @@
                                     </svg>
                                 </a>
 
-                                {{-- Tombol Edit (Hanya Icon Pensil) --}}
+                                {{-- Tombol Edit (Hanya Icon Pensil -> Menuju Formulir Pendaftaran) --}}
                                 @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
-                                <button type="button" class="action-btn action-btn-edit" data-modal-target="modalEdit{{ $item->id }}" title="Edit Data Siswa" aria-label="Edit Data {{ $item->nama_lengkap }}">
+                                <a href="{{ route('siswa.edit', $item->id) }}" class="action-btn action-btn-edit" title="Edit Formulir Pendaftaran Siswa" aria-label="Edit Formulir {{ $item->nama_lengkap }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                     </svg>
-                                </button>
+                                </a>
                                 @endif
 
                                 {{-- Tombol Hapus via SweetAlert2 --}}
@@ -224,62 +213,6 @@
                                 </form>
                                 @endif
                             </div>
-
-                            {{-- MODAL EDIT SISWA --}}
-                            <div class="app-modal" id="modalEdit{{ $item->id }}" role="dialog" aria-modal="true" aria-labelledby="modalEditTitle{{ $item->id }}">
-                                <div class="modal-dialog">
-                                    <form action="{{ route('siswa.update', $item->id) }}" method="POST">
-                                        @csrf
-                                        @method('PUT')
-
-                                        <div class="modal-header">
-                                            <div class="modal-header-title">
-                                                <div class="modal-icon-badge edit-badge">
-                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                    </svg>
-                                                </div>
-                                                <h3 class="modal-title" id="modalEditTitle{{ $item->id }}">Edit Data Siswa</h3>
-                                            </div>
-                                            <button type="button" class="modal-close-btn" data-modal-close aria-label="Tutup Modal">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                                                </svg>
-                                            </button>
-                                        </div>
-
-                                        <div class="modal-body" style="text-align:left;">
-                                            <div class="form-group">
-                                                <label for="edit_nama_{{ $item->id }}" class="form-label">Nama Lengkap <span class="required-mark">*</span></label>
-                                                <input type="text" name="nama_lengkap" id="edit_nama_{{ $item->id }}" value="{{ old('nama_lengkap', $item->nama_lengkap) }}"
-                                                       class="form-control" placeholder="" required>
-                                            </div>
-
-                                            <div class="form-group">
-                                                <label for="edit_kamar_{{ $item->id }}" class="form-label">Kamar / Asrama <span class="required-mark">*</span></label>
-                                                <input type="text" name="kamar" id="edit_kamar_{{ $item->id }}" value="{{ old('kamar', $item->kamar) }}"
-                                                       class="form-control" placeholder="" required>
-                                            </div>
-
-                                            <div class="form-group">
-                                                <label for="edit_status_{{ $item->id }}" class="form-label">Status Santri <span class="required-mark">*</span></label>
-                                                <select name="status" id="edit_status_{{ $item->id }}" class="form-select" required>
-                                                    <option value="aktif" {{ old('status', $item->status) === 'aktif' ? 'selected' : '' }}>Aktif (Di Pondok)</option>
-                                                    <option value="pulang" {{ old('status', $item->status) === 'pulang' ? 'selected' : '' }}>Pulang (Izin / Libur)</option>
-                                                    <option value="sakit" {{ old('status', $item->status) === 'sakit' ? 'selected' : '' }}>Sakit (Perawatan)</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-modal-close>Batal</button>
-                                            <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
                         </td>
                     </tr>
                     @empty
@@ -301,69 +234,7 @@
     </div>
 </div>
 
-{{-- MODAL TAMBAH SISWA BARU --}}
-<div class="app-modal" id="modalAddSiswa" role="dialog" aria-modal="true" aria-labelledby="modalAddSiswaTitle">
-    <div class="modal-dialog">
-        <form action="{{ route('siswa.store') }}" method="POST">
-            @csrf
 
-            <div class="modal-header">
-                <div class="modal-header-title">
-                    <div class="modal-icon-badge view-badge">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                    </div>
-                    <h3 class="modal-title" id="modalAddSiswaTitle">Tambah Siswa Baru</h3>
-                </div>
-                <button type="button" class="modal-close-btn" data-modal-close aria-label="Tutup Modal">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-
-            <div class="modal-body" style="text-align:left;">
-                <div class="form-group">
-                    <label for="add_nama" class="form-label">Nama Lengkap <span class="required-mark">*</span></label>
-                    <input type="text" name="nama_lengkap" id="add_nama" value="{{ old('nama_lengkap') }}"
-                           class="form-control" placeholder="" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="add_jenjang" class="form-label">Jenjang Pendidikan <span class="required-mark">*</span></label>
-                    <select name="jenjang" id="add_jenjang" class="form-select" required>
-                        <option value="SMP" {{ old('jenjang', ($activeRoom === 'smp' ? 'SMP' : '')) === 'SMP' ? 'selected' : '' }}>SMP Al-Muttaqin</option>
-                        <option value="SMA" {{ old('jenjang', ($activeRoom === 'sma' ? 'SMA' : '')) === 'SMA' ? 'selected' : '' }}>SMA Al-Muttaqin</option>
-                        <option value="Reguler" {{ old('jenjang', in_array($activeRoom, ['pondok', 'yayasan']) ? 'Reguler' : '') === 'Reguler' ? 'selected' : '' }}>Pondok Pesantren (Reguler)</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="add_kamar" class="form-label">Kamar / Asrama <span class="required-mark">*</span></label>
-                    <input type="text" name="kamar" id="add_kamar" value="{{ old('kamar') }}"
-                           class="form-control" placeholder="" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="add_status" class="form-label">Status Santri <span class="required-mark">*</span></label>
-                    <select name="status" id="add_status" class="form-select" required>
-                        <option value="aktif" {{ old('status') === 'aktif' || !old('status') ? 'selected' : '' }}>Aktif (Di Pondok)</option>
-                        <option value="pulang" {{ old('status') === 'pulang' ? 'selected' : '' }}>Pulang (Izin / Libur)</option>
-                        <option value="sakit" {{ old('status') === 'sakit' ? 'selected' : '' }}>Sakit (Perawatan)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-modal-close>Batal</button>
-                <button type="submit" class="btn btn-primary">Simpan Siswa</button>
-            </div>
-        </form>
-    </div>
-</div>
 
 {{-- SCRIPT PENGENDALI MODAL --}}
 <script>
