@@ -232,11 +232,23 @@ Route::middleware('auth')->group(function () {
             ->name('muat-standar');
     });
 
-    // Menu Pengaturan Sekolah: Plotting Kelas
+    // Menu Pengaturan Sekolah: Plotting Kelas & Kelola Ruang Kelas
     Route::prefix('plotting-kelas')->name('plotting-kelas.')->group(function () {
         Route::get('/', [PlottingKelasController::class, 'index'])
-            ->middleware('permission:plotting_kelas,view')
+            ->middleware('permission:plotting_kelas|master_kelas,view')
             ->name('index');
+        Route::post('/kelas', [PlottingKelasController::class, 'storeKelas'])
+            ->middleware('permission:plotting_kelas|master_kelas,create')
+            ->name('store-kelas');
+        Route::put('/kelas/{classroom}', [PlottingKelasController::class, 'updateKelas'])
+            ->middleware('permission:plotting_kelas|master_kelas,edit')
+            ->name('update-kelas');
+        Route::delete('/kelas/{classroom}', [PlottingKelasController::class, 'destroyKelas'])
+            ->middleware('permission:plotting_kelas|master_kelas,delete')
+            ->name('destroy-kelas');
+        Route::post('/muat-standar', [PlottingKelasController::class, 'muatStandar'])
+            ->middleware('permission:plotting_kelas|master_kelas,create')
+            ->name('muat-standar');
         Route::post('/mutasi', [PlottingKelasController::class, 'mutasi'])
             ->middleware('permission:plotting_kelas,edit')
             ->name('mutasi');
@@ -282,26 +294,16 @@ Route::middleware('auth')->group(function () {
 
     // Menu Data Master (Ruang Kelas, Jam Pelajaran, Lembaga)
     Route::prefix('master')->name('master.')->group(function () {
-        // Master Ruang Kelas
+        // Master Ruang Kelas (Dialihkan ke Plotting Kelas untuk integrasi 1-pintu)
         Route::prefix('kelas')->name('kelas.')->group(function () {
-            Route::get('/', [ClassroomController::class, 'index'])
-                ->middleware('permission:master_kelas|data_master,view')
-                ->name('index');
-            Route::post('/', [ClassroomController::class, 'store'])
-                ->middleware('permission:master_kelas|data_master,create')
-                ->name('store');
-            Route::put('/{kela}', [ClassroomController::class, 'update'])
-                ->middleware('permission:master_kelas|data_master,edit')
-                ->name('update');
-            Route::patch('/{kela}/toggle-status', [ClassroomController::class, 'toggleStatus'])
-                ->middleware('permission:master_kelas|data_master,edit')
-                ->name('toggle-status');
-            Route::delete('/{kela}', [ClassroomController::class, 'destroy'])
-                ->middleware('permission:master_kelas|data_master,delete')
-                ->name('destroy');
-            Route::post('/muat-standar', [ClassroomController::class, 'muatStandar'])
-                ->middleware('permission:master_kelas|data_master,create')
-                ->name('muat-standar');
+            Route::get('/', function () {
+                return redirect()->route('plotting-kelas.index');
+            })->name('index');
+            Route::post('/', [PlottingKelasController::class, 'storeKelas'])->name('store');
+            Route::put('/{classroom}', [PlottingKelasController::class, 'updateKelas'])->name('update');
+            Route::patch('/{classroom}/toggle-status', [ClassroomController::class, 'toggleStatus'])->name('toggle-status');
+            Route::delete('/{classroom}', [PlottingKelasController::class, 'destroyKelas'])->name('destroy');
+            Route::post('/muat-standar', [PlottingKelasController::class, 'muatStandar'])->name('muat-standar');
         });
 
         // Master Jam Pelajaran / Time Slot

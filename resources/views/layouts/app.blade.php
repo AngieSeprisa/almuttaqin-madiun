@@ -274,13 +274,6 @@
                         </span>
                     </button>
                     <div class="sidebar-subnav">
-                        @if(!$authUser || $authUser->canDo('master_kelas', 'view') || $authUser->canDo('data_master', 'view'))
-                        <a href="{{ route('master.kelas.index') }}" class="subnav-item {{ request()->routeIs('master.kelas.*') ? 'active' : '' }}" title="Master Ruang Kelas">
-                            <span class="subnav-dot"></span>
-                            <span class="subnav-text">Ruang Kelas</span>
-                        </a>
-                        @endif
-
                         @if(!$authUser || $authUser->canDo('master_jam', 'view') || $authUser->canDo('data_master', 'view'))
                         <a href="{{ route('master.jam-pelajaran.index') }}" class="subnav-item {{ request()->routeIs('master.jam-pelajaran.*') ? 'active' : '' }}" title="Master Jam Pelajaran">
                             <span class="subnav-dot"></span>

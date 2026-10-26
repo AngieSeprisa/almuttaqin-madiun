@@ -82,8 +82,10 @@ class PlottingKelasTest extends TestCase
         $response->assertSee('Kelas VII B');
         $response->assertSee('Kelas VIII A');
 
-        // Menampilkan tombol aksi logo mata di tabel kelas
+        // Menampilkan tombol aksi logo mata di tabel kelas dan elemen mobile
         $response->assertSee('pk-btn-eye');
+        $response->assertSee('pk-kelas-sub-mobile');
+        $response->assertSee('pk-nisn-sub-mobile');
 
         // Siswa Reguler dan SMA TIDAK BOLEH tampil di data SMP
         $response->assertDontSee('Santri Reguler Murni');
@@ -201,5 +203,134 @@ class PlottingKelasTest extends TestCase
             ->get(route('plotting-kelas.index'));
 
         $response->assertStatus(403);
+    }
+
+    public function test_user_can_create_new_class_and_see_it_in_plotting_table(): void
+    {
+        $adminSMP = User::where('email', 'admin.smp@almuttaqin.id')->firstOrFail();
+        $smp = Lembaga::where('kode', 'smp')->firstOrFail();
+
+        $response = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->post(route('plotting-kelas.store-kelas'), [
+                'lembaga_id' => $smp->id,
+                'jenjang'    => 'SMP',
+                'nama_kelas' => 'VII C',
+                'tingkat'    => 7,
+            ]);
+
+        $response->assertRedirect(route('plotting-kelas.index', ['lembaga' => 'smp', 'tab' => 'kelas']));
+        $this->assertDatabaseHas('classrooms', [
+            'nama_kelas' => 'VII C',
+            'jenjang'    => 'SMP',
+            'tingkat'    => 7,
+        ]);
+
+        // Verifikasi kelas baru muncul di tabel
+        $viewResp = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->get(route('plotting-kelas.index'));
+
+        $viewResp->assertStatus(200);
+        $viewResp->assertSee('Kelas VII C');
+    }
+
+    public function test_user_can_update_class_and_students_are_synchronized(): void
+    {
+        $adminSMP = User::where('email', 'admin.smp@almuttaqin.id')->firstOrFail();
+        $smp = Lembaga::where('kode', 'smp')->firstOrFail();
+
+        $classroom = \App\Models\Classroom::create([
+            'lembaga_id' => $smp->id,
+            'jenjang'    => 'SMP',
+            'nama_kelas' => 'VII D',
+            'tingkat'    => 7,
+            'urutan'     => 10,
+            'is_active'  => true,
+        ]);
+
+        $siswa = Siswa::create([
+            'nama_lengkap' => 'Siswa Kelas VII D',
+            'kelas'        => 'VII D',
+            'jenjang'      => 'SMP',
+            'status'       => 'aktif',
+            'kamar'        => 'Kamar 1',
+        ]);
+
+        $response = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->put(route('plotting-kelas.update-kelas', $classroom->id), [
+                'nama_kelas' => 'VII D Unggulan',
+                'tingkat'    => 7,
+                'urutan'     => 10,
+            ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('classrooms', [
+            'id'         => $classroom->id,
+            'nama_kelas' => 'VII D Unggulan',
+        ]);
+        $this->assertDatabaseHas('siswas', [
+            'id'    => $siswa->id,
+            'kelas' => 'VII D Unggulan',
+        ]);
+    }
+
+    public function test_user_cannot_delete_class_with_students(): void
+    {
+        $adminSMP = User::where('email', 'admin.smp@almuttaqin.id')->firstOrFail();
+        $smp = Lembaga::where('kode', 'smp')->firstOrFail();
+
+        $classroom = \App\Models\Classroom::create([
+            'lembaga_id' => $smp->id,
+            'jenjang'    => 'SMP',
+            'nama_kelas' => 'VII E',
+            'tingkat'    => 7,
+            'urutan'     => 11,
+            'is_active'  => true,
+        ]);
+
+        Siswa::create([
+            'nama_lengkap' => 'Siswa Kelas VII E',
+            'kelas'        => 'VII E',
+            'jenjang'      => 'SMP',
+            'status'       => 'aktif',
+            'kamar'        => 'Kamar 2',
+        ]);
+
+        $response = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->delete(route('plotting-kelas.destroy-kelas', $classroom->id));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+        $this->assertDatabaseHas('classrooms', [
+            'id' => $classroom->id,
+        ]);
+    }
+
+    public function test_user_can_delete_empty_class(): void
+    {
+        $adminSMP = User::where('email', 'admin.smp@almuttaqin.id')->firstOrFail();
+        $smp = Lembaga::where('kode', 'smp')->firstOrFail();
+
+        $classroom = \App\Models\Classroom::create([
+            'lembaga_id' => $smp->id,
+            'jenjang'    => 'SMP',
+            'nama_kelas' => 'VII Kosong',
+            'tingkat'    => 7,
+            'urutan'     => 12,
+            'is_active'  => true,
+        ]);
+
+        $response = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->delete(route('plotting-kelas.destroy-kelas', $classroom->id));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+        $this->assertDatabaseMissing('classrooms', [
+            'id' => $classroom->id,
+        ]);
     }
 }

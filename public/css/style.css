@@ -2368,9 +2368,10 @@ html.dark-mode .status-badge.status-sakit {
   .page-header-row {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 10px 12px;
     width: 100%;
   }
 
@@ -2378,6 +2379,7 @@ html.dark-mode .status-badge.status-sakit {
   .banner-header-left {
     flex: 1 1 auto;
     min-width: 0;
+    max-width: 100%;
   }
 
   .page-header-title,
@@ -2385,17 +2387,21 @@ html.dark-mode .status-badge.status-sakit {
     font-size: 20px;
     letter-spacing: -0.02em;
     line-height: 1.25;
-    word-break: break-word;
+    word-break: normal;
+    white-space: normal;
+    overflow-wrap: break-word;
   }
 
   /* Action button placed on top right alongside title (Matching Image 2) */
   .page-header-actions,
   .banner-header-right {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    max-width: 100%;
     margin-left: auto;
     width: auto;
   }
@@ -2421,8 +2427,31 @@ html.dark-mode .status-badge.status-sakit {
   .banner-header-right > div {
     width: auto;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    max-width: 100%;
+  }
+
+  @media (max-width: 640px) {
+    .page-header-row {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 10px !important;
+    }
+
+    .page-header-left,
+    .banner-header-left {
+      width: 100% !important;
+      flex: none !important;
+    }
+
+    .page-header-actions,
+    .banner-header-right {
+      width: 100% !important;
+      justify-content: flex-start !important;
+      margin-left: 0 !important;
+    }
   }
 
   .page-header-actions > div .btn,

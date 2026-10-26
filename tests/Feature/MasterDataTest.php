@@ -19,14 +19,18 @@ class MasterDataTest extends TestCase
         $this->artisan('db:seed', ['--class' => 'LembagaAndUserSeeder']);
     }
 
-    public function test_yayasan_can_access_master_kelas_index(): void
+    public function test_master_kelas_route_redirects_to_plotting_kelas(): void
     {
         $yayasan = User::where('role', 'yayasan')->first();
         $this->assertNotNull($yayasan);
 
         $response = $this->actingAs($yayasan)->get(route('master.kelas.index'));
-        $response->assertStatus(200);
-        $response->assertSee('Master Ruang Kelas');
+        $response->assertRedirect(route('plotting-kelas.index'));
+
+        $followed = $this->actingAs($yayasan)->get(route('plotting-kelas.index'));
+        $followed->assertStatus(200);
+        $followed->assertSee('Plotting Kelas');
+        $followed->assertSee('Tambah Kelas');
     }
 
     public function test_yayasan_can_create_new_classroom(): void
@@ -34,16 +38,15 @@ class MasterDataTest extends TestCase
         $yayasan = User::where('role', 'yayasan')->first();
         $smp = Lembaga::where('kode', 'smp')->first();
 
-        $response = $this->actingAs($yayasan)->post(route('master.kelas.store'), [
+        $response = $this->actingAs($yayasan)->post(route('plotting-kelas.store-kelas'), [
             'lembaga_id' => $smp->id,
             'jenjang'    => 'SMP',
             'nama_kelas' => '7-Testing',
             'tingkat'    => 7,
             'urutan'     => 99,
-            'is_active'  => 1,
         ]);
 
-        $response->assertRedirect(route('master.kelas.index'));
+        $response->assertRedirect();
         $this->assertDatabaseHas('classrooms', [
             'nama_kelas' => '7-Testing',
             'jenjang'    => 'SMP',
