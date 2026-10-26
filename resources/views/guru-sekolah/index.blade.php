@@ -213,7 +213,7 @@
     </div>
 
     {{-- Tabel Utama Data Guru & Pengajuan --}}
-    <div style="background:var(--bg-surface); border:1px solid var(--border-light); border-radius:14px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+    <div class="table-card" style="background:var(--bg-surface); border:1px solid var(--border-light); border-radius:14px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.03);">
         <div style="overflow-x:auto;">
             <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13.5px;">
                 <thead>
@@ -455,7 +455,6 @@
             </table>
         </div>
 
-        {{-- Pagination --}}
         @if($users->hasPages())
         <div style="padding:16px 20px; border-top:1px solid var(--border-light); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
             <div style="font-size:13px; color:var(--text-muted);">
@@ -464,6 +463,140 @@
             <div>
                 {{ $users->links() }}
             </div>
+        </div>
+        @endif
+    </div>
+
+    {{-- Card List untuk Tampilan Mobile (<= 768px) --}}
+    <div class="mobile-card-list">
+        @forelse($users as $index => $guru)
+        <div class="mobile-card-item">
+            <div class="mobile-card-info">
+                <div class="mobile-card-title">
+                    <span>{{ $guru->name }}</span>
+                    @if($guru->mapel_status === 'disetujui')
+                    <svg viewBox="0 0 24 24" fill="#10B981" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px; height:15px; vertical-align:middle; display:inline-block;" title="Terverifikasi">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="9 12 11 14 15 10"></polyline>
+                    </svg>
+                    @endif
+                </div>
+                <div class="mobile-card-subtitle">
+                    @if($guru->nip)
+                        <span>NIP: {{ $guru->nip }}</span>
+                    @else
+                        <span>{{ $guru->email }}</span>
+                    @endif
+                    @if($guru->telepon)
+                        &bull; <span>{{ $guru->telepon }}</span>
+                    @endif
+                </div>
+
+                <div class="mobile-card-meta-grid">
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Lembaga</span>
+                        @if($guru->primaryLembaga)
+                            <span class="mobile-card-pill mobile-card-pill-blue">{{ $guru->primaryLembaga->singkatan }}</span>
+                        @elseif($guru->lembagas->isNotEmpty())
+                            <span class="mobile-card-pill mobile-card-pill-blue">{{ $guru->lembagas->first()->singkatan }}</span>
+                        @else
+                            <span class="mobile-card-pill mobile-card-pill-gray">-</span>
+                        @endif
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Mapel</span>
+                        <span class="mobile-card-pill {{ $guru->mata_pelajaran ? 'mobile-card-pill-purple' : 'mobile-card-pill-gray' }}">
+                            {{ $guru->mata_pelajaran ?: 'Belum Ada' }}
+                        </span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">&nbsp;</span>
+                        @if($guru->mapel_status === 'menunggu')
+                            <span class="status-pill status-pill-warning">Menunggu</span>
+                        @elseif($guru->mapel_status === 'disetujui')
+                            <span class="status-pill status-pill-active">Disetujui</span>
+                        @elseif($guru->mapel_status === 'ditolak')
+                            <span class="status-pill status-pill-inactive">Ditolak</span>
+                        @else
+                            <span class="status-pill" style="background:#f1f5f9; color:#64748b;">Belum Ajukan</span>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <div class="mobile-card-actions">
+                <span class="mobile-card-action-title">Aksi</span>
+                <div class="mobile-card-action-buttons">
+                    <button type="button" class="mobile-btn-pastel mobile-btn-view"
+                            data-guru="{{ htmlspecialchars(json_encode([
+                                'id' => $guru->id,
+                                'name' => $guru->name,
+                                'jabatan' => $guru->jabatan,
+                                'nip' => $guru->nip,
+                                'jenis_kelamin' => $guru->jenis_kelamin,
+                                'email' => $guru->email,
+                                'telepon' => $guru->telepon,
+                                'mata_pelajaran' => $guru->mata_pelajaran,
+                                'alamat' => $guru->alamat,
+                                'mapel_status' => $guru->mapel_status,
+                                'mapel_diajukan' => $guru->mapel_diajukan,
+                                'mapel_catatan' => $guru->mapel_catatan,
+                            ]), ENT_QUOTES, 'UTF-8') }}"
+                            onclick="bukaModalDetail(this)" title="Lihat Profil Lengkap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+
+                    @if($guru->mapel_status === 'menunggu')
+                    <button type="button" class="mobile-btn-pastel mobile-btn-success"
+                            data-guru-id="{{ $guru->id }}"
+                            data-guru-name="{{ $guru->name }}"
+                            data-guru-mapel="{{ $guru->mapel_diajukan }}"
+                            data-guru-catatan="{{ $guru->mapel_catatan ?? '' }}"
+                            onclick="bukaModalApproveBtn(this)" title="Setujui Pengajuan">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </button>
+
+                    <button type="button" class="mobile-btn-pastel mobile-btn-delete"
+                            data-guru-id="{{ $guru->id }}"
+                            data-guru-name="{{ $guru->name }}"
+                            data-guru-mapel="{{ $guru->mapel_diajukan }}"
+                            onclick="bukaModalTolakBtn(this)" title="Tolak Pengajuan">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                    @endif
+
+                    <button type="button" class="mobile-btn-pastel mobile-btn-edit"
+                            data-guru-id="{{ $guru->id }}"
+                            data-guru-name="{{ $guru->name }}"
+                            data-guru-mapel="{{ $guru->mata_pelajaran ?? '' }}"
+                            data-guru-lembaga="{{ $guru->primary_lembaga_id }}"
+                            onclick="bukaModalTetapkanMapelSpesifikBtn(this)"
+                            title="{{ $guru->mata_pelajaran ? 'Ubah Mapel' : 'Tetapkan Mapel' }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        @empty
+        <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
+            Tidak ada data guru yang sesuai filter.
+        </div>
+        @endforelse
+
+        @if($users->hasPages())
+        <div style="margin-top:16px; display:flex; justify-content:center;">
+            {{ $users->links() }}
         </div>
         @endif
     </div>

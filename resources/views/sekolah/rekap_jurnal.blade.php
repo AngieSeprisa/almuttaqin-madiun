@@ -237,6 +237,75 @@
         @endif
     </div>
 
+    {{-- Card List untuk Tampilan Mobile (<= 768px) --}}
+    <div class="mobile-card-list">
+        @forelse($jurnals as $index => $item)
+        <div class="mobile-card-item">
+            <div class="mobile-card-info">
+                <div class="mobile-card-title">{{ $item->mata_pelajaran }}</div>
+                <div class="mobile-card-subtitle">
+                    {{ $item->hari }}, {{ \Carbon\Carbon::parse($item->tanggal)->format('d/m/Y') }} &bull; {{ $item->nama_guru }}
+                </div>
+
+                <div class="mobile-card-meta-grid">
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Kelas</span>
+                        <span class="mobile-card-pill mobile-card-pill-blue">{{ $item->kelas }}</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Jam</span>
+                        <span class="mobile-card-pill mobile-card-pill-gray">Jam {{ $item->jam_ke }}</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Presensi</span>
+                        <div style="display:inline-flex; align-items:center; gap:3px;">
+                            <span style="font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(16, 185, 129, 0.15); color:#059669;">H:{{ $item->total_hadir }}</span>
+                            @if($item->total_sakit > 0)
+                            <span style="font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(245, 158, 11, 0.15); color:#D97706;">S:{{ $item->total_sakit }}</span>
+                            @endif
+                            @if($item->total_izin > 0)
+                            <span style="font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(37, 99, 235, 0.15); color:#2563EB;">I:{{ $item->total_izin }}</span>
+                            @endif
+                            @if($item->total_alpa > 0)
+                            <span style="font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(239, 68, 68, 0.15); color:#DC2626;">A:{{ $item->total_alpa }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mobile-card-actions">
+                <span class="mobile-card-action-title">Aksi</span>
+                <div class="mobile-card-action-buttons">
+                    <button type="button" class="mobile-btn-pastel mobile-btn-view" data-modal-target="modalDetailJurnal{{ $item->id }}" title="Lihat Detail Jurnal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+
+                    <button type="button" class="mobile-btn-pastel mobile-btn-delete" data-modal-target="modalDeleteJurnal{{ $item->id }}" title="Hapus Jurnal">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        @empty
+        <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
+            Belum ada data jurnal pembelajaran yang diinput.
+        </div>
+        @endforelse
+
+        @if($jurnals->hasPages())
+        <div style="margin-top:16px; display:flex; justify-content:center;">
+            {{ $jurnals->links() }}
+        </div>
+        @endif
+    </div>
+
 </div>
 
 {{-- MODAL DETAIL JURNAL & HAPUS JURNAL UNTUK SETIAP ITEM --}}

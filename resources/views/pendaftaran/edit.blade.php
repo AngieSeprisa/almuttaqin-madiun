@@ -115,7 +115,7 @@
                         {{-- Jenis Identitas --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="jenis_identitas">
-                                Jenis Identitas <span class="required-mark">*</span>
+                                Jenis Identitas 
                             </label>
                             <select id="jenis_identitas" class="wizard-select">
                                 <option value="NIK" selected>NIK</option>
@@ -125,11 +125,11 @@
                         {{-- Nomor Identitas (NIK) --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="nik">
-                                Nomor Identitas <span class="required-mark">*</span>
+                                Nomor Identitas 
                             </label>
                             <input type="text" name="nik" id="nik" maxlength="16" value="{{ old('nik', $pendaftaran->nik) }}"
                                    class="wizard-input @error('nik') is-invalid @enderror"
-                                   placeholder="Nomor Identitas" required>
+                                   placeholder="Nomor Identitas">
                             @error('nik')
                                 <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                             @enderror
@@ -138,9 +138,9 @@
                         {{-- Daftar Sebagai (Pilihan Jenjang di Awal) --}}
                         <div class="wizard-form-group" style="grid-column: 1 / -1; max-width: 480px; width: 100%;">
                             <label class="wizard-label" for="jenjang">
-                                Daftar Sebagai <span class="required-mark">*</span>
+                                Daftar Sebagai 
                             </label>
-                            <select name="jenjang" id="jenjang" class="wizard-select @error('jenjang') is-invalid @enderror" required>
+                            <select name="jenjang" id="jenjang" class="wizard-select @error('jenjang') is-invalid @enderror">
                                 <option value="">Pilih salah satu opsi</option>
                                 <option value="SMP" {{ old('jenjang', $pendaftaran->jenjang) == 'SMP' ? 'selected' : '' }}>SMP</option>
                                 <option value="SMA" {{ old('jenjang', $pendaftaran->jenjang) == 'SMA' ? 'selected' : '' }}>SMA</option>
@@ -154,7 +154,7 @@
                         {{-- NISN (Nomor Induk Siswa Nasional) --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="nisn">
-                                NISN (Nomor Induk Siswa Nasional) <span class="required-mark" id="mark_nisn" style="display:none;">*</span>
+                                NISN (Nomor Induk Siswa Nasional) 
                             </label>
                             <input type="text" name="nisn" id="nisn" maxlength="20" value="{{ old('nisn', $pendaftaran->nisn) }}"
                                    class="wizard-input @error('nisn') is-invalid @enderror"
@@ -200,10 +200,10 @@
                         {{-- Nama Lengkap --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="nama_lengkap">
-                                Nama Lengkap <span class="required-mark">*</span>
+                                Nama Lengkap 
                             </label>
                             <input type="text" name="nama_lengkap" id="nama_lengkap" value="{{ old('nama_lengkap', $pendaftaran->nama_lengkap) }}"
-                                   class="wizard-input @error('nama_lengkap') is-invalid @enderror" placeholder="Nama Lengkap Sesuai KK/Akta" required>
+                                   class="wizard-input @error('nama_lengkap') is-invalid @enderror" placeholder="Nama Lengkap Sesuai KK/Akta">
                             @error('nama_lengkap')
                                 <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                             @enderror
@@ -212,10 +212,10 @@
                         {{-- Nama Panggilan --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="nama_panggilan">
-                                Nama Panggilan <span class="required-mark">*</span>
+                                Nama Panggilan 
                             </label>
                             <input type="text" name="nama_panggilan" id="nama_panggilan" value="{{ old('nama_panggilan', $pendaftaran->nama_panggilan) }}"
-                                   class="wizard-input @error('nama_panggilan') is-invalid @enderror" placeholder="Nama Panggilan" required>
+                                   class="wizard-input @error('nama_panggilan') is-invalid @enderror" placeholder="Nama Panggilan">
                             @error('nama_panggilan')
                                 <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                             @enderror
@@ -224,9 +224,9 @@
                         {{-- Jenis Kelamin --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="jenis_kelamin">
-                                Jenis Kelamin <span class="required-mark">*</span>
+                                Jenis Kelamin 
                             </label>
-                            <select name="jenis_kelamin" id="jenis_kelamin" class="wizard-select @error('jenis_kelamin') is-invalid @enderror" required>
+                            <select name="jenis_kelamin" id="jenis_kelamin" class="wizard-select @error('jenis_kelamin') is-invalid @enderror">
                                 <option value="">Pilih Jenis Kelamin</option>
                                 <option value="Laki-laki" {{ old('jenis_kelamin', $pendaftaran->jenis_kelamin) == 'Laki-laki' ? 'selected' : '' }}>Laki-laki</option>
                                 <option value="Perempuan" {{ old('jenis_kelamin', $pendaftaran->jenis_kelamin) == 'Perempuan' ? 'selected' : '' }}>Perempuan</option>
@@ -239,10 +239,10 @@
                         {{-- Tempat Lahir --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="tempat_lahir">
-                                Tempat Lahir <span class="required-mark">*</span>
+                                Tempat Lahir 
                             </label>
                             <input type="text" name="tempat_lahir" id="tempat_lahir" value="{{ old('tempat_lahir', $pendaftaran->tempat_lahir) }}"
-                                   class="wizard-input @error('tempat_lahir') is-invalid @enderror" placeholder="Kota / Kabupaten Lahir" required>
+                                   class="wizard-input @error('tempat_lahir') is-invalid @enderror" placeholder="Kota / Kabupaten Lahir">
                             @error('tempat_lahir')
                                 <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                             @enderror
@@ -254,10 +254,10 @@
                         @endphp
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="tanggal_lahir">
-                                Tanggal Lahir <span class="required-mark">*</span>
+                                Tanggal Lahir 
                             </label>
                             <input type="date" name="tanggal_lahir" id="tanggal_lahir" value="{{ old('tanggal_lahir', $tglLahirVal) }}"
-                                   class="wizard-input @error('tanggal_lahir') is-invalid @enderror" required>
+                                   class="wizard-input @error('tanggal_lahir') is-invalid @enderror">
                             @error('tanggal_lahir')
                                 <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                             @enderror
@@ -266,10 +266,10 @@
                         {{-- Anak Ke- --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="anak_ke">
-                                Anak Ke- <span class="required-mark">*</span>
+                                Anak Ke- 
                             </label>
                             <input type="number" name="anak_ke" id="anak_ke" min="1" value="{{ old('anak_ke', $pendaftaran->anak_ke) }}"
-                                   class="wizard-input @error('anak_ke') is-invalid @enderror" placeholder="1" required>
+                                   class="wizard-input @error('anak_ke') is-invalid @enderror" placeholder="1">
                             @error('anak_ke')
                                 <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                             @enderror
@@ -278,10 +278,10 @@
                         {{-- Dari Jumlah Saudara --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="jumlah_saudara">
-                                Dari Jumlah Saudara <span class="required-mark">*</span>
+                                Dari Jumlah Saudara 
                             </label>
                             <input type="number" name="jumlah_saudara" id="jumlah_saudara" min="0" value="{{ old('jumlah_saudara', $pendaftaran->jumlah_saudara) }}"
-                                   class="wizard-input @error('jumlah_saudara') is-invalid @enderror" placeholder="0" required>
+                                   class="wizard-input @error('jumlah_saudara') is-invalid @enderror" placeholder="0">
                             @error('jumlah_saudara')
                                 <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                             @enderror
@@ -290,9 +290,9 @@
                         {{-- Tinggal Bersama --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="tinggal_bersama">
-                                Tinggal Bersama <span class="required-mark">*</span>
+                                Tinggal Bersama 
                             </label>
-                            <select name="tinggal_bersama" id="tinggal_bersama" class="wizard-select @error('tinggal_bersama') is-invalid @enderror" required>
+                            <select name="tinggal_bersama" id="tinggal_bersama" class="wizard-select @error('tinggal_bersama') is-invalid @enderror">
                                 <option value="">Pilih Tinggal Bersama</option>
                                 @foreach (['Orang Tua Kandung', 'Ayah', 'Ibu', 'Wali'] as $tb)
                                     <option value="{{ $tb }}" {{ old('tinggal_bersama', $pendaftaran->tinggal_bersama) == $tb ? 'selected' : '' }}>{{ $tb }}</option>
@@ -318,9 +318,9 @@
                         {{-- Status Mondok --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="status_mondok">
-                                Status Mondok <span class="required-mark">*</span>
+                                Status Mondok 
                             </label>
-                            <select name="status_mondok" id="status_mondok" class="wizard-select @error('status_mondok') is-invalid @enderror" required>
+                            <select name="status_mondok" id="status_mondok" class="wizard-select @error('status_mondok') is-invalid @enderror">
                                 <option value="Person" {{ old('status_mondok', $pendaftaran->status_mondok ?? 'Person') == 'Person' ? 'selected' : '' }}>Person (Mandiri)</option>
                                 <option value="Utusan/Kiriman" {{ old('status_mondok', $pendaftaran->status_mondok) == 'Utusan/Kiriman' ? 'selected' : '' }}>Utusan / Kiriman</option>
                             </select>
@@ -335,9 +335,9 @@
                         {{-- Pendidikan Terakhir --}}
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="pendidikan_terakhir">
-                                Pendidikan Terakhir <span class="required-mark">*</span>
+                                Pendidikan Terakhir 
                             </label>
-                            <select name="pendidikan_terakhir" id="pendidikan_terakhir" class="wizard-select @error('pendidikan_terakhir') is-invalid @enderror" required>
+                            <select name="pendidikan_terakhir" id="pendidikan_terakhir" class="wizard-select @error('pendidikan_terakhir') is-invalid @enderror">
                                 <option value="">Pilih Pendidikan Terakhir</option>
                                 @foreach (['SD/MI', 'SMP/MTs', 'SMA/MA/SMK', 'D3', 'S1/D4', 'Lainnya'] as $pddk)
                                     <option value="{{ $pddk }}" {{ old('pendidikan_terakhir', $pendaftaran->pendidikan_terakhir ?? 'SD/MI') == $pddk ? 'selected' : '' }}>{{ $pddk }}</option>
@@ -392,7 +392,7 @@
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-bottom: 24px; padding-top: 18px; border-top: 1px solid #F3F4F6;">
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="penerima_kip">
-                                Penerima KIP / PIP / PKH <span class="required-mark">*</span>
+                                Penerima KIP / PIP / PKH 
                             </label>
                             <select name="penerima_kip" id="penerima_kip" class="wizard-select @error('penerima_kip') is-invalid @enderror">
                                 <option value="0" {{ $isKip == '0' ? 'selected' : '' }}>Tidak</option>
@@ -508,10 +508,10 @@
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="ayah_nama">
-                                    Nama Lengkap Ayah <span class="required-mark">*</span>
+                                    Nama Lengkap Ayah 
                                 </label>
                                 <input type="text" name="ayah_nama" id="ayah_nama" value="{{ old('ayah_nama', $pendaftaran->ayah_nama) }}"
-                                       class="wizard-input @error('ayah_nama') is-invalid @enderror" placeholder="Nama Lengkap Ayah" required>
+                                       class="wizard-input @error('ayah_nama') is-invalid @enderror" placeholder="Nama Lengkap Ayah">
                                 @error('ayah_nama')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -519,9 +519,9 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="ayah_status">
-                                    Status Ayah <span class="required-mark">*</span>
+                                    Status Ayah 
                                 </label>
-                                <select name="ayah_status" id="ayah_status" class="wizard-select @error('ayah_status') is-invalid @enderror" required>
+                                <select name="ayah_status" id="ayah_status" class="wizard-select @error('ayah_status') is-invalid @enderror">
                                     <option value="Hidup" {{ old('ayah_status', $pendaftaran->ayah_status ?? 'Hidup') == 'Hidup' ? 'selected' : '' }}>Hidup</option>
                                     <option value="Meninggal" {{ old('ayah_status', $pendaftaran->ayah_status) == 'Meninggal' ? 'selected' : '' }}>Meninggal</option>
                                 </select>
@@ -604,10 +604,10 @@
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="ibu_nama">
-                                    Nama Lengkap Ibu <span class="required-mark">*</span>
+                                    Nama Lengkap Ibu 
                                 </label>
                                 <input type="text" name="ibu_nama" id="ibu_nama" value="{{ old('ibu_nama', $pendaftaran->ibu_nama) }}"
-                                       class="wizard-input @error('ibu_nama') is-invalid @enderror" placeholder="Nama Lengkap Ibu" required>
+                                       class="wizard-input @error('ibu_nama') is-invalid @enderror" placeholder="Nama Lengkap Ibu">
                                 @error('ibu_nama')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -615,9 +615,9 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="ibu_status">
-                                    Status Ibu <span class="required-mark">*</span>
+                                    Status Ibu 
                                 </label>
-                                <select name="ibu_status" id="ibu_status" class="wizard-select @error('ibu_status') is-invalid @enderror" required>
+                                <select name="ibu_status" id="ibu_status" class="wizard-select @error('ibu_status') is-invalid @enderror">
                                     <option value="Hidup" {{ old('ibu_status', $pendaftaran->ibu_status ?? 'Hidup') == 'Hidup' ? 'selected' : '' }}>Hidup</option>
                                     <option value="Meninggal" {{ old('ibu_status', $pendaftaran->ibu_status) == 'Meninggal' ? 'selected' : '' }}>Meninggal</option>
                                 </select>
@@ -700,10 +700,10 @@
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="pj_biaya_nama">
-                                    Nama Penanggung Jawab Biaya <span class="required-mark">*</span>
+                                    Nama Penanggung Jawab Biaya 
                                 </label>
                                 <input type="text" name="pj_biaya_nama" id="pj_biaya_nama" value="{{ old('pj_biaya_nama', $pendaftaran->pj_biaya_nama) }}"
-                                       class="wizard-input @error('pj_biaya_nama') is-invalid @enderror" placeholder="Nama Penanggung Jawab" required>
+                                       class="wizard-input @error('pj_biaya_nama') is-invalid @enderror" placeholder="Nama Penanggung Jawab">
                                 @error('pj_biaya_nama')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -711,10 +711,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="pj_biaya_hp">
-                                    No. HP Penanggung Jawab <span class="required-mark">*</span>
+                                    No. HP Penanggung Jawab 
                                 </label>
                                 <input type="text" name="pj_biaya_hp" id="pj_biaya_hp" value="{{ old('pj_biaya_hp', $pendaftaran->pj_biaya_hp) }}"
-                                       class="wizard-input @error('pj_biaya_hp') is-invalid @enderror" placeholder="Nomor WhatsApp aktif" required>
+                                       class="wizard-input @error('pj_biaya_hp') is-invalid @enderror" placeholder="Nomor WhatsApp aktif">
                                 @error('pj_biaya_hp')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -753,10 +753,10 @@
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
                             <div class="wizard-form-group" style="grid-column: 1 / -1;">
                                 <label class="wizard-label" for="alamat_jalan">
-                                    Alamat Jalan / Dusun <span class="required-mark">*</span>
+                                    Alamat Jalan / Dusun 
                                 </label>
                                 <input type="text" name="alamat_jalan" id="alamat_jalan" value="{{ old('alamat_jalan', $pendaftaran->alamat_jalan) }}"
-                                       class="wizard-input @error('alamat_jalan') is-invalid @enderror" placeholder="Nama Jalan, No. Rumah, RT/RW" required>
+                                       class="wizard-input @error('alamat_jalan') is-invalid @enderror" placeholder="Nama Jalan, No. Rumah, RT/RW">
                                 @error('alamat_jalan')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -764,10 +764,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="rt_rw">
-                                    RT / RW <span class="required-mark">*</span>
+                                    RT / RW 
                                 </label>
                                 <input type="text" name="rt_rw" id="rt_rw" value="{{ old('rt_rw', $pendaftaran->rt_rw) }}"
-                                       class="wizard-input @error('rt_rw') is-invalid @enderror" placeholder="001/002" required>
+                                       class="wizard-input @error('rt_rw') is-invalid @enderror" placeholder="001/002">
                                 @error('rt_rw')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -775,10 +775,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="desa_kelurahan">
-                                    Desa / Kelurahan <span class="required-mark">*</span>
+                                    Desa / Kelurahan 
                                 </label>
                                 <input type="text" name="desa_kelurahan" id="desa_kelurahan" value="{{ old('desa_kelurahan', $pendaftaran->desa_kelurahan) }}"
-                                       class="wizard-input @error('desa_kelurahan') is-invalid @enderror" placeholder="Desa / Kelurahan" required>
+                                       class="wizard-input @error('desa_kelurahan') is-invalid @enderror" placeholder="Desa / Kelurahan">
                                 @error('desa_kelurahan')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -786,10 +786,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="kecamatan">
-                                    Kecamatan <span class="required-mark">*</span>
+                                    Kecamatan 
                                 </label>
                                 <input type="text" name="kecamatan" id="kecamatan" value="{{ old('kecamatan', $pendaftaran->kecamatan) }}"
-                                       class="wizard-input @error('kecamatan') is-invalid @enderror" placeholder="Kecamatan" required>
+                                       class="wizard-input @error('kecamatan') is-invalid @enderror" placeholder="Kecamatan">
                                 @error('kecamatan')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -797,10 +797,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="kab_kota">
-                                    Kabupaten / Kota <span class="required-mark">*</span>
+                                    Kabupaten / Kota 
                                 </label>
                                 <input type="text" name="kab_kota" id="kab_kota" value="{{ old('kab_kota', $pendaftaran->kab_kota) }}"
-                                       class="wizard-input @error('kab_kota') is-invalid @enderror" placeholder="Kabupaten / Kota" required>
+                                       class="wizard-input @error('kab_kota') is-invalid @enderror" placeholder="Kabupaten / Kota">
                                 @error('kab_kota')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -808,10 +808,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="kode_pos">
-                                    Kode Pos <span class="required-mark">*</span>
+                                    Kode Pos 
                                 </label>
                                 <input type="text" name="kode_pos" id="kode_pos" value="{{ old('kode_pos', $pendaftaran->kode_pos) }}"
-                                       class="wizard-input @error('kode_pos') is-invalid @enderror" placeholder="63134" required>
+                                       class="wizard-input @error('kode_pos') is-invalid @enderror" placeholder="63134">
                                 @error('kode_pos')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -819,10 +819,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="provinsi">
-                                    Provinsi <span class="required-mark">*</span>
+                                    Provinsi 
                                 </label>
                                 <input type="text" name="provinsi" id="provinsi" value="{{ old('provinsi', $pendaftaran->provinsi) }}"
-                                       class="wizard-input @error('provinsi') is-invalid @enderror" placeholder="Provinsi" required>
+                                       class="wizard-input @error('provinsi') is-invalid @enderror" placeholder="Provinsi">
                                 @error('provinsi')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -830,10 +830,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="warga_negara">
-                                    Kewarganegaraan <span class="required-mark">*</span>
+                                    Kewarganegaraan 
                                 </label>
                                 <input type="text" name="warga_negara" id="warga_negara" value="{{ old('warga_negara', $pendaftaran->warga_negara ?? 'Indonesia') }}"
-                                       class="wizard-input @error('warga_negara') is-invalid @enderror" placeholder="Indonesia" required>
+                                       class="wizard-input @error('warga_negara') is-invalid @enderror" placeholder="Indonesia">
                                 @error('warga_negara')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -850,10 +850,10 @@
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="kelompok">
-                                    Kelompok <span class="required-mark">*</span>
+                                    Kelompok 
                                 </label>
                                 <input type="text" name="kelompok" id="kelompok" value="{{ old('kelompok', $pendaftaran->kelompok) }}"
-                                       class="wizard-input @error('kelompok') is-invalid @enderror" placeholder="Kelompok Sambung" required>
+                                       class="wizard-input @error('kelompok') is-invalid @enderror" placeholder="Kelompok Sambung">
                                 @error('kelompok')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -861,10 +861,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="desa">
-                                    Desa <span class="required-mark">*</span>
+                                    Desa 
                                 </label>
                                 <input type="text" name="desa" id="desa" value="{{ old('desa', $pendaftaran->desa) }}"
-                                       class="wizard-input @error('desa') is-invalid @enderror" placeholder="Desa Sambung" required>
+                                       class="wizard-input @error('desa') is-invalid @enderror" placeholder="Desa Sambung">
                                 @error('desa')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -872,10 +872,10 @@
 
                             <div class="wizard-form-group">
                                 <label class="wizard-label" for="daerah">
-                                    Daerah <span class="required-mark">*</span>
+                                    Daerah 
                                 </label>
                                 <input type="text" name="daerah" id="daerah" value="{{ old('daerah', $pendaftaran->daerah) }}"
-                                       class="wizard-input @error('daerah') is-invalid @enderror" placeholder="Daerah Sambung" required>
+                                       class="wizard-input @error('daerah') is-invalid @enderror" placeholder="Daerah Sambung">
                                 @error('daerah')
                                     <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
                                 @enderror
@@ -1040,34 +1040,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Step validation check
     function validateStep(stepIndex) {
-        const pane = steps[stepIndex - 1];
-        if (!pane) return true;
-
-        const requiredInputs = pane.querySelectorAll('input[required], select[required], textarea[required]');
-        let isValid = true;
-        let firstInvalid = null;
-
-        requiredInputs.forEach(input => {
-            // Check visibility
-            if (input.offsetParent === null) return;
-
-            if (!input.value || !input.value.trim()) {
-                isValid = false;
-                input.classList.add('is-invalid');
-                if (!firstInvalid) firstInvalid = input;
-            } else {
-                input.classList.remove('is-invalid');
-            }
-        });
-
-        if (!isValid && firstInvalid) {
-            firstInvalid.focus();
-            if (firstInvalid.scrollIntoView) {
-                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
-
-        return isValid;
+        return true;
     }
 
     // Click on Stepper tabs
@@ -1120,14 +1093,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function handleJenjangChange(val, isUser = false) {
         if (val === 'SMP') {
-            if (labelSekolahAsal) labelSekolahAsal.innerHTML = 'Nama SD / MI Asal <span class="required-mark">*</span>';
+            if (labelSekolahAsal) labelSekolahAsal.innerHTML = 'Nama SD / MI Asal ';
             if (inputSekolahAsal) inputSekolahAsal.placeholder = 'Contoh: SDN 1 Bojonegoro / MI Al Hidayah';
             if (markNisn) markNisn.style.display = 'inline';
             if (isUser && selectPendidikan && (!selectPendidikan.value || selectPendidikan.value === 'SMP/MTs')) {
                 selectPendidikan.value = 'SD/MI';
             }
         } else if (val === 'SMA') {
-            if (labelSekolahAsal) labelSekolahAsal.innerHTML = 'Nama SMP / MTs Asal <span class="required-mark">*</span>';
+            if (labelSekolahAsal) labelSekolahAsal.innerHTML = 'Nama SMP / MTs Asal ';
             if (inputSekolahAsal) inputSekolahAsal.placeholder = 'Contoh: SMPN 2 Madiun / MTs Negeri 1';
             if (markNisn) markNisn.style.display = 'inline';
             if (isUser && selectPendidikan && (!selectPendidikan.value || selectPendidikan.value === 'SD/MI')) {

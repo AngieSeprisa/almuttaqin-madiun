@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\ClassroomController;
 use App\Http\Controllers\GuruSekolahController;
+use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\LembagaController;
 use App\Http\Controllers\PendaftaranController;
@@ -345,6 +346,19 @@ Route::middleware('auth')->group(function () {
             Route::delete('/{lembaga}', [LembagaController::class, 'destroy'])
                 ->middleware('permission:master_lembaga|data_master,delete')
                 ->name('destroy');
+        });
+
+        // Master Import Data Siswa
+        Route::prefix('import-siswa')->name('import-siswa.')->group(function () {
+            Route::get('/', [ImportSiswaController::class, 'index'])
+                ->middleware('permission:master_import_siswa|data_master,view')
+                ->name('index');
+            Route::get('/template', [ImportSiswaController::class, 'downloadTemplate'])
+                ->middleware('permission:master_import_siswa|data_master,view')
+                ->name('template');
+            Route::post('/', [ImportSiswaController::class, 'import'])
+                ->middleware('permission:master_import_siswa|data_master,create')
+                ->name('store');
         });
     });
 });

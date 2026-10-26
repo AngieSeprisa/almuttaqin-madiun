@@ -24,47 +24,47 @@ class PendaftaranRequest extends FormRequest
 
         return [
             // Pilihan Jenjang Pendidikan
-            'jenjang' => 'required|in:SMP,SMA,Reguler',
+            'jenjang' => 'nullable|in:SMP,SMA,Reguler',
 
             // Identitas Pribadi
             'no_induk' => 'nullable|string|max:50',
-            'nik' => 'required|string|size:16|unique:pendaftarans,nik' . ($id ? ",$id" : ''),
+            'nik' => 'nullable|string|max:16' . ($this->filled('nik') ? '|unique:pendaftarans,nik' . ($id ? ",$id" : '') : ''),
             'nisn' => 'nullable|string|max:20',
-            'nama_lengkap' => 'required|string|max:255',
-            'nama_panggilan' => 'required|string|max:100',
-            'tempat_lahir' => 'required|string|max:100',
-            'tanggal_lahir' => 'required|date',
-            'jenis_kelamin' => 'required|in:Laki-laki,Perempuan',
-            'anak_ke' => 'required|integer|min:1',
-            'jumlah_saudara' => 'required|integer|min:0',
-            'tinggal_bersama' => 'required|string|max:100',
+            'nama_lengkap' => 'nullable|string|max:255',
+            'nama_panggilan' => 'nullable|string|max:100',
+            'tempat_lahir' => 'nullable|string|max:100',
+            'tanggal_lahir' => 'nullable|date',
+            'jenis_kelamin' => 'nullable|in:Laki-laki,Perempuan',
+            'anak_ke' => 'nullable|integer|min:1',
+            'jumlah_saudara' => 'nullable|integer|min:0',
+            'tinggal_bersama' => 'nullable|string|max:100',
             'mulai_pengajian' => 'nullable|string|max:100',
 
             // Alamat Lengkap
-            'alamat_jalan' => 'required|string|max:255',
-            'rt_rw' => 'required|string|max:50',
-            'desa_kelurahan' => 'required|string|max:100',
-            'kecamatan' => 'required|string|max:100',
-            'kab_kota' => 'required|string|max:100',
-            'kode_pos' => 'required|string|max:10',
-            'provinsi' => 'required|string|max:100',
-            'warga_negara' => 'required|string|max:100',
+            'alamat_jalan' => 'nullable|string|max:255',
+            'rt_rw' => 'nullable|string|max:50',
+            'desa_kelurahan' => 'nullable|string|max:100',
+            'kecamatan' => 'nullable|string|max:100',
+            'kab_kota' => 'nullable|string|max:100',
+            'kode_pos' => 'nullable|string|max:10',
+            'provinsi' => 'nullable|string|max:100',
+            'warga_negara' => 'nullable|string|max:100',
 
             // Alamat Pengajian
-            'kelompok' => 'required|string|max:100',
-            'desa' => 'required|string|max:100',
-            'daerah' => 'required|string|max:100',
+            'kelompok' => 'nullable|string|max:100',
+            'desa' => 'nullable|string|max:100',
+            'daerah' => 'nullable|string|max:100',
 
             // Pendidikan Terakhir & Sekolah Asal
-            'pendidikan_terakhir' => 'required|string|max:100',
+            'pendidikan_terakhir' => 'nullable|string|max:100',
             'nama_sekolah_asal' => 'nullable|string|max:255',
             'jurusan' => 'nullable|string|max:100',
             'tahun_lulus' => 'nullable|string|max:10',
 
             // Status & PJ Biaya
-            'status_mondok' => 'required|in:Person,Utusan/Kiriman',
-            'pj_biaya_nama' => 'required|string|max:255',
-            'pj_biaya_hp' => 'required|string|max:30',
+            'status_mondok' => 'nullable|in:Person,Utusan/Kiriman',
+            'pj_biaya_nama' => 'nullable|string|max:255',
+            'pj_biaya_hp' => 'nullable|string|max:30',
 
             // Kesejahteraan & KIP / PIP
             'penerima_kip' => 'nullable|boolean',
@@ -79,8 +79,8 @@ class PendaftaranRequest extends FormRequest
             'keahlian_prestasi' => 'nullable|string',
 
             // Data Ayah
-            'ayah_nama' => 'required|string|max:255',
-            'ayah_status' => 'required|in:Hidup,Meninggal',
+            'ayah_nama' => 'nullable|string|max:255',
+            'ayah_status' => 'nullable|in:Hidup,Meninggal',
             'ayah_ttl' => 'nullable|string|max:100',
             'ayah_pendidikan' => 'nullable|string|max:100',
             'ayah_pekerjaan' => 'nullable|string|max:100',
@@ -94,8 +94,8 @@ class PendaftaranRequest extends FormRequest
             'ayah_kelompok' => 'nullable|string|max:100',
 
             // Data Ibu
-            'ibu_nama' => 'required|string|max:255',
-            'ibu_status' => 'required|in:Hidup,Meninggal',
+            'ibu_nama' => 'nullable|string|max:255',
+            'ibu_status' => 'nullable|in:Hidup,Meninggal',
             'ibu_ttl' => 'nullable|string|max:100',
             'ibu_pendidikan' => 'nullable|string|max:100',
             'ibu_pekerjaan' => 'nullable|string|max:100',

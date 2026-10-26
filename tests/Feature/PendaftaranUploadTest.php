@@ -105,4 +105,17 @@ class PendaftaranUploadTest extends TestCase
             ]))
             ->assertSessionHasErrors('foto_akta');
     }
+
+    public function test_pendaftaran_tanpa_kolom_wajib_tetap_berhasil(): void
+    {
+        $response = $this->actingAs($this->admin)
+            ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->post(route('pendaftaran.store'), []);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+        $this->assertDatabaseHas('pendaftarans', [
+            'nama_lengkap' => 'Santri Baru',
+        ]);
+    }
 }

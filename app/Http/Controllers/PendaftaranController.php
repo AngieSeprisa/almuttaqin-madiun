@@ -105,6 +105,22 @@ class PendaftaranController extends Controller
             return back()->withInput()->withErrors(['foto_berkas' => $e->getMessage()]);
         }
 
+        // Normalisasi field opsional agar MySQL unique tidak duplicate empty string
+        if (empty($data['nik'])) {
+            $data['nik'] = null;
+        }
+        if (empty($data['nama_lengkap'])) {
+            $data['nama_lengkap'] = 'Santri Baru';
+        }
+        if (empty($data['jenjang'])) {
+            $activeRoom = session('active_lembaga');
+            $data['jenjang'] = match ($activeRoom) {
+                'smp' => 'SMP',
+                'sma' => 'SMA',
+                default => 'Reguler',
+            };
+        }
+
         // Generate No. Induk otomatis jika kosong
         if (empty($data['no_induk'])) {
             $tahun = date('Y');
@@ -234,6 +250,10 @@ class PendaftaranController extends Controller
             }
 
             return back()->withInput()->withErrors(['foto_berkas' => $e->getMessage()]);
+        }
+
+        if (array_key_exists('nik', $data) && empty($data['nik'])) {
+            $data['nik'] = null;
         }
 
         try {

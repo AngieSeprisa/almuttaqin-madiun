@@ -224,7 +224,7 @@
     </div>
 
     {{-- Tabel Rekap Data Presensi --}}
-    <div class="table-container" style="background:var(--bg-surface); border-radius:14px; border:1px solid var(--border-light); overflow:hidden; box-shadow:var(--card-shadow);">
+    <div class="table-container table-card" style="background:var(--bg-surface); border-radius:14px; border:1px solid var(--border-light); overflow:hidden; box-shadow:var(--card-shadow);">
         <table class="table" style="width:100%; border-collapse:collapse; text-align:left;">
             <thead>
                 <tr style="background:var(--table-th-bg); border-bottom:1px solid var(--border-light);">
@@ -326,6 +326,67 @@
 
         @if($presensis->hasPages())
         <div style="padding:16px 20px; border-top:1px solid var(--border-light);">
+            {{ $presensis->links() }}
+        </div>
+        @endif
+    </div>
+
+    {{-- Card List untuk Tampilan Mobile (<= 768px) --}}
+    <div class="mobile-card-list">
+        @forelse($presensis as $index => $row)
+        <div class="mobile-card-item">
+            <div class="mobile-card-info">
+                <div class="mobile-card-title">{{ $row->user->name ?? '-' }}</div>
+                <div class="mobile-card-subtitle">
+                    {{ $row->tanggal ? $row->tanggal->translatedFormat('d M Y') : '-' }} &bull; {{ $row->user->nip ?? ($row->user->jabatan ?? '-') }}
+                </div>
+
+                <div class="mobile-card-meta-grid">
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Lembaga</span>
+                        <span class="mobile-card-pill mobile-card-pill-blue">{{ $row->lembaga->singkatan ?? ($row->lembaga->nama ?? '-') }}</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Jam</span>
+                        <span class="mobile-card-pill mobile-card-pill-gray" style="font-family:monospace;">{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '-' }} - {{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '-' }}</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">&nbsp;</span>
+                        <span class="status-pill {{ $row->status === 'hadir' ? 'status-pill-active' : ($row->status === 'terlambat' ? 'status-pill-warning' : 'status-pill-inactive') }}">
+                            {{ $row->status_label }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mobile-card-actions">
+                <span class="mobile-card-action-title">Aksi</span>
+                <div class="mobile-card-action-buttons">
+                    <button type="button" class="mobile-btn-pastel mobile-btn-edit btn-koreksi"
+                            data-id="{{ $row->id }}"
+                            data-nama="{{ $row->user->name ?? '-' }}"
+                            data-tanggal="{{ $row->tanggal ? $row->tanggal->format('d/m/Y') : '' }}"
+                            data-status="{{ $row->status }}"
+                            data-masuk="{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '' }}"
+                            data-pulang="{{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '' }}"
+                            data-keterangan="{{ $row->keterangan ?? '' }}"
+                            title="Koreksi Presensi">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        @empty
+        <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
+            Tidak ada data presensi guru untuk filter yang dipilih.
+        </div>
+        @endforelse
+
+        @if($presensis->hasPages())
+        <div style="margin-top:16px; display:flex; justify-content:center;">
             {{ $presensis->links() }}
         </div>
         @endif

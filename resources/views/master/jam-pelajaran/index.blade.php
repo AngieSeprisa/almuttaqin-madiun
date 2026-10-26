@@ -562,7 +562,7 @@
     </div>
 
     {{-- Tabel Master Jam Pelajaran --}}
-    <div class="mstr-card">
+    <div class="mstr-card table-card">
         <div style="overflow-x:auto;">
             <table class="mstr-table" id="tabelMasterSlot">
                 <thead>
@@ -663,7 +663,7 @@
                                         })">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 9.5-9.5z"></path>
                                     </svg>
                                 </button>
 
@@ -697,6 +697,83 @@
                 </tbody>
             </table>
         </div>
+    </div>
+
+    {{-- Card List untuk Tampilan Mobile (<= 768px) --}}
+    <div class="mobile-card-list">
+        @forelse($timeSlots as $item)
+        <div class="mobile-card-item">
+            <div class="mobile-card-info">
+                <div class="mobile-card-title">{{ $item->label }}</div>
+                <div class="mobile-card-subtitle">
+                    {{ $item->jam_ke > 0 ? 'Jam ke-' . $item->jam_ke : 'Non-KBM' }} &bull; {{ $item->hari }} &bull; {{ $item->rentang_waktu }}
+                </div>
+
+                <div class="mobile-card-meta-grid">
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Tipe</span>
+                        <span class="mobile-card-pill mobile-card-pill-blue">{{ $item->tipe_kegiatan }}</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Jenjang</span>
+                        <span class="mobile-card-pill mobile-card-pill-gray">{{ $item->jenjang }}</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">&nbsp;</span>
+                        <form action="{{ route('master.jam-pelajaran.toggle-status', $item->id) }}" method="POST" style="margin:0; display:inline-block;">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" style="background:none; border:none; padding:0; cursor:pointer;" title="Klik ubah status">
+                                <span class="status-pill {{ $item->is_active ? 'status-pill-active' : 'status-pill-inactive' }}">
+                                    {{ $item->is_active ? 'Aktif' : 'Nonaktif' }}
+                                </span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mobile-card-actions">
+                <span class="mobile-card-action-title">Aksi</span>
+                <div class="mobile-card-action-buttons">
+                    <button type="button" class="mobile-btn-pastel mobile-btn-edit" title="Edit Slot"
+                            onclick="bukaModalEditSlot({
+                                id: {{ $item->id }},
+                                hari: '{{ $item->hari }}',
+                                jenjang: '{{ $item->jenjang }}',
+                                jam_ke: {{ $item->jam_ke }},
+                                waktu_mulai: '{{ substr($item->waktu_mulai, 0, 5) }}',
+                                waktu_selesai: '{{ substr($item->waktu_selesai, 0, 5) }}',
+                                tipe_kegiatan: '{{ $item->tipe_kegiatan }}',
+                                label: '{{ addslashes($item->label) }}',
+                                urutan: {{ $item->urutan }},
+                                is_break: {{ $item->is_break ? 'true' : 'false' }},
+                                is_active: {{ $item->is_active ? 'true' : 'false' }}
+                            })">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+
+                    <form action="{{ route('master.jam-pelajaran.destroy', $item->id) }}" method="POST" style="margin:0; display:inline-block;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus slot {{ $item->label }} ({{ $item->hari }})?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="mobile-btn-pastel mobile-btn-delete" title="Hapus Slot">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        @empty
+        <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
+            Belum ada slot jam untuk filter ini.
+        </div>
+        @endforelse
     </div>
 </div>
 
@@ -955,6 +1032,12 @@
             } else {
                 row.style.display = 'none';
             }
+        });
+
+        var cards = document.querySelectorAll('.mobile-card-list .mobile-card-item');
+        cards.forEach(function(card) {
+            var text = card.innerText.toLowerCase();
+            card.style.display = text.indexOf(query) > -1 ? '' : 'none';
         });
     }
 

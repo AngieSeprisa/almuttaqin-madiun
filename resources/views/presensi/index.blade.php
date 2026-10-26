@@ -235,6 +235,41 @@
                 </tbody>
             </table>
         </div>
+
+        {{-- Card List untuk Tampilan Mobile (<= 768px) --}}
+        <div class="mobile-card-list">
+            @forelse($riwayatPribadi as $row)
+            <div class="mobile-card-item">
+                <div class="mobile-card-info">
+                    <div class="mobile-card-title">{{ $row->tanggal ? $row->tanggal->translatedFormat('l, d F Y') : '-' }}</div>
+                    <div class="mobile-card-subtitle">
+                        Masuk: {{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '-' }} &bull; Pulang: {{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '-' }}
+                    </div>
+
+                    <div class="mobile-card-meta-grid">
+                        <div class="mobile-card-meta-item">
+                            <span class="mobile-card-meta-label">Jam Masuk</span>
+                            <span class="mobile-card-pill mobile-card-pill-blue" style="font-family:monospace;">{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '-' }}</span>
+                        </div>
+                        <div class="mobile-card-meta-item">
+                            <span class="mobile-card-meta-label">Jam Pulang</span>
+                            <span class="mobile-card-pill mobile-card-pill-gray" style="font-family:monospace;">{{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '-' }}</span>
+                        </div>
+                        <div class="mobile-card-meta-item">
+                            <span class="mobile-card-meta-label">&nbsp;</span>
+                            <span class="status-pill {{ $row->status === 'hadir' ? 'status-pill-active' : ($row->status === 'terlambat' ? 'status-pill-warning' : 'status-pill-inactive') }}">
+                                {{ $row->status_label }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @empty
+            <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
+                Belum ada riwayat presensi tercatat.
+            </div>
+            @endforelse
+        </div>
     </div>
 </div>
 

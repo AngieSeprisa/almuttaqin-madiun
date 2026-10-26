@@ -626,6 +626,61 @@
             </table>
         </div>
 
+        {{-- Mobile Card List (<= 768px) --}}
+        <div class="mobile-card-list" style="padding: 12px;">
+            @forelse($mataPelajarans as $index => $item)
+            <div class="mobile-card-item">
+                <div class="mobile-card-info">
+                    <div class="mobile-card-title">{{ $item->mata_pelajaran ?: $item->nama_pelajaran }}</div>
+                    <div class="mobile-card-subtitle">Kode: {{ $item->kode ?: ($item->kode_mapel ?: '-') }}</div>
+
+                    <div class="mobile-card-meta-grid">
+                        @if($isYayasan && empty($selectedLembagaId))
+                        <div class="mobile-card-meta-item">
+                            <span class="mobile-card-meta-label">Sekolah</span>
+                            <span class="mobile-card-pill mobile-card-pill-blue">{{ $item->lembaga->nama_singkat ?? $item->lembaga->singkatan ?? '-' }}</span>
+                        </div>
+                        @endif
+                        <div class="mobile-card-meta-item">
+                            <span class="mobile-card-meta-label">Kode Mapel</span>
+                            <span class="mobile-card-pill mobile-card-pill-gray">{{ $item->kode ?: ($item->kode_mapel ?: '-') }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mobile-card-actions">
+                    <span class="mobile-card-action-title">Aksi</span>
+                    <div class="mobile-card-action-buttons">
+                        <button type="button" class="mobile-btn-pastel mobile-btn-edit"
+                                onclick="bukaModalEditMapel({{ json_encode($item) }})"
+                                title="Edit Mata Pelajaran">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+
+                        <form action="{{ route('plotting-mapel.destroy', $item->id) }}" method="POST" style="margin:0; display:inline-block;"
+                              onsubmit="return confirm('Apakah Anda yakin ingin menghapus mata pelajaran {{ addslashes($item->mata_pelajaran ?: $item->nama_pelajaran) }}?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="mobile-btn-pastel mobile-btn-delete" title="Hapus Mata Pelajaran">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            @empty
+            <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
+                Belum ada mata pelajaran yang diatur untuk sekolah ini.
+            </div>
+            @endforelse
+        </div>
+
         {{-- Pagination --}}
         @if($mataPelajarans->hasPages())
         <div style="padding:12px 18px; border-top:1px solid var(--border-light); background:var(--bg-surface); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; box-sizing:border-box;">

@@ -134,13 +134,31 @@
             </div>
         </div>
 
-        <div class="form-section-card stat-summary-card">
+        @php
+            $totalAbsen = $totalSemuaHadir + $totalSemuaSakit + $totalSemuaIzin + $totalSemuaAlpa;
+            $persenHadir = $totalAbsen > 0 ? round($totalSemuaHadir / $totalAbsen * 100) : 0;
+            $donutR = 42;
+            $donutC = 2 * M_PI * $donutR;
+            $donutOffset = $donutC * (1 - $persenHadir / 100);
+        @endphp
+        <div class="form-section-card stat-summary-card stat-donut-card">
             <span class="stat-summary-label">Akumulasi Kehadiran Siswa</span>
-            <div class="stat-pills-row">
-                <span class="stat-pill-tag tag-h">H: {{ $totalSemuaHadir }}</span>
-                <span class="stat-pill-tag tag-s">S: {{ $totalSemuaSakit }}</span>
-                <span class="stat-pill-tag tag-i">I: {{ $totalSemuaIzin }}</span>
-                <span class="stat-pill-tag tag-a">A: {{ $totalSemuaAlpa }}</span>
+            <div class="donut-row">
+                <div class="donut-wrap" role="img" aria-label="Persentase kehadiran {{ $persenHadir }} persen">
+                    <svg viewBox="0 0 100 100" class="donut-svg">
+                        <circle class="donut-track" cx="50" cy="50" r="{{ $donutR }}"></circle>
+                        <circle class="donut-value" cx="50" cy="50" r="{{ $donutR }}"
+                                stroke-dasharray="{{ $donutC }}" stroke-dashoffset="{{ $donutOffset }}"
+                                transform="rotate(-90 50 50)"></circle>
+                    </svg>
+                    <span class="donut-text">{{ $persenHadir }}%</span>
+                </div>
+                <div class="donut-legend">
+                    <span class="stat-pill-tag tag-h">H: {{ $totalSemuaHadir }}</span>
+                    <span class="stat-pill-tag tag-s">S: {{ $totalSemuaSakit }}</span>
+                    <span class="stat-pill-tag tag-i">I: {{ $totalSemuaIzin }}</span>
+                    <span class="stat-pill-tag tag-a">A: {{ $totalSemuaAlpa }}</span>
+                </div>
             </div>
         </div>
     </div>
@@ -178,7 +196,7 @@
                     <tr>
                         @foreach($jurnals as $jurnal)
                             <th class="th-mapel-code" title="{{ $jurnal->mata_pelajaran }} ({{ $jurnal->jam_ke }}) - Guru: {{ $jurnal->nama_guru }}">
-                                {{ $jurnal->kode_mapel }}
+                                <span class="mapel-code">{{ $jurnal->kode_mapel }}</span>
                             </th>
                         @endforeach
                     </tr>
@@ -272,6 +290,7 @@
         </div>
     </div>
 
+
 </div>
 
 {{-- Modal Detail Kehadiran Siswa --}}
@@ -290,7 +309,7 @@
                     </div>
                     <div>
                         <h3 class="modal-title-text" id="modalNamaSiswa">Nama Siswa</h3>
-                        <p class="modal-subtitle-text" id="modalSubInfo">NISN: - • Kelas -</p>
+                        <p class="modal-subtitle-text" id="modalSubInfo">NISN: - â€¢ Kelas -</p>
                     </div>
                 </div>
                 <button type="button" class="modal-close-btn" id="modalCloseBtn" aria-label="Tutup Modal">&times;</button>
@@ -431,6 +450,64 @@
 .stat-pill-tag.tag-i { background: rgba(37, 99, 235, 0.12); color: #2563EB; }
 .stat-pill-tag.tag-a { background: rgba(239, 68, 68, 0.12); color: #EF4444; }
 
+/* Donut Chart Persentase Absensi */
+.stat-donut-card {
+    padding: 14px 18px;
+}
+.donut-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 8px;
+}
+.donut-wrap {
+    position: relative;
+    width: 82px;
+    height: 82px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.donut-svg {
+    width: 100%;
+    height: 100%;
+}
+.donut-track {
+    fill: none;
+    stroke: #E2E8F0;
+    stroke-width: 13;
+}
+.donut-value {
+    fill: none;
+    stroke: #3B82F6;
+    stroke-width: 13;
+    stroke-linecap: butt;
+    transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.donut-text {
+    position: absolute;
+    font-size: 18px;
+    font-weight: 800;
+    color: #3B82F6;
+    letter-spacing: -0.5px;
+    user-select: none;
+}
+.donut-legend {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 6px 8px;
+}
+.dark-mode .donut-track {
+    stroke: #334155;
+}
+.dark-mode .donut-value {
+    stroke: #60A5FA;
+}
+.dark-mode .donut-text {
+    color: #60A5FA;
+}
+
 /* Table Wrapper & Styling */
 .rekap-matrix-card {
     overflow: hidden;
@@ -502,8 +579,47 @@
     font-size: 10.5px;
     font-weight: 600;
     color: #64748B;
-    padding: 6px 4px;
-    min-width: 38px;
+    padding: 6px 2px;
+    min-width: 34px;
+    width: 34px;
+    vertical-align: bottom;
+    background: #FBFCFE !important;
+}
+.th-mapel-code .mapel-code {
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+.dark-mode .th-mapel-code { background: #172033 !important; }
+.dark-mode .th-mapel-code .mapel-code { color: #E2E8F0; }
+
+/* Gaya buku absensi: kolom No & Nama menempel saat digeser, header menempel saat scroll */
+.rekap-scroll-wrap { max-height: 78vh; overflow: auto; }
+.rekap-matrix-table thead tr:first-child th { position: sticky; top: 0; z-index: 3; }
+.rekap-matrix-table thead tr:nth-child(2) th { position: sticky; top: 33px; z-index: 3; }
+.rekap-matrix-table .th-col-no,
+.rekap-matrix-table .td-col-no { position: sticky; left: 0; z-index: 4; background: #fff; min-width: 40px; width: 40px; }
+.rekap-matrix-table .th-col-nama,
+.rekap-matrix-table .td-col-nama { position: sticky; left: 40px; z-index: 4; background: #fff; box-shadow: 2px 0 4px -2px rgba(15, 23, 42, 0.12); }
+.rekap-matrix-table thead .th-col-no,
+.rekap-matrix-table thead .th-col-nama { z-index: 6; background: #F8FAFC; }
+.dark-mode .rekap-matrix-table .td-col-no,
+.dark-mode .rekap-matrix-table .td-col-nama { background: #0F172A; }
+.dark-mode .rekap-matrix-table thead .th-col-no,
+.dark-mode .rekap-matrix-table thead .th-col-nama { background: #1E293B; }
+.rekap-matrix-table .td-matrix-cell { border-right: 1px solid #E2E8F0; }
+
+@media (max-width: 768px) {
+    .rekap-matrix-card { display: block !important; }
+    .rekap-matrix-table { font-size: 12px; }
+    .th-col-nama { min-width: 130px; padding-left: 10px !important; }
+    .rekap-matrix-table .td-col-nama { padding-left: 10px !important; }
+    .siswa-nama-text { font-size: 12.5px; white-space: normal; min-width: 120px; max-width: 150px; }
+    .absen-pill { width: 24px; height: 24px; font-size: 11px; }
 }
 .th-no-session {
     min-width: 140px;
@@ -1033,7 +1149,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Set Header
             document.getElementById('modalNamaSiswa').textContent = dataNama;
-            document.getElementById('modalSubInfo').textContent = `NISN: ${dataNisn} • Kelas ${dataKelas}${dataJenjang ? ' • ' + dataJenjang : ''}`;
+            document.getElementById('modalSubInfo').textContent = `NISN: ${dataNisn} â€¢ Kelas ${dataKelas}${dataJenjang ? ' â€¢ ' + dataJenjang : ''}`;
 
             // Set Stats Box
             document.getElementById('modalTotalSesi').textContent = dataPertemuan;

@@ -287,6 +287,13 @@
                             <span class="subnav-text">Lembaga</span>
                         </a>
                         @endif
+
+                        @if(!$authUser || $authUser->canDo('master_import_siswa', 'view') || $authUser->canDo('data_master', 'view'))
+                        <a href="{{ route('master.import-siswa.index') }}" class="subnav-item {{ request()->routeIs('master.import-siswa.*') ? 'active' : '' }}" title="Import Data Siswa">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Import Siswa</span>
+                        </a>
+                        @endif
                     </div>
                 </div>
                 @endif

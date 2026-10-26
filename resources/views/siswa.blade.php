@@ -2,6 +2,688 @@
 
 @section('title', 'Siswa')
 
+@section('header-actions')
+<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+    @if(!auth()->check() || auth()->user()->canDo('pendaftaran', 'create'))
+    <a href="{{ route('pendaftaran.create') }}" class="btn btn-primary btn-header-action" style="display:inline-flex; align-items:center; gap:8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Pendaftaran Baru</span>
+    </a>
+    @endif
+</div>
+@endsection
+
+@push('styles')
+<style>
+/* Baris santri belum lengkap (merah tipis dengan opacity 90% merah) */
+.modern-table tbody tr.row-incomplete > td {
+    background-color: rgba(239, 68, 68, 0.08) !important;
+    transition: background-color 0.15s ease;
+}
+
+.modern-table tbody tr.row-incomplete:hover > td {
+    background-color: rgba(239, 68, 68, 0.14) !important;
+}
+
+.modern-table tbody tr.row-incomplete > td:first-child {
+    border-left: 3px solid #ef4444 !important;
+}
+
+.dark-mode .modern-table tbody tr.row-incomplete > td {
+    background-color: rgba(239, 68, 68, 0.12) !important;
+}
+
+.dark-mode .modern-table tbody tr.row-incomplete:hover > td {
+    background-color: rgba(239, 68, 68, 0.20) !important;
+}
+
+/* Badge belum lengkap & info teks */
+.nama-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.nama-text {
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.badge-incomplete {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #dc2626;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: default;
+}
+
+.dark-mode .badge-incomplete {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #f87171;
+}
+
+.text-missing-fields {
+    font-size: 11.5px;
+    color: #b91c1c;
+    margin-top: 3px;
+    line-height: 1.3;
+}
+
+.dark-mode .text-missing-fields {
+    color: #fca5a5;
+}
+
+.missing-label {
+    font-weight: 600;
+    color: #dc2626;
+}
+
+.dark-mode .missing-label {
+    color: #f87171;
+}
+
+/* Action button koreksi */
+.action-btn.action-btn-koreksi {
+    color: #dc2626;
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.action-btn.action-btn-koreksi:hover {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+    transform: translateY(-1px);
+}
+
+/* Banner Notifikasi Kelengkapan Data */
+.alert-incomplete-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 18px;
+    background: rgba(239, 68, 68, 0.07);
+    border: 1px solid rgba(239, 68, 68, 0.22);
+    border-left: 4px solid #ef4444;
+    border-radius: 12px;
+    font-size: 13.5px;
+    color: var(--text-main);
+    flex-wrap: wrap;
+}
+
+.alert-incomplete-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ef4444;
+    flex-shrink: 0;
+}
+
+.alert-incomplete-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 240px;
+}
+
+.alert-incomplete-body strong {
+    color: #b91c1c;
+}
+
+.dark-mode .alert-incomplete-body strong {
+    color: #fca5a5;
+}
+
+.alert-incomplete-body span {
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+
+.btn-filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #dc2626;
+    font-weight: 600;
+    font-size: 12.5px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-filter-tag:hover,
+.btn-filter-tag.active {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #dc2626;
+}
+
+.dark-mode .btn-filter-tag {
+    background: var(--card-bg, #1e293b);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #f87171;
+}
+
+.dark-mode .btn-filter-tag:hover,
+.dark-mode .btn-filter-tag.active {
+    background: #dc2626;
+    color: #ffffff;
+}
+
+/* ========================================================
+   TAMPILAN KHUSUS MOBILE SESUAI GAMBAR (<= 768px)
+   ======================================================== */
+.mobile-siswa-list {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    /* Sembunyikan tabel desktop di mobile */
+    .table-card {
+        display: none !important;
+    }
+
+    /* Tampilkan daftar card mobile */
+    .mobile-siswa-list {
+        display: flex !important;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* Container Card Siswa Mobile Sesuai Gambar */
+    .mobile-siswa-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 13px 15px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .dark-mode .mobile-siswa-card {
+        background: var(--card-bg, #1e293b);
+        border-color: var(--border-light, #334155);
+        box-shadow: none;
+    }
+
+    /* Highlight merah tipis (opacity 90%) untuk santri data belum lengkap */
+    .mobile-siswa-card.row-incomplete {
+        background-color: rgba(239, 68, 68, 0.08) !important;
+        border-color: rgba(239, 68, 68, 0.3) !important;
+        border-left: 4px solid #ef4444 !important;
+    }
+
+    .dark-mode .mobile-siswa-card.row-incomplete {
+        background-color: rgba(239, 68, 68, 0.14) !important;
+        border-color: rgba(239, 68, 68, 0.45) !important;
+    }
+
+    /* Sisi Kiri: Info Santri */
+    .mobile-siswa-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .mobile-siswa-nama-wrap {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .mobile-siswa-nama {
+        font-size: 15px;
+        font-weight: 700;
+        color: #0f172a;
+        line-height: 1.3;
+        word-break: break-word;
+    }
+
+    .dark-mode .mobile-siswa-nama {
+        color: #f8fafc;
+    }
+
+    /* Grid Label & Badges di bawah Nama Sesuai Gambar */
+    .mobile-siswa-meta-grid {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+        margin-top: 4px;
+        flex-wrap: wrap;
+    }
+
+    .mobile-meta-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .mobile-meta-label {
+        font-size: 11px;
+        font-weight: 500;
+        color: #64748b;
+        line-height: 1;
+    }
+
+    .dark-mode .mobile-meta-label {
+        color: #94a3b8;
+    }
+
+    .mobile-badge-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3px 9px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 600;
+        background-color: #f1f5f9;
+        color: #334155;
+        border: 1px solid #e2e8f0;
+        line-height: 1.25;
+        white-space: nowrap;
+    }
+
+    .dark-mode .mobile-badge-pill {
+        background-color: #334155;
+        color: #f1f5f9;
+        border-color: #475569;
+    }
+
+    /* Status badge (Aktif / Pulang / Sakit) */
+    .mobile-badge-pill.status-aktif {
+        background-color: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+
+    .mobile-badge-pill.status-pulang {
+        background-color: #fef3c7;
+        color: #b45309;
+        border: 1px solid #fde68a;
+    }
+
+    .mobile-badge-pill.status-sakit {
+        background-color: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+    }
+
+    .dark-mode .mobile-badge-pill.status-aktif {
+        background-color: rgba(34, 197, 94, 0.18);
+        color: #4ade80;
+        border-color: rgba(34, 197, 94, 0.35);
+    }
+
+    /* Sisi Kanan: Aksi Sesuai Gambar */
+    .mobile-siswa-action-col {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    .mobile-action-title {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: #475569;
+        line-height: 1;
+        text-align: right;
+        padding-right: 2px;
+    }
+
+    .dark-mode .mobile-action-title {
+        color: #94a3b8;
+    }
+
+    .mobile-action-buttons {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .mobile-action-btn {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        min-height: 32px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        padding: 0;
+        transition: transform 0.1s ease, filter 0.15s ease;
+    }
+
+    .mobile-action-btn:active {
+        transform: scale(0.92);
+    }
+
+    .mobile-action-btn svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    /* Tombol Lihat (Mata - Biru) */
+    .mobile-action-btn.btn-view {
+        background-color: #dbeafe;
+        color: #2563eb;
+    }
+    .dark-mode .mobile-action-btn.btn-view {
+        background-color: rgba(37, 99, 235, 0.22);
+        color: #60a5fa;
+    }
+
+    /* Tombol Edit (Pensil - Kuning) */
+    .mobile-action-btn.btn-edit {
+        background-color: #fef3c7;
+        color: #d97706;
+    }
+    .dark-mode .mobile-action-btn.btn-edit {
+        background-color: rgba(217, 119, 6, 0.22);
+        color: #fbbf24;
+    }
+
+    /* Tombol Hapus (Sampah - Merah) */
+    .mobile-action-btn.btn-delete {
+        background-color: #fee2e2;
+        color: #ef4444;
+    }
+    .dark-mode .mobile-action-btn.btn-delete {
+        background-color: rgba(239, 68, 68, 0.22);
+        color: #f87171;
+    }
+
+    /* ---- Penyempurnaan tampilan card mobile ---- */
+    .mobile-siswa-list { gap: 14px; }
+
+    .mobile-siswa-card {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 16px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+
+    .mobile-siswa-info {
+        padding: 14px 16px 12px;
+        gap: 8px;
+    }
+
+    .mobile-siswa-nama { font-size: 16px; letter-spacing: -0.01em; }
+
+    .mobile-siswa-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(3, auto);
+        justify-content: start;
+        gap: 6px 14px;
+        margin-top: 2px;
+    }
+
+    .mobile-meta-label {
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #94a3b8;
+    }
+
+    .mobile-badge-pill { padding: 4px 10px; font-size: 12px; border-radius: 8px; }
+
+    .mobile-siswa-action-col {
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-end;
+        border-top: 1px solid #f1f5f9;
+        background: transparent;
+        padding: 6px 10px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .dark-mode .mobile-siswa-action-col {
+        border-top-color: var(--border-light, #334155);
+    }
+
+    .mobile-action-title { display: none; }
+
+    .mobile-action-buttons {
+        width: auto;
+        gap: 4px;
+    }
+
+    .mobile-action-buttons form { display: flex !important; margin: 0; }
+
+    .mobile-action-btn {
+        flex: none;
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        min-height: 30px;
+        border-radius: 8px;
+        background: transparent !important;
+        opacity: 0.75;
+    }
+
+    .mobile-action-btn:active,
+    .mobile-action-btn:hover { opacity: 1; background: #f1f5f9 !important; }
+
+    .mobile-action-btn svg { width: 15px; height: 15px; }
+    .mobile-action-btn.btn-view { color: #64748b; }
+    .mobile-action-btn.btn-edit { color: #64748b; }
+    .mobile-action-btn.btn-delete { color: #ef4444; }
+
+    /* Filter Card & Search Bar Mobile Responsive Sesuai Gambar */
+    .filter-card {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin-bottom: 2px !important;
+    }
+
+    .filter-form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .filter-search-wrap {
+        order: 1;
+        width: 100%;
+        position: relative;
+        margin: 0;
+        height: 42px;
+    }
+
+    .filter-search-input {
+        width: 100%;
+        height: 42px;
+        border-radius: 8px;
+        background: #ffffff;
+        border: 1px solid #d1d5db;
+        padding: 0 40px 0 14px;
+        font-size: 13.5px;
+        color: var(--text-main);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+
+    .dark-mode .filter-search-input {
+        background: var(--card-bg, #1e293b);
+        border-color: var(--border-light, #334155);
+        color: #f8fafc;
+    }
+
+    .filter-search-btn {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 34px;
+        height: 34px;
+        background: transparent !important;
+        border: none !important;
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+
+    /* Horizontal scrollable pills filter row */
+    .filter-group-left {
+        order: 2;
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+        width: 100%;
+    }
+    .filter-group-left::-webkit-scrollbar {
+        display: none;
+    }
+
+    .filter-select-wrap {
+        flex: 0 0 auto;
+        width: auto;
+        min-width: 0;
+        position: relative;
+    }
+
+    .filter-select-icon-left {
+        display: none !important;
+    }
+
+    .filter-select {
+        height: 34px !important;
+        line-height: 34px !important;
+        padding: 0 26px 0 14px !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        border-radius: 9999px !important;
+        cursor: pointer;
+        white-space: nowrap;
+        appearance: none;
+        -webkit-appearance: none;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    }
+
+    .filter-select option {
+        background-color: #ffffff;
+        color: #1e293b;
+    }
+    .dark-mode .filter-select option {
+        background-color: #1e293b;
+        color: #f8fafc;
+    }
+
+    /* Pill 1: Jenjang (Background Slate/Gray sesuai gambar) */
+    .filter-select-wrap:nth-child(1) .filter-select {
+        background-color: #64748b !important;
+        color: #ffffff !important;
+        border: 1px solid #64748b !important;
+    }
+    .filter-select-wrap:nth-child(1) .filter-select-icon-right {
+        color: #ffffff !important;
+    }
+
+    /* Pill 2, 3, 4: Kamar, Status, Kelengkapan (Background putih dengan border sesuai gambar) */
+    .filter-select-wrap:nth-child(2) .filter-select,
+    .filter-select-wrap:nth-child(3) .filter-select,
+    .filter-select-wrap:nth-child(4) .filter-select {
+        background-color: #ffffff !important;
+        color: #334155 !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    .filter-select-wrap:nth-child(2) .filter-select-icon-right,
+    .filter-select-wrap:nth-child(3) .filter-select-icon-right,
+    .filter-select-wrap:nth-child(4) .filter-select-icon-right {
+        color: #64748b !important;
+    }
+
+    .dark-mode .filter-select-wrap:nth-child(2) .filter-select,
+    .dark-mode .filter-select-wrap:nth-child(3) .filter-select,
+    .dark-mode .filter-select-wrap:nth-child(4) .filter-select {
+        background-color: var(--card-bg, #1e293b) !important;
+        color: #f1f5f9 !important;
+        border-color: var(--border-light, #334155) !important;
+    }
+
+    .filter-select-icon-right {
+        right: 9px;
+        pointer-events: none;
+    }
+    .filter-select-icon-right svg {
+        width: 12px !important;
+        height: 12px !important;
+    }
+
+    .filter-btn-reset {
+        height: 34px;
+        padding: 0 12px;
+        border-radius: 9999px;
+        font-size: 11.5px;
+        flex: 0 0 auto;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .mobile-empty-card {
+        background: #ffffff;
+        border: 1px dashed #cbd5e1;
+        border-radius: 14px;
+        padding: 32px 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 13px;
+        text-align: center;
+    }
+    .dark-mode .mobile-empty-card {
+        background: var(--card-bg);
+        border-color: var(--border-light);
+    }
+}
+</style>
+@endpush
 
 @section('content')
 <div style="display:flex; flex-direction:column; gap:20px;">
@@ -31,6 +713,34 @@
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
+        </div>
+    </div>
+    @endif
+
+    {{-- Banner Notifikasi Kelengkapan Data Diri Santri --}}
+    @if(isset($countBelumLengkap) && $countBelumLengkap > 0)
+    <div class="alert-incomplete-info">
+        <div class="alert-incomplete-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+        </div>
+        <div class="alert-incomplete-body">
+            <strong>Terdapat {{ $countBelumLengkap }} santri dengan data diri belum lengkap</strong>
+            <span>Baris santri ditandai merah tipis untuk memudahkan identifikasi. Klik icon pensil (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;display:inline-block;vertical-align:middle;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>) pada baris tersebut untuk mengoreksi / melengkapi data.</span>
+        </div>
+        <div class="alert-incomplete-action">
+            @if(request('kelengkapan') === 'belum_lengkap')
+                <a href="{{ route('siswa', request()->except('kelengkapan')) }}" class="btn-filter-tag active" title="Tampilkan semua santri">
+                    Tampilkan Semua
+                </a>
+            @else
+                <a href="{{ route('siswa', array_merge(request()->query(), ['kelengkapan' => 'belum_lengkap'])) }}" class="btn-filter-tag" title="Saring hanya santri yang belum lengkap">
+                    Saring yang Perlu Koreksi ({{ $countBelumLengkap }})
+                </a>
+            @endif
         </div>
     </div>
     @endif
@@ -105,7 +815,32 @@
                     </div>
                 </div>
 
-                @if(request('jenjang') || request('kamar') || request('status') || request('search'))
+                {{-- Filter Kelengkapan Data Diri --}}
+                <div class="filter-select-wrap">
+                    <div class="filter-select-icon-left">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                    </div>
+                    <select name="kelengkapan" id="filter_kelengkapan" class="form-select filter-select" onchange="this.form.submit()">
+                        <option value="">Semua Status Data</option>
+                        <option value="belum_lengkap" {{ request('kelengkapan') === 'belum_lengkap' ? 'selected' : '' }}>
+                            Perlu Koreksi {{ isset($countBelumLengkap) && $countBelumLengkap > 0 ? "($countBelumLengkap)" : '' }}
+                        </option>
+                        <option value="lengkap" {{ request('kelengkapan') === 'lengkap' ? 'selected' : '' }}>
+                            Data Lengkap
+                        </option>
+                    </select>
+                    <div class="filter-select-icon-right">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </div>
+
+                @if(request('jenjang') || request('kamar') || request('status') || request('kelengkapan') || request('search'))
                     <a href="{{ route('siswa') }}" class="btn btn-sm btn-secondary filter-btn-reset" title="Reset Filter">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -118,7 +853,7 @@
 
             <div class="filter-search-wrap">
                 <input type="text" name="search" value="{{ request('search') }}"
-                       class="form-control filter-search-input" placeholder="Cari nama santri / kamar...">
+                       class="form-control filter-search-input" placeholder="Cari nama santri/kamar...">
                 <button type="submit" class="btn btn-secondary filter-search-btn" title="Cari">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
                         <circle cx="11" cy="11" r="8"></circle>
@@ -144,9 +879,30 @@
                 </thead>
                 <tbody>
                     @forelse($siswa as $item)
-                    <tr>
+                    @php
+                        $isLengkap = $item->isDataLengkap();
+                        $missingFields = !$isLengkap ? $item->field_belum_lengkap : [];
+                    @endphp
+                    <tr class="{{ !$isLengkap ? 'row-incomplete' : '' }}">
                         <td class="cell-nama">
-                            <div>{{ $item->nama_lengkap }}</div>
+                            <div class="nama-wrapper">
+                                <div class="nama-text">{{ $item->nama_lengkap }}</div>
+                                @if(!$isLengkap)
+                                    <span class="badge-incomplete" title="Data belum lengkap: {{ implode(', ', $missingFields) }}">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                        </svg>
+                                        Perlu Dilengkapi
+                                    </span>
+                                @endif
+                            </div>
+                            @if(!$isLengkap && count($missingFields) > 0)
+                                <div class="text-missing-fields" title="Field yang belum diisi: {{ implode(', ', $missingFields) }}">
+                                    <span class="missing-label">Kurang:</span> {{ implode(', ', array_slice($missingFields, 0, 3)) }}{{ count($missingFields) > 3 ? ', +' . (count($missingFields) - 3) . ' lainnya' : '' }}
+                                </div>
+                            @endif
                         </td>
                         <td>
                             @php
@@ -180,9 +936,12 @@
                                     </svg>
                                 </a>
 
-                                {{-- Tombol Edit (Hanya Icon Pensil -> Menuju Formulir Pendaftaran) --}}
+                                {{-- Tombol Edit / Koreksi (Icon Pensil -> Menuju Formulir Pendaftaran) --}}
                                 @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
-                                <a href="{{ route('siswa.edit', $item->id) }}" class="action-btn action-btn-edit" title="Edit Formulir Pendaftaran Siswa" aria-label="Edit Formulir {{ $item->nama_lengkap }}">
+                                <a href="{{ route('siswa.edit', $item->id) }}"
+                                   class="action-btn {{ !$isLengkap ? 'action-btn-koreksi' : 'action-btn-edit' }}"
+                                   title="{{ !$isLengkap ? 'Edit & Koreksi Kelengkapan Data Santri (' . implode(', ', $missingFields) . ')' : 'Edit Formulir Pendaftaran Siswa' }}"
+                                   aria-label="{{ !$isLengkap ? 'Edit & Koreksi Data ' . $item->nama_lengkap : 'Edit Formulir ' . $item->nama_lengkap }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -231,6 +990,120 @@
                 </tbody>
             </table>
         </div>
+    </div>
+
+    {{-- Tampilan Mobile Card List (Khusus Tampilan Layar HP Sesuai Gambar) --}}
+    <div class="mobile-siswa-list">
+        @forelse($siswa as $item)
+        @php
+            $isLengkap = $item->isDataLengkap();
+            $missingFields = !$isLengkap ? $item->field_belum_lengkap : [];
+            $targetCetakUrl = $item->pendaftaran_id
+                ? route('pendaftaran.cetak', ['id' => $item->pendaftaran_id, 'from' => 'siswa'])
+                : route('siswa.show', $item->id);
+            $jenjangText = $item->jenjang ?? ($item->pendaftaran?->jenjang ?? 'Reguler');
+            $kamarText = $item->kamar ?? '-';
+            $statusText = ucfirst($item->status ?? 'aktif');
+            $statusKey = strtolower($item->status ?? 'aktif');
+        @endphp
+        <div class="mobile-siswa-card {{ !$isLengkap ? 'row-incomplete' : '' }}">
+            {{-- Sisi Kiri: Nama & Kolom Jenjang, Kamar, Status --}}
+            <div class="mobile-siswa-info">
+                <div class="mobile-siswa-nama-wrap">
+                    <span class="mobile-siswa-nama">{{ $item->nama_lengkap }}</span>
+                    @if(!$isLengkap)
+                        <span class="badge-incomplete" title="Data belum lengkap: {{ implode(', ', $missingFields) }}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            Perlu Dilengkapi
+                        </span>
+                    @endif
+                </div>
+
+                @if(!$isLengkap && count($missingFields) > 0)
+                    <div class="text-missing-fields" style="margin-bottom: 4px;" title="Field yang belum diisi: {{ implode(', ', $missingFields) }}">
+                        <span class="missing-label">Kurang:</span> {{ implode(', ', array_slice($missingFields, 0, 3)) }}{{ count($missingFields) > 3 ? ', +' . (count($missingFields) - 3) . ' lainnya' : '' }}
+                    </div>
+                @endif
+
+                <div class="mobile-siswa-meta-grid">
+                    <div class="mobile-meta-item">
+                        <span class="mobile-meta-label">Jenjang</span>
+                        <span class="mobile-badge-pill">{{ $jenjangText }}</span>
+                    </div>
+                    <div class="mobile-meta-item">
+                        <span class="mobile-meta-label">Kamar</span>
+                        <span class="mobile-badge-pill">{{ $kamarText }}</span>
+                    </div>
+                    <div class="mobile-meta-item mobile-meta-status">
+                        <span class="mobile-meta-label">&nbsp;</span>
+                        <span class="mobile-badge-pill status-{{ $statusKey }}">{{ $statusText }}</span>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Sisi Kanan: Kolom Aksi dengan Tombol Lihat, Edit, Hapus --}}
+            <div class="mobile-siswa-action-col">
+                <span class="mobile-action-title">Aksi</span>
+                <div class="mobile-action-buttons">
+                    {{-- Tombol Lihat (Mata - Biru) --}}
+                    <a href="{{ $targetCetakUrl }}" class="mobile-action-btn btn-view" title="Lihat Formulir Siswa" aria-label="Lihat Formulir {{ $item->nama_lengkap }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </a>
+
+                    {{-- Tombol Edit / Koreksi (Pensil - Kuning) --}}
+                    @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
+                    <a href="{{ route('siswa.edit', $item->id) }}"
+                       class="mobile-action-btn btn-edit {{ !$isLengkap ? 'is-koreksi' : '' }}"
+                       title="{{ !$isLengkap ? 'Edit & Koreksi Kelengkapan Data Santri (' . implode(', ', $missingFields) . ')' : 'Edit Formulir Pendaftaran Siswa' }}"
+                       aria-label="{{ !$isLengkap ? 'Edit & Koreksi Data ' . $item->nama_lengkap : 'Edit Formulir ' . $item->nama_lengkap }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </a>
+                    @endif
+
+                    {{-- Tombol Hapus (Sampah - Merah) --}}
+                    @if(!auth()->check() || auth()->user()->canDo('siswa', 'delete'))
+                    <form action="{{ route('siswa.destroy', $item->id) }}" method="POST" style="display:inline; margin:0;">
+                        @csrf
+                        @method('DELETE')
+                        <button type="button" class="mobile-action-btn btn-delete js-swal-confirm"
+                            data-title="Konfirmasi Hapus Siswa?"
+                            data-html="Apakah Anda yakin ingin menghapus data santri <strong>{{ $item->nama_lengkap }}</strong>?<br><div style='padding:12px 14px; background:var(--nav-hover-bg); border-radius:10px; border:1px solid var(--border-light); margin-top:12px; font-size:13px; text-align:left; line-height:1.6;'><div>Kamar: <strong>{{ $item->kamar }}</strong></div><div>Status: <strong>{{ ucfirst($item->status ?? 'aktif') }}</strong></div></div><div style='margin-top:10px; font-size:12.5px; color:#DC2626; font-weight:600;'>⚠️ Data yang sudah dihapus tidak dapat dipulihkan kembali.</div>"
+                            data-icon="warning"
+                            data-confirm-text="Ya, Hapus Data"
+                            data-confirm-color="#DC2626"
+                            data-cancel-text="Batal"
+                            title="Hapus Data Siswa" aria-label="Hapus Data {{ $item->nama_lengkap }}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                        </button>
+                    </form>
+                    @endif
+                </div>
+            </div>
+        </div>
+        @empty
+        <div class="mobile-empty-card">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:36px;height:36px;color:var(--text-muted);">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+            </svg>
+            <span>Tidak ada data siswa yang ditemukan.</span>
+        </div>
+        @endforelse
     </div>
 </div>
 

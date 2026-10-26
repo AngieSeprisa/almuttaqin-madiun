@@ -282,5 +282,92 @@
         @endif
     </div>
 
+    {{-- Tampilan Mobile Card List (Khusus Tampilan Layar HP Sesuai Gambar) --}}
+    <div class="mobile-card-list">
+        @forelse ($pendaftarans as $pendaftar)
+        @php
+            $jenjangText = $pendaftar->jenjang ?? 'Reguler';
+            $statusKey = strtolower($pendaftar->status_pendaftaran ?? 'pending');
+            $usiaText = $pendaftar->tanggal_lahir ? $pendaftar->tanggal_lahir->age . ' Thn' : '-';
+            $jkText = $pendaftar->jenis_kelamin ? ($pendaftar->jenis_kelamin === 'Laki-laki' ? 'L' : 'P') : '-';
+        @endphp
+        <div class="mobile-card-item">
+            <div class="mobile-card-info">
+                <div class="mobile-card-title-wrap">
+                    <span class="mobile-card-title">{{ $pendaftar->nama_lengkap }}</span>
+                    @if($pendaftar->penerima_kip)
+                        <span class="badge-kip" title="Penerima KIP / PIP / PKH" style="font-size:10px; padding:2px 6px;">KIP</span>
+                    @endif
+                </div>
+
+                <div class="mobile-card-subtitle">
+                    {{ $pendaftar->no_induk ?? '-' }} • NIK: {{ $pendaftar->nik ?? '-' }}
+                </div>
+
+                <div class="mobile-card-meta-grid">
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Jenjang</span>
+                        <span class="mobile-card-pill">{{ $jenjangText }}</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">JK / Usia</span>
+                        <span class="mobile-card-pill">{{ $jkText }} ({{ $usiaText }})</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">&nbsp;</span>
+                        <span class="mobile-card-pill status-{{ $statusKey }}">{{ $pendaftar->status_pendaftaran ?? 'Pending' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mobile-card-actions">
+                <span class="mobile-card-action-title">Aksi</span>
+                <div class="mobile-card-action-buttons">
+                    {{-- Tombol Lihat / Detail --}}
+                    <a href="{{ route('pendaftaran.show', $pendaftar->id) }}" class="mobile-btn-pastel mobile-btn-view" title="Detail & Verifikasi" aria-label="Detail {{ $pendaftar->nama_lengkap }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </a>
+
+                    {{-- Tombol Edit --}}
+                    @if(!auth()->check() || auth()->user()->canDo('pendaftaran', 'edit'))
+                    <a href="{{ route('pendaftaran.edit', $pendaftar->id) }}" class="mobile-btn-pastel mobile-btn-edit" title="Edit Formulir" aria-label="Edit {{ $pendaftar->nama_lengkap }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </a>
+                    @endif
+
+                    {{-- Tombol Cetak --}}
+                    <a href="{{ route('pendaftaran.cetak', $pendaftar->id) }}" class="mobile-btn-pastel mobile-btn-print" title="Cetak Formulir A4" aria-label="Cetak {{ $pendaftar->nama_lengkap }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                            <rect x="6" y="14" width="12" height="8"></rect>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+        @empty
+        <div class="mobile-empty-card">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:36px;height:36px;color:var(--text-muted);">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+            </svg>
+            <span>Belum ada calon santri yang mendaftar.</span>
+        </div>
+        @endforelse
+
+        @if ($pendaftarans->hasPages())
+        <div style="padding:10px 0;">
+            {{ $pendaftarans->links() }}
+        </div>
+        @endif
+    </div>
+
 </div>
 @endsection

@@ -192,6 +192,67 @@
                 </table>
             </div>
         </div>
+
+        {{-- Mobile Card List: Kelas --}}
+        <div class="mobile-card-list">
+            @forelse($dataKelas as $item)
+            <div class="mobile-card-item">
+                <div class="mobile-card-info">
+                    <div class="mobile-card-title">Kelas {{ $item->nama_kelas_display ?? $item->nama_kelas }}</div>
+                    <div class="mobile-card-subtitle">Tingkat {{ $item->tingkat ?? 7 }} &bull; Jenjang {{ $jenjang }}</div>
+
+                    <div class="mobile-card-meta-grid">
+                        <div class="mobile-card-meta-item">
+                            <span class="mobile-card-meta-label">Tingkat</span>
+                            <span class="mobile-card-pill mobile-card-pill-blue">Tingkat {{ $item->tingkat ?? 7 }}</span>
+                        </div>
+                        <div class="mobile-card-meta-item">
+                            <span class="mobile-card-meta-label">Jumlah</span>
+                            <span class="mobile-card-pill mobile-card-pill-green">{{ $item->jumlah_siswa }} Siswa</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mobile-card-actions">
+                    <span class="mobile-card-action-title">Aksi</span>
+                    <div class="mobile-card-action-buttons">
+                        <button type="button" class="mobile-btn-pastel mobile-btn-view"
+                                title="Lihat & Plotting Siswa"
+                                onclick="openAnggotaModal('{{ $item->nama_kelas }}')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+
+                        @if(isset($item->id))
+                        <button type="button" class="mobile-btn-pastel mobile-btn-edit"
+                                title="Edit Ruang Kelas"
+                                onclick="openEditKelasModal({{ $item->id }}, '{{ addslashes($item->nama_kelas) }}', {{ $item->tingkat ?? 7 }}, {{ $item->urutan ?? 1 }})">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+
+                        <button type="button" class="mobile-btn-pastel mobile-btn-delete"
+                                title="Hapus Ruang Kelas"
+                                onclick="confirmDeleteKelas({{ $item->id }}, '{{ addslashes($item->nama_kelas) }}', {{ $item->jumlah_siswa }})">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @empty
+            <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
+                Tidak ada kelas yang terdaftar untuk jenjang {{ $jenjang }}.
+            </div>
+            @endforelse
+        </div>
     </div>
 
     {{-- TAB 2: SISWA BELUM TERDAFTAR --}}
@@ -241,6 +302,46 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+
+        {{-- Mobile Card List: Siswa Belum Terdaftar --}}
+        <div class="mobile-card-list">
+            @forelse($belumTerdaftar as $siswa)
+            <div class="mobile-card-item">
+                <div class="mobile-card-info">
+                    <div class="mobile-card-title">{{ $siswa->nama_lengkap }}</div>
+                    <div class="mobile-card-subtitle">NISN: {{ $siswa->pendaftaran?->nisn ?? $siswa->nisn ?? '-' }}</div>
+
+                    <div class="mobile-card-meta-grid">
+                        <div class="mobile-card-meta-item">
+                            <span class="mobile-card-meta-label">Jenjang</span>
+                            <span class="mobile-card-pill mobile-card-pill-blue">{{ $jenjang }}</span>
+                        </div>
+                        <div class="mobile-card-meta-item">
+                            <span class="mobile-card-meta-label">&nbsp;</span>
+                            <span class="status-pill status-pill-warning">Belum Terdaftar</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mobile-card-actions">
+                    <span class="mobile-card-action-title">Aksi</span>
+                    <div class="mobile-card-action-buttons">
+                        <button type="button" class="mobile-btn-pastel mobile-btn-view"
+                                title="Mutasikan ke Kelas"
+                                onclick="openMutasiSingleModal({{ $siswa->id }}, '{{ addslashes($siswa->nama_lengkap) }}')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            @empty
+            <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
+                Semua siswa jenjang {{ $jenjang }} telah terdaftar ke kelas.
+            </div>
+            @endforelse
         </div>
     </div>
 
@@ -1455,6 +1556,12 @@ function filterTableRows() {
     document.querySelectorAll('#tableBelum tbody tr.pk-row-siswa').forEach(tr => {
         const text = tr.innerText.toLowerCase();
         tr.style.display = text.includes(q) ? '' : 'none';
+    });
+
+    // Filter kartu mobile di kedua tab
+    document.querySelectorAll('.pk-tab-pane .mobile-card-item').forEach(card => {
+        const text = card.innerText.toLowerCase();
+        card.style.display = text.includes(q) ? '' : 'none';
     });
 }
 

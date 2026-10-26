@@ -4,7 +4,11 @@
 ])
 
 @php
-    $displayTitle = $title ?? trim($__env->yieldContent('page-title', $__env->yieldContent('title', '')));
+    $rawTitle = $title ?? trim($__env->yieldContent('page-title', $__env->yieldContent('title', '')));
+    $displayTitle = (string)$rawTitle;
+    while (($decoded = html_entity_decode($displayTitle, ENT_QUOTES | ENT_HTML5, 'UTF-8')) !== $displayTitle) {
+        $displayTitle = $decoded;
+    }
     
     // Auto-generate breadcrumbs if not explicitly provided as an array
     if ($breadcrumbs === null) {
@@ -95,6 +99,19 @@
     } else {
         $customBreadcrumbHtml = null;
         $breadcrumbsList = is_array($breadcrumbs) ? $breadcrumbs : [];
+    }
+
+    if (is_array($breadcrumbsList)) {
+        foreach ($breadcrumbsList as &$bcItem) {
+            if (isset($bcItem['label'])) {
+                $label = (string)$bcItem['label'];
+                while (($decoded = html_entity_decode($label, ENT_QUOTES | ENT_HTML5, 'UTF-8')) !== $label) {
+                    $label = $decoded;
+                }
+                $bcItem['label'] = $label;
+            }
+        }
+        unset($bcItem);
     }
 
     $actionsContent = isset($actions) && trim($actions) !== '' ? $actions : trim($__env->yieldContent('header-actions'));

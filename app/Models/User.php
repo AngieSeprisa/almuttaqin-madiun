@@ -205,7 +205,7 @@ class User extends Authenticatable
         if ($this->role === 'admin_lembaga' && in_array($menuCode, [
             'presensi', 'rekap_absensi', 'pengaturan_absensi', 'guru_sekolah', 
             'plotting_mapel', 'plotting_kelas', 'jadwal_pelajaran',
-            'data_master', 'master_kelas', 'master_jam', 'master_lembaga'
+            'data_master', 'master_kelas', 'master_jam', 'master_lembaga', 'master_import_siswa'
         ])) {
             return true;
         }

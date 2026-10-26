@@ -88,7 +88,7 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow-x: clip;
   transition: background-color var(--transition-default), color var(--transition-default);
 }
 
@@ -2465,7 +2465,7 @@ html.dark-mode .status-badge.status-sakit {
     padding: 0 !important;
     min-width: 0 !important;
     max-width: 100vw !important;
-    overflow-x: hidden;
+    overflow-x: clip;
     box-sizing: border-box;
   }
 
@@ -5573,10 +5573,15 @@ html.dark-mode .clean-input-control:focus {
 
 /* Mobile Filter System Responsive (<= 768px) */
 @media (max-width: 768px) {
+  /* ========================================================
+     UNIVERSAL MOBILE FILTER & SEARCH SYSTEM
+     ======================================================== */
   .filter-card {
-    padding: 12px 14px;
-    border-radius: 14px;
-    margin-bottom: 14px;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-bottom: 6px !important;
   }
 
   .filter-form {
@@ -5587,106 +5592,452 @@ html.dark-mode .clean-input-control:focus {
     width: 100%;
   }
 
-  /* Search bar is placed prominently on top with proper fixed height */
+  /* Search bar full-width on top */
   .filter-search-wrap {
-    order: -1;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    margin-left: 0;
-    flex: none !important; /* Overrides flex-basis: 240px that caused giant vertical stretching */
-    height: 42px;
-    gap: 8px;
+    order: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-left: 0 !important;
+    flex: none !important;
+    height: 42px !important;
+    position: relative !important;
   }
 
   .filter-search-input {
-    height: 42px;
-    font-size: 13.5px;
-    padding: 0 14px;
-    border-radius: 10px;
-    background-color: var(--bg-surface);
+    width: 100% !important;
+    height: 42px !important;
+    font-size: 13.5px !important;
+    padding: 0 40px 0 14px !important;
+    border-radius: 8px !important;
+    border: 1px solid #d1d5db !important;
+    background-color: #ffffff !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  }
+
+  .dark-mode .filter-search-input {
+    background-color: var(--card-bg, #1e293b) !important;
+    border-color: var(--border-light, #334155) !important;
+    color: #f8fafc !important;
   }
 
   .filter-search-btn {
-    height: 42px;
-    width: 44px;
-    min-width: 44px;
-    border-radius: 10px;
-    background-color: var(--electric-blue);
-    border: 1px solid var(--electric-blue);
-    color: #FFFFFF;
+    position: absolute !important;
+    right: 4px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    height: 34px !important;
+    width: 34px !important;
+    min-width: 34px !important;
+    border-radius: 8px !important;
+    background: transparent !important;
+    border: none !important;
+    color: #94a3b8 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
   }
 
-  .filter-search-btn:hover,
-  .filter-search-btn:active {
-    background-color: var(--electric-blue-hover);
-    border-color: var(--electric-blue-hover);
-    color: #FFFFFF;
-  }
-
-  /* Dropdown filters arranged in a clean, compact 2-column grid */
+  /* Horizontal scrollable pills filter row */
   .filter-group-left {
-    order: 2;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    width: 100%;
+    order: 2 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding-bottom: 4px !important;
+  }
+
+  .filter-group-left::-webkit-scrollbar {
+    display: none !important;
   }
 
   .filter-select-wrap {
-    width: 100%;
-    min-width: 0;
-  }
-
-  /* Single filter takes full width */
-  .filter-group-left > .filter-select-wrap:only-child {
-    grid-column: 1 / -1;
-  }
-
-  /* 3rd filter without reset button spans 2 columns */
-  .filter-group-left > .filter-select-wrap:nth-child(3):last-child {
-    grid-column: 1 / -1;
-  }
-
-  .filter-select {
-    width: 100%;
-    min-width: 0;
-    height: 38px;
-    line-height: 38px;
-    font-size: 12.5px;
-    padding: 0 28px 0 32px;
-    border-radius: 8px;
-    background-color: var(--nav-hover-bg);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-
-  .filter-select-icon-left svg,
-  .filter-select-icon-right svg {
-    width: 13px !important;
-    height: 13px !important;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    position: relative !important;
   }
 
   .filter-select-icon-left {
-    left: 9px;
+    display: none !important;
+  }
+
+  .filter-select {
+    height: 34px !important;
+    line-height: 34px !important;
+    padding: 0 26px 0 14px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    border-radius: 9999px !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  }
+
+  .filter-select option {
+    background-color: #ffffff;
+    color: #1e293b;
+  }
+  .dark-mode .filter-select option {
+    background-color: #1e293b;
+    color: #f8fafc;
+  }
+
+  /* Pill 1: Slate/gray filled */
+  .filter-select-wrap:nth-child(1) .filter-select {
+    background-color: #64748b !important;
+    color: #ffffff !important;
+    border: 1px solid #64748b !important;
+  }
+  .filter-select-wrap:nth-child(1) .filter-select-icon-right {
+    color: #ffffff !important;
+  }
+
+  /* Subsequent Pills: White with border */
+  .filter-select-wrap:nth-child(2) .filter-select,
+  .filter-select-wrap:nth-child(3) .filter-select,
+  .filter-select-wrap:nth-child(4) .filter-select,
+  .filter-select-wrap:nth-child(5) .filter-select {
+    background-color: #ffffff !important;
+    color: #334155 !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+  .filter-select-wrap:nth-child(2) .filter-select-icon-right,
+  .filter-select-wrap:nth-child(3) .filter-select-icon-right,
+  .filter-select-wrap:nth-child(4) .filter-select-icon-right,
+  .filter-select-wrap:nth-child(5) .filter-select-icon-right {
+    color: #64748b !important;
+  }
+
+  .dark-mode .filter-select-wrap:nth-child(2) .filter-select,
+  .dark-mode .filter-select-wrap:nth-child(3) .filter-select,
+  .dark-mode .filter-select-wrap:nth-child(4) .filter-select,
+  .dark-mode .filter-select-wrap:nth-child(5) .filter-select {
+    background-color: var(--card-bg, #1e293b) !important;
+    color: #f1f5f9 !important;
+    border-color: var(--border-light, #334155) !important;
   }
 
   .filter-select-icon-right {
-    right: 9px;
+    right: 9px !important;
+    pointer-events: none !important;
+  }
+  .filter-select-icon-right svg {
+    width: 12px !important;
+    height: 12px !important;
   }
 
   .filter-btn-reset {
-    height: 38px;
-    font-size: 12px;
-    border-radius: 8px;
-    width: 100%;
-    box-sizing: border-box;
+    height: 34px !important;
+    padding: 0 12px !important;
+    border-radius: 9999px !important;
+    font-size: 11.5px !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    box-sizing: border-box !important;
   }
 
-  /* Solitary reset button in its row spans both columns */
-  .filter-group-left > .filter-btn-reset:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
+  /* ========================================================
+     UNIVERSAL MOBILE CARDS SYSTEM (MATCHING SCREENSHOT)
+     ======================================================== */
+  .table-card:has(+ .mobile-card-list),
+  .table-card:has(~ .mobile-card-list),
+  .form-section-card:has(+ .mobile-card-list),
+  .form-section-card:has(~ .mobile-card-list),
+  .pk-table-card:has(+ .mobile-card-list),
+  .pk-table-card:has(~ .mobile-card-list),
+  .mapel-table-responsive:has(+ .mobile-card-list),
+  .table-responsive:has(+ .mobile-card-list),
+  .table-container:has(+ .mobile-card-list) {
+    display: none !important;
+  }
+
+  .mobile-card-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+
+  .mobile-card-item {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 13px 15px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .dark-mode .mobile-card-item {
+    background: var(--card-bg, #1e293b);
+    border-color: var(--border-light, #334155);
+    box-shadow: none;
+  }
+
+  .mobile-card-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mobile-card-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .mobile-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.3;
+    word-break: break-word;
+  }
+
+  .dark-mode .mobile-card-title {
+    color: #f8fafc;
+  }
+
+  .mobile-card-subtitle {
+    font-size: 12px;
+    color: var(--text-muted, #64748b);
+    line-height: 1.3;
+  }
+
+  .mobile-card-meta-grid {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+  }
+
+  .mobile-card-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mobile-card-meta-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #64748b;
+    line-height: 1;
+  }
+
+  .dark-mode .mobile-card-meta-label {
+    color: #94a3b8;
+  }
+
+  .mobile-card-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    background-color: #f1f5f9;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+
+  .dark-mode .mobile-card-pill {
+    background-color: #334155;
+    color: #f1f5f9;
+    border-color: #475569;
+  }
+
+  .mobile-card-pill.status-green,
+  .mobile-card-pill.status-aktif,
+  .mobile-card-pill.status-diterima,
+  .mobile-card-pill.status-disetujui,
+  .mobile-card-pill.status-sembuh,
+  .mobile-card-pill.status-sudah_kembali {
+    background-color: #dcfce7 !important;
+    color: #15803d !important;
+    border: 1px solid #bbf7d0 !important;
+  }
+
+  .mobile-card-pill.status-yellow,
+  .mobile-card-pill.status-pulang,
+  .mobile-card-pill.status-pending,
+  .mobile-card-pill.status-menunggu,
+  .mobile-card-pill.status-sambang {
+    background-color: #fef3c7 !important;
+    color: #b45309 !important;
+    border: 1px solid #fde68a !important;
+  }
+
+  .mobile-card-pill.status-red,
+  .mobile-card-pill.status-sakit,
+  .mobile-card-pill.status-ditolak,
+  .mobile-card-pill.status-nonaktif,
+  .mobile-card-pill.status-melewati_batas {
+    background-color: #fee2e2 !important;
+    color: #b91c1c !important;
+    border: 1px solid #fecaca !important;
+  }
+
+  .dark-mode .mobile-card-pill.status-green,
+  .dark-mode .mobile-card-pill.status-aktif,
+  .dark-mode .mobile-card-pill.status-diterima,
+  .dark-mode .mobile-card-pill.status-disetujui,
+  .dark-mode .mobile-card-pill.status-sembuh,
+  .dark-mode .mobile-card-pill.status-sudah_kembali {
+    background-color: rgba(34, 197, 94, 0.18) !important;
+    color: #4ade80 !important;
+    border-color: rgba(34, 197, 94, 0.35) !important;
+  }
+
+  .mobile-card-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .mobile-card-action-title {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #475569;
+    line-height: 1;
+    text-align: right;
+    padding-right: 2px;
+  }
+
+  .dark-mode .mobile-card-action-title {
+    color: #94a3b8;
+  }
+
+  .mobile-card-action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .mobile-btn-pastel {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0;
+    transition: transform 0.1s ease, filter 0.15s ease;
+  }
+
+  .mobile-btn-pastel:active {
+    transform: scale(0.92);
+  }
+
+  .mobile-btn-pastel svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  /* Pastel View (Blue) */
+  .mobile-btn-view {
+    background-color: #dbeafe !important;
+    color: #2563eb !important;
+  }
+  .dark-mode .mobile-btn-view {
+    background-color: rgba(37, 99, 235, 0.22) !important;
+    color: #60a5fa !important;
+  }
+
+  /* Pastel Edit (Yellow) */
+  .mobile-btn-edit {
+    background-color: #fef3c7 !important;
+    color: #d97706 !important;
+  }
+  .dark-mode .mobile-btn-edit {
+    background-color: rgba(217, 119, 6, 0.22) !important;
+    color: #fbbf24 !important;
+  }
+
+  /* Pastel Delete (Red) */
+  .mobile-btn-delete {
+    background-color: #fee2e2 !important;
+    color: #ef4444 !important;
+  }
+  .dark-mode .mobile-btn-delete {
+    background-color: rgba(239, 68, 68, 0.22) !important;
+    color: #f87171 !important;
+  }
+
+  /* Pastel Print (Purple) */
+  .mobile-btn-print {
+    background-color: #ede9fe !important;
+    color: #7c3aed !important;
+  }
+  .dark-mode .mobile-btn-print {
+    background-color: rgba(124, 58, 237, 0.22) !important;
+    color: #a78bfa !important;
+  }
+
+  /* Pastel Key / Reset (Indigo) */
+  .mobile-btn-key {
+    background-color: #e0e7ff !important;
+    color: #4338ca !important;
+  }
+  .dark-mode .mobile-btn-key {
+    background-color: rgba(67, 56, 202, 0.22) !important;
+    color: #818cf8 !important;
+  }
+
+  /* Pastel Success (Green) */
+  .mobile-btn-success {
+    background-color: #dcfce7 !important;
+    color: #16a34a !important;
+  }
+  .dark-mode .mobile-btn-success {
+    background-color: rgba(22, 163, 74, 0.22) !important;
+    color: #4ade80 !important;
+  }
+
+  .mobile-empty-card {
+    background: #ffffff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 14px;
+    padding: 32px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+  }
+  .dark-mode .mobile-empty-card {
+    background: var(--card-bg);
+    border-color: var(--border-light);
   }
 }
 

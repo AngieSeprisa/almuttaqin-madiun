@@ -50,6 +50,17 @@ class SiswaController extends Controller
 
         $siswa = $query->latest('id')->get();
 
+        $countBelumLengkap = $siswa->filter(fn($item) => !$item->isDataLengkap())->count();
+
+        // Filter kelengkapan data diri
+        if ($request->filled('kelengkapan')) {
+            if ($request->kelengkapan === 'belum_lengkap') {
+                $siswa = $siswa->filter(fn($item) => !$item->isDataLengkap())->values();
+            } elseif ($request->kelengkapan === 'lengkap') {
+                $siswa = $siswa->filter(fn($item) => $item->isDataLengkap())->values();
+            }
+        }
+
         // Ambil daftar unik kamar dari database
         $kamars = Siswa::whereNotNull('kamar')
             ->where('kamar', '!=', '')
@@ -59,7 +70,7 @@ class SiswaController extends Controller
 
         $jenjangList = ['Reguler', 'SMP', 'SMA'];
 
-        return view('siswa', compact('siswa', 'activeRoom', 'kamars', 'jenjangList'));
+        return view('siswa', compact('siswa', 'activeRoom', 'kamars', 'jenjangList', 'countBelumLengkap'));
     }
 
     /**
@@ -284,52 +295,8 @@ class SiswaController extends Controller
             $pendaftaran = Pendaftaran::create([
                 'jenjang' => $siswa->jenjang ?? 'Reguler',
                 'no_induk' => "PSB-{$tahun}-{$urut}",
-                'nik' => '3519' . str_pad($siswa->id % 99, 2, '0', STR_PAD_LEFT) . date('dmy') . rand(1000, 9999),
                 'nama_lengkap' => $siswa->nama_lengkap,
                 'nama_panggilan' => $panggilan,
-                'tempat_lahir' => 'Kota Madiun',
-                'tanggal_lahir' => '2008-01-01',
-                'jenis_kelamin' => 'Laki-laki',
-                'anak_ke' => 1,
-                'jumlah_saudara' => 2,
-                'tinggal_bersama' => 'Orang Tua',
-                'mulai_pengajian' => 'sejak kecil',
-                'alamat_jalan' => 'Jl. Nogososro No. 26',
-                'rt_rw' => '001/001',
-                'desa_kelurahan' => 'Josenan',
-                'kecamatan' => 'Taman',
-                'kab_kota' => 'Kota Madiun',
-                'kode_pos' => '63134',
-                'provinsi' => 'Jawa Timur',
-                'warga_negara' => 'Indonesia',
-                'kelompok' => 'Bina Syarekah',
-                'desa' => 'Mentawai',
-                'daerah' => 'Madiun Kota',
-                'pendidikan_terakhir' => 'SMP/MTs',
-                'status_mondok' => 'Person',
-                'pj_biaya_nama' => 'Orang Tua',
-                'pj_biaya_hp' => '-',
-                'penyakit_diderita' => 'Tidak Ada',
-                'alergi' => '-',
-                'gol_darah' => 'O',
-                'ayah_nama' => 'Bapak ' . $panggilan,
-                'ayah_status' => 'Hidup',
-                'ayah_agama' => 'Islam',
-                'ayah_wn' => 'Indonesia',
-                'ayah_daerah' => 'Madiun Kota',
-                'ayah_desa' => 'Mentawai',
-                'ayah_kelompok' => 'Bina Syarekah',
-                'ibu_nama' => 'Ibu ' . $panggilan,
-                'ibu_status' => 'Hidup',
-                'ibu_agama' => 'Islam',
-                'ibu_wn' => 'Indonesia',
-                'ibu_daerah' => 'Madiun Kota',
-                'ibu_desa' => 'Mentawai',
-                'ibu_kelompok' => 'Bina Syarekah',
-                'berkas_akta' => true,
-                'berkas_kk' => true,
-                'berkas_ktp_ortu' => true,
-                'berkas_surat_pernyataan' => true,
                 'status_pendaftaran' => 'Diterima',
             ]);
 

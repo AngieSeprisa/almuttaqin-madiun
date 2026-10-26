@@ -284,5 +284,104 @@
             </table>
         </div>
     </div>
+
+    {{-- Tampilan Mobile Card List (Khusus Tampilan Layar HP Sesuai Gambar) --}}
+    <div class="mobile-card-list">
+        @forelse($perizinan as $item)
+        @php
+            $effectiveStatus = $item->effective_status;
+            $statusKey = match($effectiveStatus) {
+                'sudah_kembali' => 'sudah_kembali',
+                'melewati_batas' => 'melewati_batas',
+                default => 'sambang',
+            };
+            $statusLabel = match($effectiveStatus) {
+                'sudah_kembali' => 'Sudah Kembali',
+                'melewati_batas' => 'Melewati Batas',
+                default => 'Sambang',
+            };
+            $mulaiText = $item->tanggal_mulai ? $item->tanggal_mulai->format('d M Y') : '-';
+            $kembaliText = $item->tanggal_kembali ? $item->tanggal_kembali->format('d M Y') : '-';
+        @endphp
+        <div class="mobile-card-item">
+            <div class="mobile-card-info">
+                <div class="mobile-card-title-wrap">
+                    <span class="mobile-card-title">{{ $item->nama }}</span>
+                </div>
+
+                <div class="mobile-card-subtitle">
+                    Kamar: {{ $item->kamar }}{{ $item->keterangan ? ' • ' . $item->keterangan : '' }}
+                </div>
+
+                <div class="mobile-card-meta-grid">
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Mulai</span>
+                        <span class="mobile-card-pill">{{ $mulaiText }}</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">Estimasi Kembali</span>
+                        <span class="mobile-card-pill">{{ $kembaliText }}</span>
+                    </div>
+                    <div class="mobile-card-meta-item">
+                        <span class="mobile-card-meta-label">&nbsp;</span>
+                        <span class="mobile-card-pill status-{{ $statusKey }}">{{ $statusLabel }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mobile-card-actions">
+                <span class="mobile-card-action-title">Aksi</span>
+                <div class="mobile-card-action-buttons">
+                    {{-- Tombol Tandai Kembali --}}
+                    @if($effectiveStatus !== 'sudah_kembali')
+                    <form action="{{ route('perizinan.sambang.kembali', $item->id) }}" method="POST" style="display:inline; margin:0;">
+                        @csrf
+                        <button type="submit" class="mobile-btn-pastel mobile-btn-success" title="Tandai Sudah Kembali" aria-label="Tandai Kembali {{ $item->nama }}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </button>
+                    </form>
+                    @endif
+
+                    {{-- Tombol Edit --}}
+                    <button type="button" class="mobile-btn-pastel mobile-btn-edit" data-modal-target="modalEditSambang{{ $item->id }}" title="Edit Perizinan" aria-label="Edit Perizinan {{ $item->nama }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+
+                    {{-- Tombol Hapus --}}
+                    <form action="{{ route('perizinan.sambang.destroy', $item->id) }}" method="POST" style="display:inline; margin:0;">
+                        @csrf
+                        @method('DELETE')
+                        <button type="button" class="mobile-btn-pastel mobile-btn-delete js-swal-confirm"
+                            data-title="Konfirmasi Hapus Perizinan?"
+                            data-html="Apakah Anda yakin ingin menghapus perizinan sambang untuk santri <strong>{{ $item->nama }}</strong>?"
+                            data-icon="warning"
+                            data-confirm-text="Ya, Hapus"
+                            data-confirm-color="#DC2626"
+                            data-cancel-text="Batal"
+                            title="Hapus Perizinan" aria-label="Hapus Perizinan {{ $item->nama }}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        @empty
+        <div class="mobile-empty-card">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:36px;height:36px;color:var(--text-muted);">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+            </svg>
+            <span>Belum ada data perizinan sambang.</span>
+        </div>
+        @endforelse
+    </div>
 </div>
 @endsection
