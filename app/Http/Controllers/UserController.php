@@ -28,6 +28,10 @@ class UserController extends Controller
             'pengaturan_absensi' => 'Pengaturan Absensi Guru',
             'guru_sekolah'       => 'Guru Sekolah (Pengelolaan & Approval Mapel)',
             'plotting_mapel'     => 'Plotting Mata Pelajaran',
+            'plotting_kelas'     => 'Plotting Kelas',
+            'master_kelas'       => 'Master Ruang Kelas',
+            'master_jam'         => 'Master Jam Pelajaran (Time Slot)',
+            'master_lembaga'     => 'Master Lembaga Pendidikan',
             'pengguna'           => 'Pengguna & Hak Akses',
         ];
     }

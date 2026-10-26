@@ -255,6 +255,49 @@
                 </div>
                 @endif
 
+                {{-- Menu Data Master dengan Submenu Ruang Kelas, Jam Pelajaran & Lembaga --}}
+                @if(!$authUser || $authUser->canDo('data_master', 'view') || $authUser->canDo('master_kelas', 'view') || $authUser->canDo('master_jam', 'view') || $authUser->canDo('master_lembaga', 'view'))
+                <div class="nav-group {{ request()->routeIs('master.*') ? 'open' : '' }}" id="navGroupDataMaster">
+                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('master.*') ? 'active' : '' }}" id="toggleDataMaster" title="Data Master">
+                        <span class="nav-item-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-item-text">Data Master</span>
+                        <span class="nav-item-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="sidebar-subnav">
+                        @if(!$authUser || $authUser->canDo('master_kelas', 'view') || $authUser->canDo('data_master', 'view'))
+                        <a href="{{ route('master.kelas.index') }}" class="subnav-item {{ request()->routeIs('master.kelas.*') ? 'active' : '' }}" title="Master Ruang Kelas">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Ruang Kelas</span>
+                        </a>
+                        @endif
+
+                        @if(!$authUser || $authUser->canDo('master_jam', 'view') || $authUser->canDo('data_master', 'view'))
+                        <a href="{{ route('master.jam-pelajaran.index') }}" class="subnav-item {{ request()->routeIs('master.jam-pelajaran.*') ? 'active' : '' }}" title="Master Jam Pelajaran">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Jam Pelajaran</span>
+                        </a>
+                        @endif
+
+                        @if(!$authUser || $authUser->canDo('master_lembaga', 'view') || $authUser->canDo('data_master', 'view'))
+                        <a href="{{ route('master.lembaga.index') }}" class="subnav-item {{ request()->routeIs('master.lembaga.*') ? 'active' : '' }}" title="Master Lembaga Pendidikan">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Lembaga</span>
+                        </a>
+                        @endif
+                    </div>
+                </div>
+                @endif
+
                 {{-- Menu Pengaturan Sekolah dengan Submenu Absensi Guru, Guru Sekolah, Plotting Mata Pelajaran & Plotting Kelas --}}
                 @if(!$authUser || $authUser->canDo('pengaturan_absensi', 'view') || $authUser->canDo('guru_sekolah', 'view') || $authUser->canDo('plotting_mapel', 'view') || $authUser->canDo('plotting_kelas', 'view'))
                 <div class="nav-group {{ request()->routeIs('pengaturan-absensi.*') || request()->routeIs('guru-sekolah.*') || request()->routeIs('plotting-mapel.*') || request()->routeIs('plotting-kelas.*') || request()->routeIs('pengaturan.*') ? 'open' : '' }}" id="navGroupPengaturan">

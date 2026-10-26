@@ -18,34 +18,38 @@
     {{-- Hero Welcome Card untuk Mobile & Desktop --}}
     <div class="beranda-hero-card">
         <div class="beranda-hero-content" style="width: 100%;">
-            <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                <h1 class="beranda-hero-title" style="margin: 0;">
+            <div class="beranda-hero-header">
+                <h1 class="beranda-hero-title">
                     Halo, {{ $firstName }} 👋
                 </h1>
-                <span style="font-size: 13px; font-weight: 500; color: var(--text-muted, #64748b);">{{ $tanggalFormatted }}</span>
+                <span class="beranda-hero-date">{{ $tanggalFormatted }}</span>
             </div>
 
-            <div class="beranda-ticker-wrapper" id="berandaTickerWrapper" style="margin-top: 10px;">
+            <div class="beranda-ticker-wrapper" id="berandaTickerWrapper">
                 @if(!empty($pengumumanList) && count($pengumumanList) > 0)
                     <div class="beranda-ticker-carousel" id="berandaTickerCarousel">
                         @foreach($pengumumanList as $idx => $item)
                             <div class="beranda-ticker-item {{ $idx === 0 ? 'active' : '' }}" data-index="{{ $idx }}">
-                                <span class="ticker-badge ticker-badge-{{ $item['tipe'] }}">
-                                    @if($item['tipe'] === 'jadwal')
-                                        <svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                                <div class="ticker-badge-col">
+                                    <span class="ticker-badge ticker-badge-{{ $item['tipe'] }}">
+                                        @if($item['tipe'] === 'jadwal')
+                                            <svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                                        @else
+                                            <svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                        @endif
+                                        {{ $item['badge'] }}
+                                    </span>
+                                </div>
+                                <div class="ticker-text-col">
+                                    @if(!empty($item['url']))
+                                        <a href="{{ $item['url'] }}" class="ticker-text ticker-link" title="Buka jadwal">
+                                            <span>{{ $item['text'] }}</span>
+                                            <svg class="ticker-link-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                                        </a>
                                     @else
-                                        <svg class="ticker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                        <span class="ticker-text">{{ $item['text'] }}</span>
                                     @endif
-                                    {{ $item['badge'] }}
-                                </span>
-                                @if(!empty($item['url']))
-                                    <a href="{{ $item['url'] }}" class="ticker-text ticker-link" style="color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Buka jadwal">
-                                        <span>{{ $item['text'] }}</span>
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6; flex-shrink: 0;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
-                                    </a>
-                                @else
-                                    <span class="ticker-text">{{ $item['text'] }}</span>
-                                @endif
+                                </div>
                             </div>
                         @endforeach
                     </div>
@@ -66,7 +70,7 @@
                         </svg>
                         <span class="ticker-empty-text">tidak ada jadwal mengajar / tidak ada agenda hari ini</span>
                         @if(Route::has('jadwal-pelajaran.saya'))
-                            <a href="{{ route('jadwal-pelajaran.saya') }}" style="margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--electric-blue, #0052FF); text-decoration: none; display: inline-flex; align-items: center; gap: 3px;">
+                            <a href="{{ route('jadwal-pelajaran.saya') }}" class="ticker-empty-link">
                                 <span>Lihat Jadwal Saya</span>
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
                             </a>

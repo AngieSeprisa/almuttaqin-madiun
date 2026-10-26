@@ -18,6 +18,7 @@ jobs:
             cd /var/www/al-muttaqin
             git config --global --add safe.directory /var/www/al-muttaqin
             git pull origin main
+            php artisan storage:link
             php artisan migrate --force
             php artisan optimize:clear
             php artisan optimize

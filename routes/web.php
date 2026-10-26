@@ -4,8 +4,10 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BerandaController;
+use App\Http\Controllers\ClassroomController;
 use App\Http\Controllers\GuruSekolahController;
 use App\Http\Controllers\JadwalPelajaranController;
+use App\Http\Controllers\LembagaController;
 use App\Http\Controllers\PendaftaranController;
 use App\Http\Controllers\PengaturanAbsensiController;
 use App\Http\Controllers\PlottingKelasController;
@@ -17,6 +19,7 @@ use App\Http\Controllers\QuickSearchController;
 use App\Http\Controllers\RekapAbsensiController;
 use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\SiswaController;
+use App\Http\Controllers\TimeSlotController;
 use App\Http\Controllers\UserController;
 
 
@@ -275,5 +278,71 @@ Route::middleware('auth')->group(function () {
         Route::delete('/{pengguna}', [UserController::class, 'destroy'])
             ->middleware('permission:pengguna,delete')
             ->name('destroy');
+    });
+
+    // Menu Data Master (Ruang Kelas, Jam Pelajaran, Lembaga)
+    Route::prefix('master')->name('master.')->group(function () {
+        // Master Ruang Kelas
+        Route::prefix('kelas')->name('kelas.')->group(function () {
+            Route::get('/', [ClassroomController::class, 'index'])
+                ->middleware('permission:master_kelas|data_master,view')
+                ->name('index');
+            Route::post('/', [ClassroomController::class, 'store'])
+                ->middleware('permission:master_kelas|data_master,create')
+                ->name('store');
+            Route::put('/{kela}', [ClassroomController::class, 'update'])
+                ->middleware('permission:master_kelas|data_master,edit')
+                ->name('update');
+            Route::patch('/{kela}/toggle-status', [ClassroomController::class, 'toggleStatus'])
+                ->middleware('permission:master_kelas|data_master,edit')
+                ->name('toggle-status');
+            Route::delete('/{kela}', [ClassroomController::class, 'destroy'])
+                ->middleware('permission:master_kelas|data_master,delete')
+                ->name('destroy');
+            Route::post('/muat-standar', [ClassroomController::class, 'muatStandar'])
+                ->middleware('permission:master_kelas|data_master,create')
+                ->name('muat-standar');
+        });
+
+        // Master Jam Pelajaran / Time Slot
+        Route::prefix('jam-pelajaran')->name('jam-pelajaran.')->group(function () {
+            Route::get('/', [TimeSlotController::class, 'index'])
+                ->middleware('permission:master_jam|data_master,view')
+                ->name('index');
+            Route::post('/', [TimeSlotController::class, 'store'])
+                ->middleware('permission:master_jam|data_master,create')
+                ->name('store');
+            Route::put('/{jamPelajaran}', [TimeSlotController::class, 'update'])
+                ->middleware('permission:master_jam|data_master,edit')
+                ->name('update');
+            Route::patch('/{jamPelajaran}/toggle-status', [TimeSlotController::class, 'toggleStatus'])
+                ->middleware('permission:master_jam|data_master,edit')
+                ->name('toggle-status');
+            Route::delete('/{jamPelajaran}', [TimeSlotController::class, 'destroy'])
+                ->middleware('permission:master_jam|data_master,delete')
+                ->name('destroy');
+            Route::post('/muat-standar', [TimeSlotController::class, 'muatStandar'])
+                ->middleware('permission:master_jam|data_master,create')
+                ->name('muat-standar');
+        });
+
+        // Master Lembaga Pendidikan
+        Route::prefix('lembaga')->name('lembaga.')->group(function () {
+            Route::get('/', [LembagaController::class, 'index'])
+                ->middleware('permission:master_lembaga|data_master,view')
+                ->name('index');
+            Route::post('/', [LembagaController::class, 'store'])
+                ->middleware('permission:master_lembaga|data_master,create')
+                ->name('store');
+            Route::put('/{lembaga}', [LembagaController::class, 'update'])
+                ->middleware('permission:master_lembaga|data_master,edit')
+                ->name('update');
+            Route::patch('/{lembaga}/toggle-status', [LembagaController::class, 'toggleStatus'])
+                ->middleware('permission:master_lembaga|data_master,edit')
+                ->name('toggle-status');
+            Route::delete('/{lembaga}', [LembagaController::class, 'destroy'])
+                ->middleware('permission:master_lembaga|data_master,delete')
+                ->name('destroy');
+        });
     });
 });

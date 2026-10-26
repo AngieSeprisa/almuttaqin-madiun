@@ -237,9 +237,13 @@
                         {{-- Identitas Guru --}}
                         <td style="padding:14px 16px;">
                             <div style="display:flex; align-items:center; gap:12px;">
-                                <div style="width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg, #3B82F6, #1D4ED8); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:14px; flex-shrink:0;">
-                                    {{ strtoupper(substr($guru->name, 0, 1)) }}
-                                </div>
+                                @if($guru->foto_url)
+                                    <img src="{{ $guru->foto_url }}" alt="{{ $guru->name }}" style="width:38px; height:38px; border-radius:10px; object-fit:cover; flex-shrink:0; border:1px solid var(--border-light);">
+                                @else
+                                    <div style="width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg, #3B82F6, #1D4ED8); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:14px; flex-shrink:0;">
+                                        {{ $guru->initials }}
+                                    </div>
+                                @endif
                                 <div>
                                     <div style="font-weight:700; color:var(--text-primary); font-size:14px; display:flex; align-items:center; gap:6px;">
                                         <span>{{ $guru->name }}</span>

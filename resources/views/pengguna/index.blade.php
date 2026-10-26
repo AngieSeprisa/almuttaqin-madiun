@@ -171,9 +171,13 @@
                     <tr>
                         <td style="padding-left:22px;">
                             <div style="display:flex; align-items:center; gap:12px;">
-                                <div class="user-avatar" style="width:36px; height:36px; border-radius:10px; font-size:14px;">
-                                    {{ strtoupper(substr($user->name, 0, 1)) }}
-                                </div>
+                                @if($user->foto_url)
+                                    <img src="{{ $user->foto_url }}" alt="{{ $user->name }}" style="width:36px; height:36px; border-radius:10px; object-fit:cover; flex-shrink:0; border:1px solid var(--border-light);">
+                                @else
+                                    <div class="user-avatar" style="width:36px; height:36px; border-radius:10px; font-size:14px; flex-shrink:0;">
+                                        {{ $user->initials }}
+                                    </div>
+                                @endif
                                 <div>
                                     <div style="font-weight:700; color:var(--text-primary);">{{ $user->name }}</div>
                                     <div style="font-size:12px; color:var(--text-muted);">{{ $user->email }}</div>
