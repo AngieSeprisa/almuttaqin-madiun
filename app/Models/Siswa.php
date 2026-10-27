@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class Siswa extends Model
 {
     protected $fillable = [
+        'rfid_uid',
         'nama_lengkap',
         'jenjang',
         'kelas',
@@ -38,6 +39,14 @@ class Siswa extends Model
     public function perizinanSakit()
     {
         return $this->hasMany(PerizinanSakit::class);
+    }
+
+    /**
+     * Relasi ke data presensi santri via RFID
+     */
+    public function presensiSantri()
+    {
+        return $this->hasMany(PresensiSantri::class, 'siswa_id');
     }
 
     /**

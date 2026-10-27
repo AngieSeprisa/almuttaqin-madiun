@@ -336,6 +336,47 @@ class SiswaController extends Controller
     }
 
     /**
+     * Memperbarui UID kartu RFID santri (Pairing RFID).
+     */
+    public function updateRfid(Request $request, $id)
+    {
+        $siswa = Siswa::findOrFail($id);
+
+        $validated = $request->validate([
+            'rfid_uid' => 'nullable|string|max:32|unique:siswas,rfid_uid,' . $siswa->id,
+        ], [
+            'rfid_uid.unique' => 'UID RFID ini sudah terdaftar untuk santri lain!',
+        ]);
+
+        $uid = !empty($validated['rfid_uid']) ? strtoupper(trim($validated['rfid_uid'])) : null;
+        $siswa->update(['rfid_uid' => $uid]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Kartu RFID santri {$siswa->nama_lengkap} berhasil diperbarui.",
+                'rfid_uid' => $uid,
+            ]);
+        }
+
+        return redirect()->back()->with('success', "Kartu RFID santri \"{$siswa->nama_lengkap}\" berhasil diperbarui.");
+    }
+
+    /**
+     * Mengambil info kartu RFID yang terakhir di-tap (membantu pairing live).
+     */
+    public function lastRfidTap()
+    {
+        $path = '/tmp/rfid_last_tap.json';
+        if (file_exists($path)) {
+            $content = json_decode(file_get_contents($path), true);
+            return response()->json($content);
+        }
+
+        return response()->json(['uid' => null]);
+    }
+
+    /**
      * Menghapus data siswa.
      */
     public function destroy($id)

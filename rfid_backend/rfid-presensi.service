@@ -1,0 +1,17 @@
+[Unit]
+Description=Daemon Presensi RFID Santri Pondok Pesantren Yayasan Muttaqin
+After=network.target mysql.service mosquitto.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/rfid-backend
+EnvironmentFile=-/opt/rfid-backend/.env
+ExecStart=/usr/bin/python3 /opt/rfid-backend/presensi_daemon.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

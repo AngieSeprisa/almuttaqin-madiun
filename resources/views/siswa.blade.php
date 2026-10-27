@@ -874,7 +874,8 @@
                         <th>Jenjang</th>
                         <th>Kamar</th>
                         <th>Status</th>
-                        <th style="text-align:center; width:130px;">Aksi</th>
+                        <th>Kartu RFID</th>
+                        <th style="text-align:center; width:150px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -921,8 +922,33 @@
                                 {{ ucfirst($item->status ?? 'aktif') }}
                             </span>
                         </td>
+                        <td class="cell-rfid">
+                            @if(!empty($item->rfid_uid))
+                                <span class="badge-rfid-active" style="background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-family: monospace; font-weight: 600; padding: 2px 7px; border-radius: 6px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+                                    {{ $item->rfid_uid }}
+                                </span>
+                            @else
+                                <span style="color: var(--text-muted); font-size: 11px; font-style: italic;">Belum dipairing</span>
+                            @endif
+                        </td>
                         <td style="text-align:center;">
                             <div class="action-btn-group">
+                                {{-- Tombol Pairing RFID --}}
+                                @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
+                                <button type="button" class="action-btn btn-rfid-pair" 
+                                        data-id="{{ $item->id }}" 
+                                        data-nama="{{ $item->nama_lengkap }}" 
+                                        data-uid="{{ $item->rfid_uid ?? '' }}"
+                                        title="Pairing / Ubah Kartu RFID Santri" 
+                                        style="color: #2563eb; background: rgba(37, 99, 235, 0.1);">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                        <line x1="2" y1="10" x2="22" y2="10"></line>
+                                    </svg>
+                                </button>
+                                @endif
+
                                 {{-- Tombol Lihat (Hanya Icon Mata -> Menampilkan Formulir Cetak Seperti Gambar 2) --}}
                                 @php
                                     $targetCetakUrl = $item->pendaftaran_id
@@ -1038,6 +1064,10 @@
                         <span class="mobile-meta-label">Kamar</span>
                         <span class="mobile-badge-pill">{{ $kamarText }}</span>
                     </div>
+                    <div class="mobile-meta-item">
+                        <span class="mobile-meta-label">RFID</span>
+                        <span class="mobile-badge-pill" style="font-family: monospace; font-size: 11px;">{{ $item->rfid_uid ?? '-' }}</span>
+                    </div>
                     <div class="mobile-meta-item mobile-meta-status">
                         <span class="mobile-meta-label">&nbsp;</span>
                         <span class="mobile-badge-pill status-{{ $statusKey }}">{{ $statusText }}</span>
@@ -1045,10 +1075,25 @@
                 </div>
             </div>
 
-            {{-- Sisi Kanan: Kolom Aksi dengan Tombol Lihat, Edit, Hapus --}}
+            {{-- Sisi Kanan: Kolom Aksi dengan Tombol Lihat, Edit, Hapus, RFID --}}
             <div class="mobile-siswa-action-col">
                 <span class="mobile-action-title">Aksi</span>
                 <div class="mobile-action-buttons">
+                    {{-- Tombol Pairing RFID (Mobile) --}}
+                    @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
+                    <button type="button" class="mobile-action-btn btn-rfid-pair"
+                       data-id="{{ $item->id }}" 
+                       data-nama="{{ $item->nama_lengkap }}" 
+                       data-uid="{{ $item->rfid_uid ?? '' }}"
+                       title="Pairing Kartu RFID Santri"
+                       style="color: #2563eb;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                            <line x1="2" y1="10" x2="22" y2="10"></line>
+                        </svg>
+                    </button>
+                    @endif
+
                     {{-- Tombol Lihat (Mata - Biru) --}}
                     <a href="{{ $targetCetakUrl }}" class="mobile-action-btn btn-view" title="Lihat Formulir Siswa" aria-label="Lihat Formulir {{ $item->nama_lengkap }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1183,6 +1228,119 @@ document.addEventListener('DOMContentLoaded', function () {
                 closeModal(activeModal);
             }
         }
+    });
+
+    // Handler Pairing Kartu RFID Santri
+    document.querySelectorAll('.btn-rfid-pair').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var siswaId = this.getAttribute('data-id');
+            var nama = this.getAttribute('data-nama');
+            var currentUid = this.getAttribute('data-uid') || '';
+
+            if (typeof Swal === 'undefined') {
+                var manualUid = prompt('Masukkan UID Kartu RFID untuk santri ' + nama + ':', currentUid);
+                if (manualUid !== null) {
+                    var form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '/siswa/' + siswaId + '/rfid';
+                    var csrf = document.createElement('input');
+                    csrf.type = 'hidden';
+                    csrf.name = '_token';
+                    csrf.value = '{{ csrf_token() }}';
+                    form.appendChild(csrf);
+                    var inputUid = document.createElement('input');
+                    inputUid.type = 'hidden';
+                    inputUid.name = 'rfid_uid';
+                    inputUid.value = manualUid.trim().toUpperCase();
+                    form.appendChild(inputUid);
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+                return;
+            }
+
+            Swal.fire({
+                title: 'Pairing Kartu RFID',
+                html: `
+                    <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text-main);">
+                        <p style="margin-bottom:10px;">Santri: <strong>${nama}</strong></p>
+                        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">UID Kartu RFID (Hexadecimal):</label>
+                        <div style="display:flex; gap:8px;">
+                            <input id="swal_rfid_uid" class="swal2-input" style="margin:0; flex:1; text-transform:uppercase; font-family:monospace; font-size:14px; font-weight:600;" placeholder="Contoh: C1F8EFA7" value="${currentUid}">
+                            <button type="button" id="btn_detect_rfid" class="btn btn-secondary" style="font-size:12px; padding:0 12px; white-space:nowrap; border-radius:8px;" title="Ambil tap kartu terakhir di alat">
+                                📡 Cek Tap Terakhir
+                            </button>
+                        </div>
+                        <div id="detect_rfid_status" style="font-size:11.5px; color:#64748b; margin-top:8px;">
+                            💡 <em>Tip: Tap kartu baru di sensor RFID alat ESP32, lalu klik tombol "Cek Tap Terakhir".</em>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Simpan Kartu',
+                confirmButtonColor: '#2563eb',
+                cancelButtonText: 'Batal',
+                focusConfirm: false,
+                didOpen: () => {
+                    const detectBtn = document.getElementById('btn_detect_rfid');
+                    const uidInput = document.getElementById('swal_rfid_uid');
+                    const statusText = document.getElementById('detect_rfid_status');
+                    
+                    detectBtn.addEventListener('click', function() {
+                        statusText.innerHTML = '<span style="color:#2563eb;">⏳ Memeriksa data tap kartu terakhir...</span>';
+                        fetch('{{ route("siswa.lastRfidTap") }}')
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data && data.uid) {
+                                    uidInput.value = data.uid.toUpperCase();
+                                    statusText.innerHTML = `<span style="color:#059669; font-weight:600;">✓ Terdeteksi UID: ${data.uid} (${data.timestamp || 'Baru saja'})</span>`;
+                                } else {
+                                    statusText.innerHTML = '<span style="color:#dc2626;">⚠️ Belum ada kartu baru yang di-tap di alat. Silakan tap kartu di sensor RFID terlebih dahulu.</span>';
+                                }
+                            })
+                            .catch(err => {
+                                statusText.innerHTML = '<span style="color:#dc2626;">Gagal menghubungi server: ' + err.message + '</span>';
+                            });
+                    });
+                },
+                preConfirm: () => {
+                    const uid = document.getElementById('swal_rfid_uid').value.trim().toUpperCase();
+                    return fetch(`/siswa/${siswaId}/rfid`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ rfid_uid: uid })
+                    })
+                    .then(res => {
+                        if (!res.ok) {
+                            return res.json().then(errData => {
+                                throw new Error(errData.message || (errData.errors && errData.errors.rfid_uid ? errData.errors.rfid_uid[0] : 'Gagal menyimpan pairing kartu'));
+                            });
+                        }
+                        return res.json();
+                    })
+                    .catch(error => {
+                        Swal.showValidationMessage(error.message);
+                    });
+                }
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil Dipasangkan!',
+                        text: result.value.message || 'Kartu RFID berhasil disimpan.',
+                        timer: 1600,
+                        showConfirmButton: false
+                    }).then(() => {
+                        location.reload();
+                    });
+                }
+            });
+        });
     });
 });
 </script>

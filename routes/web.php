@@ -66,6 +66,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:siswa,edit')->group(function () {
         Route::get('/siswa/{id}/edit', [SiswaController::class, 'edit'])->name('siswa.edit');
         Route::put('/siswa/{id}', [SiswaController::class, 'update'])->name('siswa.update');
+        Route::post('/siswa/{id}/rfid', [SiswaController::class, 'updateRfid'])->name('siswa.updateRfid');
+        Route::get('/siswa-rfid/last-tap', [SiswaController::class, 'lastRfidTap'])->name('siswa.lastRfidTap');
     });
 
     Route::delete('/siswa/{id}', [SiswaController::class, 'destroy'])
