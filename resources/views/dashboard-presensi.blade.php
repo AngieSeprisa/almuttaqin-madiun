@@ -1,405 +1,607 @@
-<!DOCTYPE html>
-<html lang="id" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Presensi Real-Time - Yayasan Muttaqin Kota Madiun</title>
-    
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS (CDN Standalone for Instant Projector Rendering) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-                        mono: ['"JetBrains Mono"', 'monospace'],
-                    },
-                    colors: {
-                        dark: {
-                            900: '#0b1120',
-                            800: '#0f172a',
-                            700: '#1e293b',
-                            600: '#334155'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+@extends('layouts.presensi-nfc', [
+    'nfcPage' => 'dashboard',
+    'activeSidebarKey' => $initialTab ?? 'pondok',
+    'sesiCount' => $allSesis->count(),
+    'deviceCount' => $totalDevicesCount ?? $allDevices->count(),
+])
 
-    <style>
-        [x-cloak] { display: none !important; }
-        .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
-        .custom-scroll::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
-        @keyframes pulse-subtle {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.85; transform: scale(1.02); }
-        }
-        .pulse-live { animation: pulse-subtle 2s infinite ease-in-out; }
-    </style>
-</head>
-<body class="bg-[#0b1120] text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden"
-      x-data="dashboardApp()"
-      x-init="initApp()">
+@section('title', 'Monitoring NFC Tap Real-Time')
 
-    <!-- TOP HEADER BAR -->
-    <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-xl sticky top-0 z-50">
-        <div class="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
-            
-            <!-- Logo & Brand -->
-            <div class="flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 ring-1 ring-white/20">
-                    <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-2">
-                        <span>Pondok Pesantren Al Muttaqin</span>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            Kota Madiun
-                        </span>
-                    </h1>
-                    <p class="text-xs text-slate-400">Monitoring Presensi RFID Multi-Lokasi Real-Time</p>
-                </div>
-            </div>
+@section('body-attrs')
+x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($event.detail.tab)"
+@endsection
 
-            <!-- Sesi Aktif Badge -->
-            <div class="flex items-center gap-3 bg-slate-800/70 border border-slate-700/60 rounded-2xl px-4 py-2 shadow-inner">
-                <div class="relative flex h-3 w-3">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                </div>
-                <div>
-                    <div class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Sesi Aktif Sekarang:</div>
-                    <div class="text-sm font-bold text-white flex items-center gap-2">
-                        <span x-text="sesiAktif.nama || 'Memuat Sesi...'"></span>
-                        <span class="text-xs text-emerald-400 font-mono" x-show="sesiAktif.jam_mulai" x-text="'(' + sesiAktif.jam_mulai.substring(0,5) + ' - ' + sesiAktif.jam_selesai.substring(0,5) + ')'"></span>
-                    </div>
-                </div>
-            </div>
+@section('content')
+<div class="space-y-6">
 
-            <!-- Jam Digital Real-Time & Tanggal -->
-            <div class="text-right flex items-center gap-2.5 sm:gap-3">
-                <div class="hidden sm:block text-right mr-1">
-                    <div class="text-2xl font-black font-mono tracking-tight text-white" x-text="clock">00:00:00</div>
-                    <div class="text-xs font-medium text-slate-400" x-text="currentDate">Memuat Tanggal...</div>
-                </div>
-                <a href="{{ route('pengaturan.sesi') }}" class="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition text-xs font-semibold" title="Pengaturan Sesi & Perangkat ESP32">
-                    <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span class="hidden md:inline">Pengaturan Sesi</span>
-                </a>
-                <a href="{{ route('siswa') }}" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition" title="Kembali ke Dashboard Utama">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </header>
+    <!-- ======================================================= -->
+    <!-- FILAMENT V4 PAGE HEADER: BREADCRUMB + TITLE + BLUE CTA  -->
+    <!-- ======================================================= -->
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        <div>
+            <!-- Breadcrumb -->
+            <nav class="flex items-center gap-2 text-[13px] font-medium text-gray-500 mb-1.5" aria-label="Breadcrumb">
+                <span>Monitoring NFC Tap</span>
+                <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                <span class="text-gray-700 font-semibold" x-text="tabLabel()">Pondok / Asrama</span>
+            </nav>
 
-    <!-- MAIN CONTAINER -->
-    <main class="max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+            <!-- Page Heading -->
+            <h1 class="text-2xl sm:text-[28px] font-extrabold tracking-tight text-gray-950 leading-tight"
+                x-text="tabHeading()">
+                Presensi Pondok / Asrama
+            </h1>
 
-        <!-- 3 TAB NAVIGATION & FILTER SECTION -->
-        <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-slate-900/40 p-2 rounded-2xl border border-slate-800/80">
-            
-            <!-- Tab Buttons (3 Mode) -->
-            <div class="grid grid-cols-3 sm:flex items-center gap-1.5 p-1 bg-slate-950/50 rounded-xl border border-slate-800">
-                <button type="button"
-                        @click="changeTab('pondok')"
-                        :class="currentTab === 'pondok' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 font-semibold' : 'text-slate-400 hover:text-slate-200 font-medium'"
-                        class="px-4 py-2.5 rounded-lg text-xs sm:text-sm transition flex items-center justify-center gap-2">
-                    <span class="text-base">🕌</span>
-                    <span>Pondok / Asrama</span>
-                </button>
-
-                <button type="button"
-                        @click="changeTab('sekolah')"
-                        :class="currentTab === 'sekolah' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 font-semibold' : 'text-slate-400 hover:text-slate-200 font-medium'"
-                        class="px-4 py-2.5 rounded-lg text-xs sm:text-sm transition flex items-center justify-center gap-2">
-                    <span class="text-base">🏫</span>
-                    <span>Sekolah (SMP/SMA)</span>
-                </button>
-
-                <button type="button"
-                        @click="changeTab('pegawai')"
-                        :class="currentTab === 'pegawai' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30 font-semibold' : 'text-slate-400 hover:text-slate-200 font-medium'"
-                        class="px-4 py-2.5 rounded-lg text-xs sm:text-sm transition flex items-center justify-center gap-2">
-                    <span class="text-base">👥</span>
-                    <span>Pegawai & Guru</span>
-                </button>
-            </div>
-
-            <!-- Dropdown Filters (Sesi & Kamar) -->
-            <div class="flex flex-wrap items-center gap-2.5">
-                <!-- Filter Sesi -->
-                <div class="flex items-center gap-2 bg-slate-800/70 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300">
-                    <span class="text-slate-400 font-medium">Sesi:</span>
-                    <select x-model="selectedSesi" @change="fetchData()" class="bg-transparent text-white font-semibold outline-none cursor-pointer">
-                        <option value="" class="bg-slate-900 text-white">Otomatis (Sesi Saat Ini)</option>
-                        @foreach($allSesis as $sesi)
-                            <option value="{{ $sesi->id }}" class="bg-slate-900 text-white">{{ $sesi->nama_sesi }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Filter Kamar (Khusus Tab Pondok) -->
-                <div x-show="currentTab === 'pondok'" class="flex items-center gap-2 bg-slate-800/70 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-300">
-                    <span class="text-slate-400 font-medium">Kamar:</span>
-                    <select x-model="selectedKamar" @change="fetchData()" class="bg-transparent text-emerald-400 font-bold outline-none cursor-pointer">
-                        <option value="Reguler" class="bg-slate-900 text-white">Kamar Reguler (16 Santri Target)</option>
-                        <option value="all" class="bg-slate-900 text-white">Semua Kamar Asrama</option>
-                        @foreach($kamars as $kmr)
-                            @if($kmr !== 'Reguler')
-                                <option value="{{ $kmr }}" class="bg-slate-900 text-white">Kamar {{ $kmr }}</option>
-                            @endif
-                        @endforeach
-                    </select>
-                </div>
-
-                <!-- Auto Refresh Indicator -->
-                <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/40 border border-slate-800 text-[11px] text-slate-400 font-mono">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <!-- Active Session Live Status -->
+            <div class="mt-1.5 flex flex-wrap items-center gap-2 text-xs sm:text-[13px] text-gray-500">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#EFF4FF] text-[#0052FF] border border-[#0052FF]/15 font-semibold">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#0052FF] animate-ping"></span>
                     <span>Live 3s</span>
-                </div>
+                </span>
+                <span>Sesi Aktif:</span>
+                <strong class="text-gray-900 font-semibold" x-text="sesiAktif.nama || 'Memuat Sesi...'"></strong>
+                <span class="font-mono text-xs text-gray-500"
+                      x-show="sesiAktif.jam_mulai && sesiAktif.jam_selesai"
+                      x-text="'(' + (sesiAktif.jam_mulai || '').substring(0, 5) + ' - ' + (sesiAktif.jam_selesai || '').substring(0, 5) + ' WIB)'"></span>
+                <span class="hidden sm:inline text-gray-300">•</span>
+                <span class="hidden sm:inline text-gray-500" x-text="currentDate"></span>
             </div>
         </div>
 
-        <!-- 3 KARTU RINGKASAN BESAR (STATISTIK) -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
-            
-            <!-- Total Target -->
-            <div class="bg-slate-900/60 border border-slate-800/90 rounded-2xl p-5 shadow-lg relative overflow-hidden">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Wajib Hadir</div>
-                        <div class="text-3xl sm:text-4xl font-extrabold text-white mt-1.5 font-mono" x-text="summary.totalTarget">0</div>
-                    </div>
-                    <div class="w-12 h-12 rounded-2xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center text-slate-300">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-3 text-xs text-slate-400" x-text="currentTab === 'pondok' ? 'Santri Mukim Terdata' : (currentTab === 'sekolah' ? 'Siswa Formal Terdaftar' : 'Pegawai Yayasan')"></div>
+        <!-- Right Controls & Electric Blue Primary Action -->
+        <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Filter Sesi -->
+            <div class="inline-flex items-center bg-white border border-gray-200 rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.03)] px-3 py-2 text-xs sm:text-sm">
+                <span class="text-gray-500 font-medium mr-2">Sesi:</span>
+                <select x-model="selectedSesi"
+                        @change="currentPage = 1; fetchData()"
+                        class="bg-transparent text-gray-900 font-semibold outline-none cursor-pointer pr-1">
+                    <option value="">Otomatis (Sesi Saat Ini)</option>
+                    @foreach($allSesis as $sesi)
+                        <option value="{{ $sesi->id }}">{{ $sesi->nama_sesi }}</option>
+                    @endforeach
+                </select>
             </div>
 
-            <!-- Sudah Hadir (Hijau) -->
-            <div class="bg-gradient-to-br from-emerald-950/40 to-slate-900/80 border border-emerald-500/30 rounded-2xl p-5 shadow-lg relative overflow-hidden">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Sudah Tap Hadir</div>
-                        <div class="text-3xl sm:text-4xl font-extrabold text-emerald-400 mt-1.5 font-mono" x-text="summary.sudahHadir">0</div>
-                    </div>
-                    <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                </div>
-                <div class="mt-3 flex items-center gap-2">
-                    <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                        <div class="bg-emerald-500 h-2 rounded-full transition-all duration-500" :style="'width: ' + summary.persentase + '%'"></div>
-                    </div>
-                    <span class="text-xs font-bold text-emerald-400 font-mono" x-text="summary.persentase + '%'">0%</span>
-                </div>
+            <!-- Filter Kamar (Khusus Tab Pondok) -->
+            <div x-show="currentTab === 'pondok'"
+                 class="inline-flex items-center bg-white border border-gray-200 rounded-lg shadow-[0_1px_2px_rgba(0,0,0,0.03)] px-3 py-2 text-xs sm:text-sm">
+                <span class="text-gray-500 font-medium mr-2">Kamar:</span>
+                <select x-model="selectedKamar"
+                        @change="currentPage = 1; fetchData()"
+                        class="bg-transparent text-[#0052FF] font-bold outline-none cursor-pointer pr-1">
+                    <option value="Reguler" class="text-gray-900">Kamar Reguler</option>
+                    <option value="all" class="text-gray-900">Semua Kamar Asrama</option>
+                    @foreach($kamars as $kmr)
+                        @if($kmr !== 'Reguler')
+                            <option value="{{ $kmr }}" class="text-gray-900">Kamar {{ $kmr }}</option>
+                        @endif
+                    @endforeach
+                </select>
             </div>
 
-            <!-- Belum Hadir (Merah) -->
-            <div class="bg-gradient-to-br from-rose-950/40 to-slate-900/80 border border-rose-500/30 rounded-2xl p-5 shadow-lg relative overflow-hidden">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <div class="text-xs font-semibold uppercase tracking-wider text-rose-400">Belum Tap / Absen</div>
-                        <div class="text-3xl sm:text-4xl font-extrabold text-rose-400 mt-1.5 font-mono" x-text="summary.belumHadir">0</div>
-                    </div>
-                    <div class="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400">
-                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
+            <!-- Primary CTA Button: Electric Blue (#0052FF) -->
+            <a href="{{ route('pengaturan.sesi') }}"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0052FF] hover:bg-[#0043D4] active:bg-[#0038B3] text-white text-xs sm:text-sm font-semibold shadow-sm shadow-[#0052FF]/20 transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>Pengaturan Sesi</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- 3 KARTU STATISTIK RINGKAS (CLEAN LIGHT CARDS)           -->
+    <!-- ======================================================= -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Total Wajib Hadir -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="text-xs font-semibold text-gray-500">Total Wajib Hadir</div>
+                    <div class="text-3xl font-extrabold text-gray-950 font-mono mt-1.5" x-text="summary.totalTarget">0</div>
                 </div>
-                <div class="mt-3 text-xs text-rose-300 font-medium">Perlu disisir oleh pamong / wali kelas</div>
+                <div class="w-10 h-10 rounded-lg bg-[#EFF4FF] border border-[#0052FF]/15 text-[#0052FF] flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-2.5 text-xs font-medium text-gray-500"
+                 x-text="currentTab === 'pondok' ? 'Santri mukim aktif pada filter kamar' : (currentTab === 'sekolah' ? 'Siswa formal SMP & SMA terdaftar' : 'Guru & pegawai yayasan terdaftar')"></div>
+        </div>
+
+        <!-- Sudah Tap Hadir -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="text-xs font-semibold text-gray-500">Sudah Tap Hadir</div>
+                    <div class="text-3xl font-extrabold text-emerald-600 font-mono mt-1.5" x-text="summary.sudahHadir">0</div>
+                </div>
+                <div class="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200/70 text-emerald-600 flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+            </div>
+            <div class="mt-3 flex items-center gap-2.5">
+                <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div class="bg-[#0052FF] h-2 rounded-full transition-all duration-500" :style="'width: ' + summary.persentase + '%'"></div>
+                </div>
+                <span class="text-xs font-bold text-[#0052FF] font-mono" x-text="summary.persentase + '%'">0%</span>
             </div>
         </div>
 
-        <!-- TWO-COLUMN SPLIT LAYOUT -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            <!-- KOLOM KIRI: LIVE TAP FEED (5 Kolom) -->
-            <div class="lg:col-span-5 bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col h-[650px]">
-                <div class="flex items-center justify-between pb-3.5 border-b border-slate-800">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></div>
-                        <h2 class="text-sm font-bold text-white tracking-wide uppercase">Live Tap Feed (Aktivitas Terakhir)</h2>
-                    </div>
-                    <span class="text-xs text-slate-400 font-mono" x-text="liveFeeds.length + ' Tap Terakhir'"></span>
+        <!-- Belum Tap / Absen -->
+        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+            <div class="flex items-start justify-between">
+                <div>
+                    <div class="text-xs font-semibold text-gray-500">Belum Tap / Absen</div>
+                    <div class="text-3xl font-extrabold text-rose-600 font-mono mt-1.5" x-text="summary.belumHadir">0</div>
                 </div>
-
-                <!-- Feed List -->
-                <div class="flex-1 overflow-y-auto space-y-2.5 mt-3.5 pr-1 custom-scroll">
-                    <template x-for="(feed, index) in liveFeeds" :key="feed.id">
-                        <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 hover:border-emerald-500/50 transition flex items-center justify-between gap-3"
-                             :class="index === 0 ? 'ring-1 ring-emerald-500/50 bg-emerald-950/20' : ''">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="w-10 h-10 rounded-xl bg-slate-700/60 border border-slate-600 flex items-center justify-center font-bold text-sm text-emerald-400 shrink-0"
-                                     x-text="feed.nama ? feed.nama.substring(0, 2).toUpperCase() : 'ST'">
-                                </div>
-                                <div class="truncate">
-                                    <div class="text-sm font-bold text-white truncate" x-text="feed.nama"></div>
-                                    <div class="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
-                                        <span class="text-emerald-400 font-medium" x-text="feed.kamar_or_role"></span>
-                                        <span>•</span>
-                                        <span x-text="feed.sesi"></span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="text-right shrink-0">
-                                <div class="text-xs font-mono font-bold text-emerald-400" x-text="feed.waktu"></div>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mt-1">
-                                    Berhasil Tap
-                                </span>
-                            </div>
-                        </div>
-                    </template>
-
-                    <div x-show="liveFeeds.length === 0" class="text-center py-20 text-slate-500 text-xs">
-                        Belum ada aktivitas tap kartu untuk hari ini.
-                    </div>
+                <div class="w-10 h-10 rounded-lg bg-rose-50 border border-rose-200/70 text-rose-600 flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                 </div>
             </div>
+            <div class="mt-2.5 text-xs font-medium text-rose-600">Perlu disisir pamong / wali kelas</div>
+        </div>
+    </div>
 
-            <!-- KOLOM KANAN: WAITING LIST / BELUM HADIR (7 Kolom) -->
-            <div class="lg:col-span-7 bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col h-[650px]">
-                <div class="flex items-center justify-between pb-3.5 border-b border-slate-800">
-                    <div class="flex items-center gap-2">
-                        <div class="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
-                        <h2 class="text-sm font-bold text-white tracking-wide uppercase">Waiting List (Belum Tap Pada Sesi Ini)</h2>
-                    </div>
-                    <span class="text-xs font-bold text-rose-400 font-mono" x-text="waitingList.length + ' Belum Hadir'"></span>
+    <!-- ======================================================= -->
+    <!-- MAIN GRID: FILAMENT V4 TABLE CARD + LIVE TAP FEED       -->
+    <!-- ======================================================= -->
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+
+        <!-- KOLOM UTAMA (8 Kolom): TABEL PESERTA GAYA FILAMENT V4 -->
+        <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
+
+            <!-- Toolbar Atas Kartu Tabel (Filter Pills + Search + Funnel Filter) -->
+            <div class="px-4 py-3.5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 bg-white">
+                <!-- Quick Status Filter Tabs -->
+                <div class="inline-flex items-center p-1 rounded-lg bg-gray-100/80 border border-gray-200/70 text-xs">
+                    <button type="button"
+                            @click="statusFilter = 'all'; currentPage = 1"
+                            :class="statusFilter === 'all' ? 'bg-white text-gray-900 font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
+                            class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5">
+                        <span>Semua</span>
+                        <span class="px-1.5 py-0.2 rounded text-[11px] font-mono bg-gray-100 text-gray-700" x-text="summary.totalTarget">0</span>
+                    </button>
+                    <button type="button"
+                            @click="statusFilter = 'belum'; currentPage = 1"
+                            :class="statusFilter === 'belum' ? 'bg-white text-rose-600 font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
+                            class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5">
+                        <span>Belum Tap</span>
+                        <span class="px-1.5 py-0.2 rounded text-[11px] font-mono bg-rose-50 text-rose-600" x-text="waitingList.length">0</span>
+                    </button>
+                    <button type="button"
+                            @click="statusFilter = 'hadir'; currentPage = 1"
+                            :class="statusFilter === 'hadir' ? 'bg-white text-emerald-700 font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
+                            class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5">
+                        <span>Sudah Hadir</span>
+                        <span class="px-1.5 py-0.2 rounded text-[11px] font-mono bg-emerald-50 text-emerald-700" x-text="hadirList.length">0</span>
+                    </button>
                 </div>
 
-                <!-- Waiting List Grid / Cards -->
-                <div class="flex-1 overflow-y-auto mt-3.5 pr-1 custom-scroll">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <template x-for="item in waitingList" :key="item.id">
-                            <div class="p-3.5 rounded-xl bg-slate-800/40 border border-rose-500/20 hover:border-rose-500/50 transition flex items-center justify-between gap-3">
-                                <div class="flex items-center gap-3 min-w-0">
-                                    <div class="w-10 h-10 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-center font-bold text-sm text-rose-400 shrink-0"
-                                         x-text="item.nama ? item.nama.substring(0, 2).toUpperCase() : '?'">
-                                    </div>
-                                    <div class="truncate">
-                                        <div class="text-sm font-semibold text-slate-100 truncate" x-text="item.nama"></div>
-                                        <div class="text-xs text-slate-400 mt-0.5" x-text="item.sub"></div>
-                                    </div>
-                                </div>
-                                <div class="text-right shrink-0">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                        Belum Absen
-                                    </span>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-
-                    <!-- All Present Banner -->
-                    <div x-show="waitingList.length === 0 && summary.totalTarget > 0" class="text-center py-20">
-                        <div class="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto mb-3">
-                            <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                <!-- Search Input + Funnel Button (Persis Gambar Referensi) -->
+                <div class="flex items-center gap-2.5 ml-auto">
+                    <div class="relative w-56 sm:w-64">
+                        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input type="text"
+                               x-model="tableSearch"
+                               @input="currentPage = 1"
+                               placeholder="Cari nama atau kartu..."
+                               class="w-full pl-9 pr-8 py-1.5 rounded-lg bg-white border border-gray-200 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm text-gray-900 placeholder-gray-400 outline-none transition">
+                        <button type="button"
+                                x-show="tableSearch.length > 0"
+                                @click="tableSearch = ''; currentPage = 1"
+                                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                        </div>
-                        <h3 class="text-base font-bold text-white">Alhamdulillah, Semua Sudah Hadir!</h3>
-                        <p class="text-xs text-slate-400 mt-1">Seluruh target entitas telah berhasil melakukan presensi tap RFID.</p>
+                        </button>
                     </div>
 
-                    <div x-show="summary.totalTarget === 0" class="text-center py-20 text-slate-500 text-xs">
-                        Tidak ada entitas terdaftar pada kategori yang dipilih.
+                    <!-- Funnel Filter Button with Electric Blue Badge -->
+                    <div class="relative" @click.outside="showFilterMenu = false">
+                        <button type="button"
+                                @click="showFilterMenu = !showFilterMenu"
+                                class="relative w-9 h-9 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-800 flex items-center justify-center transition"
+                                title="Filter Status">
+                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 01.628.74v2.288a2.25 2.25 0 01-.659 1.59l-4.682 4.683a2.25 2.25 0 00-.659 1.59v3.037c0 .684-.31 1.33-.844 1.757l-1.937 1.55A.75.75 0 018 18.25v-5.757a2.25 2.25 0 00-.659-1.591L2.659 6.22A2.25 2.25 0 012 4.629V2.34a.75.75 0 01.628-.74z" clip-rule="evenodd" />
+                            </svg>
+                            <span class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-md text-[10px] font-bold flex items-center justify-center border"
+                                  :class="activeFilterCount() > 0 ? 'bg-[#0052FF] text-white border-[#0052FF]' : 'bg-[#EFF4FF] text-[#0052FF] border-[#0052FF]/20'"
+                                  x-text="activeFilterCount()">0</span>
+                        </button>
+
+                        <!-- Filter Popover -->
+                        <div x-show="showFilterMenu" x-cloak x-transition
+                             class="absolute right-0 mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-lg p-3.5 z-30 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold text-gray-900">Filter Tabel</span>
+                                <button type="button"
+                                        @click="statusFilter = 'all'; sortField = 'status'; sortAsc = true; currentPage = 1"
+                                        class="text-xs font-semibold text-[#0052FF] hover:underline">Reset</button>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-gray-500 mb-1">Status Presensi</label>
+                                <select x-model="statusFilter" @change="currentPage = 1"
+                                        class="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-800 outline-none focus:border-[#0052FF]">
+                                    <option value="all">Semua Peserta</option>
+                                    <option value="belum">Belum Tap (Waiting List)</option>
+                                    <option value="hadir">Sudah Tap Hadir</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Tabel Utama (Persis Filament v4 Reference) -->
+            <div class="overflow-x-auto custom-scroll">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-[#FAFAFA] border-b border-gray-200 text-xs font-semibold text-gray-700">
+                            <th class="py-3 pl-4 pr-2 w-10">
+                                <span class="inline-block w-4 h-4 rounded border border-gray-300 bg-white"></span>
+                            </th>
+                            <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" @click="toggleSort('nama')">
+                                <div class="inline-flex items-center gap-1">
+                                    <span>Nama Peserta</span>
+                                    <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                            </th>
+                            <th class="py-3 px-4">Kamar / Unit</th>
+                            <th class="py-3 px-4">Status</th>
+                            <th class="py-3 px-4 text-center">Tap NFC</th>
+                            <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" @click="toggleSort('waktu')">
+                                <div class="inline-flex items-center gap-1">
+                                    <span>Waktu Tap</span>
+                                    <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </div>
+                            </th>
+                            <th class="py-3 pl-4 pr-5 text-right">UID Kartu</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 text-sm bg-white">
+                        <template x-for="item in paginatedRows()" :key="(item.is_hadir ? 'H-' : 'W-') + item.id">
+                            <tr class="hover:bg-gray-50/80 transition-colors">
+                                <!-- Checkbox Visual -->
+                                <td class="py-3.5 pl-4 pr-2">
+                                    <span class="inline-block w-4 h-4 rounded border border-gray-300 bg-white"></span>
+                                </td>
+
+                                <!-- Nama Peserta -->
+                                <td class="py-3.5 px-4 font-semibold text-gray-900" x-text="item.nama"></td>
+
+                                <!-- Kamar / Kelas / Jabatan -->
+                                <td class="py-3.5 px-4 text-gray-600" x-text="item.sub"></td>
+
+                                <!-- Status Badge Pill -->
+                                <td class="py-3.5 px-4 whitespace-nowrap">
+                                    <template x-if="item.is_hadir && item.status_kehadiran !== 'terlambat'">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                            hadir
+                                        </span>
+                                    </template>
+                                    <template x-if="item.is_hadir && item.status_kehadiran === 'terlambat'">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                                            terlambat
+                                        </span>
+                                    </template>
+                                    <template x-if="!item.is_hadir">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-500/20">
+                                            belum tap
+                                        </span>
+                                    </template>
+                                </td>
+
+                                <!-- Check / Cross Circle Icon (Persis Gambar Referensi) -->
+                                <td class="py-3.5 px-4 text-center">
+                                    <template x-if="item.is_hadir">
+                                        <svg class="w-5 h-5 text-emerald-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </template>
+                                    <template x-if="!item.is_hadir">
+                                        <svg class="w-5 h-5 text-rose-500 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </template>
+                                </td>
+
+                                <!-- Waktu Tap -->
+                                <td class="py-3.5 px-4 whitespace-nowrap font-mono text-xs"
+                                    :class="item.waktu_tap ? 'text-gray-800 font-semibold' : 'text-gray-400'"
+                                    x-text="item.waktu_tap ? (item.waktu_tap + ' WIB') : '—'">
+                                </td>
+
+                                <!-- UID Kartu NFC -->
+                                <td class="py-3.5 pl-4 pr-5 text-right whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono"
+                                          :class="(item.rfid_uid && item.rfid_uid !== '-' && item.rfid_uid !== 'Belum ada kartu') ? 'bg-[#EFF4FF] text-[#0052FF] font-semibold' : 'bg-gray-100 text-gray-400'"
+                                          x-text="item.rfid_uid || '-'"></span>
+                                </td>
+                            </tr>
+                        </template>
+
+                        <!-- Empty State -->
+                        <tr x-show="filteredRows().length === 0">
+                            <td colspan="7" class="py-14 px-6 text-center">
+                                <div class="w-12 h-12 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-3">
+                                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div class="text-sm font-bold text-gray-900"
+                                     x-text="statusFilter === 'belum' && summary.totalTarget > 0 && waitingList.length === 0 ? 'Alhamdulillah, Semua Peserta Sudah Tap Hadir!' : 'Tidak ada data peserta yang sesuai'"></div>
+                                <p class="text-xs text-gray-500 mt-1">Gunakan filter atau kolom pencarian di kanan atas tabel untuk menyesuaikan tampilan.</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer Pagination & Per Page (Persis Gambar Referensi) -->
+            <div class="px-4 py-3 border-t border-gray-200 bg-white flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
+                <div class="font-medium text-gray-700" x-text="paginationLabel()">
+                    Menampilkan 0 hasil
+                </div>
+
+                <!-- Segmented Per Page Selector -->
+                <div class="inline-flex items-center rounded-lg border border-gray-200 bg-white overflow-hidden shadow-2xs">
+                    <span class="px-3 py-1.5 text-xs font-medium text-gray-500 border-r border-gray-200 bg-gray-50/60">Per page</span>
+                    <select x-model.number="perPage"
+                            @change="currentPage = 1"
+                            class="px-2.5 py-1.5 text-xs font-semibold text-gray-900 bg-white outline-none cursor-pointer">
+                        <option :value="10">10</option>
+                        <option :value="25">25</option>
+                        <option :value="50">50</option>
+                        <option :value="100">100</option>
+                    </select>
+                </div>
+
+                <!-- Prev / Next Page Buttons -->
+                <div class="inline-flex items-center gap-1.5" x-show="totalPages() > 1">
+                    <button type="button"
+                            @click="if (currentPage > 1) currentPage--"
+                            :disabled="currentPage <= 1"
+                            class="px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 text-xs font-semibold text-gray-700 transition">
+                        Sebelumnya
+                    </button>
+                    <span class="px-2 text-xs font-semibold text-gray-600" x-text="currentPage + ' / ' + totalPages()"></span>
+                    <button type="button"
+                            @click="if (currentPage < totalPages()) currentPage++"
+                            :disabled="currentPage >= totalPages()"
+                            class="px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-40 text-xs font-semibold text-gray-700 transition">
+                        Berikutnya
+                    </button>
                 </div>
             </div>
         </div>
 
-    </main>
+        <!-- KOLOM KANAN (4 Kolom): LIVE TAP FEED REAL-TIME -->
+        <div class="xl:col-span-4 bg-white border border-gray-200 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col">
+            <div class="px-4 py-3.5 border-b border-gray-200 flex items-center justify-between bg-white">
+                <div class="flex items-center gap-2">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0052FF] opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#0052FF]"></span>
+                    </span>
+                    <h2 class="text-sm font-bold text-gray-900">Live Tap Feed</h2>
+                </div>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#EFF4FF] text-[#0052FF]"
+                      x-text="liveFeeds.length + ' Tap Terakhir'">0 Tap Terakhir</span>
+            </div>
 
-    <!-- ALPINE.JS COMPONENT LOGIC -->
-    <script>
-        function dashboardApp() {
-            return {
-                currentTab: 'pondok',
-                selectedSesi: '',
-                selectedKamar: 'Reguler',
-                clock: '00:00:00',
-                currentDate: '',
-                sesiAktif: {},
-                summary: {
-                    totalTarget: 0,
-                    sudahHadir: 0,
-                    belumHadir: 0,
-                    persentase: 0
-                },
-                liveFeeds: [],
-                waitingList: [],
-                timerInterval: null,
+            <div class="p-3.5 space-y-2.5 max-h-[540px] overflow-y-auto custom-scroll divide-y divide-gray-100">
+                <template x-for="(feed, index) in liveFeeds" :key="feed.id">
+                    <div class="pt-2.5 first:pt-0 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 border"
+                                 :class="index === 0 ? 'bg-[#0052FF] text-white border-[#0052FF]' : 'bg-gray-50 text-gray-700 border-gray-200'"
+                                 x-text="feed.nama ? feed.nama.substring(0, 2).toUpperCase() : 'NF'">
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-sm font-semibold text-gray-900 truncate" x-text="feed.nama"></div>
+                                <div class="text-xs text-gray-500 truncate">
+                                    <span class="font-medium text-[#0052FF]" x-text="feed.kamar_or_role"></span>
+                                    <span>•</span>
+                                    <span x-text="feed.sesi"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <div class="text-xs font-mono font-bold text-gray-900" x-text="feed.waktu"></div>
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold mt-0.5"
+                                  :class="feed.status === 'terlambat' ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20'"
+                                  x-text="feed.status === 'terlambat' ? 'Terlambat' : 'Berhasil Tap'">
+                            </span>
+                        </div>
+                    </div>
+                </template>
 
-                initApp() {
-                    this.updateClock();
-                    setInterval(() => this.updateClock(), 1000);
-                    
-                    // Fetch data pertama kali
-                    this.fetchData();
+                <div x-show="liveFeeds.length === 0" class="py-14 text-center">
+                    <div class="w-11 h-11 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 flex items-center justify-center mx-auto mb-2.5">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <div class="text-xs font-semibold text-gray-700">Belum ada tap kartu hari ini</div>
+                    <p class="text-[11px] text-gray-400 mt-0.5">Data akan muncul otomatis saat kartu ditempelkan ke mesin ESP32.</p>
+                </div>
+            </div>
+        </div>
 
-                    // Polling real-time setiap 3 detik
-                    this.timerInterval = setInterval(() => {
-                        this.fetchData();
-                    }, 3000);
-                },
+    </div>
+</div>
+@endsection
 
-                updateClock() {
-                    const now = new Date();
-                    this.clock = now.toLocaleTimeString('id-ID', { hour12: false });
-                },
+@push('scripts')
+<script>
+    function dashboardApp() {
+        return {
+            currentTab: @json($initialTab ?? 'pondok'),
+            selectedSesi: '',
+            selectedKamar: 'Reguler',
+            statusFilter: 'all',
+            tableSearch: '',
+            sortField: 'status',
+            sortAsc: true,
+            perPage: 10,
+            currentPage: 1,
+            showFilterMenu: false,
+            clock: '00:00:00',
+            currentDate: '',
+            sesiAktif: {},
+            summary: {
+                totalTarget: 0,
+                sudahHadir: 0,
+                belumHadir: 0,
+                persentase: 0
+            },
+            liveFeeds: [],
+            waitingList: [],
+            hadirList: [],
+            timerInterval: null,
 
-                changeTab(tab) {
-                    this.currentTab = tab;
-                    this.fetchData();
-                },
+            initApp() {
+                this.updateClock();
+                setInterval(() => this.updateClock(), 1000);
+                this.fetchData();
+                this.timerInterval = setInterval(() => this.fetchData(), 3000);
+            },
 
-                fetchData() {
-                    const params = new URLSearchParams({
-                        tab: this.currentTab,
-                        sesi_id: this.selectedSesi,
-                        kamar: this.selectedKamar
-                    });
+            updateClock() {
+                const now = new Date();
+                this.clock = now.toLocaleTimeString('id-ID', { hour12: false });
+            },
 
-                    fetch('{{ route("dashboard-presensi.data") }}?' + params.toString())
-                        .then(res => res.json())
-                        .then(data => {
-                            this.currentDate = data.currentDate;
-                            this.sesiAktif = data.sesiAktif || {};
-                            this.summary = data.summary || this.summary;
-                            this.liveFeeds = data.liveFeeds || [];
-                            this.waitingList = data.waitingList || [];
-                        })
-                        .catch(err => console.error("Error fetching live data:", err));
+            tabLabel() {
+                if (this.currentTab === 'sekolah') return 'Sekolah (SMP/SMA)';
+                if (this.currentTab === 'pegawai') return 'Pegawai & Guru';
+                return 'Pondok / Asrama';
+            },
+
+            tabHeading() {
+                if (this.currentTab === 'sekolah') return 'Presensi Sekolah (SMP & SMA)';
+                if (this.currentTab === 'pegawai') return 'Presensi Pegawai & Guru';
+                return 'Presensi Pondok / Asrama';
+            },
+
+            changeTab(tab) {
+                if (!['pondok', 'sekolah', 'pegawai'].includes(tab)) return;
+                this.currentTab = tab;
+                this.currentPage = 1;
+                window.dispatchEvent(new CustomEvent('nfc-sync-sidebar', { detail: { tab } }));
+                this.fetchData();
+            },
+
+            activeFilterCount() {
+                return this.statusFilter !== 'all' ? 1 : 0;
+            },
+
+            toggleSort(field) {
+                if (this.sortField === field) {
+                    this.sortAsc = !this.sortAsc;
+                } else {
+                    this.sortField = field;
+                    this.sortAsc = true;
                 }
+            },
+
+            filteredRows() {
+                let rows = [];
+                if (this.statusFilter === 'hadir') {
+                    rows = [...this.hadirList];
+                } else if (this.statusFilter === 'belum') {
+                    rows = [...this.waitingList];
+                } else {
+                    rows = [...this.hadirList, ...this.waitingList];
+                }
+
+                const q = this.tableSearch.trim().toLowerCase();
+                if (q) {
+                    rows = rows.filter(item =>
+                        (item.nama && item.nama.toLowerCase().includes(q)) ||
+                        (item.sub && item.sub.toLowerCase().includes(q)) ||
+                        (item.rfid_uid && item.rfid_uid.toLowerCase().includes(q))
+                    );
+                }
+
+                rows.sort((a, b) => {
+                    if (this.sortField === 'nama') {
+                        const cmp = (a.nama || '').localeCompare(b.nama || '', 'id');
+                        return this.sortAsc ? cmp : -cmp;
+                    }
+                    if (this.sortField === 'waktu') {
+                        const wa = a.waktu_tap || '99:99:99';
+                        const wb = b.waktu_tap || '99:99:99';
+                        return this.sortAsc ? wa.localeCompare(wb) : wb.localeCompare(wa);
+                    }
+                    if (a.is_hadir !== b.is_hadir) {
+                        return a.is_hadir ? -1 : 1;
+                    }
+                    return (a.nama || '').localeCompare(b.nama || '', 'id');
+                });
+
+                return rows;
+            },
+
+            totalPages() {
+                const total = this.filteredRows().length;
+                return Math.max(1, Math.ceil(total / this.perPage));
+            },
+
+            paginatedRows() {
+                const all = this.filteredRows();
+                const safePage = Math.min(this.currentPage, Math.max(1, Math.ceil(all.length / this.perPage)));
+                const start = (safePage - 1) * this.perPage;
+                return all.slice(start, start + this.perPage);
+            },
+
+            paginationLabel() {
+                const total = this.filteredRows().length;
+                if (total === 0) return 'Showing 0 results';
+                const safePage = Math.min(this.currentPage, this.totalPages());
+                const from = (safePage - 1) * this.perPage + 1;
+                const to = Math.min(safePage * this.perPage, total);
+                return `Menampilkan ${from} sampai ${to} dari ${total} peserta`;
+            },
+
+            fetchData() {
+                const params = new URLSearchParams({
+                    tab: this.currentTab,
+                    sesi_id: this.selectedSesi,
+                    kamar: this.selectedKamar
+                });
+
+                fetch('{{ route("dashboard-presensi.data") }}?' + params.toString())
+                    .then(res => res.json())
+                    .then(data => {
+                        this.currentDate = data.currentDate || '';
+                        this.sesiAktif = data.sesiAktif || {};
+                        this.summary = data.summary || this.summary;
+                        this.liveFeeds = data.liveFeeds || [];
+                        this.waitingList = data.waitingList || [];
+                        this.hadirList = data.hadirList || [];
+                    })
+                    .catch(err => console.error('Error fetching live NFC data:', err));
             }
-        }
-    </script>
-</body>
-</html>
+        };
+    }
+</script>
+@endpush

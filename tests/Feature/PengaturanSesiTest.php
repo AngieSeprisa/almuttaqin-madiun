@@ -174,4 +174,53 @@ class PengaturanSesiTest extends TestCase
             'device_id_target' => null,
         ]);
     }
+
+    public function test_halaman_dashboard_nfc_tap_dan_sidebar_tampil_dengan_tema_baru(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        Siswa::create([
+            'nama_lengkap' => 'Zaidan Santri Reguler',
+            'kamar' => 'Reguler',
+            'jenjang' => 'SMP',
+            'kelas' => '7A',
+            'rfid_uid' => 'A1B2C3D4',
+            'status' => 'aktif',
+        ]);
+
+        // 1. Cek halaman Dashboard View NFC Tap (/dashboard-presensi)
+        $dashResp = $this->actingAs($yayasan)->get(route('dashboard-presensi', ['tab' => 'sekolah']));
+        $dashResp->assertStatus(200);
+        $dashResp->assertSee('app-sidebar', false);
+        $dashResp->assertSee('Pondok / Asrama');
+        $dashResp->assertSee('Sekolah (SMP/SMA)');
+        $dashResp->assertSee('Pegawai &amp; Guru', false);
+        $dashResp->assertSee('Jadwal Sesi');
+        $dashResp->assertSee('Perangkat ESP32');
+        $dashResp->assertSee('#0052FF', false);
+
+        // 2. Cek endpoint JSON real-time (/dashboard-presensi/data) untuk 3 tab
+        foreach (['pondok', 'sekolah', 'pegawai'] as $tab) {
+            $jsonResp = $this->actingAs($yayasan)->getJson(route('dashboard-presensi.data', ['tab' => $tab]));
+            $jsonResp->assertOk()
+                ->assertJsonStructure([
+                    'currentTime',
+                    'currentDate',
+                    'sesiAktif',
+                    'summary' => ['totalTarget', 'sudahHadir', 'belumHadir', 'persentase'],
+                    'liveFeeds',
+                    'waitingList',
+                    'hadirList',
+                ]);
+        }
+
+        // Pastikan tab sekolah memiliki field terpetakan nama, sub, is_hadir
+        $sekolahData = $this->actingAs($yayasan)
+            ->getJson(route('dashboard-presensi.data', ['tab' => 'sekolah']))
+            ->json('waitingList.0');
+
+        $this->assertSame('Zaidan Santri Reguler', $sekolahData['nama']);
+        $this->assertStringContainsString('SMP', $sekolahData['sub']);
+        $this->assertFalse($sekolahData['is_hadir']);
+    }
 }
