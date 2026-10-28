@@ -142,6 +142,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/kiosk-data', [PresensiController::class, 'kioskData'])->name('kiosk-data');
     });
 
+    // Dashboard Monitoring Real-Time Multi-Lokasi (Proyektor / TV Asrama)
+    Route::get('/dashboard-presensi', [\App\Http\Controllers\PresensiDashboardController::class, 'index'])->name('dashboard-presensi');
+    Route::get('/dashboard-presensi/data', [\App\Http\Controllers\PresensiDashboardController::class, 'data'])->name('dashboard-presensi.data');
+
     // Menu Rekap (Sekolah & Guru)
     Route::prefix('rekap-absensi')->name('rekap-absensi.')->group(function () {
         Route::get('/sekolah', [SekolahController::class, 'rekapAbsensi'])
