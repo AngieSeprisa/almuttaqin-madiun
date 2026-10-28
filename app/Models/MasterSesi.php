@@ -16,6 +16,8 @@ class MasterSesi extends Model
         'jam_selesai',
         'toleransi_menit',
         'kategori',
+        'target_kategori',
+        'target_filter',
     ];
 
     public function device()

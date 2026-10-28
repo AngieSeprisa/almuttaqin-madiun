@@ -54,6 +54,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '23:59:59',
                 'toleransi_menit' => 15,
                 'kategori' => 'sholat',
+                'target_kategori' => 'kamar_khusus',
+                'target_filter' => 'Reguler',
             ],
             [
                 'device_id_target' => 'ESP32_MASJID',
@@ -63,6 +65,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '05:30:00',
                 'toleransi_menit' => 15,
                 'kategori' => 'sholat',
+                'target_kategori' => 'semua_santri',
+                'target_filter' => null,
             ],
             [
                 'device_id_target' => 'ESP32_MASJID',
@@ -72,6 +76,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '13:00:00',
                 'toleransi_menit' => 15,
                 'kategori' => 'sholat',
+                'target_kategori' => 'semua_santri',
+                'target_filter' => null,
             ],
             [
                 'device_id_target' => 'ESP32_MASJID',
@@ -81,6 +87,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '16:00:00',
                 'toleransi_menit' => 15,
                 'kategori' => 'sholat',
+                'target_kategori' => 'semua_santri',
+                'target_filter' => null,
             ],
             [
                 'device_id_target' => 'ESP32_MASJID',
@@ -90,6 +98,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '18:45:00',
                 'toleransi_menit' => 15,
                 'kategori' => 'sholat',
+                'target_kategori' => 'semua_santri',
+                'target_filter' => null,
             ],
             [
                 'device_id_target' => 'ESP32_MASJID',
@@ -99,6 +109,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '20:30:00',
                 'toleransi_menit' => 15,
                 'kategori' => 'sholat',
+                'target_kategori' => 'semua_santri',
+                'target_filter' => null,
             ],
             [
                 'device_id_target' => 'ESP32_SEKOLAH',
@@ -108,6 +120,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '07:30:00',
                 'toleransi_menit' => 15,
                 'kategori' => 'sekolah',
+                'target_kategori' => 'sekolah',
+                'target_filter' => 'SMP',
             ],
             [
                 'device_id_target' => 'ESP32_SEKOLAH',
@@ -117,6 +131,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '15:30:00',
                 'toleransi_menit' => 0,
                 'kategori' => 'sekolah',
+                'target_kategori' => 'sekolah',
+                'target_filter' => 'SMP',
             ],
             [
                 'device_id_target' => 'ESP32_DAPUR',
@@ -126,6 +142,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '13:30:00',
                 'toleransi_menit' => 0,
                 'kategori' => 'makan',
+                'target_kategori' => 'semua_santri',
+                'target_filter' => null,
             ],
             [
                 'device_id_target' => null,
@@ -135,6 +153,8 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'jam_selesai' => '07:30:00',
                 'toleransi_menit' => 15,
                 'kategori' => 'pegawai',
+                'target_kategori' => 'pegawai',
+                'target_filter' => null,
             ],
         ];
 

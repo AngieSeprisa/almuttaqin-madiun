@@ -321,6 +321,14 @@
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Absensi Guru</span>
                         </a>
+                        <a href="{{ route('pengaturan.sesi') }}" class="subnav-item {{ request()->routeIs('pengaturan.sesi*') ? 'active' : '' }}" title="Pengaturan Sesi & Perangkat Presensi RFID">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Sesi Presensi RFID</span>
+                        </a>
+                        <a href="{{ route('dashboard-presensi') }}" class="subnav-item {{ request()->routeIs('dashboard-presensi*') ? 'active' : '' }}" title="Dashboard Monitoring Presensi RFID Real-Time">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Monitor Live RFID</span>
+                        </a>
                         @endif
 
                         @if(!$authUser || $authUser->isYayasan() || $authUser->canDo('guru_sekolah', 'view'))

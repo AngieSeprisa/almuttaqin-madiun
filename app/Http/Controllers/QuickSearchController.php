@@ -147,6 +147,22 @@ class QuickSearchController extends Controller
                 'permission' => 'pengaturan_absensi',
             ],
             [
+                'title' => 'Pengaturan Sesi & Perangkat RFID',
+                'description' => 'Kelola jadwal sesi otomatis, mesin ESP32 & target partisipan',
+                'url' => route('pengaturan.sesi'),
+                'icon' => 'clock',
+                'keywords' => 'pengaturan sesi presensi rfid esp32 jadwal alat kamar',
+                'permission' => 'pengaturan_absensi',
+            ],
+            [
+                'title' => 'Dashboard Monitoring Presensi RFID',
+                'description' => 'Pantau live tap kartu RFID santri, siswa & pegawai real-time',
+                'url' => route('dashboard-presensi'),
+                'icon' => 'activity',
+                'keywords' => 'dashboard presensi live rfid monitor kartu santri asrama',
+                'permission' => 'pengaturan_absensi',
+            ],
+            [
                 'title' => 'Master Ruang Kelas',
                 'description' => 'Kelola daftar ruang kelas SMP & SMA',
                 'url' => route('master.kelas.index'),

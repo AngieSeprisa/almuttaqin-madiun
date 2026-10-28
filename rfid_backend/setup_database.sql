@@ -60,10 +60,16 @@ CREATE TABLE IF NOT EXISTS `master_sesis` (
     `jam_selesai` TIME NOT NULL,
     `toleransi_menit` INT DEFAULT 15,
     `kategori` ENUM('sholat', 'pengajian', 'sekolah', 'makan', 'pegawai') DEFAULT 'sholat',
+    `target_kategori` ENUM('semua_santri', 'kamar_khusus', 'sekolah', 'pegawai') DEFAULT 'semua_santri',
+    `target_filter` VARCHAR(100) NULL COMMENT 'Contoh: Reguler, SMP, SMA, atau ALL',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`device_id_target`) REFERENCES `master_devices`(`device_id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE `master_sesis`
+    ADD COLUMN IF NOT EXISTS `target_kategori` ENUM('semua_santri', 'kamar_khusus', 'sekolah', 'pegawai') DEFAULT 'semua_santri' AFTER `kategori`,
+    ADD COLUMN IF NOT EXISTS `target_filter` VARCHAR(100) NULL COMMENT 'Contoh: Reguler, SMP, SMA, atau ALL' AFTER `target_kategori`;
 
 -- 5. Tabel presensis (Konsolidasi Log Terpadu)
 CREATE TABLE IF NOT EXISTS `presensis` (
