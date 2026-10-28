@@ -21,7 +21,7 @@ class PengaturanSesiTest extends TestCase
         $this->seed(MasterDeviceAndSesiSeeder::class);
     }
 
-    public function test_halaman_pengaturan_sesi_dapat_diakses_dan_menampilkan_data(): void
+    public function test_default_daftar_perangkat_kosong_tanpa_alat_dummy(): void
     {
         $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
 
@@ -31,19 +31,32 @@ class PengaturanSesiTest extends TestCase
             'status' => 'aktif',
         ]);
 
+        $this->assertSame(0, DB::table('master_devices')->count());
+
         $response = $this->actingAs($yayasan)->get(route('pengaturan.sesi'));
 
         $response->assertStatus(200);
-        $response->assertSee('Pengaturan Sesi & Perangkat Presensi');
+        $response->assertSee('Pengaturan Sesi &amp; Perangkat Presensi', false);
         $response->assertSee('REGULER_HARIAN');
         $response->assertSee('Presensi Kamar Reguler (24 Jam)');
-        $response->assertSee('ESP32_Presensi_Santri');
+        $response->assertSee('Semua Perangkat / Global (Belum ada alat terdaftar)');
+        $response->assertDontSee('ESP32_DAPUR');
         $response->assertSee(route('dashboard-presensi'));
     }
 
-    public function test_dapat_menambahkan_sesi_presensi_baru(): void
+    public function test_dapat_menambahkan_sesi_dengan_serial_hardware_esp32(): void
     {
         $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        DB::table('master_devices')->insert([
+            'device_id' => 'ESP32-A4CF1298B3E0',
+            'nama_lokasi' => 'Masjid Pondok Utama',
+            'kategori_area' => 'pondok',
+            'status_aktif' => 1,
+            'last_seen_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $response = $this->actingAs($yayasan)->post(route('pengaturan.sesi.store'), [
             'kode_sesi' => 'tahfidz sore',
@@ -51,7 +64,7 @@ class PengaturanSesiTest extends TestCase
             'jam_mulai' => '16:00',
             'jam_selesai' => '17:15',
             'toleransi_menit' => 10,
-            'device_id_target' => 'ESP32_MASJID',
+            'device_id_target' => 'ESP32-A4CF1298B3E0',
             'kategori' => 'pengajian',
             'target_kategori' => 'kamar_khusus',
             'target_filter' => 'Reguler',
@@ -66,7 +79,7 @@ class PengaturanSesiTest extends TestCase
             'jam_mulai' => '16:00:00',
             'jam_selesai' => '17:15:00',
             'toleransi_menit' => 10,
-            'device_id_target' => 'ESP32_MASJID',
+            'device_id_target' => 'ESP32-A4CF1298B3E0',
             'kategori' => 'pengajian',
             'target_kategori' => 'kamar_khusus',
             'target_filter' => 'Reguler',
@@ -86,7 +99,7 @@ class PengaturanSesiTest extends TestCase
             'jam_mulai' => '04:10',
             'jam_selesai' => '05:45',
             'toleransi_menit' => 20,
-            'device_id_target' => 'ESP32_MASJID',
+            'device_id_target' => '',
             'kategori' => 'sholat',
             'target_kategori' => 'semua_santri',
             'target_filter' => 'AbaikanFilterIni',
@@ -99,6 +112,7 @@ class PengaturanSesiTest extends TestCase
             'jam_mulai' => '04:10:00',
             'jam_selesai' => '05:45:00',
             'toleransi_menit' => 20,
+            'device_id_target' => null,
             'target_kategori' => 'semua_santri',
             'target_filter' => null,
         ]);
@@ -111,32 +125,53 @@ class PengaturanSesiTest extends TestCase
         ]);
     }
 
-    public function test_dapat_mengelola_perangkat_esp32(): void
+    public function test_kelola_serial_perangkat_edit_lokasi_dan_hapus_aman(): void
     {
         $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
 
+        // 1. Daftar serial unik ESP32
         $storeResp = $this->actingAs($yayasan)->post(route('pengaturan.sesi.device.store'), [
-            'device_id' => 'ESP32 GERBANG UTAMA',
-            'nama_lokasi' => 'Pos Keamanan Gerbang Depan',
-            'kategori_area' => 'umum',
+            'device_id' => 'ESP32-7C9EBD4412FA',
+            'nama_lokasi' => 'Alat Baru (Belum Diberi Lokasi)',
+            'kategori_area' => 'pondok',
         ]);
 
         $storeResp->assertRedirect(route('pengaturan.sesi', ['tab' => 'devices']));
-        $this->assertDatabaseHas('master_devices', [
-            'device_id' => 'ESP32_GERBANG_UTAMA',
-            'nama_lokasi' => 'Pos Keamanan Gerbang Depan',
-            'kategori_area' => 'umum',
-            'status_aktif' => 1,
+        $device = DB::table('master_devices')->where('device_id', 'ESP32-7C9EBD4412FA')->first();
+        $this->assertNotNull($device);
+
+        // Hubungkan 1 sesi ke alat ini
+        DB::table('master_sesis')->where('kode_sesi', 'REGULER_HARIAN')->update([
+            'device_id_target' => 'ESP32-7C9EBD4412FA',
         ]);
 
-        $device = DB::table('master_devices')->where('device_id', 'ESP32_GERBANG_UTAMA')->first();
-
-        $toggleResp = $this->actingAs($yayasan)->patch(route('pengaturan.sesi.device.toggle', $device->id));
-        $toggleResp->assertRedirect(route('pengaturan.sesi', ['tab' => 'devices']));
+        // 2. Ubah nama lokasi alat
+        $editResp = $this->actingAs($yayasan)->put(route('pengaturan.sesi.device.update', $device->id), [
+            'nama_lokasi' => 'Pintu Masuk Kamar Reguler',
+            'kategori_area' => 'pondok',
+        ]);
+        $editResp->assertRedirect(route('pengaturan.sesi', ['tab' => 'devices']));
         $this->assertDatabaseHas('master_devices', [
             'id' => $device->id,
-            'status_aktif' => 0,
+            'nama_lokasi' => 'Pintu Masuk Kamar Reguler',
+        ]);
+
+        // 3. Cek endpoint live deteksi perangkat
+        DB::table('master_devices')->where('id', $device->id)->update(['last_seen_at' => now()]);
+        $detectResp = $this->actingAs($yayasan)->getJson(route('pengaturan.sesi.last-device'));
+        $detectResp->assertOk()->assertJsonFragment([
+            'device_id' => 'ESP32-7C9EBD4412FA',
+            'nama_lokasi' => 'Pintu Masuk Kamar Reguler',
+        ]);
+
+        // 4. Hapus perangkat — sesi terkait harus otomatis kembali ke Global (NULL) tanpa error
+        $delResp = $this->actingAs($yayasan)->delete(route('pengaturan.sesi.device.destroy', $device->id));
+        $delResp->assertRedirect(route('pengaturan.sesi', ['tab' => 'devices']));
+
+        $this->assertDatabaseMissing('master_devices', ['id' => $device->id]);
+        $this->assertDatabaseHas('master_sesis', [
+            'kode_sesi' => 'REGULER_HARIAN',
+            'device_id_target' => null,
         ]);
     }
 }
-

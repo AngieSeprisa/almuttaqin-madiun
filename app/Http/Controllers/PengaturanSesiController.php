@@ -26,7 +26,8 @@ class PengaturanSesiController extends Controller
 
         $devices = DB::table('master_devices')
             ->where('status_aktif', 1)
-            ->orderBy('device_id')
+            ->orderByDesc('last_seen_at')
+            ->orderBy('nama_lokasi')
             ->get();
 
         $allDevices = DB::table('master_devices')
@@ -40,10 +41,13 @@ class PengaturanSesiController extends Controller
                 'master_devices.device_id',
                 'master_devices.nama_lokasi',
                 'master_devices.kategori_area',
+                'master_devices.ip_address',
                 'master_devices.status_aktif',
+                'master_devices.last_seen_at',
                 'master_devices.created_at',
                 'master_devices.updated_at'
             )
+            ->orderByDesc('master_devices.last_seen_at')
             ->orderBy('master_devices.device_id')
             ->get();
 
@@ -55,6 +59,56 @@ class PengaturanSesiController extends Controller
             ->pluck('kamar');
 
         return view('pengaturan-sesi', compact('sesis', 'devices', 'allDevices', 'kamars'));
+    }
+
+    /**
+     * Endpoint JSON Live Auto-Detect Serial ESP32 terakhir yang menyala / tap.
+     */
+    public function lastDetectedDevice()
+    {
+        $data = null;
+
+        foreach (['/tmp/rfid_last_device.json', '/tmp/rfid_last_tap.json'] as $file) {
+            if (file_exists($file)) {
+                $decoded = json_decode((string) file_get_contents($file), true);
+                if (is_array($decoded) && !empty($decoded['device_id'])) {
+                    $data = $decoded;
+                    break;
+                }
+            }
+        }
+
+        if (!$data) {
+            // Fallback ke perangkat terbaru yang terdeteksi di tabel master_devices
+            $latestDb = DB::table('master_devices')
+                ->whereNotNull('last_seen_at')
+                ->orderByDesc('last_seen_at')
+                ->first();
+
+            if ($latestDb) {
+                return response()->json([
+                    'device_id' => $latestDb->device_id,
+                    'ip' => $latestDb->ip_address,
+                    'timestamp' => $latestDb->last_seen_at,
+                    'already_registered' => true,
+                    'nama_lokasi' => $latestDb->nama_lokasi,
+                ]);
+            }
+
+            return response()->json(['device_id' => null]);
+        }
+
+        $existing = DB::table('master_devices')
+            ->where('device_id', $data['device_id'])
+            ->first();
+
+        return response()->json([
+            'device_id' => $data['device_id'],
+            'ip' => $data['ip'] ?? ($existing->ip_address ?? null),
+            'timestamp' => $data['timestamp'] ?? null,
+            'already_registered' => (bool) $existing,
+            'nama_lokasi' => $existing->nama_lokasi ?? null,
+        ]);
     }
 
     /**
@@ -173,7 +227,7 @@ class PengaturanSesiController extends Controller
     }
 
     /**
-     * Tambah Perangkat ESP32 Baru ke Master Devices.
+     * Tambah / Simpan Perangkat ESP32 (Serial Unik) ke Master Devices.
      */
     public function storeDevice(Request $request)
     {
@@ -184,26 +238,65 @@ class PengaturanSesiController extends Controller
         }
 
         $validated = $request->validate([
-            'device_id' => ['required', 'string', 'max:50', 'unique:master_devices,device_id'],
+            'device_id' => ['required', 'string', 'max:50'],
             'nama_lokasi' => ['required', 'string', 'max:100'],
             'kategori_area' => ['required', Rule::in(['pondok', 'sekolah', 'dapur', 'umum'])],
         ], [
-            'device_id.required' => 'ID Perangkat ESP32 wajib diisi.',
-            'device_id.unique' => 'ID Perangkat tersebut sudah terdaftar.',
+            'device_id.required' => 'Serial / ID Perangkat ESP32 wajib diisi.',
             'nama_lokasi.required' => 'Nama lokasi pemasangan wajib diisi.',
         ]);
 
-        DB::table('master_devices')->insert([
-            'device_id' => $validated['device_id'],
+        // Gunakan updateOrInsert agar jika serial sudah auto-register oleh daemon, tinggal memperbarui lokasinya
+        $existing = DB::table('master_devices')->where('device_id', $validated['device_id'])->first();
+
+        if ($existing) {
+            DB::table('master_devices')->where('id', $existing->id)->update([
+                'nama_lokasi' => trim($validated['nama_lokasi']),
+                'kategori_area' => $validated['kategori_area'],
+                'status_aktif' => 1,
+                'updated_at' => now(),
+            ]);
+            $msg = 'Lokasi perangkat ' . $validated['device_id'] . ' berhasil diperbarui.';
+        } else {
+            DB::table('master_devices')->insert([
+                'device_id' => $validated['device_id'],
+                'nama_lokasi' => trim($validated['nama_lokasi']),
+                'kategori_area' => $validated['kategori_area'],
+                'status_aktif' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $msg = 'Perangkat ESP32 (' . $validated['device_id'] . ') berhasil didaftarkan.';
+        }
+
+        return redirect()->route('pengaturan.sesi', ['tab' => 'devices'])
+            ->with('success', $msg);
+    }
+
+    /**
+     * Edit Nama Lokasi & Kategori Area Perangkat ESP32.
+     */
+    public function updateDevice(Request $request, $id)
+    {
+        $device = DB::table('master_devices')->where('id', $id)->first();
+        if (!$device) {
+            return redirect()->route('pengaturan.sesi', ['tab' => 'devices'])
+                ->with('error', 'Perangkat tidak ditemukan.');
+        }
+
+        $validated = $request->validate([
+            'nama_lokasi' => ['required', 'string', 'max:100'],
+            'kategori_area' => ['required', Rule::in(['pondok', 'sekolah', 'dapur', 'umum'])],
+        ]);
+
+        DB::table('master_devices')->where('id', $id)->update([
             'nama_lokasi' => trim($validated['nama_lokasi']),
             'kategori_area' => $validated['kategori_area'],
-            'status_aktif' => 1,
-            'created_at' => now(),
             'updated_at' => now(),
         ]);
 
         return redirect()->route('pengaturan.sesi', ['tab' => 'devices'])
-            ->with('success', 'Perangkat ESP32 baru berhasil didaftarkan.');
+            ->with('success', 'Nama lokasi perangkat ' . $device->device_id . ' berhasil disimpan.');
     }
 
     /**
@@ -224,14 +317,21 @@ class PengaturanSesiController extends Controller
     }
 
     /**
-     * Hapus Perangkat ESP32 dari Master Devices.
+     * Hapus Perangkat ESP32 (Sesi yang memakainya otomatis dikembalikan ke Global/NULL).
      */
     public function destroyDevice($id)
     {
-        DB::table('master_devices')->where('id', $id)->delete();
+        $device = DB::table('master_devices')->where('id', $id)->first();
+        if ($device) {
+            DB::table('master_sesis')
+                ->where('device_id_target', $device->device_id)
+                ->update(['device_id_target' => null]);
+
+            DB::table('master_devices')->where('id', $id)->delete();
+        }
 
         return redirect()->route('pengaturan.sesi', ['tab' => 'devices'])
-            ->with('success', 'Perangkat ESP32 berhasil dihapus.');
+            ->with('success', 'Perangkat berhasil dihapus dan sesi terkait dikembalikan ke Global.');
     }
 
     /**
@@ -246,4 +346,3 @@ class PengaturanSesiController extends Controller
         return $clean;
     }
 }
-

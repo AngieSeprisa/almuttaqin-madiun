@@ -39,13 +39,15 @@ PREPARE alterIfNotExistsUser FROM @preparedStatement_user;
 EXECUTE alterIfNotExistsUser;
 DEALLOCATE PREPARE alterIfNotExistsUser;
 
--- 3. Tabel master_devices
+-- 3. Tabel master_devices (Otomatis mendeteksi Serial Hardware ESP32)
 CREATE TABLE IF NOT EXISTS `master_devices` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `device_id` VARCHAR(50) UNIQUE NOT NULL,
+    `device_id` VARCHAR(50) UNIQUE NOT NULL COMMENT 'Serial unik hardware ESP32 (misal: ESP32-A4CF1298B3E0)',
     `nama_lokasi` VARCHAR(100) NOT NULL,
     `kategori_area` ENUM('pondok', 'sekolah', 'dapur', 'umum') DEFAULT 'pondok',
+    `ip_address` VARCHAR(45) NULL,
     `status_aktif` TINYINT(1) DEFAULT 1,
+    `last_seen_at` TIMESTAMP NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -106,26 +108,18 @@ CREATE TABLE IF NOT EXISTS `presensi_santris` (
     INDEX `idx_presensi_harian` (`tanggal`, `siswa_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 7. Inisialisasi Master Devices
-INSERT INTO `master_devices` (`device_id`, `nama_lokasi`, `kategori_area`, `status_aktif`) VALUES
-('ESP32_Presensi_Santri', 'Asrama Santri Kamar Reguler', 'pondok', 1),
-('ESP32_MASJID', 'Masjid Pondok Al Muttaqin', 'pondok', 1),
-('ESP32_SEKOLAH', 'Lobi Utama Sekolah (SMP/SMA)', 'sekolah', 1),
-('ESP32_DAPUR', 'Dapur & Ruang Makan Asrama', 'dapur', 1)
-ON DUPLICATE KEY UPDATE `nama_lokasi` = VALUES(`nama_lokasi`), `kategori_area` = VALUES(`kategori_area`);
-
--- 8. Inisialisasi Master Sesi
-INSERT INTO `master_sesis` (`device_id_target`, `kode_sesi`, `nama_sesi`, `jam_mulai`, `jam_selesai`, `toleransi_menit`, `kategori`) VALUES
-('ESP32_Presensi_Santri', 'REGULER_HARIAN', 'Presensi Kamar Reguler (24 Jam)', '00:00:00', '23:59:59', 15, 'sholat'),
-('ESP32_MASJID', 'SUBUH', 'Sholat Subuh Berjamaah', '04:00:00', '05:30:00', 15, 'sholat'),
-('ESP32_MASJID', 'DZUHUR', 'Sholat Dzuhur Berjamaah', '11:30:00', '13:00:00', 15, 'sholat'),
-('ESP32_MASJID', 'ASHAR', 'Sholat Ashar Berjamaah', '14:45:00', '16:00:00', 15, 'sholat'),
-('ESP32_MASJID', 'MAGHRIB', 'Sholat Maghrib & Pengajian', '17:30:00', '18:45:00', 15, 'sholat'),
-('ESP32_MASJID', 'ISYA', 'Sholat Isya Berjamaah', '18:45:00', '20:30:00', 15, 'sholat'),
-('ESP32_SEKOLAH', 'SEKOLAH_MASUK', 'Masuk Sekolah Pagi (SMP/SMA)', '06:30:00', '07:30:00', 15, 'sekolah'),
-('ESP32_SEKOLAH', 'SEKOLAH_PULANG', 'Kepulangan Sekolah (SMP/SMA)', '13:30:00', '15:30:00', 0, 'sekolah'),
-('ESP32_DAPUR', 'MAKAN_SIANG', 'Jatah Makan Siang Asrama', '11:45:00', '13:30:00', 0, 'makan'),
-(NULL, 'PEGAWAI_MASUK', 'Presensi Datang Guru & Pegawai', '06:15:00', '07:30:00', 15, 'pegawai')
+-- 7. Inisialisasi Master Sesi (Tanpa perangkat dummy; otomatis Global sampai alat ESP32 terdeteksi)
+INSERT INTO `master_sesis` (`device_id_target`, `kode_sesi`, `nama_sesi`, `jam_mulai`, `jam_selesai`, `toleransi_menit`, `kategori`, `target_kategori`, `target_filter`) VALUES
+(NULL, 'REGULER_HARIAN', 'Presensi Kamar Reguler (24 Jam)', '00:00:00', '23:59:59', 15, 'sholat', 'kamar_khusus', 'Reguler'),
+(NULL, 'SUBUH', 'Sholat Subuh Berjamaah', '04:00:00', '05:30:00', 15, 'sholat', 'semua_santri', NULL),
+(NULL, 'DZUHUR', 'Sholat Dzuhur Berjamaah', '11:30:00', '13:00:00', 15, 'sholat', 'semua_santri', NULL),
+(NULL, 'ASHAR', 'Sholat Ashar Berjamaah', '14:45:00', '16:00:00', 15, 'sholat', 'semua_santri', NULL),
+(NULL, 'MAGHRIB', 'Sholat Maghrib & Pengajian', '17:30:00', '18:45:00', 15, 'sholat', 'semua_santri', NULL),
+(NULL, 'ISYA', 'Sholat Isya Berjamaah', '18:45:00', '20:30:00', 15, 'sholat', 'semua_santri', NULL),
+(NULL, 'SEKOLAH_MASUK', 'Masuk Sekolah Pagi (SMP/SMA)', '06:30:00', '07:30:00', 15, 'sekolah', 'sekolah', 'SMP'),
+(NULL, 'SEKOLAH_PULANG', 'Kepulangan Sekolah (SMP/SMA)', '13:30:00', '15:30:00', 0, 'sekolah', 'sekolah', 'SMP'),
+(NULL, 'MAKAN_SIANG', 'Jatah Makan Siang Asrama', '11:45:00', '13:30:00', 0, 'makan', 'semua_santri', NULL),
+(NULL, 'PEGAWAI_MASUK', 'Presensi Datang Guru & Pegawai', '06:15:00', '07:30:00', 15, 'pegawai', 'pegawai', NULL)
 ON DUPLICATE KEY UPDATE `nama_sesi` = VALUES(`nama_sesi`), `jam_mulai` = VALUES(`jam_mulai`), `jam_selesai` = VALUES(`jam_selesai`);
 
 -- 9. Sinkronisasi Data 16 Santri Kamar Reguler & Pasang Contoh UID Kartu

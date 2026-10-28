@@ -324,12 +324,12 @@
             <!-- Action pada Tab Perangkat -->
             <div x-show="activeTab === 'devices'" x-cloak class="flex items-center justify-end">
                 <button type="button"
-                        @click="showDeviceModal = true"
+                        @click="openCreateDeviceModal()"
                         class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-cyan-600/20 transition">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
                     </svg>
-                    <span>Daftarkan Mesin ESP32</span>
+                    <span>Deteksi / Daftarkan ESP32</span>
                 </button>
             </div>
         </div>
@@ -512,7 +512,13 @@
         <!-- ======================================================= -->
         <section x-show="activeTab === 'devices'" x-cloak class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             @forelse($allDevices as $dev)
-                <div class="bg-slate-900/60 border {{ $dev->status_aktif ? 'border-slate-800/90 hover:border-cyan-500/40' : 'border-slate-800/50 opacity-75' }} rounded-2xl p-5 shadow-lg transition flex flex-col justify-between gap-4">
+                @php
+                    $isNewUnlabeled = str_contains(strtolower((string) $dev->nama_lokasi), 'belum diberi lokasi');
+                    $lastSeenFormatted = $dev->last_seen_at
+                        ? \Carbon\Carbon::parse($dev->last_seen_at)->diffForHumans()
+                        : null;
+                @endphp
+                <div class="bg-slate-900/60 border {{ $dev->status_aktif ? ($isNewUnlabeled ? 'border-amber-500/40 hover:border-amber-400/60' : 'border-slate-800/90 hover:border-cyan-500/40') : 'border-slate-800/50 opacity-75' }} rounded-2xl p-5 shadow-lg transition flex flex-col justify-between gap-4">
                     <div>
                         <div class="flex items-start justify-between gap-2">
                             <div class="w-10 h-10 rounded-xl {{ $dev->status_aktif ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' : 'bg-slate-800 border-slate-700 text-slate-500' }} border flex items-center justify-center shrink-0">
@@ -520,15 +526,36 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                                 </svg>
                             </div>
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold {{ $dev->status_aktif ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 border border-slate-700' }}">
-                                <span class="w-1.5 h-1.5 rounded-full {{ $dev->status_aktif ? 'bg-emerald-400' : 'bg-slate-500' }}"></span>
-                                {{ $dev->status_aktif ? 'Aktif' : 'Nonaktif' }}
-                            </span>
+                            <div class="flex items-center gap-1.5">
+                                @if($isNewUnlabeled)
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                        Beri Nama Lokasi
+                                    </span>
+                                @endif
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold {{ $dev->status_aktif ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 border border-slate-700' }}">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $dev->status_aktif ? 'bg-emerald-400' : 'bg-slate-500' }}"></span>
+                                    {{ $dev->status_aktif ? 'Aktif' : 'Nonaktif' }}
+                                </span>
+                            </div>
                         </div>
 
                         <div class="mt-3.5">
-                            <div class="text-sm font-mono font-bold text-white break-all">{{ $dev->device_id }}</div>
-                            <div class="text-xs text-slate-400 mt-1">{{ $dev->nama_lokasi }}</div>
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Serial Hardware ESP32</div>
+                            <div class="text-sm font-mono font-bold text-white break-all mt-0.5">{{ $dev->device_id }}</div>
+                            <div class="text-xs {{ $isNewUnlabeled ? 'text-amber-300 font-semibold' : 'text-slate-300 font-medium' }} mt-1.5">
+                                {{ $dev->nama_lokasi }}
+                            </div>
+                            <div class="text-[11px] text-slate-500 font-mono mt-1.5 flex flex-wrap items-center gap-1.5">
+                                @if(!empty($dev->ip_address))
+                                    <span>IP: {{ $dev->ip_address }}</span>
+                                    <span>•</span>
+                                @endif
+                                @if($lastSeenFormatted)
+                                    <span class="text-emerald-400/90">Terhubung {{ $lastSeenFormatted }}</span>
+                                @else
+                                    <span>Belum pernah mengirim sinyal</span>
+                                @endif
+                            </div>
                         </div>
                     </div>
 
@@ -541,6 +568,17 @@
                         </div>
 
                         <div class="flex items-center gap-1.5">
+                            <!-- Edit Lokasi -->
+                            <button type="button"
+                                    @click="openEditDeviceModal({{ $dev->id }}, @js($dev->device_id), @js($dev->nama_lokasi), @js($dev->kategori_area))"
+                                    class="p-1.5 rounded-lg bg-slate-800 hover:bg-blue-600/20 text-slate-300 hover:text-blue-400 border border-slate-700 hover:border-blue-500/40 transition"
+                                    title="Ubah Nama Lokasi Alat">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+
+                            <!-- Toggle Aktif / Nonaktif -->
                             <form action="{{ route('pengaturan.sesi.device.toggle', $dev->id) }}" method="POST">
                                 @csrf
                                 @method('PATCH')
@@ -551,26 +589,39 @@
                                 </button>
                             </form>
 
-                            @if($dev->total_sesi == 0)
-                                <form action="{{ route('pengaturan.sesi.device.destroy', $dev->id) }}" method="POST" onsubmit="return confirm('Hapus perangkat {{ $dev->device_id }}?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit"
-                                            class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 transition"
-                                            title="Hapus Perangkat">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
-                                </form>
-                            @endif
+                            <!-- Hapus Perangkat (Sesi terkait otomatis kembali ke Global) -->
+                            <form action="{{ route('pengaturan.sesi.device.destroy', $dev->id) }}" method="POST"
+                                  onsubmit="return confirm('Hapus perangkat {{ $dev->device_id }}? Sesi yang terhubung ke alat ini akan otomatis dikembalikan ke Semua Perangkat (Global).');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit"
+                                        class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600/20 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-500/40 transition"
+                                        title="Hapus Perangkat">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
             @empty
-                <div class="col-span-full bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center">
-                    <div class="text-sm font-bold text-white">Belum Ada Perangkat ESP32 Terdaftar</div>
-                    <p class="text-xs text-slate-400 mt-1">Tambahkan ID perangkat sesuai parameter <code class="font-mono text-cyan-400">device_id</code> pada kode ESP32.</p>
+                <div class="col-span-full bg-slate-900/60 border border-slate-800 rounded-2xl p-10 sm:p-12 text-center">
+                    <div class="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 flex items-center justify-center mx-auto mb-3.5">
+                        <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                        </svg>
+                    </div>
+                    <div class="text-base font-extrabold text-white">Belum Ada Perangkat Fisik ESP32 Terdaftar</div>
+                    <p class="text-xs sm:text-sm text-slate-400 mt-1.5 max-w-xl mx-auto leading-relaxed">
+                        Daftar dikosongkan agar tidak ada alat fiktif yang membingungkan. Begitu mesin ESP32 dinyalakan atau dipakai men-tap kartu,
+                        <strong class="text-cyan-300">Serial Unik Hardware ESP32</strong> akan otomatis terdeteksi di sini dan Anda tinggal menamai lokasinya.
+                    </p>
+                    <button type="button"
+                            @click="openCreateDeviceModal()"
+                            class="mt-5 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-cyan-600/20 transition">
+                        <span>Pindai / Daftarkan Serial ESP32 Sekarang</span>
+                    </button>
                 </div>
             @endforelse
         </section>
@@ -691,11 +742,20 @@
                             <select name="device_id_target"
                                     x-model="form.device_id_target"
                                     class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 focus:border-emerald-500 text-sm text-white outline-none transition">
-                                <option value="">Semua Perangkat (Global)</option>
-                                @foreach($devices as $d)
-                                    <option value="{{ $d->device_id }}">{{ $d->device_id }} — {{ $d->nama_lokasi }}</option>
-                                @endforeach
+                                @if($devices->isEmpty())
+                                    <option value="">Semua Perangkat / Global (Belum ada alat terdaftar)</option>
+                                @else
+                                    <option value="">Semua Perangkat (Global)</option>
+                                    @foreach($devices as $d)
+                                        <option value="{{ $d->device_id }}">{{ $d->nama_lokasi }} ({{ $d->device_id }})</option>
+                                    @endforeach
+                                @endif
                             </select>
+                            @if($devices->isEmpty())
+                                <p class="text-[11px] text-slate-500 mt-1">Belum ada mesin spesifik terdaftar. Sesi berlaku otomatis untuk alat mana pun yang aktif.</p>
+                            @else
+                                <p class="text-[11px] text-slate-500 mt-1">Pilih lokasi &amp; serial spesifik, atau biarkan Global.</p>
+                            @endif
                         </div>
 
                         <!-- Toleransi Menit & Kategori -->
@@ -863,44 +923,105 @@
     </div>
 
     <!-- ======================================================= -->
-    <!-- MODAL DAFTARKAN MESIN ESP32 BARU                        -->
+    <!-- MODAL DETEKSI / DAFTARKAN / EDIT LOKASI MESIN ESP32     -->
     <!-- ======================================================= -->
     <div x-show="showDeviceModal" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center p-4"
-         @keydown.escape.window="showDeviceModal = false">
-        <div x-show="showDeviceModal" x-transition.opacity @click="showDeviceModal = false" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"></div>
+         @keydown.escape.window="closeDeviceModal()">
+        <div x-show="showDeviceModal" x-transition.opacity @click="closeDeviceModal()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"></div>
 
         <div x-show="showDeviceModal"
              x-transition
              class="relative w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden z-10">
             <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
                 <div>
-                    <h3 class="text-base font-extrabold text-white">Daftarkan Mesin ESP32 Baru</h3>
-                    <p class="text-xs text-slate-400">Sesuaikan ID dengan variabel <code class="font-mono text-cyan-400">device_id</code> pada firmware ESP32.</p>
+                    <h3 class="text-base font-extrabold text-white"
+                        x-text="deviceModalMode === 'create' ? 'Deteksi / Daftarkan Serial ESP32' : 'Ubah Nama Lokasi Perangkat'"></h3>
+                    <p class="text-xs text-slate-400"
+                       x-text="deviceModalMode === 'create' ? 'Nyalakan ESP32 atau tap 1 kartu agar Serial Hardware terbaca otomatis.' : 'Berikan nama lokasi agar mudah dikenali pada pilihan sesi.'"></p>
                 </div>
-                <button type="button" @click="showDeviceModal = false" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                <button type="button" @click="closeDeviceModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
 
-            <form action="{{ route('pengaturan.sesi.device.store') }}" method="POST">
+            <form :action="deviceModalMode === 'create' ? '{{ route('pengaturan.sesi.device.store') }}' : ('/pengaturan-sesi/device/' + deviceForm.id)" method="POST">
                 @csrf
+                <template x-if="deviceModalMode === 'edit'">
+                    <input type="hidden" name="_method" value="PUT">
+                </template>
+
                 <div class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">Device ID (Unik) <span class="text-rose-400">*</span></label>
-                        <input type="text" name="device_id" required maxlength="50" placeholder="Contoh: ESP32_ASRAMA_PUTRI"
-                               class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 focus:border-cyan-500 text-sm font-mono text-white placeholder-slate-500 outline-none transition">
+
+                    <!-- Radar Auto-Detect Serial Live (Hanya saat mode Create) -->
+                    <div x-show="deviceModalMode === 'create'"
+                         class="p-3.5 rounded-xl border transition"
+                         :class="detectedDevice.device_id ? 'bg-cyan-950/40 border-cyan-500/40' : 'bg-slate-950/60 border-slate-800'">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full"
+                                      :class="detectedDevice.device_id ? 'bg-cyan-400 animate-ping' : 'bg-slate-500 animate-pulse'"></span>
+                                <span class="text-xs font-bold uppercase tracking-wider"
+                                      :class="detectedDevice.device_id ? 'text-cyan-300' : 'text-slate-400'"
+                                      x-text="detectedDevice.device_id ? 'Serial Alat Terdeteksi!' : 'Memindai Sinyal MQTT ESP32...'"></span>
+                            </div>
+                            <button type="button"
+                                    x-show="detectedDevice.device_id"
+                                    @click="deviceForm.device_id = detectedDevice.device_id"
+                                    class="px-2.5 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-[11px] font-bold transition">
+                                Pakai Serial Ini
+                            </button>
+                        </div>
+
+                        <template x-if="detectedDevice.device_id">
+                            <div class="mt-2 text-xs text-slate-300 font-mono">
+                                ID: <strong class="text-white" x-text="detectedDevice.device_id"></strong>
+                                <span x-show="detectedDevice.ip" x-text="' • IP: ' + detectedDevice.ip"></span>
+                                <span x-show="detectedDevice.timestamp" class="text-slate-400" x-text="' (' + detectedDevice.timestamp + ')'"></span>
+                            </div>
+                        </template>
+                        <template x-if="!detectedDevice.device_id">
+                            <p class="mt-1.5 text-[11px] text-slate-500">
+                                Colokkan daya ke ESP32 atau tempelkan kartu apa saja pada reader — nomor seri akan muncul otomatis di sini.
+                            </p>
+                        </template>
                     </div>
+
                     <div>
-                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">Nama Lokasi Pemasangan <span class="text-rose-400">*</span></label>
-                        <input type="text" name="nama_lokasi" required maxlength="100" placeholder="Contoh: Teras Asrama Putri Lantai 1"
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                            Serial Hardware ESP32 (Unik) <span class="text-rose-400">*</span>
+                        </label>
+                        <input type="text"
+                               name="device_id"
+                               x-model="deviceForm.device_id"
+                               :readonly="deviceModalMode === 'edit'"
+                               required
+                               maxlength="50"
+                               placeholder="Contoh: ESP32-A4CF1298B3E0"
+                               :class="deviceModalMode === 'edit' ? 'opacity-70 cursor-not-allowed' : ''"
+                               class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 focus:border-cyan-500 text-sm font-mono font-bold text-white placeholder-slate-500 outline-none transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                            Nama Lokasi Pemasangan <span class="text-rose-400">*</span>
+                        </label>
+                        <input type="text"
+                               name="nama_lokasi"
+                               x-model="deviceForm.nama_lokasi"
+                               required
+                               maxlength="100"
+                               placeholder="Contoh: Pintu Kamar Reguler / Teras Masjid"
                                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 focus:border-cyan-500 text-sm text-white placeholder-slate-500 outline-none transition">
                     </div>
+
                     <div>
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">Kategori Area</label>
-                        <select name="kategori_area" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 focus:border-cyan-500 text-sm text-white outline-none transition">
+                        <select name="kategori_area"
+                                x-model="deviceForm.kategori_area"
+                                class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700/80 focus:border-cyan-500 text-sm text-white outline-none transition">
                             <option value="pondok">Pondok / Asrama</option>
                             <option value="sekolah">Sekolah (SMP / SMA)</option>
                             <option value="dapur">Dapur / Ruang Makan</option>
@@ -909,11 +1030,11 @@
                     </div>
                 </div>
                 <div class="px-6 py-4 border-t border-slate-800 bg-slate-950/50 flex items-center justify-end gap-2.5">
-                    <button type="button" @click="showDeviceModal = false" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-semibold border border-slate-700 transition">
+                    <button type="button" @click="closeDeviceModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-semibold border border-slate-700 transition">
                         Batal
                     </button>
-                    <button type="submit" class="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-cyan-600/20 transition">
-                        Simpan Perangkat
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-cyan-600/20 transition"
+                            x-text="deviceModalMode === 'create' ? 'Simpan Perangkat' : 'Simpan Nama Lokasi'">
                     </button>
                 </div>
             </form>
@@ -931,6 +1052,19 @@
                 filterKategori: 'all',
                 showModal: false,
                 showDeviceModal: false,
+                deviceModalMode: 'create',
+                devicePollTimer: null,
+                detectedDevice: {
+                    device_id: null,
+                    ip: null,
+                    timestamp: null
+                },
+                deviceForm: {
+                    id: null,
+                    device_id: '',
+                    nama_lokasi: '',
+                    kategori_area: 'pondok'
+                },
                 modalMode: 'create',
                 sesisData: @json($sesisJson),
                 kategoriFilters: [
@@ -1053,6 +1187,60 @@
                         nama: nama,
                         kode: kode
                     };
+                },
+
+                openCreateDeviceModal() {
+                    this.deviceModalMode = 'create';
+                    this.deviceForm = {
+                        id: null,
+                        device_id: '',
+                        nama_lokasi: '',
+                        kategori_area: 'pondok'
+                    };
+                    this.showDeviceModal = true;
+                    this.pollDetectedDevice();
+                    if (this.devicePollTimer) clearInterval(this.devicePollTimer);
+                    this.devicePollTimer = setInterval(() => this.pollDetectedDevice(), 2000);
+                },
+
+                openEditDeviceModal(id, deviceId, namaLokasi, kategoriArea) {
+                    this.deviceModalMode = 'edit';
+                    this.deviceForm = {
+                        id: id,
+                        device_id: deviceId,
+                        nama_lokasi: namaLokasi.includes('Belum Diberi Lokasi') ? '' : namaLokasi,
+                        kategori_area: kategoriArea || 'pondok'
+                    };
+                    if (this.devicePollTimer) {
+                        clearInterval(this.devicePollTimer);
+                        this.devicePollTimer = null;
+                    }
+                    this.showDeviceModal = true;
+                },
+
+                closeDeviceModal() {
+                    this.showDeviceModal = false;
+                    if (this.devicePollTimer) {
+                        clearInterval(this.devicePollTimer);
+                        this.devicePollTimer = null;
+                    }
+                },
+
+                pollDetectedDevice() {
+                    fetch('{{ route("pengaturan.sesi.last-device") }}')
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data && data.device_id) {
+                                this.detectedDevice = data;
+                                if (!this.deviceForm.device_id) {
+                                    this.deviceForm.device_id = data.device_id;
+                                }
+                                if (!this.deviceForm.nama_lokasi && data.nama_lokasi && !data.nama_lokasi.includes('Belum Diberi Lokasi')) {
+                                    this.deviceForm.nama_lokasi = data.nama_lokasi;
+                                }
+                            }
+                        })
+                        .catch(() => {});
                 }
             };
         }

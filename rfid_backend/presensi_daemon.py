@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Presensi RFID Daemon - Multi-Lokasi & Sesi Otomatis
+Presensi RFID Daemon - Multi-Lokasi, Auto-Serial ESP32 & Sesi Otomatis
 Yayasan Pondok Pesantren Al Muttaqin Madiun
 
-Mendengarkan tap kartu RFID dari berbagai perangkat ESP32 via MQTT,
-menentukan sesi aktif berbasis lokasi & waktu lokal, memvalidasi santri / pegawai di MySQL,
-mencegah duplikasi per sesi, dan mengirim balasan status ke LCD 16x2.
+Mendengarkan heartbeat & tap kartu RFID dari perangkat ESP32 via MQTT menggunakan
+Serial Unik Hardware (eFuse MAC), mendaftarkan alat otomatis ke master_devices,
+menentukan sesi aktif berbasis lokasi & waktu lokal, memvalidasi santri / pegawai,
+mencegah duplikasi per sesi, dan mengirim balasan status ke LCD 16x2 spesifik alat.
 """
 
 import os
@@ -34,6 +35,7 @@ import paho.mqtt.client as mqtt
 MQTT_BROKER = os.getenv("MQTT_BROKER", "127.0.0.1")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_TOPIC_TAP = os.getenv("MQTT_TOPIC_TAP", "presensi/santri/tap")
+MQTT_TOPIC_HEARTBEAT = os.getenv("MQTT_TOPIC_HEARTBEAT", "presensi/santri/heartbeat")
 MQTT_TOPIC_RESPONSE = os.getenv("MQTT_TOPIC_RESPONSE", "presensi/santri/response")
 MQTT_CLIENT_ID = os.getenv("MQTT_CLIENT_ID", f"Muttaqin_MultiRFID_Backend_{int(time.time())}")
 
@@ -49,8 +51,9 @@ DB_CONFIG = {
 
 DEBOUNCE_SECONDS = int(os.getenv("DEBOUNCE_SECONDS", "3"))
 
-# File cache untuk live auto-detect pairing kartu di dashboard
+# File cache untuk live auto-detect pairing kartu & serial perangkat di dashboard web
 LAST_TAP_LOG_FILE = Path("/tmp/rfid_last_tap.json")
+LAST_DEVICE_LOG_FILE = Path("/tmp/rfid_last_device.json")
 
 # In-memory cache debounce {uid: timestamp}
 tap_history = {}
@@ -96,12 +99,13 @@ def format_lcd_name(full_name: str) -> str:
         return parts[0][:16]
     return clean_name[:16]
 
-def save_last_tap_info(uid: str, device_id: str, is_registered: bool, name: str = ""):
+def save_last_tap_info(uid: str, device_id: str, is_registered: bool, name: str = "", ip_addr: str = ""):
     """Menyimpan kartu terakhir untuk fitur live pairing kartu di dashboard."""
     try:
         data = {
             "uid": uid,
             "device_id": device_id,
+            "ip": ip_addr,
             "is_registered": is_registered,
             "name": name,
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -110,11 +114,75 @@ def save_last_tap_info(uid: str, device_id: str, is_registered: bool, name: str 
     except Exception as e:
         logging.debug(f"Gagal menulis cache last tap: {e}")
 
+def save_last_device_info(device_id: str, ip_addr: str = "", event: str = "online"):
+    """Menyimpan perangkat ESP32 terakhir yang menyala/mengirim sinyal."""
+    try:
+        data = {
+            "device_id": device_id,
+            "ip": ip_addr,
+            "event": event,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        LAST_DEVICE_LOG_FILE.write_text(json.dumps(data), encoding="utf-8")
+    except Exception as e:
+        logging.debug(f"Gagal menulis cache last device: {e}")
+
+def sync_device_presence(cursor, device_id: str, ip_addr: str = "") -> dict:
+    """
+    Memastikan Serial/ID perangkat terdaftar di master_devices dan memperbarui last_seen_at & ip_address.
+    Mengembalikan row perangkat dari database.
+    """
+    cursor.execute(
+        "SELECT id, device_id, nama_lokasi, status_aktif FROM master_devices WHERE device_id = %s LIMIT 1",
+        (device_id,)
+    )
+    device = cursor.fetchone()
+
+    if not device:
+        default_label = "Alat Baru (Belum Diberi Lokasi)"
+        try:
+            cursor.execute(
+                """
+                INSERT INTO master_devices (device_id, nama_lokasi, kategori_area, ip_address, status_aktif, last_seen_at, created_at, updated_at)
+                VALUES (%s, %s, 'pondok', %s, 1, NOW(), NOW(), NOW())
+                """,
+                (device_id, default_label, ip_addr or None)
+            )
+        except Exception:
+            cursor.execute(
+                """
+                INSERT INTO master_devices (device_id, nama_lokasi, kategori_area, status_aktif, created_at, updated_at)
+                VALUES (%s, %s, 'pondok', 1, NOW(), NOW())
+                """,
+                (device_id, default_label)
+            )
+        logging.info(f"[AUTO-DISCOVERY] Serial perangkat baru '{device_id}' ({ip_addr or '-'}) otomatis terdaftar.")
+        device = {
+            "device_id": device_id,
+            "nama_lokasi": default_label,
+            "status_aktif": 1
+        }
+    else:
+        try:
+            if ip_addr:
+                cursor.execute(
+                    "UPDATE master_devices SET last_seen_at = NOW(), ip_address = %s, updated_at = NOW() WHERE device_id = %s",
+                    (ip_addr, device_id)
+                )
+            else:
+                cursor.execute(
+                    "UPDATE master_devices SET last_seen_at = NOW(), updated_at = NOW() WHERE device_id = %s",
+                    (device_id,)
+                )
+        except Exception:
+            pass
+
+    return device
+
 def get_active_sesi(cursor, device_id: str, current_time: str):
     """
     Mencari sesi aktif di master_sesis yang cocok dengan device_id dan jam saat ini.
     """
-    # 1. Cek sesi spesifik untuk device_id atau global
     query = """
         SELECT id, kode_sesi, nama_sesi, jam_mulai, jam_selesai, toleransi_menit, kategori
         FROM master_sesis
@@ -130,7 +198,7 @@ def get_active_sesi(cursor, device_id: str, current_time: str):
     cursor.execute(query, (device_id, current_time, current_time, current_time, device_id))
     sesi = cursor.fetchone()
 
-    # 2. Jika tidak ada sesi terjadwal pada jam ini, gunakan sesi fallback default
+    # Jika tidak ada sesi terjadwal pada jam ini, gunakan sesi fallback default
     if not sesi:
         fallback_query = "SELECT id, kode_sesi, nama_sesi, jam_mulai, jam_selesai, toleransi_menit, kategori FROM master_sesis ORDER BY id ASC LIMIT 1"
         cursor.execute(fallback_query)
@@ -144,7 +212,6 @@ def find_entity_by_uid(cursor, clean_uid: str):
     1. Cek tabel siswas (santri/siswa)
     2. Cek tabel users (guru/pegawai)
     """
-    # Cek Santri / Siswa
     cursor.execute("SELECT id, nama_lengkap, kamar, status FROM siswas WHERE UPPER(TRIM(rfid_uid)) = %s LIMIT 1", (clean_uid,))
     santri = cursor.fetchone()
     if santri:
@@ -155,7 +222,6 @@ def find_entity_by_uid(cursor, clean_uid: str):
             "sub": santri.get("kamar", "Santri")
         }
 
-    # Cek Guru / Pegawai
     cursor.execute("SELECT id, name, email FROM users WHERE UPPER(TRIM(rfid_uid)) = %s LIMIT 1", (clean_uid,))
     user = cursor.fetchone()
     if user:
@@ -168,11 +234,11 @@ def find_entity_by_uid(cursor, clean_uid: str):
 
     return None
 
-def process_tap(db, uid: str, device_id: str) -> dict:
+def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
     """
-    Logika Pemrosesan Multi-Lokasi & Sesi Otomatis:
-    1. Validasi Device
-    2. Tentukan Sesi Berdasarkan Jam & Device
+    Logika Pemrosesan Multi-Lokasi & Sesi Otomatis berbasis Serial Perangkat:
+    1. Sinkronisasi Serial Perangkat & Cek Status Aktif
+    2. Tentukan Sesi Berdasarkan Jam & Serial Device
     3. Cari Pemilik Kartu (Santri / Pegawai)
     4. Anti-Duplikasi Per Sesi
     5. Simpan Log Presensi Terpadu
@@ -185,16 +251,18 @@ def process_tap(db, uid: str, device_id: str) -> dict:
 
     cursor = db.cursor(dictionary=True)
 
-    # 1. Validasi Device ID (Pastikan terdaftar di master_devices)
-    cursor.execute("SELECT id, device_id, nama_lokasi, status_aktif FROM master_devices WHERE device_id = %s LIMIT 1", (device_id,))
-    device = cursor.fetchone()
-    if not device:
-        # Auto-register device jika belum terdaftar agar alat baru langsung bisa bekerja
-        cursor.execute(
-            "INSERT INTO master_devices (device_id, nama_lokasi, kategori_area, status_aktif, created_at, updated_at) VALUES (%s, %s, 'pondok', 1, NOW(), NOW())",
-            (device_id, f"Perangkat {device_id}")
-        )
-        logging.info(f"[DEVICE AUTO-REGISTER] Device '{device_id}' otomatis ditambahkan ke master_devices.")
+    # 1. Sinkronisasi Serial Device & Cek apakah alat diaktifkan oleh admin
+    device = sync_device_presence(cursor, device_id, ip_addr)
+    save_last_device_info(device_id, ip_addr=ip_addr, event="tap")
+
+    if not device.get("status_aktif", 1):
+        cursor.close()
+        logging.warning(f"[DISABLED DEVICE] Tap dari '{device_id}' ditolak karena status perangkat nonaktif.")
+        return {
+            "device_id": device_id,
+            "nama": "Alat Nonaktif",
+            "status": "Hubungi Admin"
+        }
 
     # 2. Penentuan Sesi Dinamis
     sesi = get_active_sesi(cursor, device_id, current_time)
@@ -206,9 +274,10 @@ def process_tap(db, uid: str, device_id: str) -> dict:
 
     if not entity:
         cursor.close()
-        logging.warning(f"[UNREGISTERED] UID '{clean_uid}' dari device '{device_id}' tidak dikenal.")
-        save_last_tap_info(clean_uid, device_id, is_registered=False)
+        logging.warning(f"[UNREGISTERED] UID '{clean_uid}' dari serial '{device_id}' tidak dikenal.")
+        save_last_tap_info(clean_uid, device_id, is_registered=False, ip_addr=ip_addr)
         return {
+            "device_id": device_id,
             "nama": "Tak Terdaftar",
             "status": "Hubungi Pamong"
         }
@@ -218,7 +287,7 @@ def process_tap(db, uid: str, device_id: str) -> dict:
     entity_id = entity["id"]
     lcd_name = format_lcd_name(entity_name)
 
-    save_last_tap_info(clean_uid, device_id, is_registered=True, name=entity_name)
+    save_last_tap_info(clean_uid, device_id, is_registered=True, name=entity_name, ip_addr=ip_addr)
 
     # 4. Anti-Duplikasi Per Sesi
     query_check = """
@@ -233,6 +302,7 @@ def process_tap(db, uid: str, device_id: str) -> dict:
         cursor.close()
         logging.info(f"[DUPLICATE] '{entity_name}' sudah absen pada sesi '{sesi_name}' hari ini.")
         return {
+            "device_id": device_id,
             "nama": lcd_name,
             "status": "Sudah Hadir"
         }
@@ -270,14 +340,13 @@ def process_tap(db, uid: str, device_id: str) -> dict:
 
     cursor.close()
 
-    logging.info(f"[SUCCESS] Presensi '{entity_name}' tercatat pada sesi '{sesi_name}' ({status_kehadiran}).")
+    logging.info(f"[SUCCESS] Presensi '{entity_name}' tercatat pada sesi '{sesi_name}' via '{device_id}' ({status_kehadiran}).")
 
-    # Format status untuk baris kedua LCD 16x2
-    # Contoh: "SUBUH: Hadir" atau "Hadir: Tepat Wkt"
     short_sesi = sesi.get("kode_sesi", "HADIR") if sesi else "HADIR"
     lcd_status = format_lcd_text(f"{short_sesi}: Hadir", 16)
 
     return {
+        "device_id": device_id,
         "nama": lcd_name,
         "status": lcd_status
     }
@@ -286,15 +355,16 @@ def process_tap(db, uid: str, device_id: str) -> dict:
 def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         logging.info(f"Terhubung ke Broker MQTT ({MQTT_BROKER}:{MQTT_PORT})!")
-        logging.info(f"Berlangganan topik tap: '{MQTT_TOPIC_TAP}'")
         client.subscribe(MQTT_TOPIC_TAP, qos=1)
+        client.subscribe(MQTT_TOPIC_HEARTBEAT, qos=1)
+        logging.info(f"Berlangganan topik tap: '{MQTT_TOPIC_TAP}' & heartbeat: '{MQTT_TOPIC_HEARTBEAT}'")
     else:
         logging.error(f"Koneksi MQTT Gagal dengan kode: {rc}")
 
 def on_message(client, userdata, msg):
     try:
         payload_raw = msg.payload.decode("utf-8").strip()
-        logging.info(f"Menerima tap dari [{msg.topic}]: {payload_raw}")
+        logging.info(f"Menerima pesan [{msg.topic}]: {payload_raw}")
 
         try:
             data = json.loads(payload_raw)
@@ -302,11 +372,30 @@ def on_message(client, userdata, msg):
             logging.warning(f"Payload bukan JSON valid: {payload_raw}")
             return
 
-        uid = data.get("uid") or data.get("rfid_uid")
-        device_id = data.get("device_id", "ESP32_Presensi_Santri")
+        # Prioritaskan serial unik hardware ESP32 (serial / chip_id / device_id)
+        raw_device_id = data.get("serial") or data.get("chip_id") or data.get("device_id") or "ESP32_UNKNOWN"
+        device_id = str(raw_device_id).strip()
+        ip_addr = str(data.get("ip", "")).strip()
 
+        # Pastikan koneksi DB aktif
+        db = userdata.get("db")
+        if not db or not db.is_connected():
+            logging.warning("Koneksi DB terputus, mencoba reconnect...")
+            db = create_db_connection()
+            userdata["db"] = db
+
+        # Jika pesan adalah HEARTBEAT / BOOT CHECK-IN dari ESP32 (tanpa perlu tap kartu)
+        if msg.topic == MQTT_TOPIC_HEARTBEAT:
+            save_last_device_info(device_id, ip_addr=ip_addr, event=str(data.get("event", "heartbeat")))
+            if db:
+                cur = db.cursor(dictionary=True)
+                sync_device_presence(cur, device_id, ip_addr)
+                cur.close()
+            return
+
+        uid = data.get("uid") or data.get("rfid_uid")
         if not uid:
-            logging.warning("Pesan diterima tanpa parameter 'uid'. Diabaikan.")
+            logging.warning("Pesan tap diterima tanpa parameter 'uid'. Diabaikan.")
             return
 
         clean_uid = str(uid).strip().upper()
@@ -321,26 +410,22 @@ def on_message(client, userdata, msg):
 
         tap_history[clean_uid] = now_ts
 
-        # Pastikan koneksi DB aktif
-        db = userdata.get("db")
-        if not db or not db.is_connected():
-            logging.warning("Koneksi DB terputus, mencoba reconnect...")
-            db = create_db_connection()
-            userdata["db"] = db
-
         if not db:
             logging.error("Database offline! Tidak dapat memproses tap.")
             response_payload = {
+                "device_id": device_id,
                 "nama": "Server Offline",
                 "status": "Coba Sesaat Lagi"
             }
         else:
-            response_payload = process_tap(db, clean_uid, device_id)
+            response_payload = process_tap(db, clean_uid, device_id, ip_addr)
 
-        # Kirim balasan status ke topik respons ESP32
+        # Kirim balasan ke topik spesifik serial alat DAN topik umum (kompatibilitas firmware lama)
         response_json = json.dumps(response_payload)
+        specific_topic = f"{MQTT_TOPIC_RESPONSE}/{device_id}"
+        client.publish(specific_topic, response_json, qos=1)
         client.publish(MQTT_TOPIC_RESPONSE, response_json, qos=1)
-        logging.info(f"Respons dikirim ke [{MQTT_TOPIC_RESPONSE}]: {response_json}")
+        logging.info(f"Respons dikirim ke [{specific_topic}]: {response_json}")
 
     except Exception as ex:
         logging.error(f"Error memproses pesan MQTT: {ex}", exc_info=True)
@@ -350,7 +435,7 @@ def main():
     logging.info("=" * 65)
     logging.info("Memulai Multi-Location Presensi Daemon Yayasan Al Muttaqin")
     logging.info(f"Broker: {MQTT_BROKER}:{MQTT_PORT}")
-    logging.info(f"Topik Sub: {MQTT_TOPIC_TAP} | Topik Pub: {MQTT_TOPIC_RESPONSE}")
+    logging.info(f"Topik Sub: {MQTT_TOPIC_TAP}, {MQTT_TOPIC_HEARTBEAT}")
     logging.info("=" * 65)
 
     db = None

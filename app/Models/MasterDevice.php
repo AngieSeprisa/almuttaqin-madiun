@@ -12,11 +12,14 @@ class MasterDevice extends Model
         'device_id',
         'nama_lokasi',
         'kategori_area',
+        'ip_address',
         'status_aktif',
+        'last_seen_at',
     ];
 
     protected $casts = [
         'status_aktif' => 'boolean',
+        'last_seen_at' => 'datetime',
     ];
 
     public function sesis()

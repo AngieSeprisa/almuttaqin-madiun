@@ -9,45 +9,13 @@ class MasterDeviceAndSesiSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Seed Master Devices
-        $devices = [
-            [
-                'device_id' => 'ESP32_Presensi_Santri',
-                'nama_lokasi' => 'Asrama Santri Kamar Reguler',
-                'kategori_area' => 'pondok',
-                'status_aktif' => true,
-            ],
-            [
-                'device_id' => 'ESP32_MASJID',
-                'nama_lokasi' => 'Masjid Pondok Al Muttaqin',
-                'kategori_area' => 'pondok',
-                'status_aktif' => true,
-            ],
-            [
-                'device_id' => 'ESP32_SEKOLAH',
-                'nama_lokasi' => 'Lobi Utama Sekolah (SMP/SMA)',
-                'kategori_area' => 'sekolah',
-                'status_aktif' => true,
-            ],
-            [
-                'device_id' => 'ESP32_DAPUR',
-                'nama_lokasi' => 'Dapur & Ruang Makan Asrama',
-                'kategori_area' => 'dapur',
-                'status_aktif' => true,
-            ],
-        ];
+        // Perangkat fisik ESP32 dibiarkan kosong secara default (tidak membuat alat dummy).
+        // Alat akan otomatis terdaftar saat ESP32 menyala/tap dengan Serial Hardware (eFuse MAC)
+        // atau ketika didaftarkan oleh admin melalui menu Pengaturan Sesi & Perangkat.
 
-        foreach ($devices as $d) {
-            DB::table('master_devices')->updateOrInsert(
-                ['device_id' => $d['device_id']],
-                array_merge($d, ['created_at' => now(), 'updated_at' => now()])
-            );
-        }
-
-        // 2. Seed Master Sesis
         $sesis = [
             [
-                'device_id_target' => 'ESP32_Presensi_Santri',
+                'device_id_target' => null,
                 'kode_sesi' => 'REGULER_HARIAN',
                 'nama_sesi' => 'Presensi Kamar Reguler (24 Jam)',
                 'jam_mulai' => '00:00:00',
@@ -58,7 +26,7 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'target_filter' => 'Reguler',
             ],
             [
-                'device_id_target' => 'ESP32_MASJID',
+                'device_id_target' => null,
                 'kode_sesi' => 'SUBUH',
                 'nama_sesi' => 'Sholat Subuh Berjamaah',
                 'jam_mulai' => '04:00:00',
@@ -69,7 +37,7 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'target_filter' => null,
             ],
             [
-                'device_id_target' => 'ESP32_MASJID',
+                'device_id_target' => null,
                 'kode_sesi' => 'DZUHUR',
                 'nama_sesi' => 'Sholat Dzuhur Berjamaah',
                 'jam_mulai' => '11:30:00',
@@ -80,7 +48,7 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'target_filter' => null,
             ],
             [
-                'device_id_target' => 'ESP32_MASJID',
+                'device_id_target' => null,
                 'kode_sesi' => 'ASHAR',
                 'nama_sesi' => 'Sholat Ashar Berjamaah',
                 'jam_mulai' => '14:45:00',
@@ -91,7 +59,7 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'target_filter' => null,
             ],
             [
-                'device_id_target' => 'ESP32_MASJID',
+                'device_id_target' => null,
                 'kode_sesi' => 'MAGHRIB',
                 'nama_sesi' => 'Sholat Maghrib & Pengajian',
                 'jam_mulai' => '17:30:00',
@@ -102,7 +70,7 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'target_filter' => null,
             ],
             [
-                'device_id_target' => 'ESP32_MASJID',
+                'device_id_target' => null,
                 'kode_sesi' => 'ISYA',
                 'nama_sesi' => 'Sholat Isya Berjamaah',
                 'jam_mulai' => '18:45:00',
@@ -113,7 +81,7 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'target_filter' => null,
             ],
             [
-                'device_id_target' => 'ESP32_SEKOLAH',
+                'device_id_target' => null,
                 'kode_sesi' => 'SEKOLAH_MASUK',
                 'nama_sesi' => 'Masuk Sekolah Pagi (SMP/SMA)',
                 'jam_mulai' => '06:30:00',
@@ -124,7 +92,7 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'target_filter' => 'SMP',
             ],
             [
-                'device_id_target' => 'ESP32_SEKOLAH',
+                'device_id_target' => null,
                 'kode_sesi' => 'SEKOLAH_PULANG',
                 'nama_sesi' => 'Kepulangan Sekolah (SMP/SMA)',
                 'jam_mulai' => '13:30:00',
@@ -135,7 +103,7 @@ class MasterDeviceAndSesiSeeder extends Seeder
                 'target_filter' => 'SMP',
             ],
             [
-                'device_id_target' => 'ESP32_DAPUR',
+                'device_id_target' => null,
                 'kode_sesi' => 'MAKAN_SIANG',
                 'nama_sesi' => 'Jatah Makan Siang Asrama',
                 'jam_mulai' => '11:45:00',

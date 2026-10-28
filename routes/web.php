@@ -149,10 +149,12 @@ Route::middleware('auth')->group(function () {
 
     // Pengaturan Sesi & Perangkat Presensi RFID
     Route::get('/pengaturan-sesi', [PengaturanSesiController::class, 'index'])->name('pengaturan.sesi');
+    Route::get('/pengaturan-sesi/last-device', [PengaturanSesiController::class, 'lastDetectedDevice'])->name('pengaturan.sesi.last-device');
     Route::post('/pengaturan-sesi/store', [PengaturanSesiController::class, 'store'])->name('pengaturan.sesi.store');
     Route::put('/pengaturan-sesi/{id}', [PengaturanSesiController::class, 'update'])->whereNumber('id')->name('pengaturan.sesi.update');
     Route::delete('/pengaturan-sesi/{id}', [PengaturanSesiController::class, 'destroy'])->whereNumber('id')->name('pengaturan.sesi.destroy');
     Route::post('/pengaturan-sesi/device', [PengaturanSesiController::class, 'storeDevice'])->name('pengaturan.sesi.device.store');
+    Route::put('/pengaturan-sesi/device/{id}', [PengaturanSesiController::class, 'updateDevice'])->whereNumber('id')->name('pengaturan.sesi.device.update');
     Route::patch('/pengaturan-sesi/device/{id}/toggle', [PengaturanSesiController::class, 'toggleDevice'])->whereNumber('id')->name('pengaturan.sesi.device.toggle');
     Route::delete('/pengaturan-sesi/device/{id}', [PengaturanSesiController::class, 'destroyDevice'])->whereNumber('id')->name('pengaturan.sesi.device.destroy');
 
