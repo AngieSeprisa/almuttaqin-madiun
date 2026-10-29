@@ -12,6 +12,7 @@ use App\Http\Controllers\LembagaController;
 use App\Http\Controllers\PendaftaranController;
 use App\Http\Controllers\PengaturanAbsensiController;
 use App\Http\Controllers\PengaturanSesiController;
+use App\Http\Controllers\PlottingKamarController;
 use App\Http\Controllers\PlottingKelasController;
 use App\Http\Controllers\PlottingMapelController;
 use App\Http\Controllers\PerizinanController;
@@ -276,6 +277,34 @@ Route::middleware('auth')->group(function () {
             ->name('unassign');
         Route::get('/anggota/{kelas}', [PlottingKelasController::class, 'anggota'])
             ->middleware('permission:plotting_kelas,view')
+            ->name('anggota');
+    });
+
+    // Menu Pengaturan Pondok: Plotting Kamar & Kelola Kamar Asrama
+    Route::prefix('plotting-kamar')->name('plotting-kamar.')->group(function () {
+        Route::get('/', [PlottingKamarController::class, 'index'])
+            ->middleware('permission:plotting_kamar|pengaturan_pondok,view')
+            ->name('index');
+        Route::post('/kamar', [PlottingKamarController::class, 'storeKamar'])
+            ->middleware('permission:plotting_kamar,create')
+            ->name('store-kamar');
+        Route::put('/kamar/{kamar}', [PlottingKamarController::class, 'updateKamar'])
+            ->middleware('permission:plotting_kamar,edit')
+            ->name('update-kamar');
+        Route::delete('/kamar/{kamar}', [PlottingKamarController::class, 'destroyKamar'])
+            ->middleware('permission:plotting_kamar,delete')
+            ->name('destroy-kamar');
+        Route::post('/muat-standar', [PlottingKamarController::class, 'muatStandar'])
+            ->middleware('permission:plotting_kamar,create')
+            ->name('muat-standar');
+        Route::post('/mutasi', [PlottingKamarController::class, 'mutasi'])
+            ->middleware('permission:plotting_kamar,edit')
+            ->name('mutasi');
+        Route::post('/unassign', [PlottingKamarController::class, 'unassign'])
+            ->middleware('permission:plotting_kamar,edit')
+            ->name('unassign');
+        Route::get('/anggota/{kamar}', [PlottingKamarController::class, 'anggota'])
+            ->middleware('permission:plotting_kamar|pengaturan_pondok,view')
             ->name('anggota');
     });
 

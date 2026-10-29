@@ -139,6 +139,14 @@ class QuickSearchController extends Controller
                 'permission' => 'plotting_kelas',
             ],
             [
+                'title' => 'Plotting Kamar',
+                'description' => 'Penempatan & mutasi santri ke kamar asrama pondok',
+                'url' => route('plotting-kamar.index'),
+                'icon' => 'home',
+                'keywords' => 'plotting kamar asrama pondok penempatan santri mutasi kamar',
+                'permission' => 'plotting_kamar',
+            ],
+            [
                 'title' => 'Pengaturan Absensi Guru',
                 'description' => 'Pengaturan radius GPS & jam kerja presensi',
                 'url' => route('pengaturan-absensi.index'),

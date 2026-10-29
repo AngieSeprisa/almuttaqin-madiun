@@ -916,7 +916,7 @@
                             @endphp
                             <span class="badge-lembaga badge-lembaga-{{ $badgeColor }}">{{ $j }}</span>
                         </td>
-                        <td class="cell-kamar">{{ $item->kamar }}</td>
+                        <td class="cell-kamar">{{ $item->kamar ?: '-' }}</td>
                         <td class="cell-status">
                             <span class="status-badge status-{{ strtolower($item->status ?? 'aktif') }}">
                                 {{ ucfirst($item->status ?? 'aktif') }}

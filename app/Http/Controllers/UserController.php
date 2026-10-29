@@ -29,6 +29,7 @@ class UserController extends Controller
             'guru_sekolah'       => 'Guru Sekolah (Pengelolaan & Approval Mapel)',
             'plotting_mapel'     => 'Plotting Mata Pelajaran',
             'plotting_kelas'     => 'Plotting Kelas',
+            'plotting_kamar'     => 'Plotting Kamar Santri (Pondok)',
             'master_kelas'       => 'Master Ruang Kelas',
             'master_jam'         => 'Master Jam Pelajaran (Time Slot)',
             'master_lembaga'     => 'Master Lembaga Pendidikan',

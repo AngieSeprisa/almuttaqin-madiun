@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Kamar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -51,12 +52,7 @@ class PengaturanSesiController extends Controller
             ->orderBy('master_devices.device_id')
             ->get();
 
-        $kamars = DB::table('siswas')
-            ->whereNotNull('kamar')
-            ->where('kamar', '!=', '')
-            ->distinct()
-            ->orderBy('kamar')
-            ->pluck('kamar');
+        $kamars = Kamar::daftarNamaKamarAktif();
 
         return view('pengaturan-sesi', compact('sesis', 'devices', 'allDevices', 'kamars'));
     }

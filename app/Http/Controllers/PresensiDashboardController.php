@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Kamar;
 use App\Models\MasterDevice;
 use App\Models\MasterSesi;
 use App\Models\Presensi;
@@ -41,11 +42,7 @@ class PresensiDashboardController extends Controller
         $totalDevicesCount = MasterDevice::count();
 
         // 2. Daftar Kamar untuk Filter Pondok
-        $kamars = Siswa::whereNotNull('kamar')
-            ->where('kamar', '!=', '')
-            ->distinct()
-            ->orderBy('kamar')
-            ->pluck('kamar');
+        $kamars = Kamar::daftarNamaKamarAktif();
 
         return view('dashboard-presensi', compact(
             'activeSesi',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Kamar;
 use App\Models\Pendaftaran;
 use App\Models\Siswa;
 use Illuminate\Http\Request;
@@ -61,12 +62,8 @@ class SiswaController extends Controller
             }
         }
 
-        // Ambil daftar unik kamar dari database
-        $kamars = Siswa::whereNotNull('kamar')
-            ->where('kamar', '!=', '')
-            ->distinct()
-            ->orderBy('kamar')
-            ->pluck('kamar');
+        // Ambil daftar unik kamar dari master kamars + data siswa
+        $kamars = Kamar::daftarNamaKamarAktif();
 
         $jenjangList = ['Reguler', 'SMP', 'SMA'];
 

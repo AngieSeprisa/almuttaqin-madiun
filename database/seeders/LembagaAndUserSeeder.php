@@ -143,6 +143,7 @@ class LembagaAndUserSeeder extends Seeder
             'pendaftaran'       => ['view' => true, 'create' => true, 'edit' => true, 'delete' => true],
             'perizinan_sambang' => ['view' => true, 'create' => true, 'edit' => true, 'delete' => true],
             'perizinan_sakit'   => ['view' => true, 'create' => true, 'edit' => true, 'delete' => true],
+            'plotting_kamar'    => ['view' => true, 'create' => true, 'edit' => true, 'delete' => true],
             'pengguna'          => ['view' => false, 'create' => false, 'edit' => false, 'delete' => false],
         ]);
 
