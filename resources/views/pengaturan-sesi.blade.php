@@ -361,6 +361,57 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                         </div>
                     </div>
                 </div>
+
+                <!-- Custom Kolom Toggle Button + Popover (Gambar Referensi) -->
+                <div class="relative shrink-0" @click.outside="showSesiColPopover = false">
+                    <button type="button"
+                            @click="showSesiColPopover = !showSesiColPopover"
+                            :class="hasHiddenSesiCols() ? 'border-[#0052FF] bg-[#EFF4FF]/60 text-[#0052FF]' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-800'"
+                            class="relative w-9 h-9 rounded-lg border flex items-center justify-center transition"
+                            title="Sesuaikan Kolom">
+                        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <rect x="3" y="3" width="3.2" height="14" rx="1.6" />
+                            <rect x="8.4" y="3" width="3.2" height="14" rx="1.6" />
+                            <rect x="13.8" y="3" width="3.2" height="14" rx="1.6" />
+                        </svg>
+                    </button>
+
+                    <div x-show="showSesiColPopover" x-cloak x-transition
+                         class="absolute right-0 mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-xl p-3 z-40">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-100">
+                            <span class="text-xs font-bold text-gray-900">Kolom</span>
+                            <button type="button"
+                                    @click="resetSesiCols()"
+                                    class="text-[11px] font-semibold text-[#0052FF] hover:underline">Reset</button>
+                        </div>
+                        <div class="space-y-1 max-h-60 overflow-y-auto">
+                            <label class="flex items-center gap-2 p-1 rounded hover:bg-gray-50 cursor-pointer text-xs font-medium text-gray-700">
+                                <input type="checkbox" x-model="sesiCols.nama" @change="saveSesiCols()" class="w-3.5 h-3.5 rounded border-gray-300 text-[#0052FF] accent-[#0052FF]">
+                                <span>Nama & Kode Sesi</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-1 rounded hover:bg-gray-50 cursor-pointer text-xs font-medium text-gray-700">
+                                <input type="checkbox" x-model="sesiCols.perangkat" @change="saveSesiCols()" class="w-3.5 h-3.5 rounded border-gray-300 text-[#0052FF] accent-[#0052FF]">
+                                <span>Perangkat ESP32</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-1 rounded hover:bg-gray-50 cursor-pointer text-xs font-medium text-gray-700">
+                                <input type="checkbox" x-model="sesiCols.kategori" @change="saveSesiCols()" class="w-3.5 h-3.5 rounded border-gray-300 text-[#0052FF] accent-[#0052FF]">
+                                <span>Kategori</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-1 rounded hover:bg-gray-50 cursor-pointer text-xs font-medium text-gray-700">
+                                <input type="checkbox" x-model="sesiCols.aktif" @change="saveSesiCols()" class="w-3.5 h-3.5 rounded border-gray-300 text-[#0052FF] accent-[#0052FF]">
+                                <span>Aktif Jam Ini</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-1 rounded hover:bg-gray-50 cursor-pointer text-xs font-medium text-gray-700">
+                                <input type="checkbox" x-model="sesiCols.jadwal" @change="saveSesiCols()" class="w-3.5 h-3.5 rounded border-gray-300 text-[#0052FF] accent-[#0052FF]">
+                                <span>Jadwal & Target</span>
+                            </label>
+                            <label class="flex items-center gap-2 p-1 rounded hover:bg-gray-50 cursor-pointer text-xs font-medium text-gray-700">
+                                <input type="checkbox" x-model="sesiCols.aksi" @change="saveSesiCols()" class="w-3.5 h-3.5 rounded border-gray-300 text-[#0052FF] accent-[#0052FF]">
+                                <span>Aksi</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -397,7 +448,7 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                                    class="w-4 h-4 rounded border-gray-300 text-[#0052FF] accent-[#0052FF] focus:ring-[#0052FF]/25 cursor-pointer"
                                    aria-label="Pilih semua sesi di halaman ini">
                         </th>
-                        <th class="py-3 px-4">
+                        <th class="py-3 px-4" x-show="sesiCols.nama">
                             <div class="inline-flex items-center gap-1">
                                 <span>Nama &amp; Kode Sesi</span>
                                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -405,10 +456,10 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                                 </svg>
                             </div>
                         </th>
-                        <th class="py-3 px-4">Perangkat ESP32</th>
-                        <th class="py-3 px-4">Kategori</th>
-                        <th class="py-3 px-4 text-center">Aktif Jam Ini</th>
-                        <th class="py-3 px-4">
+                        <th class="py-3 px-4" x-show="sesiCols.perangkat">Perangkat ESP32</th>
+                        <th class="py-3 px-4" x-show="sesiCols.kategori">Kategori</th>
+                        <th class="py-3 px-4 text-center" x-show="sesiCols.aktif">Aktif Jam Ini</th>
+                        <th class="py-3 px-4" x-show="sesiCols.jadwal">
                             <div class="inline-flex items-center gap-1">
                                 <span>Jadwal &amp; Target</span>
                                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -416,7 +467,7 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                                 </svg>
                             </div>
                         </th>
-                        <th class="py-3 pl-4 pr-5 text-right">Aksi</th>
+                        <th class="py-3 pl-4 pr-5 text-right" x-show="sesiCols.aksi">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 text-sm bg-white">
@@ -450,7 +501,7 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                             </td>
 
                             <!-- Nama Sesi & Kode -->
-                            <td class="py-3.5 px-4">
+                            <td class="py-3.5 px-4" x-show="sesiCols.nama">
                                 <div class="font-semibold text-gray-900">{{ $s->nama_sesi }}</div>
                                 <div class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-500">
                                     <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-mono text-[11px] font-semibold">
@@ -459,14 +510,14 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                                     <span>•</span>
                                     @if(($s->toleransi_menit ?? 0) > 0)
                                         <span>Toleransi {{ $s->toleransi_menit }} menit</span>
-                                    @else
+                                     @else
                                         <span>Tanpa batas terlambat</span>
                                     @endif
                                 </div>
                             </td>
 
                             <!-- Perangkat ESP32 -->
-                            <td class="py-3.5 px-4">
+                            <td class="py-3.5 px-4" x-show="sesiCols.perangkat">
                                 @if($s->device_id_target)
                                     <div class="font-mono text-xs font-semibold text-[#0052FF]">{{ $s->device_id_target }}</div>
                                     <div class="text-xs text-gray-500 mt-0.5">{{ $s->nama_lokasi ?? 'Lokasi belum diatur' }}</div>
@@ -477,14 +528,14 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                             </td>
 
                             <!-- Kategori Pill (Persis Status Pill Gambar Referensi) -->
-                            <td class="py-3.5 px-4 whitespace-nowrap">
+                            <td class="py-3.5 px-4 whitespace-nowrap" x-show="sesiCols.kategori">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold ring-1 ring-inset {{ $kategoriPill }}">
                                     {{ $kat }}
                                 </span>
                             </td>
 
                             <!-- Aktif Jam Ini (Check / Cross Circle Persis Gambar Referensi) -->
-                            <td class="py-3.5 px-4 text-center">
+                            <td class="py-3.5 px-4 text-center" x-show="sesiCols.aktif">
                                 <template x-if="isTimeActive('{{ $jamMulaiShort }}', '{{ $jamSelesaiShort }}')">
                                     <svg class="w-5 h-5 text-emerald-600 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" title="Sedang Aktif Jam Ini">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -498,7 +549,7 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                             </td>
 
                             <!-- Jadwal & Target -->
-                            <td class="py-3.5 px-4 whitespace-nowrap">
+                            <td class="py-3.5 px-4 whitespace-nowrap" x-show="sesiCols.jadwal">
                                 <div class="font-mono text-xs font-semibold text-gray-800">
                                     {{ $jamMulaiShort }} - {{ $jamSelesaiShort }} WIB
                                 </div>
@@ -516,7 +567,7 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                             </td>
 
                             <!-- Inline Actions: Electric Blue Edit + Red Delete -->
-                            <td class="py-3.5 pl-4 pr-5 whitespace-nowrap text-right">
+                            <td class="py-3.5 pl-4 pr-5 whitespace-nowrap text-right" x-show="sesiCols.aksi">
                                 <div class="inline-flex items-center justify-end gap-3.5">
                                     <button type="button"
                                             @click="openEditModal({{ $s->id }})"
@@ -1285,6 +1336,15 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
             sesiPerPage: 10,
             sesiPage: 1,
             showSesiFilterPopover: false,
+            showSesiColPopover: false,
+            sesiCols: {
+                nama: true,
+                perangkat: true,
+                kategori: true,
+                aktif: true,
+                jadwal: true,
+                aksi: true
+            },
             deviceSearchQuery: '',
             deviceStatusFilter: 'all',
             showModal: false,
@@ -1334,7 +1394,41 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
 
             initApp() {
                 this.updateClock();
+                this.loadSesiCols();
                 setInterval(() => this.updateClock(), 1000);
+            },
+
+            loadSesiCols() {
+                try {
+                    const saved = localStorage.getItem('fi_cols_sesi');
+                    if (saved) {
+                        this.sesiCols = Object.assign(this.sesiCols, JSON.parse(saved));
+                    }
+                } catch(e) {}
+            },
+
+            saveSesiCols() {
+                try {
+                    localStorage.setItem('fi_cols_sesi', JSON.stringify(this.sesiCols));
+                } catch(e) {}
+            },
+
+            resetSesiCols() {
+                this.sesiCols = {
+                    nama: true,
+                    perangkat: true,
+                    kategori: true,
+                    aktif: true,
+                    jadwal: true,
+                    aksi: true
+                };
+                try {
+                    localStorage.removeItem('fi_cols_sesi');
+                } catch(e) {}
+            },
+
+            hasHiddenSesiCols() {
+                return Object.values(this.sesiCols).some(v => v === false);
             },
 
             switchTab(tab) {

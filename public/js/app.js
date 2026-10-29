@@ -869,8 +869,33 @@ document.addEventListener('DOMContentLoaded', function () {
         filterContainer.classList.add('fi-filter-docked');
       }
 
+      // Column Customizer Popover (Gambar Referensi Filament v4)
+      var colWrap = document.createElement('div');
+      colWrap.className = 'fi-ta-col-wrap';
+      colWrap.innerHTML =
+        '<button type="button" class="fi-ta-col-btn" title="Sesuaikan Kolom" aria-label="Sesuaikan Kolom">' +
+          '<svg viewBox="0 0 20 20" fill="currentColor">' +
+            '<rect x="3" y="3" width="3.2" height="14" rx="1.6" />' +
+            '<rect x="8.4" y="3" width="3.2" height="14" rx="1.6" />' +
+            '<rect x="13.8" y="3" width="3.2" height="14" rx="1.6" />' +
+          '</svg>' +
+        '</button>' +
+        '<div class="fi-ta-col-popover">' +
+          '<div class="fi-ta-col-head">' +
+            '<span class="fi-ta-col-title">Kolom</span>' +
+            '<button type="button" class="fi-ta-col-reset">Reset</button>' +
+          '</div>' +
+          '<div class="fi-ta-col-list"></div>' +
+        '</div>';
+
+      var colBtn = colWrap.querySelector('.fi-ta-col-btn');
+      var colPopover = colWrap.querySelector('.fi-ta-col-popover');
+      var colListEl = colWrap.querySelector('.fi-ta-col-list');
+      var colResetBtn = colWrap.querySelector('.fi-ta-col-reset');
+
       toolbarRight.appendChild(searchWrap);
       toolbarRight.appendChild(filterWrap);
+      toolbarRight.appendChild(colWrap);
       toolbar.appendChild(toolbarLeft);
       toolbar.appendChild(toolbarRight);
 
@@ -940,6 +965,98 @@ document.addEventListener('DOMContentLoaded', function () {
       if (dataRows.length > 0) {
         tbody.appendChild(noMatchRow);
       }
+
+      // Column Customizer Logic & Persistence (Filament v4)
+      var tableStorageKey = 'fi_cols_' + (table.id || (card.id ? card.id : window.location.pathname.replace(/[^a-zA-Z0-9_-]/g, '_')));
+      var savedCols = {};
+      try {
+        savedCols = JSON.parse(localStorage.getItem(tableStorageKey) || '{}');
+      } catch (e) {
+        savedCols = {};
+      }
+
+      function updateColspans() {
+        var visibleCount = 0;
+        Array.from(headRow.cells).forEach(function (th) {
+          if (th.style.display !== 'none') visibleCount++;
+        });
+        if (noMatchTd) noMatchTd.colSpan = Math.max(1, visibleCount);
+        emptyRows.forEach(function (er) {
+          if (er.cells[0]) er.cells[0].colSpan = Math.max(1, visibleCount);
+        });
+      }
+
+      function applyColVisibility(colIdx, isVisible) {
+        if (headRow && headRow.cells[colIdx]) {
+          headRow.cells[colIdx].style.display = isVisible ? '' : 'none';
+        }
+        dataRows.forEach(function (tr) {
+          if (tr.cells[colIdx]) {
+            tr.cells[colIdx].style.display = isVisible ? '' : 'none';
+          }
+        });
+        updateColspans();
+      }
+
+      var hasHiddenCols = false;
+      Array.from(headRow.cells).forEach(function (th, idx) {
+        if (idx === 0 || th.classList.contains('fi-ta-th-check')) return;
+        var colTitle = (th.querySelector('span') ? th.querySelector('span').textContent : th.textContent || '').replace(/\s+/g, ' ').trim() || ('Kolom ' + idx);
+
+        var isVisible = savedCols[idx] !== undefined ? !!savedCols[idx] : true;
+        if (!isVisible) hasHiddenCols = true;
+
+        applyColVisibility(idx, isVisible);
+
+        var itemLabel = document.createElement('label');
+        itemLabel.className = 'fi-ta-col-item';
+        itemLabel.innerHTML =
+          '<input type="checkbox" class="fi-ta-checkbox fi-ta-col-check" data-col-idx="' + idx + '"' + (isVisible ? ' checked' : '') + '>' +
+          '<span class="fi-ta-col-item-text">' + colTitle.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</span>';
+
+        var colCb = itemLabel.querySelector('input');
+        colCb.addEventListener('change', function () {
+          var checked = this.checked;
+          savedCols[idx] = checked;
+          try {
+            localStorage.setItem(tableStorageKey, JSON.stringify(savedCols));
+          } catch (e) {}
+          applyColVisibility(idx, checked);
+          var anyHidden = Object.keys(savedCols).some(function (k) { return savedCols[k] === false; });
+          colBtn.classList.toggle('has-hidden-cols', anyHidden);
+        });
+
+        colListEl.appendChild(itemLabel);
+      });
+
+      colBtn.classList.toggle('has-hidden-cols', hasHiddenCols);
+      updateColspans();
+
+      colResetBtn.addEventListener('click', function () {
+        Array.from(headRow.cells).forEach(function (th, idx) {
+          if (idx === 0) return;
+          applyColVisibility(idx, true);
+        });
+        colListEl.querySelectorAll('.fi-ta-col-check').forEach(function (cb) {
+          cb.checked = true;
+        });
+        savedCols = {};
+        try {
+          localStorage.removeItem(tableStorageKey);
+        } catch (e) {}
+        colBtn.classList.remove('has-hidden-cols');
+      });
+
+      colBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        bulkMenu.classList.remove('is-open');
+        filterPopover.classList.remove('is-open');
+        colPopover.classList.toggle('is-open');
+      });
+
+      colPopover.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+      });
 
       function getFilteredMeta() {
         var q = (searchInput.value || '').trim().toLowerCase();
@@ -1122,6 +1239,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ev.stopPropagation();
         if (bulkBtn.disabled) return;
         filterPopover.classList.remove('is-open');
+        colPopover.classList.remove('is-open');
         bulkMenu.classList.toggle('is-open');
       });
 
@@ -1157,6 +1275,7 @@ document.addEventListener('DOMContentLoaded', function () {
       filterBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
         bulkMenu.classList.remove('is-open');
+        colPopover.classList.remove('is-open');
         filterPopover.classList.toggle('is-open');
       });
 
@@ -1219,6 +1338,15 @@ document.addEventListener('DOMContentLoaded', function () {
       document.addEventListener('click', function (ev) {
         if (!bulkWrap.contains(ev.target)) bulkMenu.classList.remove('is-open');
         if (!filterWrap.contains(ev.target)) filterPopover.classList.remove('is-open');
+        if (!colWrap.contains(ev.target)) colPopover.classList.remove('is-open');
+      });
+
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape') {
+          bulkMenu.classList.remove('is-open');
+          filterPopover.classList.remove('is-open');
+          colPopover.classList.remove('is-open');
+        }
       });
 
       // Column Sorting (Gambar 3 Chevron Sort)

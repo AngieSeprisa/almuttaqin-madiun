@@ -219,6 +219,29 @@
                             </div>
                         </div>
                     </div>
+
+                    {{-- Custom Kolom Toggle Button + Popover (Gambar Referensi) --}}
+                    <div class="fi-ta-col-wrap" id="colWrapKelas">
+                        <button type="button"
+                                class="fi-ta-col-btn"
+                                id="btnColsKelas"
+                                title="Sesuaikan Kolom"
+                                onclick="toggleDropdownMenu('popoverColsKelas', event)">
+                            <svg viewBox="0 0 20 20" fill="currentColor">
+                                <rect x="3" y="3" width="3.2" height="14" rx="1.6" />
+                                <rect x="8.4" y="3" width="3.2" height="14" rx="1.6" />
+                                <rect x="13.8" y="3" width="3.2" height="14" rx="1.6" />
+                            </svg>
+                        </button>
+
+                        <div class="fi-ta-col-popover" id="popoverColsKelas" onclick="event.stopPropagation()">
+                            <div class="fi-ta-col-head">
+                                <span class="fi-ta-col-title">Kolom</span>
+                                <button type="button" class="fi-ta-col-reset" onclick="resetColumns('kelas')">Reset</button>
+                            </div>
+                            <div class="fi-ta-col-list" id="colListKelas"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -469,6 +492,29 @@
                                     Terapkan filter
                                 </button>
                             </div>
+                        </div>
+                    </div>
+
+                    {{-- Custom Kolom Toggle Button + Popover (Gambar Referensi) --}}
+                    <div class="fi-ta-col-wrap" id="colWrapBelum">
+                        <button type="button"
+                                class="fi-ta-col-btn"
+                                id="btnColsBelum"
+                                title="Sesuaikan Kolom"
+                                onclick="toggleDropdownMenu('popoverColsBelum', event)">
+                            <svg viewBox="0 0 20 20" fill="currentColor">
+                                <rect x="3" y="3" width="3.2" height="14" rx="1.6" />
+                                <rect x="8.4" y="3" width="3.2" height="14" rx="1.6" />
+                                <rect x="13.8" y="3" width="3.2" height="14" rx="1.6" />
+                            </svg>
+                        </button>
+
+                        <div class="fi-ta-col-popover" id="popoverColsBelum" onclick="event.stopPropagation()">
+                            <div class="fi-ta-col-head">
+                                <span class="fi-ta-col-title">Kolom</span>
+                                <button type="button" class="fi-ta-col-reset" onclick="resetColumns('belum')">Reset</button>
+                            </div>
+                            <div class="fi-ta-col-list" id="colListBelum"></div>
                         </div>
                     </div>
                 </div>
@@ -1114,7 +1160,7 @@ function switchTab(tab) {
 }
 
 function closeAllPopovers() {
-    document.querySelectorAll('.fi-ta-bulk-menu.is-open, .fi-ta-filter-popover.is-open').forEach(el => {
+    document.querySelectorAll('.fi-ta-bulk-menu.is-open, .fi-ta-filter-popover.is-open, .fi-ta-col-popover.is-open').forEach(el => {
         el.classList.remove('is-open');
     });
 }
@@ -1686,7 +1732,129 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+function getColumnStorageKey(key) {
+    return 'fi_cols_kelas_' + key;
+}
+
+function initColumnCustomizer(key) {
+    const tableId = key === 'kelas' ? 'tableKelas' : 'tableBelum';
+    const listId = key === 'kelas' ? 'colListKelas' : 'colListBelum';
+    const btnId = key === 'kelas' ? 'btnColsKelas' : 'btnColsBelum';
+
+    const table = document.getElementById(tableId);
+    const listEl = document.getElementById(listId);
+    const btnEl = document.getElementById(btnId);
+    if (!table || !listEl) return;
+
+    const headRow = table.tHead.rows[0];
+    const storageKey = getColumnStorageKey(key);
+    let savedCols = {};
+    try {
+        savedCols = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    } catch(e) { savedCols = {}; }
+
+    listEl.innerHTML = '';
+    let hasHidden = false;
+
+    Array.from(headRow.cells).forEach((th, idx) => {
+        if (th.classList.contains('fi-ta-th-check')) return;
+        const colTitle = (th.querySelector('span')?.textContent || th.textContent || '').trim() || `Kolom ${idx}`;
+        const isVisible = savedCols[idx] !== undefined ? !!savedCols[idx] : true;
+        if (!isVisible) hasHidden = true;
+
+        applyColumnVisibility(table, idx, isVisible);
+
+        const labelEl = document.createElement('label');
+        labelEl.className = 'fi-ta-col-item';
+        labelEl.innerHTML = `
+            <input type="checkbox" class="fi-ta-checkbox fi-ta-col-check" data-col-idx="${idx}" ${isVisible ? 'checked' : ''}>
+            <span class="fi-ta-col-item-text">${colTitle}</span>
+        `;
+        const cb = labelEl.querySelector('input');
+        cb.addEventListener('change', function() {
+            toggleColumn(key, idx, this.checked);
+        });
+        listEl.appendChild(labelEl);
+    });
+
+    if (btnEl) btnEl.classList.toggle('has-hidden-cols', hasHidden);
+    updateEmptyColspan(key);
+}
+
+function applyColumnVisibility(table, colIdx, isVisible) {
+    const headRow = table.tHead.rows[0];
+    if (headRow && headRow.cells[colIdx]) {
+        headRow.cells[colIdx].style.display = isVisible ? '' : 'none';
+    }
+    const tbody = table.tBodies[0];
+    if (tbody) {
+        Array.from(tbody.rows).forEach(tr => {
+            if (tr.classList.contains('fi-empty-row') || tr.id?.startsWith('emptyFilterRow')) return;
+            if (tr.cells[colIdx]) {
+                tr.cells[colIdx].style.display = isVisible ? '' : 'none';
+            }
+        });
+    }
+}
+
+function toggleColumn(key, colIdx, isVisible) {
+    const tableId = key === 'kelas' ? 'tableKelas' : 'tableBelum';
+    const btnId = key === 'kelas' ? 'btnColsKelas' : 'btnColsBelum';
+    const table = document.getElementById(tableId);
+    if (!table) return;
+
+    applyColumnVisibility(table, colIdx, isVisible);
+
+    const storageKey = getColumnStorageKey(key);
+    let savedCols = {};
+    try {
+        savedCols = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    } catch(e) { savedCols = {}; }
+    savedCols[colIdx] = isVisible;
+    localStorage.setItem(storageKey, JSON.stringify(savedCols));
+
+    const hasHidden = Object.values(savedCols).some(v => v === false);
+    const btnEl = document.getElementById(btnId);
+    if (btnEl) btnEl.classList.toggle('has-hidden-cols', hasHidden);
+    updateEmptyColspan(key);
+}
+
+function resetColumns(key) {
+    const tableId = key === 'kelas' ? 'tableKelas' : 'tableBelum';
+    const listId = key === 'kelas' ? 'colListKelas' : 'colListBelum';
+    const btnId = key === 'kelas' ? 'btnColsKelas' : 'btnColsBelum';
+    const table = document.getElementById(tableId);
+    const listEl = document.getElementById(listId);
+    const btnEl = document.getElementById(btnId);
+    if (!table) return;
+
+    const headRow = table.tHead.rows[0];
+    Array.from(headRow.cells).forEach((th, idx) => {
+        applyColumnVisibility(table, idx, true);
+    });
+
+    if (listEl) {
+        listEl.querySelectorAll('.fi-ta-col-check').forEach(cb => cb.checked = true);
+    }
+    localStorage.removeItem(getColumnStorageKey(key));
+    if (btnEl) btnEl.classList.remove('has-hidden-cols');
+    updateEmptyColspan(key);
+}
+
+function updateEmptyColspan(key) {
+    const tableId = key === 'kelas' ? 'tableKelas' : 'tableBelum';
+    const emptyRowId = key === 'kelas' ? 'emptyFilterRowKelas' : 'emptyFilterRowBelum';
+    const table = document.getElementById(tableId);
+    const emptyRow = document.getElementById(emptyRowId);
+    if (!table || !emptyRow) return;
+
+    const visibleCols = Array.from(table.tHead.rows[0].cells).filter(c => c.style.display !== 'none').length;
+    if (emptyRow.cells[0]) emptyRow.cells[0].colSpan = Math.max(1, visibleCols);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    initColumnCustomizer('kelas');
+    initColumnCustomizer('belum');
     renderTable('kelas');
     renderTable('belum');
 });
