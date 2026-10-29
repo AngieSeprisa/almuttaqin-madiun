@@ -186,6 +186,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/rekap-jurnal', [SekolahController::class, 'rekapJurnal'])->name('rekap-jurnal');
         Route::delete('/rekap-jurnal/{jurnal}', [SekolahController::class, 'destroyJurnal'])->name('jurnal.destroy');
         Route::get('/rekap-absensi', [SekolahController::class, 'rekapAbsensi'])->name('rekap-absensi');
+        Route::get('/kelas-anggota/{kelas}', [SekolahController::class, 'getAnggotaKelas'])->name('kelas-anggota');
     });
 
     // Menu Jadwal Pelajaran Multi-Jenjang (SMP & SMA)

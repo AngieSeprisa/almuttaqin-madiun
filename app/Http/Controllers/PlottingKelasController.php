@@ -68,12 +68,13 @@ class PlottingKelasController extends Controller
         }
 
         $map = [
-            'VII' => '7', 'VIII' => '8', 'IX' => '9',
-            'X' => '10', 'XI' => '11', 'XII' => '12',
+            'VIII' => '8', 'VII' => '7', 'XII' => '12',
+            'XI' => '11', 'IX' => '9', 'X' => '10',
         ];
 
-        $normA = preg_replace_callback('/\b(VII|VIII|IX|X|XI|XII)\b/i', fn($m) => $map[strtoupper($m[1])] ?? $m[1], $cleanA);
-        $normB = preg_replace_callback('/\b(VII|VIII|IX|X|XI|XII)\b/i', fn($m) => $map[strtoupper($m[1])] ?? $m[1], $cleanB);
+        $regex = '/(VIII|VII|XII|XI|IX|X)/i';
+        $normA = preg_replace_callback($regex, fn($m) => $map[strtoupper($m[1])] ?? $m[1], $cleanA);
+        $normB = preg_replace_callback($regex, fn($m) => $map[strtoupper($m[1])] ?? $m[1], $cleanB);
 
         $normA = str_replace([' ', '-', '_'], '', strtoupper($normA));
         $normB = str_replace([' ', '-', '_'], '', strtoupper($normB));

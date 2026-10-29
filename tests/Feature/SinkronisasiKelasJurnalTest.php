@@ -133,5 +133,31 @@ class SinkronisasiKelasJurnalTest extends TestCase
         $this->assertContains('VII A', $equivalentsVIIA);
         $this->assertContains('7A', $equivalentsVIIA);
     }
+
+    public function test_endpoint_kelas_anggota_returns_siswa_7a_when_queried_vii_a(): void
+    {
+        $adminSMP = User::where('email', 'admin.smp@almuttaqin.id')->firstOrFail();
+
+        $siswa = Siswa::create([
+            'nama_lengkap' => 'Bisma Recoba Zayyan',
+            'kelas'        => '7A',
+            'jenjang'      => 'SMP',
+            'status'       => 'aktif',
+        ]);
+
+        $response = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->get(route('sekolah.kelas-anggota', ['kelas' => 'VII A']));
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'total'   => 1,
+        ]);
+        $response->assertJsonFragment([
+            'id'           => $siswa->id,
+            'nama_lengkap' => 'Bisma Recoba Zayyan',
+        ]);
+    }
 }
 

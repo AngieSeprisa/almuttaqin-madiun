@@ -14,6 +14,12 @@
 </a>
 @endsection
 
+@push('styles')
+<style>
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+@endpush
+
 @section('content')
 <div style="display:flex; flex-direction:column; gap:20px; width:100%; max-width:1200px;">
 
@@ -205,6 +211,15 @@
                     <button type="button" class="btn btn-sm btn-secondary" onclick="setSemuaStatus('hadir')" style="font-size:11.5px; padding:4px 10px;">
                         Set Semua Hadir
                     </button>
+                    <a href="{{ route('plotting-kelas.index') }}" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:11.5px; padding:4px 10px; display:inline-flex; align-items:center; gap:6px;" title="Kelola pembagian siswa per kelas di menu Plotting Kelas">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        <span>Plotting Kelas</span>
+                    </a>
                 </div>
             </div>
 
@@ -308,17 +323,13 @@
         return dataSiswasByKelas[kelasName] || [];
     }
 
-    // 1. Render Siswa saat kelas dipilih
-    function renderSiswaByKelas(kelasName) {
+    // 1. Render Baris Siswa
+    function renderRows(list) {
         const tbody = document.getElementById('siswaTbody');
-        const labelKelas = document.getElementById('label_nama_kelas');
-        const displayLabel = toRomanDisplayJs(kelasName) || kelasName || '-';
-        labelKelas.textContent = displayLabel;
-
-        const list = findSiswaByKelas(kelasName);
         tbody.innerHTML = '';
 
-        if (list.length === 0) {
+        if (!list || list.length === 0) {
+            const displayLabel = document.getElementById('label_nama_kelas').textContent || '-';
             tbody.innerHTML = `
                 <tr>
                     <td colspan="4" style="text-align:center; padding:32px 16px; color:var(--text-secondary);">
@@ -328,7 +339,10 @@
                                 <line x1="12" y1="8" x2="12" y2="12"></line>
                                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
                             </svg>
-                            <span style="font-size:13.5px; font-weight:500;">Belum ada data siswa terdaftar di Kelas ${displayLabel}</span>
+                            <span style="font-size:13.5px; font-weight:500;">Belum ada data siswa terdaftar di Kelas ${displayLabel} pada Plotting Kelas</span>
+                            <a href="{{ route('plotting-kelas.index') }}" target="_blank" class="btn btn-sm btn-outline-primary" style="font-size:12px; margin-top:4px;">
+                                Buka Menu Plotting Kelas &rarr;
+                            </a>
                         </div>
                     </td>
                 </tr>
@@ -361,6 +375,52 @@
         });
 
         updateStatCounters();
+    }
+
+    // 2. Render Siswa saat kelas dipilih (Preload + Realtime AJAX fallback ke Plotting Kelas)
+    function renderSiswaByKelas(kelasName) {
+        const tbody = document.getElementById('siswaTbody');
+        const labelKelas = document.getElementById('label_nama_kelas');
+        const displayLabel = toRomanDisplayJs(kelasName) || kelasName || '-';
+        labelKelas.textContent = displayLabel;
+
+        const list = findSiswaByKelas(kelasName);
+
+        if (list && list.length > 0) {
+            renderRows(list);
+            return;
+        }
+
+        // Tampilkan status memuat dari database Plotting Kelas
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" style="text-align:center; padding:28px 16px; color:var(--text-secondary);">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:10px;">
+                        <span style="display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin 0.75s linear infinite;"></span>
+                        <span style="font-size:13px;">Menghubungkan & memuat data dari Plotting Kelas...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        // Live AJAX fetch langsung ke Plotting Kelas
+        fetch(`/sekolah/kelas-anggota/${encodeURIComponent(kelasName)}`, {
+            headers: { 'Accept': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(res => {
+            if (res && res.success && res.anggota && res.anggota.length > 0) {
+                dataSiswasByKelas[kelasName] = res.anggota;
+                const roman = toRomanDisplayJs(kelasName);
+                if (roman) dataSiswasByKelas[roman] = res.anggota;
+                renderRows(res.anggota);
+            } else {
+                renderRows([]);
+            }
+        })
+        .catch(() => {
+            renderRows([]);
+        });
     }
 
     // 2. Tombol toggle berganti status saat diklik: Hadir -> Sakit -> Izin -> Alpa -> Hadir

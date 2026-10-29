@@ -44,10 +44,10 @@ class SekolahController extends Controller
 
         // Format Angka Arab (7, 8, 9, 10, 11, 12)
         $map = [
-            'VII' => '7', 'VIII' => '8', 'IX' => '9',
-            'X' => '10', 'XI' => '11', 'XII' => '12',
+            'VIII' => '8', 'VII' => '7', 'XII' => '12',
+            'XI' => '11', 'IX' => '9', 'X' => '10',
         ];
-        $arabic = preg_replace_callback('/\b(VII|VIII|IX|X|XI|XII)\b/i', fn($m) => $map[strtoupper($m[1])] ?? $m[1], $cleanRoman);
+        $arabic = preg_replace_callback('/(VIII|VII|XII|XI|IX|X)/i', fn($m) => $map[strtoupper($m[1])] ?? $m[1], $cleanRoman);
         $cleanArabic = trim(str_ireplace('kelas', '', $arabic));
         $variants[] = $arabic;
         $variants[] = $cleanArabic;
@@ -233,11 +233,18 @@ class SekolahController extends Controller
         $gurus = $guruQuery->orderBy('name')->get();
 
         // Ambil seluruh siswa aktif non-reguler yang memiliki kelas dan kelompokkan per kelas
-        $siswas = Siswa::where('status', 'aktif')
+        $siswas = Siswa::where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', 'aktif')
+                  ->orWhere('status', 'Aktif');
+            })
             ->whereNotNull('kelas')
             ->where('kelas', '!=', '')
             ->where('kelas', '!=', '-')
-            ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
+            ->where(function ($q) {
+                $q->whereNull('jenjang')
+                  ->orWhereRaw('LOWER(jenjang) != ?', ['reguler']);
+            })
             ->orderBy('nama_lengkap')
             ->get(['id', 'nama_lengkap', 'kelas', 'jenjang']);
 
@@ -738,5 +745,50 @@ class SekolahController extends Controller
             'tahun',
             'activeRoom'
         ));
+    }
+
+    /**
+     * Endpoint API AJAX: Ambil data anggota kelas langsung terhubung dengan Plotting Kelas
+     */
+    public function getAnggotaKelas(Request $request, string $kelas)
+    {
+        $kelasDecoded = urldecode($kelas);
+        $cleanKelas = trim(str_ireplace('kelas', '', $kelasDecoded));
+
+        $allSiswa = Siswa::where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', 'aktif')
+                  ->orWhere('status', 'Aktif');
+            })
+            ->whereNotNull('kelas')
+            ->where('kelas', '!=', '')
+            ->where('kelas', '!=', '-')
+            ->where(function ($q) {
+                $q->whereNull('jenjang')
+                  ->orWhereRaw('LOWER(jenjang) != ?', ['reguler']);
+            })
+            ->with('pendaftaran')
+            ->orderBy('nama_lengkap')
+            ->get();
+
+        $anggota = $allSiswa->filter(function ($s) use ($cleanKelas, $kelasDecoded) {
+            return PlottingKelasController::isSameClass($s->kelas, $kelasDecoded)
+                || PlottingKelasController::isSameClass($s->kelas, $cleanKelas);
+        })->values()->map(function ($s) {
+            return [
+                'id'           => $s->id,
+                'nama_lengkap' => $s->nama_lengkap,
+                'nisn'         => $s->pendaftaran?->nisn ?? $s->nisn ?? '-',
+                'kelas'        => $s->kelas,
+                'jenjang'      => $s->jenjang,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'kelas'   => $kelasDecoded,
+            'total'   => $anggota->count(),
+            'anggota' => $anggota,
+        ]);
     }
 }
