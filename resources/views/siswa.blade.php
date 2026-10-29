@@ -875,16 +875,59 @@
                         <th>Kamar</th>
                         <th>Status</th>
                         <th>Kartu RFID</th>
-                        <th style="text-align:center; width:150px;">Aksi</th>
+                        <th data-col-hidden="true" style="display:none;">Tinggi Badan</th>
+                        <th data-col-hidden="true" style="display:none;">Berat Badan</th>
+                        <th data-col-hidden="true" style="display:none;">Gol. Darah</th>
+                        <th data-col-hidden="true" style="display:none;">NIK</th>
+                        <th data-col-hidden="true" style="display:none;">NISN</th>
+                        <th data-col-hidden="true" style="display:none;">No. Induk</th>
+                        <th data-col-hidden="true" style="display:none;">Nama Panggilan</th>
+                        <th data-col-hidden="true" style="display:none;">Tempat Lahir</th>
+                        <th data-col-hidden="true" style="display:none;">Tanggal Lahir</th>
+                        <th data-col-hidden="true" style="display:none;">Jenis Kelamin</th>
+                        <th data-col-hidden="true" style="display:none;">Anak Ke</th>
+                        <th data-col-hidden="true" style="display:none;">Tinggal Bersama</th>
+                        <th data-col-hidden="true" style="display:none;">Alamat Jalan</th>
+                        <th data-col-hidden="true" style="display:none;">RT / RW</th>
+                        <th data-col-hidden="true" style="display:none;">Desa / Kelurahan</th>
+                        <th data-col-hidden="true" style="display:none;">Kecamatan</th>
+                        <th data-col-hidden="true" style="display:none;">Kabupaten / Kota</th>
+                        <th data-col-hidden="true" style="display:none;">Provinsi</th>
+                        <th data-col-hidden="true" style="display:none;">No. HP / WA (PJ)</th>
+                        <th data-col-hidden="true" style="display:none;">Nama PJ Biaya</th>
+                        <th data-col-hidden="true" style="display:none;">Pendidikan Terakhir</th>
+                        <th data-col-hidden="true" style="display:none;">Asal Sekolah</th>
+                        <th data-col-hidden="true" style="display:none;">Tahun Lulus</th>
+                        <th data-col-hidden="true" style="display:none;">Status Mondok</th>
+                        <th data-col-hidden="true" style="display:none;">Riwayat Penyakit</th>
+                        <th data-col-hidden="true" style="display:none;">Alergi</th>
+                        <th data-col-hidden="true" style="display:none;">Keahlian / Prestasi</th>
+                        <th data-col-hidden="true" style="display:none;">Nama Ayah</th>
+                        <th data-col-hidden="true" style="display:none;">Pekerjaan Ayah</th>
+                        <th data-col-hidden="true" style="display:none;">No. HP Ayah</th>
+                        <th data-col-hidden="true" style="display:none;">Nama Ibu</th>
+                        <th data-col-hidden="true" style="display:none;">Pekerjaan Ibu</th>
+                        <th data-col-hidden="true" style="display:none;">No. HP Ibu</th>
+                        <th data-col-hidden="true" style="display:none;">Penerima KIP</th>
+                        <th data-col-hidden="true" class="col-aksi-head" style="text-align:center; width:150px; display:none;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($siswa as $item)
                     @php
+                        $p = $item->pendaftaran;
                         $isLengkap = $item->isDataLengkap();
                         $missingFields = !$isLengkap ? $item->field_belum_lengkap : [];
+                        $targetCetakUrl = $item->pendaftaran_id
+                            ? route('pendaftaran.cetak', ['id' => $item->pendaftaran_id, 'from' => 'siswa'])
+                            : route('siswa.show', $item->id);
+                        $targetEditUrl = route('siswa.edit', $item->id);
                     @endphp
-                    <tr class="{{ !$isLengkap ? 'row-incomplete' : '' }}">
+                    <tr class="{{ !$isLengkap ? 'row-incomplete' : '' }}"
+                        data-id="{{ $item->id }}"
+                        data-nama="{{ $item->nama_lengkap }}"
+                        data-view-url="{{ $targetCetakUrl }}"
+                        data-edit-url="{{ $targetEditUrl }}">
                         <td class="cell-nama">
                             <div class="nama-wrapper">
                                 <div class="nama-text">{{ $item->nama_lengkap }}</div>
@@ -907,7 +950,7 @@
                         </td>
                         <td>
                             @php
-                                $j = $item->jenjang ?? ($item->pendaftaran?->jenjang ?? 'Reguler');
+                                $j = $item->jenjang ?? ($p?->jenjang ?? 'Reguler');
                                 $badgeColor = match($j) {
                                     'SMP' => 'smp',
                                     'SMA' => 'sma',
@@ -932,7 +975,45 @@
                                 <span style="color: var(--text-muted); font-size: 11px; font-style: italic;">Belum dipairing</span>
                             @endif
                         </td>
-                        <td style="text-align:center;">
+
+                        {{-- Seluruh Kolom Data Diri Siswa (Tinggi Badan, Berat Badan, Gol Darah, NIK, dll) --}}
+                        <td style="display:none;">{{ $p?->tinggi_badan ? $p->tinggi_badan . ' cm' : '-' }}</td>
+                        <td style="display:none;">{{ $p?->berat_badan ? $p->berat_badan . ' kg' : '-' }}</td>
+                        <td style="display:none;">{{ $p?->gol_darah ?: '-' }}</td>
+                        <td style="display:none; font-family:monospace;">{{ $p?->nik ?: '-' }}</td>
+                        <td style="display:none; font-family:monospace;">{{ $p?->nisn ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->no_induk ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->nama_panggilan ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->tempat_lahir ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->tanggal_lahir ? date('d/m/Y', strtotime($p->tanggal_lahir)) : '-' }}</td>
+                        <td style="display:none;">{{ $p?->jenis_kelamin ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->anak_ke ? 'Ke-' . $p->anak_ke . ($p->jumlah_saudara ? ' (dari ' . $p->jumlah_saudara . ')' : '') : '-' }}</td>
+                        <td style="display:none;">{{ $p?->tinggal_bersama ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->alamat_jalan ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->rt_rw ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->desa_kelurahan ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->kecamatan ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->kab_kota ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->provinsi ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->pj_biaya_hp ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->pj_biaya_nama ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->pendidikan_terakhir ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->nama_sekolah_asal ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->tahun_lulus ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->status_mondok ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->penyakit_diderita ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->alergi ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->keahlian_prestasi ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->ayah_nama ? $p->ayah_nama . ($p->ayah_status === 'Meninggal' ? ' (Alm.)' : '') : '-' }}</td>
+                        <td style="display:none;">{{ $p?->ayah_pekerjaan ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->ayah_hp ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->ibu_nama ? $p->ibu_nama . ($p->ibu_status === 'Meninggal' ? ' (Almh.)' : '') : '-' }}</td>
+                        <td style="display:none;">{{ $p?->ibu_pekerjaan ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->ibu_hp ?: '-' }}</td>
+                        <td style="display:none;">{{ $p?->penerima_kip ? 'Ya' . ($p->nomor_kip ? ' (' . $p->nomor_kip . ')' : '') : 'Tidak' }}</td>
+
+                        {{-- Kolom Aksi (Dipindahkan ke Tombol Aksi di Kiri Atas Toolbar) --}}
+                        <td class="col-aksi-cell" style="text-align:center; display:none;">
                             <div class="action-btn-group">
                                 {{-- Tombol Pairing RFID --}}
                                 @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
@@ -950,28 +1031,25 @@
                                 @endif
 
                                 {{-- Tombol Lihat (Hanya Icon Mata -> Menampilkan Formulir Cetak Seperti Gambar 2) --}}
-                                @php
-                                    $targetCetakUrl = $item->pendaftaran_id
-                                        ? route('pendaftaran.cetak', ['id' => $item->pendaftaran_id, 'from' => 'siswa'])
-                                        : route('siswa.show', $item->id);
-                                @endphp
-                                <a href="{{ $targetCetakUrl }}" class="action-btn action-btn-view" title="Lihat Formulir Siswa" aria-label="Lihat Formulir {{ $item->nama_lengkap }}">
+                                <a href="{{ $targetCetakUrl }}" class="action-btn action-btn-view btn-view" title="Lihat Formulir Siswa" aria-label="Lihat Formulir {{ $item->nama_lengkap }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                         <circle cx="12" cy="12" r="3"></circle>
                                     </svg>
+                                    <span class="sr-only" style="display:none;">Lihat</span>
                                 </a>
 
                                 {{-- Tombol Edit / Koreksi (Icon Pensil -> Menuju Formulir Pendaftaran) --}}
                                 @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
-                                <a href="{{ route('siswa.edit', $item->id) }}"
-                                   class="action-btn {{ !$isLengkap ? 'action-btn-koreksi' : 'action-btn-edit' }}"
+                                <a href="{{ $targetEditUrl }}"
+                                   class="action-btn btn-edit {{ !$isLengkap ? 'action-btn-koreksi' : 'action-btn-edit' }}"
                                    title="{{ !$isLengkap ? 'Edit & Koreksi Kelengkapan Data Santri (' . implode(', ', $missingFields) . ')' : 'Edit Formulir Pendaftaran Siswa' }}"
                                    aria-label="{{ !$isLengkap ? 'Edit & Koreksi Data ' . $item->nama_lengkap : 'Edit Formulir ' . $item->nama_lengkap }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                     </svg>
+                                    <span class="sr-only" style="display:none;">Edit</span>
                                 </a>
                                 @endif
 
@@ -980,7 +1058,7 @@
                                 <form action="{{ route('siswa.destroy', $item->id) }}" method="POST" style="display:inline;">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="button" class="action-btn action-btn-delete js-swal-confirm"
+                                    <button type="button" class="action-btn action-btn-delete btn-delete js-swal-confirm"
                                         data-title="Konfirmasi Hapus Siswa?"
                                         data-html="Apakah Anda yakin ingin menghapus data santri <strong>{{ $item->nama_lengkap }}</strong>?<br><div style='padding:12px 14px; background:var(--nav-hover-bg); border-radius:10px; border:1px solid var(--border-light); margin-top:12px; font-size:13px; text-align:left; line-height:1.6;'><div>Kamar: <strong>{{ $item->kamar }}</strong></div><div>Status: <strong>{{ ucfirst($item->status ?? 'aktif') }}</strong></div></div><div style='margin-top:10px; font-size:12.5px; color:#DC2626; font-weight:600;'>⚠️ Data yang sudah dihapus tidak dapat dipulihkan kembali.</div>"
                                         data-icon="warning"
@@ -994,6 +1072,7 @@
                                             <line x1="10" y1="11" x2="10" y2="17"></line>
                                             <line x1="14" y1="11" x2="14" y2="17"></line>
                                         </svg>
+                                        <span class="sr-only" style="display:none;">Hapus</span>
                                     </button>
                                 </form>
                                 @endif
@@ -1002,7 +1081,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="cell-empty" style="padding:40px 20px;">
+                        <td colspan="41" class="cell-empty" style="padding:40px 20px;">
                             <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;color:var(--text-muted);">
                                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>

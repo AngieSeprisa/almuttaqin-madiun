@@ -616,78 +616,6 @@ document.addEventListener('DOMContentLoaded', function () {
       var bulkMenu = document.createElement('div');
       bulkMenu.className = 'fi-ta-bulk-menu';
 
-      if (hasDeletableRows) {
-        var bulkDelBtn = document.createElement('button');
-        bulkDelBtn.type = 'button';
-        bulkDelBtn.className = 'fi-ta-bulk-item is-danger';
-        bulkDelBtn.innerHTML =
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-            '<polyline points="3 6 5 6 21 6"></polyline>' +
-            '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
-          '</svg>' +
-          '<span>Hapus terpilih</span>';
-        bulkDelBtn.addEventListener('click', function () {
-          bulkMenu.classList.remove('is-open');
-          var deletableSelected = rowMeta.filter(function (m) { return m.selected && m.deleteForm; });
-          if (!deletableSelected.length) return;
-
-          window.showFiConfirmModal({
-            title: 'Hapus data terpilih',
-            description: 'Apakah Anda yakin ingin menghapus ' + deletableSelected.length + ' data yang dipilih? Tindakan ini tidak dapat dibatalkan.',
-            confirmText: 'Hapus',
-            cancelText: 'Batal',
-            variant: 'danger',
-            onConfirm: function () {
-              return deletableSelected.reduce(function (chain, item) {
-                return chain.then(function () {
-                  return fetch(item.deleteForm.action, {
-                    method: 'POST',
-                    body: new FormData(item.deleteForm),
-                    credentials: 'same-origin',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                  });
-                });
-              }, Promise.resolve()).then(function () {
-                window.location.reload();
-              });
-            }
-          });
-        });
-        bulkMenu.appendChild(bulkDelBtn);
-      }
-
-      var bulkCsvBtn = document.createElement('button');
-      bulkCsvBtn.type = 'button';
-      bulkCsvBtn.className = 'fi-ta-bulk-item is-primary';
-      bulkCsvBtn.innerHTML =
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>' +
-          '<polyline points="7 10 12 15 17 10"></polyline>' +
-          '<line x1="12" y1="15" x2="12" y2="3"></line>' +
-        '</svg>' +
-        '<span>Ekspor CSV terpilih</span>';
-      bulkCsvBtn.addEventListener('click', function () {
-        bulkMenu.classList.remove('is-open');
-        var selTrs = rowMeta.filter(function (m) { return m.selected; }).map(function (m) { return m.tr; });
-        if (selTrs.length) downloadSelectedCsv(table, selTrs);
-      });
-      bulkMenu.appendChild(bulkCsvBtn);
-
-      var bulkDiv = document.createElement('div');
-      bulkDiv.className = 'fi-ta-bulk-divider';
-      bulkMenu.appendChild(bulkDiv);
-
-      var bulkClearBtn = document.createElement('button');
-      bulkClearBtn.type = 'button';
-      bulkClearBtn.className = 'fi-ta-bulk-item';
-      bulkClearBtn.innerHTML =
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-          '<line x1="18" y1="6" x2="6" y2="18"></line>' +
-          '<line x1="6" y1="6" x2="18" y2="18"></line>' +
-        '</svg>' +
-        '<span>Batalkan pilihan</span>';
-      bulkMenu.appendChild(bulkClearBtn);
-
       bulkWrap.appendChild(bulkBtn);
       bulkWrap.appendChild(bulkMenu);
       toolbarLeft.appendChild(bulkWrap);
@@ -885,11 +813,15 @@ document.addEventListener('DOMContentLoaded', function () {
             '<span class="fi-ta-col-title">Kolom</span>' +
             '<button type="button" class="fi-ta-col-reset">Reset</button>' +
           '</div>' +
+          '<div class="fi-ta-col-search-wrap">' +
+            '<input type="text" class="fi-ta-col-search" placeholder="Cari nama kolom...">' +
+          '</div>' +
           '<div class="fi-ta-col-list"></div>' +
         '</div>';
 
       var colBtn = colWrap.querySelector('.fi-ta-col-btn');
       var colPopover = colWrap.querySelector('.fi-ta-col-popover');
+      var colSearchInput = colWrap.querySelector('.fi-ta-col-search');
       var colListEl = colWrap.querySelector('.fi-ta-col-list');
       var colResetBtn = colWrap.querySelector('.fi-ta-col-reset');
 
@@ -1003,7 +935,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (idx === 0 || th.classList.contains('fi-ta-th-check')) return;
         var colTitle = (th.querySelector('span') ? th.querySelector('span').textContent : th.textContent || '').replace(/\s+/g, ' ').trim() || ('Kolom ' + idx);
 
-        var isVisible = savedCols[idx] !== undefined ? !!savedCols[idx] : true;
+        var defaultVisible = !th.hasAttribute('data-col-hidden') && th.getAttribute('data-col-hidden') !== 'true';
+        var isVisible = savedCols[idx] !== undefined ? !!savedCols[idx] : defaultVisible;
         if (!isVisible) hasHiddenCols = true;
 
         applyColVisibility(idx, isVisible);
@@ -1022,12 +955,25 @@ document.addEventListener('DOMContentLoaded', function () {
             localStorage.setItem(tableStorageKey, JSON.stringify(savedCols));
           } catch (e) {}
           applyColVisibility(idx, checked);
-          var anyHidden = Object.keys(savedCols).some(function (k) { return savedCols[k] === false; });
+          var anyHidden = Array.from(headRow.cells).some(function (cell, i) {
+            return i > 0 && cell.style.display === 'none';
+          });
           colBtn.classList.toggle('has-hidden-cols', anyHidden);
         });
 
         colListEl.appendChild(itemLabel);
       });
+
+      // Quick filter search inside column customizer popover
+      if (colSearchInput) {
+        colSearchInput.addEventListener('input', function () {
+          var q = (colSearchInput.value || '').trim().toLowerCase();
+          colListEl.querySelectorAll('.fi-ta-col-item').forEach(function (item) {
+            var txt = (item.querySelector('.fi-ta-col-item-text') ? item.querySelector('.fi-ta-col-item-text').textContent : '').toLowerCase();
+            item.style.display = (q === '' || txt.indexOf(q) !== -1) ? '' : 'none';
+          });
+        });
+      }
 
       colBtn.classList.toggle('has-hidden-cols', hasHiddenCols);
       updateColspans();
@@ -1035,16 +981,26 @@ document.addEventListener('DOMContentLoaded', function () {
       colResetBtn.addEventListener('click', function () {
         Array.from(headRow.cells).forEach(function (th, idx) {
           if (idx === 0) return;
-          applyColVisibility(idx, true);
+          var defVis = !th.hasAttribute('data-col-hidden') || th.getAttribute('data-col-hidden') !== 'true';
+          applyColVisibility(idx, defVis);
         });
         colListEl.querySelectorAll('.fi-ta-col-check').forEach(function (cb) {
-          cb.checked = true;
+          var idx = parseInt(cb.dataset.colIdx, 10);
+          var th = headRow.cells[idx];
+          cb.checked = th ? (!th.hasAttribute('data-col-hidden') || th.getAttribute('data-col-hidden') !== 'true') : true;
         });
+        if (colSearchInput) {
+          colSearchInput.value = '';
+          colListEl.querySelectorAll('.fi-ta-col-item').forEach(function (item) { item.style.display = ''; });
+        }
         savedCols = {};
         try {
           localStorage.removeItem(tableStorageKey);
         } catch (e) {}
-        colBtn.classList.remove('has-hidden-cols');
+        var anyHidden = Array.from(headRow.cells).some(function (cell, i) {
+          return i > 0 && cell.style.display === 'none';
+        });
+        colBtn.classList.toggle('has-hidden-cols', anyHidden);
       });
 
       colBtn.addEventListener('click', function (ev) {
@@ -1052,6 +1008,9 @@ document.addEventListener('DOMContentLoaded', function () {
         bulkMenu.classList.remove('is-open');
         filterPopover.classList.remove('is-open');
         colPopover.classList.toggle('is-open');
+        if (colPopover.classList.contains('is-open') && colSearchInput) {
+          setTimeout(function () { colSearchInput.focus(); }, 50);
+        }
       });
 
       colPopover.addEventListener('click', function (ev) {
@@ -1087,6 +1046,172 @@ document.addEventListener('DOMContentLoaded', function () {
         return filtered.slice(start, start + perPage);
       }
 
+      function renderBulkMenu(selectedCount) {
+        bulkMenu.innerHTML = '';
+        var selectedItems = rowMeta.filter(function (m) { return m.selected; });
+        if (selectedItems.length === 0) return;
+
+        if (selectedCount === 1) {
+          var selMeta = selectedItems[0];
+          var tr = selMeta.tr;
+          var viewLnk = tr.querySelector('a.action-btn-view, a.btn-view, a[title*="Lihat"], a[href*="show"], a[href*="cetak"]');
+          var editLnk = tr.querySelector('a.action-btn-edit, a.btn-edit, a.action-btn-koreksi, a[title*="Edit"], a[href*="edit"]');
+          var rfidBtn = tr.querySelector('button.btn-rfid-pair, button[data-uid], button[title*="RFID"]');
+          var delBtn = tr.querySelector('.action-btn-delete, .btn-delete, button.js-swal-confirm');
+
+          // 1. Lihat Formulir Siswa
+          if (viewLnk) {
+            var aView = document.createElement('a');
+            aView.className = 'fi-ta-bulk-item';
+            aView.href = viewLnk.href;
+            aView.innerHTML =
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>' +
+                '<circle cx="12" cy="12" r="3"></circle>' +
+              '</svg>' +
+              '<span>Lihat Formulir Siswa</span>';
+            bulkMenu.appendChild(aView);
+          }
+
+          // 2. Edit Data Siswa
+          if (editLnk) {
+            var aEdit = document.createElement('a');
+            aEdit.className = 'fi-ta-bulk-item';
+            aEdit.href = editLnk.href;
+            aEdit.innerHTML =
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>' +
+                '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>' +
+              '</svg>' +
+              '<span>Edit Data Siswa</span>';
+            bulkMenu.appendChild(aEdit);
+          }
+
+          // 3. Pairing Kartu RFID
+          if (rfidBtn) {
+            var bRfid = document.createElement('button');
+            bRfid.type = 'button';
+            bRfid.className = 'fi-ta-bulk-item';
+            bRfid.innerHTML =
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<rect x="2" y="5" width="20" height="14" rx="2"></rect>' +
+                '<line x1="2" y1="10" x2="22" y2="10"></line>' +
+              '</svg>' +
+              '<span>Pairing Kartu RFID</span>';
+            bRfid.addEventListener('click', function () {
+              bulkMenu.classList.remove('is-open');
+              rfidBtn.click();
+            });
+            bulkMenu.appendChild(bRfid);
+          }
+
+          if (viewLnk || editLnk || rfidBtn) {
+            var div1 = document.createElement('div');
+            div1.className = 'fi-ta-bulk-divider';
+            bulkMenu.appendChild(div1);
+          }
+
+          // 4. Hapus Siswa
+          if (delBtn || selMeta.deleteForm) {
+            var bDelOne = document.createElement('button');
+            bDelOne.type = 'button';
+            bDelOne.className = 'fi-ta-bulk-item is-danger';
+            bDelOne.innerHTML =
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="3 6 5 6 21 6"></polyline>' +
+                '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
+              '</svg>' +
+              '<span>Hapus Siswa</span>';
+            bDelOne.addEventListener('click', function () {
+              bulkMenu.classList.remove('is-open');
+              if (delBtn) {
+                delBtn.click();
+              } else if (selMeta.deleteForm) {
+                selMeta.deleteForm.submit();
+              }
+            });
+            bulkMenu.appendChild(bDelOne);
+          }
+        } else {
+          // Multiple rows selected
+          var deletableSelected = selectedItems.filter(function (m) { return m.deleteForm; });
+          if (deletableSelected.length > 0) {
+            var bDelAll = document.createElement('button');
+            bDelAll.type = 'button';
+            bDelAll.className = 'fi-ta-bulk-item is-danger';
+            bDelAll.innerHTML =
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="3 6 5 6 21 6"></polyline>' +
+                '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
+              '</svg>' +
+              '<span>Hapus terpilih (' + selectedCount + ')</span>';
+            bDelAll.addEventListener('click', function () {
+              bulkMenu.classList.remove('is-open');
+              window.showFiConfirmModal({
+                title: 'Hapus data terpilih',
+                description: 'Apakah Anda yakin ingin menghapus ' + deletableSelected.length + ' data yang dipilih? Tindakan ini tidak dapat dibatalkan.',
+                confirmText: 'Hapus',
+                cancelText: 'Batal',
+                variant: 'danger',
+                onConfirm: function () {
+                  return deletableSelected.reduce(function (chain, item) {
+                    return chain.then(function () {
+                      return fetch(item.deleteForm.action, {
+                        method: 'POST',
+                        body: new FormData(item.deleteForm),
+                        credentials: 'same-origin',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                      });
+                    });
+                  }, Promise.resolve()).then(function () {
+                    window.location.reload();
+                  });
+                }
+              });
+            });
+            bulkMenu.appendChild(bDelAll);
+          }
+        }
+
+        // Ekspor CSV Terpilih (always available)
+        var bCsv = document.createElement('button');
+        bCsv.type = 'button';
+        bCsv.className = 'fi-ta-bulk-item is-primary';
+        bCsv.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>' +
+            '<polyline points="7 10 12 15 17 10"></polyline>' +
+            '<line x1="12" y1="15" x2="12" y2="3"></line>' +
+          '</svg>' +
+          '<span>Ekspor CSV terpilih</span>';
+        bCsv.addEventListener('click', function () {
+          bulkMenu.classList.remove('is-open');
+          var selTrs = selectedItems.map(function (m) { return m.tr; });
+          if (selTrs.length) downloadSelectedCsv(table, selTrs);
+        });
+        bulkMenu.appendChild(bCsv);
+
+        var div2 = document.createElement('div');
+        div2.className = 'fi-ta-bulk-divider';
+        bulkMenu.appendChild(div2);
+
+        // Batalkan Pilihan
+        var bCancel = document.createElement('button');
+        bCancel.type = 'button';
+        bCancel.className = 'fi-ta-bulk-item';
+        bCancel.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+            '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+          '</svg>' +
+          '<span>Batalkan pilihan</span>';
+        bCancel.addEventListener('click', function () {
+          bulkMenu.classList.remove('is-open');
+          clearAllSelections();
+        });
+        bulkMenu.appendChild(bCancel);
+      }
+
       function syncSelectionUI(filtered, pageItems) {
         var selectedCount = 0;
         rowMeta.forEach(function (m) {
@@ -1112,6 +1237,7 @@ document.addEventListener('DOMContentLoaded', function () {
           selectionBar.classList.add('is-visible');
           selCountLabel.textContent = selectedCount + ' data dipilih';
           btnSelectAllFiltered.textContent = 'Pilih semua ' + filtered.length;
+          renderBulkMenu(selectedCount);
         } else {
           bulkBtn.disabled = true;
           bulkBtn.classList.add('is-disabled');
@@ -1119,6 +1245,7 @@ document.addEventListener('DOMContentLoaded', function () {
           countBadge.style.display = 'none';
           bulkMenu.classList.remove('is-open');
           selectionBar.classList.remove('is-visible');
+          bulkMenu.innerHTML = '';
         }
       }
 
@@ -1191,9 +1318,16 @@ document.addEventListener('DOMContentLoaded', function () {
         syncSelectionUI(filtered, pageItems);
       }
 
-      // Wire row & mobile checkboxes
+      // Wire row & mobile checkboxes + click to select
       rowMeta.forEach(function (m) {
         m.cb.addEventListener('change', function () {
+          m.selected = m.cb.checked;
+          var filtered = getFilteredMeta();
+          syncSelectionUI(filtered, getPageMeta(filtered));
+        });
+        m.tr.addEventListener('click', function (ev) {
+          if (ev.target.closest('input, button, a, label, select, textarea')) return;
+          m.cb.checked = !m.cb.checked;
           m.selected = m.cb.checked;
           var filtered = getFilteredMeta();
           syncSelectionUI(filtered, getPageMeta(filtered));
@@ -1229,10 +1363,6 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       btnDeselectAll.addEventListener('click', clearAllSelections);
-      bulkClearBtn.addEventListener('click', function () {
-        bulkMenu.classList.remove('is-open');
-        clearAllSelections();
-      });
 
       // Wire Bulk Actions Menu toggle & outside click
       bulkBtn.addEventListener('click', function (ev) {
