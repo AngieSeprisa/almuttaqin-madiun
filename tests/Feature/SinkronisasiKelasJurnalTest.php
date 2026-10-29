@@ -134,3 +134,4 @@ class SinkronisasiKelasJurnalTest extends TestCase
         $this->assertContains('7A', $equivalentsVIIA);
     }
 }
+
