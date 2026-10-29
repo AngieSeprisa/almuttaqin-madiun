@@ -333,4 +333,93 @@ class PlottingKelasTest extends TestCase
             'id' => $classroom->id,
         ]);
     }
+
+    public function test_bulk_mutasi_unassign_and_bulk_delete_kelas_with_filament_table_layout(): void
+    {
+        $adminSMP = User::where('email', 'admin.smp@almuttaqin.id')->firstOrFail();
+        $smp = Lembaga::where('kode', 'smp')->firstOrFail();
+
+        $cEmpty1 = \App\Models\Classroom::create([
+            'lembaga_id' => $smp->id,
+            'jenjang'    => 'SMP',
+            'nama_kelas' => 'VIII Kosong 1',
+            'tingkat'    => 8,
+            'urutan'     => 20,
+            'is_active'  => true,
+        ]);
+        $cEmpty2 = \App\Models\Classroom::create([
+            'lembaga_id' => $smp->id,
+            'jenjang'    => 'SMP',
+            'nama_kelas' => 'VIII Kosong 2',
+            'tingkat'    => 8,
+            'urutan'     => 21,
+            'is_active'  => true,
+        ]);
+        $cOccupied = \App\Models\Classroom::create([
+            'lembaga_id' => $smp->id,
+            'jenjang'    => 'SMP',
+            'nama_kelas' => 'VIII Terisi',
+            'tingkat'    => 8,
+            'urutan'     => 22,
+            'is_active'  => true,
+        ]);
+
+        $s1 = Siswa::create([
+            'nama_lengkap' => 'Bulk Siswa SMP 1',
+            'kelas'        => null,
+            'jenjang'      => 'SMP',
+            'status'       => 'aktif',
+        ]);
+        $s2 = Siswa::create([
+            'nama_lengkap' => 'Bulk Siswa SMP 2',
+            'kelas'        => null,
+            'jenjang'      => 'SMP',
+            'status'       => 'aktif',
+        ]);
+
+        // Bulk mutasi 2 siswa sekaligus ke VIII Terisi
+        $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->post(route('plotting-kelas.mutasi'), [
+                'siswa_id' => "{$s1->id},{$s2->id}",
+                'kelas'    => 'VIII Terisi',
+            ])
+            ->assertRedirect();
+
+        $this->assertEquals('VIII Terisi', $s1->fresh()->kelas);
+        $this->assertEquals('VIII Terisi', $s2->fresh()->kelas);
+
+        // Verifikasi struktur Filament v4 table & hilangnya kebocoran .mobile-card-list
+        $viewRes = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->get(route('plotting-kelas.index'));
+        $viewRes->assertStatus(200);
+        $viewRes->assertSee('fi-ta-ctn');
+        $viewRes->assertSee('fi-ta-bulk-btn');
+        $viewRes->assertSee('Terapkan filter');
+        $viewRes->assertDontSee('mobile-card-list');
+
+        // Bulk delete kelas: yang kosong terhapus, yang terisi terlindungi
+        $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->post(route('plotting-kelas.destroy-bulk-kelas'), [
+                'kelas_ids' => "{$cEmpty1->id},{$cEmpty2->id},{$cOccupied->id}",
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('classrooms', ['id' => $cEmpty1->id]);
+        $this->assertDatabaseMissing('classrooms', ['id' => $cEmpty2->id]);
+        $this->assertDatabaseHas('classrooms', ['id' => $cOccupied->id]);
+
+        // Bulk unassign 2 siswa sekaligus
+        $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->post(route('plotting-kelas.unassign'), [
+                'siswa_id' => "{$s1->id},{$s2->id}",
+            ])
+            ->assertRedirect();
+
+        $this->assertNull($s1->fresh()->kelas);
+        $this->assertNull($s2->fresh()->kelas);
+    }
 }

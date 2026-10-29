@@ -152,6 +152,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/pengaturan-sesi', [PengaturanSesiController::class, 'index'])->name('pengaturan.sesi');
     Route::get('/pengaturan-sesi/last-device', [PengaturanSesiController::class, 'lastDetectedDevice'])->name('pengaturan.sesi.last-device');
     Route::post('/pengaturan-sesi/store', [PengaturanSesiController::class, 'store'])->name('pengaturan.sesi.store');
+    Route::post('/pengaturan-sesi/bulk-delete', [PengaturanSesiController::class, 'destroyBulk'])->name('pengaturan.sesi.bulk-destroy');
     Route::put('/pengaturan-sesi/{id}', [PengaturanSesiController::class, 'update'])->whereNumber('id')->name('pengaturan.sesi.update');
     Route::delete('/pengaturan-sesi/{id}', [PengaturanSesiController::class, 'destroy'])->whereNumber('id')->name('pengaturan.sesi.destroy');
     Route::post('/pengaturan-sesi/device', [PengaturanSesiController::class, 'storeDevice'])->name('pengaturan.sesi.device.store');
@@ -266,6 +267,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/kelas/{classroom}', [PlottingKelasController::class, 'destroyKelas'])
             ->middleware('permission:plotting_kelas|master_kelas,delete')
             ->name('destroy-kelas');
+        Route::post('/kelas-bulk-delete', [PlottingKelasController::class, 'destroyBulkKelas'])
+            ->middleware('permission:plotting_kelas|master_kelas,delete')
+            ->name('destroy-bulk-kelas');
         Route::post('/muat-standar', [PlottingKelasController::class, 'muatStandar'])
             ->middleware('permission:plotting_kelas|master_kelas,create')
             ->name('muat-standar');
@@ -294,6 +298,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/kamar/{kamar}', [PlottingKamarController::class, 'destroyKamar'])
             ->middleware('permission:plotting_kamar,delete')
             ->name('destroy-kamar');
+        Route::post('/kamar-bulk-delete', [PlottingKamarController::class, 'destroyBulkKamar'])
+            ->middleware('permission:plotting_kamar,delete')
+            ->name('destroy-bulk-kamar');
         Route::post('/muat-standar', [PlottingKamarController::class, 'muatStandar'])
             ->middleware('permission:plotting_kamar,create')
             ->name('muat-standar');

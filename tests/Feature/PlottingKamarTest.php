@@ -207,6 +207,102 @@ class PlottingKamarTest extends TestCase
                 'kamar'   => 'Ali',
                 'total'   => 2,
             ]);
+
+        // Bulk unassign 2 santri sekaligus
+        $this->actingAs($adminPondok)->post(route('plotting-kamar.unassign'), [
+            'siswa_id' => "{$s1->id},{$s2->id}",
+        ])->assertSessionHas('success');
+
+        $this->assertNull($s1->fresh()->kamar);
+        $this->assertNull($s2->fresh()->kamar);
+    }
+
+    public function test_bulk_delete_kamar_and_filament_table_layout_integrity(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        $k1 = Kamar::create([
+            'nama_kamar'      => 'Kosong Satu',
+            'kategori_asrama' => 'Putra',
+            'kapasitas'       => 15,
+            'urutan'          => 20,
+            'is_active'       => true,
+        ]);
+        $k2 = Kamar::create([
+            'nama_kamar'      => 'Kosong Dua',
+            'kategori_asrama' => 'Putri',
+            'kapasitas'       => 15,
+            'urutan'          => 21,
+            'is_active'       => true,
+        ]);
+        $kOccupied = Kamar::create([
+            'nama_kamar'      => 'Terisi Santri',
+            'kategori_asrama' => 'Putra',
+            'kapasitas'       => 15,
+            'urutan'          => 22,
+            'is_active'       => true,
+        ]);
+
+        Siswa::create([
+            'nama_lengkap' => 'Santri Penghuni Aktif',
+            'jenjang'      => 'Reguler',
+            'kamar'        => 'Terisi Santri',
+            'status'       => 'aktif',
+        ]);
+
+        // Verifikasi komponen tabel Filament v4 & tidak ada kebocoran .mobile-card-list mentah
+        $viewRes = $this->actingAs($yayasan)->get(route('plotting-kamar.index'));
+        $viewRes->assertStatus(200);
+        $viewRes->assertSee('fi-ta-ctn');
+        $viewRes->assertSee('fi-ta-bulk-btn');
+        $viewRes->assertSee('Terapkan filter');
+        $viewRes->assertDontSee('mobile-card-list');
+
+        // Bulk delete campuran: menghapus yang kosong, mempertahankan yang masih berpenghuni
+        $bulkRes = $this->actingAs($yayasan)->post(route('plotting-kamar.destroy-bulk-kamar'), [
+            'kamar_ids' => "{$k1->id},{$k2->id},{$kOccupied->id}",
+        ]);
+        $bulkRes->assertRedirect();
+        $this->assertDatabaseMissing('kamars', ['id' => $k1->id]);
+        $this->assertDatabaseMissing('kamars', ['id' => $k2->id]);
+        $this->assertDatabaseHas('kamars', ['id' => $kOccupied->id]);
+
+        // Verifikasi bulk delete sesi presensi RFID juga berfungsi
+        $sesiA = DB::table('master_sesis')->insertGetId([
+            'kode_sesi'       => 'BULK_SESI_A',
+            'nama_sesi'       => 'Sesi Uji Bulk A',
+            'jam_mulai'       => '05:00:00',
+            'jam_selesai'     => '06:00:00',
+            'toleransi_menit' => 10,
+            'kategori'        => 'sholat',
+            'target_kategori' => 'semua_santri',
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ]);
+        $sesiB = DB::table('master_sesis')->insertGetId([
+            'kode_sesi'       => 'BULK_SESI_B',
+            'nama_sesi'       => 'Sesi Uji Bulk B',
+            'jam_mulai'       => '18:00:00',
+            'jam_selesai'     => '19:00:00',
+            'toleransi_menit' => 10,
+            'kategori'        => 'pengajian',
+            'target_kategori' => 'semua_santri',
+            'created_at'      => now(),
+            'updated_at'      => now(),
+        ]);
+
+        $this->actingAs($yayasan)->post(route('pengaturan.sesi.bulk-destroy'), [
+            'sesi_ids' => "{$sesiA},{$sesiB}",
+        ])->assertRedirect(route('pengaturan.sesi'));
+
+        $this->assertDatabaseMissing('master_sesis', ['id' => $sesiA]);
+        $this->assertDatabaseMissing('master_sesis', ['id' => $sesiB]);
+
+        // Verifikasi halaman Pengaturan Sesi merender toolbar Filament v4 & modal bulk delete tanpa error
+        $sesiPageRes = $this->actingAs($yayasan)->get(route('pengaturan.sesi'));
+        $sesiPageRes->assertStatus(200);
+        $sesiPageRes->assertSee('Hapus terpilih');
+        $sesiPageRes->assertSee('Terapkan filter');
     }
 }
 

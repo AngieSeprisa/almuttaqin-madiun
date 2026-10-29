@@ -223,6 +223,29 @@ class PengaturanSesiController extends Controller
     }
 
     /**
+     * Hapus Massal Sesi Presensi Terpilih.
+     */
+    public function destroyBulk(Request $request)
+    {
+        $raw = $request->input('sesi_ids', '');
+        $items = is_array($raw) ? $raw : explode(',', (string) $raw);
+        $ids = collect($items)
+            ->map(fn ($id) => (int) trim((string) $id))
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($ids)) {
+            return redirect()->route('pengaturan.sesi')->with('error', 'Tidak ada sesi yang dipilih untuk dihapus.');
+        }
+
+        $deleted = DB::table('master_sesis')->whereIn('id', $ids)->delete();
+
+        return redirect()->route('pengaturan.sesi')->with('success', "{$deleted} sesi terpilih berhasil dihapus.");
+    }
+
+    /**
      * Tambah / Simpan Perangkat ESP32 (Serial Unik) ke Master Devices.
      */
     public function storeDevice(Request $request)

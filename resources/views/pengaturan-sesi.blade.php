@@ -225,25 +225,68 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
     <!-- VIEW 1: KARTU TABEL JADWAL SESI (FILAMENT V4 STYLE)     -->
     <!-- ======================================================= -->
     <section x-show="activeTab === 'sesi'"
-             class="bg-white border border-gray-200 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
+             class="bg-white border border-gray-200 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-visible">
 
-        <!-- Card Top Toolbar: Category Pills + Search + Funnel Filter -->
-        <div class="px-4 py-3.5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 bg-white">
-            <!-- Quick Category Pills -->
-            <div class="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-gray-100/80 border border-gray-200/70">
-                <template x-for="kat in kategoriFilters" :key="kat.value">
+        <!-- Card Top Toolbar: Bulk Actions + Category Pills + Search + Funnel Filter -->
+        <div class="px-4 py-3.5 border-b border-gray-200 rounded-t-xl flex flex-wrap items-center justify-between gap-3 bg-white">
+            <div class="flex flex-wrap items-center gap-2.5">
+                <!-- Bulk Actions Dropdown (Gambar 5 Style - Aktif Setelah Data Dipilih) -->
+                <div class="relative" @click.outside="showBulkMenu = false">
                     <button type="button"
-                            @click="filterKategori = kat.value; sesiPage = 1"
-                            :class="filterKategori === kat.value ? 'bg-white text-[#0052FF] font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
-                            class="px-2.5 py-1 rounded-md text-xs transition"
-                            x-text="kat.label">
+                            :disabled="selectedSesiIds.length === 0"
+                            @click="if (selectedSesiIds.length > 0) showBulkMenu = !showBulkMenu"
+                            :class="selectedSesiIds.length > 0 ? 'bg-white text-gray-800 border-gray-300 hover:bg-gray-50 shadow-2xs cursor-pointer' : 'bg-gray-50 text-gray-400 border-gray-200 opacity-65 cursor-not-allowed'"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs sm:text-[13px] font-semibold transition">
+                        <svg class="w-4 h-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM11.5 15.5a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0z" />
+                        </svg>
+                        <span>Aksi</span>
+                        <span x-show="selectedSesiIds.length > 0"
+                              x-cloak
+                              x-text="selectedSesiIds.length"
+                              class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#0052FF] text-white text-[11px] font-bold"></span>
                     </button>
-                </template>
+
+                    <div x-show="showBulkMenu && selectedSesiIds.length > 0"
+                         x-cloak
+                         x-transition
+                         class="absolute left-0 mt-1.5 w-52 bg-white border border-gray-200 rounded-xl shadow-xl p-1.5 z-40">
+                        <button type="button"
+                                @click="showBulkMenu = false; showBulkDeleteModal = true"
+                                class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-[13px] font-semibold text-rose-600 hover:bg-rose-50 transition">
+                            <svg class="w-4 h-4 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span>Hapus terpilih</span>
+                        </button>
+                        <div class="my-1 border-t border-gray-100"></div>
+                        <button type="button"
+                                @click="selectedSesiIds = []; showBulkMenu = false"
+                                class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-[13px] font-medium text-gray-600 hover:bg-gray-50 transition">
+                            <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            <span>Batalkan pilihan</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Category Pills -->
+                <div class="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-gray-100/80 border border-gray-200/70">
+                    <template x-for="kat in kategoriFilters" :key="kat.value">
+                        <button type="button"
+                                @click="filterKategori = kat.value; draftKategori = kat.value; sesiPage = 1"
+                                :class="filterKategori === kat.value ? 'bg-white text-[#0052FF] font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
+                                class="px-2.5 py-1 rounded-md text-xs transition"
+                                x-text="kat.label">
+                        </button>
+                    </template>
+                </div>
             </div>
 
-            <!-- Right: Search Input + Funnel Filter Button (Persis Gambar Referensi) -->
-            <div class="flex items-center gap-2.5 ml-auto">
-                <div class="relative w-56 sm:w-64">
+            <!-- Right: Search Input + Funnel Filter Button (Persis Gambar 3 & 4) -->
+            <div class="flex items-center gap-2 ml-auto w-full sm:w-auto">
+                <div class="relative flex-1 sm:w-64 sm:flex-none">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
@@ -262,42 +305,83 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                     </button>
                 </div>
 
-                <!-- Funnel Filter Button with Electric Blue Badge -->
-                <div class="relative" @click.outside="showSesiFilterPopover = false">
+                <!-- Funnel Filter Button with Active Count Badge -->
+                <div class="relative shrink-0" @click.outside="showSesiFilterPopover = false">
                     <button type="button"
-                            @click="showSesiFilterPopover = !showSesiFilterPopover"
-                            class="relative w-9 h-9 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-800 flex items-center justify-center transition"
-                            title="Filter Kategori Sesi">
+                            @click="draftKategori = filterKategori; draftTarget = filterTarget; showSesiFilterPopover = !showSesiFilterPopover"
+                            :class="(showSesiFilterPopover || activeFilterCount() > 0) ? 'border-[#0052FF] bg-[#EFF4FF]/60 text-[#0052FF]' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-800'"
+                            class="relative w-9 h-9 rounded-lg border flex items-center justify-center transition"
+                            title="Filter Jadwal Sesi">
                         <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 01.628.74v2.288a2.25 2.25 0 01-.659 1.59l-4.682 4.683a2.25 2.25 0 00-.659 1.59v3.037c0 .684-.31 1.33-.844 1.757l-1.937 1.55A.75.75 0 018 18.25v-5.757a2.25 2.25 0 00-.659-1.591L2.659 6.22A2.25 2.25 0 012 4.629V2.34a.75.75 0 01.628-.74z" clip-rule="evenodd" />
                         </svg>
                         <span class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-md text-[10px] font-bold flex items-center justify-center border"
-                              :class="filterKategori !== 'all' ? 'bg-[#0052FF] text-white border-[#0052FF]' : 'bg-[#EFF4FF] text-[#0052FF] border-[#0052FF]/20'"
-                              x-text="filterKategori !== 'all' ? 1 : 0">0</span>
+                              :class="activeFilterCount() > 0 ? 'bg-[#0052FF] text-white border-[#0052FF]' : 'bg-[#EFF4FF] text-[#0052FF] border-[#0052FF]/20'"
+                              x-text="activeFilterCount()">0</span>
                     </button>
 
+                    <!-- Popover Filter (Persis Gambar 4) -->
                     <div x-show="showSesiFilterPopover" x-cloak x-transition
-                         class="absolute right-0 mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-lg p-3.5 z-30 space-y-3">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-bold text-gray-900">Filter Jadwal Sesi</span>
+                         class="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-40 overflow-hidden">
+                        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                            <span class="text-sm font-bold text-gray-900">Filter</span>
                             <button type="button"
-                                    @click="filterKategori = 'all'; searchQuery = ''; sesiPage = 1"
-                                    class="text-xs font-semibold text-[#0052FF] hover:underline">Reset</button>
+                                    @click="resetSesiFilters()"
+                                    class="text-xs font-semibold text-rose-600 hover:underline">Reset</button>
                         </div>
-                        <div>
-                            <label class="block text-[11px] font-semibold text-gray-500 mb-1">Kategori Sesi</label>
-                            <select x-model="filterKategori" @change="sesiPage = 1"
-                                    class="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-800 outline-none focus:border-[#0052FF]">
-                                <option value="all">Semua Kategori</option>
-                                <option value="sholat">Sholat</option>
-                                <option value="pengajian">Pengajian</option>
-                                <option value="sekolah">Sekolah</option>
-                                <option value="makan">Makan</option>
-                                <option value="pegawai">Pegawai</option>
-                            </select>
+                        <div class="p-4 space-y-3.5">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1.5">Kategori Sesi</label>
+                                <select x-model="draftKategori"
+                                        class="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-800 outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15">
+                                    <option value="all">Semua Kategori</option>
+                                    <option value="sholat">Sholat</option>
+                                    <option value="pengajian">Pengajian</option>
+                                    <option value="sekolah">Sekolah</option>
+                                    <option value="makan">Makan</option>
+                                    <option value="pegawai">Pegawai</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1.5">Target Peserta</label>
+                                <select x-model="draftTarget"
+                                        class="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-800 outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15">
+                                    <option value="all">Semua Target</option>
+                                    <option value="semua_santri">Semua Santri</option>
+                                    <option value="kamar_khusus">Kamar Khusus</option>
+                                    <option value="sekolah">Siswa Sekolah</option>
+                                    <option value="pegawai">Guru &amp; Pegawai</option>
+                                </select>
+                            </div>
+                            <button type="button"
+                                    @click="applySesiFilters()"
+                                    class="w-full py-2 px-3 rounded-lg bg-[#0052FF] hover:bg-[#0043D4] text-white text-xs font-semibold shadow-sm shadow-[#0052FF]/20 transition">
+                                Terapkan filter
+                            </button>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Selection Indicator Strip (Gambar 5 Style) -->
+        <div x-show="selectedSesiIds.length > 0"
+             x-cloak
+             class="px-4 py-2.5 bg-[#F8FAFF] border-b border-gray-200 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-[13px]">
+            <span class="font-semibold text-gray-800">
+                <span x-text="selectedSesiIds.length"></span> jadwal sesi dipilih
+            </span>
+            <div class="inline-flex items-center gap-3">
+                <button type="button"
+                        @click="selectAllFilteredSesi()"
+                        class="font-semibold text-[#0052FF] hover:underline">
+                    Pilih semua <span x-text="filteredSesiIds().length"></span>
+                </button>
+                <button type="button"
+                        @click="selectedSesiIds = []"
+                        class="font-semibold text-rose-600 hover:underline">
+                    Batalkan pilihan
+                </button>
             </div>
         </div>
 
@@ -305,9 +389,13 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
         <div class="overflow-x-auto custom-scroll">
             <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="bg-[#FAFAFA] border-b border-gray-200 text-xs font-semibold text-gray-700">
+                    <tr class="bg-[#FAFAFA] border-b border-gray-200 text-xs font-semibold text-gray-900">
                         <th class="py-3 pl-4 pr-2 w-10">
-                            <span class="inline-block w-4 h-4 rounded border border-gray-300 bg-white"></span>
+                            <input type="checkbox"
+                                   :checked="isAllPageSesiSelected()"
+                                   @change="toggleSelectPageSesi($event.target.checked)"
+                                   class="w-4 h-4 rounded border-gray-300 text-[#0052FF] accent-[#0052FF] focus:ring-[#0052FF]/25 cursor-pointer"
+                                   aria-label="Pilih semua sesi di halaman ini">
                         </th>
                         <th class="py-3 px-4">
                             <div class="inline-flex items-center gap-1">
@@ -349,11 +437,16 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                             };
                         @endphp
                         <tr x-show="isSesiRowVisible({{ $s->id }})"
-                            class="hover:bg-gray-50/80 transition-colors">
+                            :class="isSesiSelected({{ $s->id }}) ? 'bg-[#F8FAFF] shadow-[inset_3px_0_0_#0052FF]' : 'hover:bg-gray-50/80'"
+                            class="transition-colors">
 
-                            <!-- Checkbox Visual -->
+                            <!-- Checkbox Row -->
                             <td class="py-3.5 pl-4 pr-2">
-                                <span class="inline-block w-4 h-4 rounded border border-gray-300 bg-white"></span>
+                                <input type="checkbox"
+                                       :checked="isSesiSelected({{ $s->id }})"
+                                       @change="toggleSesiSelect({{ $s->id }}, $event.target.checked)"
+                                       class="w-4 h-4 rounded border-gray-300 text-[#0052FF] accent-[#0052FF] focus:ring-[#0052FF]/25 cursor-pointer"
+                                       aria-label="Pilih {{ $s->nama_sesi }}">
                             </td>
 
                             <!-- Nama Sesi & Kode -->
@@ -471,13 +564,13 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
         </div>
 
         <!-- Bottom Footer: Showing X to Y + Per Page Selector -->
-        <div class="px-4 py-3 border-t border-gray-200 bg-white flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
+        <div class="px-4 py-3 border-t border-gray-200 rounded-b-xl bg-white flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
             <div class="font-medium text-gray-700" x-text="sesiPaginationLabel()">
-                Showing {{ $sesis->count() }} results
+                Menampilkan {{ $sesis->count() }} jadwal sesi
             </div>
 
             <div class="inline-flex items-center rounded-lg border border-gray-200 bg-white overflow-hidden shadow-2xs">
-                <span class="px-3 py-1.5 text-xs font-medium text-gray-500 border-r border-gray-200 bg-gray-50/60">Per page</span>
+                <span class="px-3 py-1.5 text-xs font-medium text-gray-500 border-r border-gray-200 bg-gray-50/60">Per halaman</span>
                 <select x-model.number="sesiPerPage"
                         @change="sesiPage = 1"
                         class="px-2.5 py-1.5 text-xs font-semibold text-gray-900 bg-white outline-none cursor-pointer">
@@ -957,7 +1050,7 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
     </div>
 
     <!-- ======================================================= -->
-    <!-- MODAL KONFIRMASI HAPUS SESI (CLEAN LIGHT)               -->
+    <!-- MODAL KONFIRMASI HAPUS SESI TUNGGAL (GAMBAR 5 STYLE)    -->
     <!-- ======================================================= -->
     <div x-show="deleteTarget.show" x-cloak
          class="fixed inset-0 z-[200] flex items-center justify-center p-4"
@@ -966,29 +1059,84 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
 
         <div x-show="deleteTarget.show"
              x-transition
-             class="relative w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-2xl p-6 z-10">
-            <div class="w-11 h-11 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mb-4">
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+             class="relative w-full max-w-[400px] bg-white border border-gray-200 rounded-2xl shadow-2xl p-6 text-center z-10">
+            <button type="button"
+                    @click="deleteTarget.show = false"
+                    class="absolute top-4 right-4 w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"
+                    aria-label="Tutup">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3.5">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
             </div>
-            <h3 class="text-base font-extrabold text-gray-950">Hapus Sesi Presensi?</h3>
-            <p class="text-sm text-gray-600 mt-1.5 leading-relaxed">
-                Anda akan menghapus sesi <strong class="text-gray-900" x-text="deleteTarget.nama"></strong>
-                (<span class="font-mono text-rose-600 font-semibold" x-text="deleteTarget.kode"></span>). Riwayat presensi yang terhubung ke sesi ini juga akan ikut terhapus.
+            <h3 class="text-base font-bold text-gray-950">Hapus jadwal sesi</h3>
+            <p class="text-sm text-gray-500 mt-1.5 leading-relaxed">
+                Apakah Anda yakin ingin menghapus sesi <strong class="text-gray-900" x-text="deleteTarget.nama"></strong>
+                (<span class="font-mono text-rose-600 font-semibold" x-text="deleteTarget.kode"></span>)?
             </p>
 
-            <form :action="'/pengaturan-sesi/' + deleteTarget.id" method="POST" class="mt-6 flex items-center justify-end gap-2.5">
+            <form :action="'/pengaturan-sesi/' + deleteTarget.id" method="POST" class="mt-6 grid grid-cols-2 gap-3">
                 @csrf
                 @method('DELETE')
                 <button type="button"
                         @click="deleteTarget.show = false"
-                        class="px-4 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold border border-gray-300 transition">
+                        class="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-gray-800 text-sm font-semibold border border-gray-300 shadow-2xs transition">
                     Batal
                 </button>
                 <button type="submit"
-                        class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold shadow-sm transition">
-                    Ya, Hapus Sesi
+                        class="w-full py-2.5 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold shadow-sm transition">
+                    Hapus
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- MODAL KONFIRMASI HAPUS SESI TERPILIH / BULK (GAMBAR 5)  -->
+    <!-- ======================================================= -->
+    <div x-show="showBulkDeleteModal" x-cloak
+         class="fixed inset-0 z-[200] flex items-center justify-center p-4"
+         @keydown.escape.window="showBulkDeleteModal = false">
+        <div x-show="showBulkDeleteModal" x-transition.opacity @click="showBulkDeleteModal = false" class="fixed inset-0 bg-gray-900/45 backdrop-blur-[2px]"></div>
+
+        <div x-show="showBulkDeleteModal"
+             x-transition
+             class="relative w-full max-w-[400px] bg-white border border-gray-200 rounded-2xl shadow-2xl p-6 text-center z-10">
+            <button type="button"
+                    @click="showBulkDeleteModal = false"
+                    class="absolute top-4 right-4 w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition"
+                    aria-label="Tutup">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3.5">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </div>
+            <h3 class="text-base font-bold text-gray-950">Hapus jadwal sesi terpilih</h3>
+            <p class="text-sm text-gray-500 mt-1.5 leading-relaxed">
+                Apakah Anda yakin ingin menghapus <strong class="text-gray-900" x-text="selectedSesiIds.length"></strong> jadwal sesi yang dipilih?
+            </p>
+
+            <form action="{{ route('pengaturan.sesi.bulk-destroy') }}" method="POST" class="mt-6 grid grid-cols-2 gap-3">
+                @csrf
+                <input type="hidden" name="sesi_ids" :value="selectedSesiIds.join(',')">
+                <button type="button"
+                        @click="showBulkDeleteModal = false"
+                        class="w-full py-2.5 px-4 rounded-lg bg-white hover:bg-gray-50 text-gray-800 text-sm font-semibold border border-gray-300 shadow-2xs transition">
+                    Batal
+                </button>
+                <button type="submit"
+                        class="w-full py-2.5 px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold shadow-sm transition">
+                    Hapus
                 </button>
             </form>
         </div>
@@ -1128,6 +1276,12 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
             currentHHMM: '00:00',
             searchQuery: '',
             filterKategori: 'all',
+            filterTarget: 'all',
+            draftKategori: 'all',
+            draftTarget: 'all',
+            selectedSesiIds: [],
+            showBulkMenu: false,
+            showBulkDeleteModal: false,
             sesiPerPage: 10,
             sesiPage: 1,
             showSesiFilterPopover: false,
@@ -1210,11 +1364,37 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                 return this.sesisData.filter(s => this.isTimeActive(s.jam_mulai, s.jam_selesai));
             },
 
+            activeFilterCount() {
+                let count = 0;
+                if (this.filterKategori !== 'all') count++;
+                if (this.filterTarget !== 'all') count++;
+                return count;
+            },
+
+            applySesiFilters() {
+                this.filterKategori = this.draftKategori;
+                this.filterTarget = this.draftTarget;
+                this.sesiPage = 1;
+                this.showSesiFilterPopover = false;
+            },
+
+            resetSesiFilters() {
+                this.filterKategori = 'all';
+                this.filterTarget = 'all';
+                this.draftKategori = 'all';
+                this.draftTarget = 'all';
+                this.sesiPage = 1;
+                this.showSesiFilterPopover = false;
+            },
+
             filteredSesiIds() {
                 const q = this.searchQuery.trim().toLowerCase();
                 return this.sesisData
                     .filter(s => {
                         if (this.filterKategori !== 'all' && s.kategori !== this.filterKategori) {
+                            return false;
+                        }
+                        if (this.filterTarget !== 'all' && (s.target_kategori || 'semua_santri') !== this.filterTarget) {
                             return false;
                         }
                         if (!q) return true;
@@ -1227,22 +1407,60 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                     .map(s => Number(s.id));
             },
 
+            pageSesiIds() {
+                const allIds = this.filteredSesiIds();
+                const safePage = Math.min(this.sesiPage, Math.max(1, Math.ceil(allIds.length / this.sesiPerPage)));
+                const start = (safePage - 1) * this.sesiPerPage;
+                return allIds.slice(start, start + this.sesiPerPage);
+            },
+
+            isSesiSelected(id) {
+                return this.selectedSesiIds.includes(Number(id));
+            },
+
+            toggleSesiSelect(id, checked) {
+                const numId = Number(id);
+                if (checked) {
+                    if (!this.selectedSesiIds.includes(numId)) {
+                        this.selectedSesiIds.push(numId);
+                    }
+                } else {
+                    this.selectedSesiIds = this.selectedSesiIds.filter(x => x !== numId);
+                }
+            },
+
+            isAllPageSesiSelected() {
+                const pIds = this.pageSesiIds();
+                return pIds.length > 0 && pIds.every(id => this.selectedSesiIds.includes(id));
+            },
+
+            toggleSelectPageSesi(checked) {
+                const pIds = this.pageSesiIds();
+                if (checked) {
+                    const merged = new Set([...this.selectedSesiIds, ...pIds]);
+                    this.selectedSesiIds = Array.from(merged);
+                } else {
+                    this.selectedSesiIds = this.selectedSesiIds.filter(id => !pIds.includes(id));
+                }
+            },
+
+            selectAllFilteredSesi() {
+                const merged = new Set([...this.selectedSesiIds, ...this.filteredSesiIds()]);
+                this.selectedSesiIds = Array.from(merged);
+            },
+
             sesiTotalPages() {
                 const total = this.filteredSesiIds().length;
                 return Math.max(1, Math.ceil(total / this.sesiPerPage));
             },
 
             isSesiRowVisible(id) {
-                const allIds = this.filteredSesiIds();
-                const safePage = Math.min(this.sesiPage, Math.max(1, Math.ceil(allIds.length / this.sesiPerPage)));
-                const start = (safePage - 1) * this.sesiPerPage;
-                const pageIds = allIds.slice(start, start + this.sesiPerPage);
-                return pageIds.includes(Number(id));
+                return this.pageSesiIds().includes(Number(id));
             },
 
             sesiPaginationLabel() {
                 const total = this.filteredSesiIds().length;
-                if (total === 0) return 'Showing 0 results';
+                if (total === 0) return 'Menampilkan 0 jadwal sesi';
                 const safePage = Math.min(this.sesiPage, this.sesiTotalPages());
                 const from = (safePage - 1) * this.sesiPerPage + 1;
                 const to = Math.min(safePage * this.sesiPerPage, total);

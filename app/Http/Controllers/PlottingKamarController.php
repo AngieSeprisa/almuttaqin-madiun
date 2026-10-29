@@ -392,6 +392,59 @@ class PlottingKamarController extends Controller
     }
 
     /**
+     * Hapus kamar asrama terpilih secara massal (dengan proteksi santri penghuni aktif).
+     */
+    public function destroyBulkKamar(Request $request)
+    {
+        /** @var User $authUser */
+        $authUser = Auth::user();
+        if (!$authUser->isYayasan() && !$authUser->canDo('plotting_kamar', 'delete')) {
+            abort(403, 'Anda tidak memiliki hak akses untuk menghapus kamar asrama.');
+        }
+
+        $request->validate([
+            'kamar_ids' => 'required',
+        ]);
+
+        $ids = $this->parseSiswaIds($request->kamar_ids);
+        if (empty($ids)) {
+            return redirect()->back()->with('error', 'Tidak ada kamar yang dipilih untuk dihapus.');
+        }
+
+        $kamars = Kamar::whereIn('id', $ids)->get();
+        $activeSiswas = Siswa::where('status', 'aktif')->get();
+
+        $deletedCount = 0;
+        $blockedNames = [];
+
+        foreach ($kamars as $kamar) {
+            $siswaCount = $activeSiswas->filter(fn ($s) => self::isSameKamar($s->kamar, $kamar->nama_kamar))->count();
+            if ($siswaCount > 0) {
+                $blockedNames[] = "{$kamar->nama_kamar} ({$siswaCount} santri)";
+                continue;
+            }
+            $kamar->delete();
+            $deletedCount++;
+        }
+
+        if ($deletedCount > 0 && empty($blockedNames)) {
+            return redirect()->back()->with('success', "{$deletedCount} kamar terpilih berhasil dihapus.");
+        }
+
+        if ($deletedCount > 0 && !empty($blockedNames)) {
+            return redirect()->back()->with(
+                'success',
+                "{$deletedCount} kamar kosong berhasil dihapus. Kamar berikut dilewati karena masih ditempati santri: " . implode(', ', $blockedNames) . '.'
+            );
+        }
+
+        return redirect()->back()->with(
+            'error',
+            'Kamar terpilih tidak dapat dihapus karena masih ditempati santri aktif: ' . implode(', ', $blockedNames) . '. Silakan pindahkan santri terlebih dahulu.'
+        );
+    }
+
+    /**
      * Muat daftar kamar standar pondok secara instan.
      */
     public function muatStandar(Request $request)

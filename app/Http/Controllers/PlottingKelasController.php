@@ -413,6 +413,84 @@ class PlottingKelasController extends Controller
     }
 
     /**
+     * Normalisasi input ID (mendukung single ID, array, maupun string dipisah koma).
+     */
+    protected function parseIds(mixed $raw): array
+    {
+        if (is_array($raw)) {
+            $items = $raw;
+        } elseif (is_string($raw) && str_contains($raw, ',')) {
+            $items = explode(',', $raw);
+        } else {
+            $items = [$raw];
+        }
+
+        return collect($items)
+            ->map(fn ($id) => (int) trim((string) $id))
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Hapus ruang kelas terpilih secara massal dengan proteksi siswa dan jadwal pelajaran.
+     */
+    public function destroyBulkKelas(Request $request)
+    {
+        /** @var User $authUser */
+        $authUser = Auth::user();
+        if (!$authUser->isYayasan() && !$authUser->canDo('plotting_kelas', 'delete') && !$authUser->canDo('master_kelas', 'delete')) {
+            abort(403, 'Anda tidak memiliki hak akses untuk menghapus ruang kelas.');
+        }
+
+        $request->validate([
+            'kelas_ids' => 'required',
+        ]);
+
+        $ids = $this->parseIds($request->kelas_ids);
+        if (empty($ids)) {
+            return redirect()->back()->with('error', 'Tidak ada ruang kelas yang dipilih untuk dihapus.');
+        }
+
+        $classrooms = Classroom::whereIn('id', $ids)->get();
+        $siswaList = Siswa::where('status', 'aktif')->get();
+
+        $deletedCount = 0;
+        $blockedNames = [];
+
+        foreach ($classrooms as $classroom) {
+            $siswaCount = $siswaList->filter(fn ($s) => self::isSameClass($s->kelas, $classroom->nama_kelas))->count();
+            $schedCount = Schedule::where('classroom_id', $classroom->id)->count();
+
+            if ($siswaCount > 0 || $schedCount > 0) {
+                $reason = $siswaCount > 0 ? "{$siswaCount} siswa" : "{$schedCount} jadwal";
+                $blockedNames[] = "{$classroom->nama_kelas} ({$reason})";
+                continue;
+            }
+
+            $classroom->delete();
+            $deletedCount++;
+        }
+
+        if ($deletedCount > 0 && empty($blockedNames)) {
+            return redirect()->back()->with('success', "{$deletedCount} ruang kelas terpilih berhasil dihapus.");
+        }
+
+        if ($deletedCount > 0 && !empty($blockedNames)) {
+            return redirect()->back()->with(
+                'success',
+                "{$deletedCount} ruang kelas kosong berhasil dihapus. Kelas berikut dilewati karena masih aktif digunakan: " . implode(', ', $blockedNames) . '.'
+            );
+        }
+
+        return redirect()->back()->with(
+            'error',
+            'Ruang kelas terpilih tidak dapat dihapus karena masih memiliki siswa atau jadwal: ' . implode(', ', $blockedNames) . '.'
+        );
+    }
+
+    /**
      * Muat kelas standar otomatis
      */
     public function muatStandar(Request $request)
@@ -453,7 +531,10 @@ class PlottingKelasController extends Controller
         ]);
 
         $targetKelas = trim($request->kelas);
-        $siswaIds = is_array($request->siswa_id) ? $request->siswa_id : [$request->siswa_id];
+        $siswaIds = $this->parseIds($request->siswa_id);
+        if (empty($siswaIds)) {
+            return back()->with('error', 'Tidak ada siswa yang dipilih untuk dimutasi.');
+        }
 
         // Validasi siswa tidak berstatus reguler
         $updatedCount = Siswa::whereIn('id', $siswaIds)
@@ -480,7 +561,10 @@ class PlottingKelasController extends Controller
             'siswa_id' => 'required',
         ]);
 
-        $siswaIds = is_array($request->siswa_id) ? $request->siswa_id : [$request->siswa_id];
+        $siswaIds = $this->parseIds($request->siswa_id);
+        if (empty($siswaIds)) {
+            return back()->with('error', 'Tidak ada siswa yang dipilih.');
+        }
 
         $updatedCount = Siswa::whereIn('id', $siswaIds)
             ->whereRaw('LOWER(jenjang) != ?', ['reguler'])

@@ -184,7 +184,114 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // ==========================================
-  // SWEETALERT2 UNIVERSAL CONFIRMATION HANDLER
+  // GAMBAR 5 CENTERED CONFIRMATION MODAL (.fi-confirm-*)
+  // ==========================================
+  function ensureGlobalFiConfirmModal() {
+    var existing = document.getElementById('globalFiConfirmModal');
+    if (existing) return existing;
+
+    var backdrop = document.createElement('div');
+    backdrop.id = 'globalFiConfirmModal';
+    backdrop.className = 'fi-confirm-backdrop';
+    backdrop.setAttribute('role', 'dialog');
+    backdrop.setAttribute('aria-modal', 'true');
+    backdrop.innerHTML =
+      '<div class="fi-confirm-dialog">' +
+        '<button type="button" class="fi-confirm-close" data-fi-confirm-close aria-label="Tutup">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+            '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+          '</svg>' +
+        '</button>' +
+        '<div class="fi-confirm-icon is-danger" data-fi-confirm-icon>' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<polyline points="3 6 5 6 21 6"></polyline>' +
+            '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
+            '<line x1="10" y1="11" x2="10" y2="17"></line>' +
+            '<line x1="14" y1="11" x2="14" y2="17"></line>' +
+          '</svg>' +
+        '</div>' +
+        '<h3 class="fi-confirm-title" data-fi-confirm-title>Konfirmasi</h3>' +
+        '<p class="fi-confirm-desc" data-fi-confirm-desc>Apakah Anda yakin ingin melanjutkan tindakan ini?</p>' +
+        '<div class="fi-confirm-actions">' +
+          '<button type="button" class="fi-confirm-btn-cancel" data-fi-confirm-cancel>Batal</button>' +
+          '<button type="button" class="fi-confirm-btn-submit" data-fi-confirm-submit>Hapus</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(backdrop);
+
+    backdrop.addEventListener('click', function (ev) {
+      if (ev.target === backdrop || ev.target.closest('[data-fi-confirm-close]') || ev.target.closest('[data-fi-confirm-cancel]')) {
+        backdrop.classList.remove('is-open');
+      }
+    });
+
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && backdrop.classList.contains('is-open')) {
+        backdrop.classList.remove('is-open');
+      }
+    });
+
+    return backdrop;
+  }
+
+  window.showFiConfirmModal = function (opts) {
+    opts = opts || {};
+    var modal = ensureGlobalFiConfirmModal();
+    var iconWrap = modal.querySelector('[data-fi-confirm-icon]');
+    var titleEl = modal.querySelector('[data-fi-confirm-title]');
+    var descEl = modal.querySelector('[data-fi-confirm-desc]');
+    var cancelBtn = modal.querySelector('[data-fi-confirm-cancel]');
+    var submitBtn = modal.querySelector('[data-fi-confirm-submit]');
+
+    var variant = opts.variant || 'danger';
+    iconWrap.className = 'fi-confirm-icon ' + (variant === 'primary' ? 'is-primary' : 'is-danger');
+    if (variant === 'primary') {
+      iconWrap.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<polyline points="20 6 9 17 4 12"></polyline>' +
+        '</svg>';
+    } else {
+      iconWrap.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<polyline points="3 6 5 6 21 6"></polyline>' +
+          '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
+          '<line x1="10" y1="11" x2="10" y2="17"></line>' +
+          '<line x1="14" y1="11" x2="14" y2="17"></line>' +
+        '</svg>';
+    }
+
+    titleEl.textContent = opts.title || 'Konfirmasi';
+    descEl.textContent = opts.description || 'Apakah Anda yakin ingin melakukan tindakan ini?';
+    cancelBtn.textContent = opts.cancelText || 'Batal';
+    submitBtn.textContent = opts.confirmText || (variant === 'primary' ? 'Lanjutkan' : 'Hapus');
+    submitBtn.disabled = false;
+    submitBtn.className = 'fi-confirm-btn-submit' + (variant === 'primary' ? ' is-primary' : '');
+
+    var newSubmit = submitBtn.cloneNode(true);
+    submitBtn.parentNode.replaceChild(newSubmit, submitBtn);
+
+    newSubmit.addEventListener('click', function () {
+      if (typeof opts.onConfirm === 'function') {
+        var res = opts.onConfirm(newSubmit, modal);
+        if (res && typeof res.then === 'function') {
+          newSubmit.disabled = true;
+          newSubmit.textContent = 'Memproses...';
+          res.finally(function () {
+            modal.classList.remove('is-open');
+          });
+          return;
+        }
+      }
+      modal.classList.remove('is-open');
+    });
+
+    modal.classList.add('is-open');
+  };
+
+  // ==========================================
+  // UNIVERSAL CONFIRMATION HANDLER (GAMBAR 5 + SWAL FALLBACK)
   // ==========================================
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('.js-swal-confirm');
@@ -198,24 +305,38 @@ document.addEventListener('DOMContentLoaded', function () {
     var text = btn.getAttribute('data-text') || '';
     var html = btn.getAttribute('data-html') || '';
     var icon = btn.getAttribute('data-icon') || 'warning';
-    var confirmText = btn.getAttribute('data-confirm-text') || 'Ya, Lanjutkan';
+    var confirmText = btn.getAttribute('data-confirm-text') || 'Hapus';
     var cancelText = btn.getAttribute('data-cancel-text') || 'Batal';
-    var confirmColor = btn.getAttribute('data-confirm-color') || '#DC2626';
+    var confirmColor = (btn.getAttribute('data-confirm-color') || '#DC2626').toUpperCase();
 
-    if (typeof Swal === 'undefined') {
-      var plainMsg = title + (text ? '\n\n' + text : '');
-      if (confirm(plainMsg)) {
-        if (form) {
-          if (btn.name && btn.value) {
-            var input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = btn.name;
-            input.value = btn.value;
-            form.appendChild(input);
-          }
-          form.submit();
-        }
+    function submitTargetForm() {
+      if (!form) return;
+      if (btn.name && btn.value) {
+        var hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = btn.name;
+        hidden.value = btn.value;
+        form.appendChild(hidden);
       }
+      form.submit();
+    }
+
+    if (btn.closest('.fi-ta-ctn') || typeof Swal === 'undefined') {
+      var cleanDesc = text;
+      if (!cleanDesc && html) {
+        var tmp = document.createElement('div');
+        tmp.innerHTML = html.replace(/<br\s*\/?>/gi, ' ');
+        cleanDesc = (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+      }
+      var isPositive = confirmColor.indexOf('10B981') !== -1 || confirmColor.indexOf('059669') !== -1 || confirmColor.indexOf('0052FF') !== -1 || confirmColor.indexOf('2563EB') !== -1;
+      window.showFiConfirmModal({
+        title: title.replace(/\?$/, ''),
+        description: cleanDesc || 'Apakah Anda yakin ingin melakukan tindakan ini?',
+        confirmText: confirmText,
+        cancelText: cancelText,
+        variant: isPositive ? 'primary' : 'danger',
+        onConfirm: submitTargetForm
+      });
       return;
     }
 
@@ -250,16 +371,915 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     Swal.fire(swalOptions).then(function (result) {
-      if (result.isConfirmed && form) {
-        if (btn.name && btn.value) {
-          var hidden = document.createElement('input');
-          hidden.type = 'hidden';
-          hidden.name = btn.name;
-          hidden.value = btn.value;
-          form.appendChild(hidden);
-        }
-        form.submit();
+      if (result.isConfirmed) {
+        submitTargetForm();
       }
     });
   });
+
+  // ==========================================
+  // UNIVERSAL FILAMENT V4 TABLE ENHANCER (.fi-ta-ctn)
+  // ==========================================
+  function humanizeFilterLabel(ctrl) {
+    var explicitLabel = ctrl.getAttribute('aria-label') || ctrl.getAttribute('title');
+    if (explicitLabel && explicitLabel.length < 40) return explicitLabel;
+
+    if (ctrl.tagName === 'SELECT' && ctrl.options.length > 0) {
+      var firstOpt = (ctrl.options[0].textContent || '').trim();
+      if (/^semua\s+/i.test(firstOpt)) {
+        return firstOpt.replace(/^semua\s+/i, '').trim();
+      }
+    }
+
+    var rawName = (ctrl.getAttribute('name') || ctrl.id || 'Filter')
+      .replace(/^filter_/, '')
+      .replace(/_id$/, '')
+      .replace(/_/g, ' ');
+    return rawName.charAt(0).toUpperCase() + rawName.slice(1);
+  }
+
+  function downloadSelectedCsv(table, selectedRows) {
+    var headers = [];
+    var ths = Array.from(table.tHead.rows[0].cells);
+    var skipCols = new Set();
+
+    ths.forEach(function (th, idx) {
+      var txt = (th.textContent || '').replace(/\s+/g, ' ').trim();
+      if (th.classList.contains('fi-ta-th-check') || /^aksi/i.test(txt) || (!txt && idx === ths.length - 1)) {
+        skipCols.add(idx);
+      } else {
+        headers.push('"' + txt.replace(/"/g, '""') + '"');
+      }
+    });
+
+    var lines = [headers.join(',')];
+    selectedRows.forEach(function (tr) {
+      var vals = [];
+      Array.from(tr.cells).forEach(function (td, idx) {
+        if (skipCols.has(idx)) return;
+        var cellTxt = (td.textContent || '').replace(/\s+/g, ' ').trim();
+        vals.push('"' + cellTxt.replace(/"/g, '""') + '"');
+      });
+      lines.push(vals.join(','));
+    });
+
+    var csvContent = '\uFEFF' + lines.join('\r\n');
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = 'data-terpilih-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function initFilamentTables() {
+    var candidateTables = document.querySelectorAll('.table-card table, table.permission-table, table.mapel-data-table');
+
+    candidateTables.forEach(function (table) {
+      if (table.closest('.fi-ta-ctn')) return;
+      if (table.closest('form')) return;
+      if (table.closest('.app-modal, .pk-modal-backdrop, [role="dialog"]')) return;
+      if (table.id === 'tableSiswaAbsensi') return;
+      if (!table.tHead || !table.tHead.rows.length || !table.tBodies.length) return;
+      if (table.tHead.rows[0].cells.length < 3) return;
+
+      var card = table.closest('.table-card, .mapel-table-card, .form-section-card');
+      if (!card || card.classList.contains('fi-ta-enhanced')) return;
+
+      card.classList.add('table-card', 'fi-ta-ctn', 'fi-ta-enhanced');
+      card.style.overflow = 'visible';
+      card.style.padding = '0';
+
+      var tableWrap = table.parentElement;
+      if (tableWrap && tableWrap !== card) {
+        tableWrap.classList.add('table-wrapper', 'fi-ta-table-wrap');
+      }
+      table.classList.add('fi-ta-table');
+
+      // Normalize header inline uppercase styles so Filament v4 sentence-case applies cleanly
+      var headRow = table.tHead.rows[0];
+      headRow.style.textTransform = 'none';
+      headRow.style.letterSpacing = '0';
+      Array.from(headRow.cells).forEach(function (th) {
+        th.style.textTransform = 'none';
+        th.style.letterSpacing = '0';
+      });
+
+      // Dock sibling mobile card list inside unified .fi-ta-ctn card
+      var mobileList = card.querySelector('.mobile-card-list, .mobile-siswa-list');
+      if (!mobileList && card.nextElementSibling && card.nextElementSibling.matches('.mobile-card-list, .mobile-siswa-list')) {
+        mobileList = card.nextElementSibling;
+        if (tableWrap && tableWrap.parentElement === card) {
+          tableWrap.insertAdjacentElement('afterend', mobileList);
+        } else {
+          card.appendChild(mobileList);
+        }
+      }
+
+      // Remove duplicate mobile pagination inside mobileList if desktop pagination already exists
+      var desktopServerPagination = null;
+      Array.from(card.children).forEach(function (child) {
+        if (child !== mobileList && child !== tableWrap && (child.querySelector('nav[role="navigation"], .pagination') || child.matches('nav[role="navigation"]'))) {
+          desktopServerPagination = child;
+        }
+      });
+      if (mobileList && desktopServerPagination) {
+        Array.from(mobileList.children).forEach(function (mc) {
+          if (!mc.classList.contains('mobile-card-item') && !mc.classList.contains('mobile-siswa-card') && !mc.classList.contains('mobile-empty-card')) {
+            if (mc.querySelector('nav, .pagination')) {
+              mc.style.display = 'none';
+            }
+          }
+        });
+      }
+
+      // Discover associated filter container (inside card or preceding sibling)
+      var filterContainer = card.querySelector('.mapel-toolbar-wrap');
+      if (!filterContainer) {
+        var prev = card.previousElementSibling;
+        if (prev && (prev.classList.contains('filter-card') || prev.classList.contains('mstr-topbar') || prev.querySelector('input[name="search"], select[onchange*="submit"]'))) {
+          filterContainer = prev;
+        }
+      }
+
+      var origForm = filterContainer ? filterContainer.querySelector('form') : null;
+      var origSearchInput = filterContainer ? filterContainer.querySelector('input[name="search"], .mstr-search-input, input[type="text"]') : null;
+      var origResetLink = filterContainer ? filterContainer.querySelector('a.filter-btn-reset, a.mapel-btn-reset, a[title*="Reset"]') : null;
+      var quickTabsWrap = filterContainer ? filterContainer.querySelector('.mstr-tabs-wrap') : null;
+
+      // Identify real data rows vs empty-state row
+      var tbody = table.tBodies[0];
+      var allBodyRows = Array.from(tbody.rows);
+      var dataRows = [];
+      var emptyRows = [];
+
+      allBodyRows.forEach(function (tr) {
+        var onlyCell = tr.cells.length === 1 ? tr.cells[0] : null;
+        if (onlyCell && (onlyCell.colSpan > 1 || onlyCell.classList.contains('cell-empty'))) {
+          onlyCell.colSpan = onlyCell.colSpan + 1;
+          emptyRows.push(tr);
+        } else {
+          dataRows.push(tr);
+        }
+      });
+
+      var mobileCards = mobileList
+        ? Array.from(mobileList.querySelectorAll('.mobile-card-item, .mobile-siswa-card'))
+        : [];
+
+      // Inject Master Header Checkbox + Row Checkboxes + Synced Mobile Checkboxes
+      var thCheck = document.createElement('th');
+      thCheck.className = 'fi-ta-th-check';
+      var masterCheck = document.createElement('input');
+      masterCheck.type = 'checkbox';
+      masterCheck.className = 'fi-ta-checkbox';
+      masterCheck.setAttribute('aria-label', 'Pilih semua baris');
+      thCheck.appendChild(masterCheck);
+      headRow.insertBefore(thCheck, headRow.firstChild);
+
+      var rowMeta = dataRows.map(function (tr, idx) {
+        var tdCheck = document.createElement('td');
+        tdCheck.className = 'fi-ta-td-check';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'fi-ta-checkbox';
+        cb.setAttribute('aria-label', 'Pilih baris ' + (idx + 1));
+        tdCheck.appendChild(cb);
+        tr.insertBefore(tdCheck, tr.firstChild);
+
+        var mCard = mobileCards[idx] || null;
+        var mCb = null;
+        if (mCard) {
+          mCb = document.createElement('input');
+          mCb.type = 'checkbox';
+          mCb.className = 'fi-ta-checkbox';
+          mCb.setAttribute('aria-label', 'Pilih item ' + (idx + 1));
+          var titleWrap = mCard.querySelector('.mobile-siswa-nama-wrap, .mobile-card-title-wrap');
+          if (titleWrap) {
+            titleWrap.insertBefore(mCb, titleWrap.firstChild);
+          } else {
+            var wrapDiv = document.createElement('div');
+            wrapDiv.className = 'fi-mobile-check-wrap';
+            wrapDiv.appendChild(mCb);
+            mCard.insertBefore(wrapDiv, mCard.firstChild);
+          }
+        }
+
+        // Detect delete form inside row (or paired mobile card)
+        var deleteForm = null;
+        var formsInRow = tr.querySelectorAll('form');
+        formsInRow.forEach(function (f) {
+          var methodInput = f.querySelector('input[name="_method"]');
+          var delBtn = f.querySelector('.action-btn-delete, .btn-delete, [title*="Hapus"], [aria-label*="Hapus"]');
+          if ((methodInput && methodInput.value.toUpperCase() === 'DELETE') || delBtn) {
+            deleteForm = f;
+          }
+        });
+
+        return {
+          idx: idx,
+          tr: tr,
+          cb: cb,
+          mCard: mCard,
+          mCb: mCb,
+          selected: false,
+          deleteForm: deleteForm,
+          searchText: ((tr.textContent || '') + ' ' + (mCard ? mCard.textContent : '')).replace(/\s+/g, ' ').toLowerCase()
+        };
+      });
+
+      var hasDeletableRows = rowMeta.some(function (m) { return !!m.deleteForm; });
+
+      // Build Filament v4 Top Header Toolbar ([ ⋮ Aksi ] on Left | [ Search ] + [ Funnel Filter ] on Right)
+      var toolbar = document.createElement('div');
+      toolbar.className = 'fi-ta-header-toolbar';
+
+      var toolbarLeft = document.createElement('div');
+      toolbarLeft.className = 'fi-ta-toolbar-left';
+
+      var bulkWrap = document.createElement('div');
+      bulkWrap.className = 'fi-ta-bulk-wrap';
+      var bulkBtn = document.createElement('button');
+      bulkBtn.type = 'button';
+      bulkBtn.className = 'fi-ta-bulk-btn is-disabled';
+      bulkBtn.disabled = true;
+      bulkBtn.innerHTML =
+        '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
+          '<path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM11.5 15.5a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0z" />' +
+        '</svg>' +
+        '<span>Aksi</span>' +
+        '<span class="fi-ta-bulk-count" style="display:none;">0</span>';
+
+      var bulkMenu = document.createElement('div');
+      bulkMenu.className = 'fi-ta-bulk-menu';
+
+      if (hasDeletableRows) {
+        var bulkDelBtn = document.createElement('button');
+        bulkDelBtn.type = 'button';
+        bulkDelBtn.className = 'fi-ta-bulk-item is-danger';
+        bulkDelBtn.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<polyline points="3 6 5 6 21 6"></polyline>' +
+            '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>' +
+          '</svg>' +
+          '<span>Hapus terpilih</span>';
+        bulkDelBtn.addEventListener('click', function () {
+          bulkMenu.classList.remove('is-open');
+          var deletableSelected = rowMeta.filter(function (m) { return m.selected && m.deleteForm; });
+          if (!deletableSelected.length) return;
+
+          window.showFiConfirmModal({
+            title: 'Hapus data terpilih',
+            description: 'Apakah Anda yakin ingin menghapus ' + deletableSelected.length + ' data yang dipilih? Tindakan ini tidak dapat dibatalkan.',
+            confirmText: 'Hapus',
+            cancelText: 'Batal',
+            variant: 'danger',
+            onConfirm: function () {
+              return deletableSelected.reduce(function (chain, item) {
+                return chain.then(function () {
+                  return fetch(item.deleteForm.action, {
+                    method: 'POST',
+                    body: new FormData(item.deleteForm),
+                    credentials: 'same-origin',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                  });
+                });
+              }, Promise.resolve()).then(function () {
+                window.location.reload();
+              });
+            }
+          });
+        });
+        bulkMenu.appendChild(bulkDelBtn);
+      }
+
+      var bulkCsvBtn = document.createElement('button');
+      bulkCsvBtn.type = 'button';
+      bulkCsvBtn.className = 'fi-ta-bulk-item is-primary';
+      bulkCsvBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>' +
+          '<polyline points="7 10 12 15 17 10"></polyline>' +
+          '<line x1="12" y1="15" x2="12" y2="3"></line>' +
+        '</svg>' +
+        '<span>Ekspor CSV terpilih</span>';
+      bulkCsvBtn.addEventListener('click', function () {
+        bulkMenu.classList.remove('is-open');
+        var selTrs = rowMeta.filter(function (m) { return m.selected; }).map(function (m) { return m.tr; });
+        if (selTrs.length) downloadSelectedCsv(table, selTrs);
+      });
+      bulkMenu.appendChild(bulkCsvBtn);
+
+      var bulkDiv = document.createElement('div');
+      bulkDiv.className = 'fi-ta-bulk-divider';
+      bulkMenu.appendChild(bulkDiv);
+
+      var bulkClearBtn = document.createElement('button');
+      bulkClearBtn.type = 'button';
+      bulkClearBtn.className = 'fi-ta-bulk-item';
+      bulkClearBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+          '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+        '</svg>' +
+        '<span>Batalkan pilihan</span>';
+      bulkMenu.appendChild(bulkClearBtn);
+
+      bulkWrap.appendChild(bulkBtn);
+      bulkWrap.appendChild(bulkMenu);
+      toolbarLeft.appendChild(bulkWrap);
+
+      // Dock quick tab pills (e.g. Master Kelas / Master Jam Pelajaran) right beside Bulk Actions
+      if (quickTabsWrap) {
+        toolbarLeft.appendChild(quickTabsWrap);
+      } else if (filterContainer && !origForm) {
+        var quickLinks = filterContainer.querySelectorAll('a.btn');
+        if (quickLinks.length > 0) {
+          var pillGroup = document.createElement('div');
+          pillGroup.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px; align-items:center;';
+          quickLinks.forEach(function (lnk) { pillGroup.appendChild(lnk); });
+          toolbarLeft.appendChild(pillGroup);
+        }
+      }
+
+      // Right Toolbar: Search + Funnel Filter Popover (Gambar 3 & Gambar 4)
+      var toolbarRight = document.createElement('div');
+      toolbarRight.className = 'fi-ta-toolbar-right';
+
+      var searchWrap = document.createElement('div');
+      searchWrap.className = 'fi-ta-search-wrap';
+      var searchPlaceholder = origSearchInput ? (origSearchInput.getAttribute('placeholder') || 'Cari data...') : 'Cari data...';
+      var initialSearchVal = origSearchInput ? (origSearchInput.value || '') : '';
+      searchWrap.innerHTML =
+        '<svg class="fi-ta-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<circle cx="11" cy="11" r="8"></circle>' +
+          '<line x1="21" y1="21" x2="16.65" y2="16.65"></line>' +
+        '</svg>' +
+        '<input type="text" class="fi-ta-search-input" placeholder="' + searchPlaceholder.replace(/"/g, '&quot;') + '">' +
+        '<button type="button" class="fi-ta-search-clear" title="Bersihkan pencarian" aria-label="Bersihkan pencarian">' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+            '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+          '</svg>' +
+        '</button>';
+
+      var searchInput = searchWrap.querySelector('.fi-ta-search-input');
+      var searchClear = searchWrap.querySelector('.fi-ta-search-clear');
+      searchInput.value = initialSearchVal;
+      if (initialSearchVal) searchClear.classList.add('is-visible');
+
+      // Funnel Filter Popover right next to Search
+      var filterWrap = document.createElement('div');
+      filterWrap.className = 'fi-ta-filter-wrap';
+      filterWrap.innerHTML =
+        '<button type="button" class="fi-ta-filter-btn" title="Filter Data" aria-label="Filter Data">' +
+          '<svg viewBox="0 0 20 20" fill="currentColor">' +
+            '<path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 01.628.74v2.288a2.25 2.25 0 01-.659 1.59l-4.682 4.683a2.25 2.25 0 00-.659 1.59v3.037c0 .684-.31 1.33-.844 1.757l-1.937 1.55A.75.75 0 018 18.25v-5.757a2.25 2.25 0 00-.659-1.591L2.659 6.22A2.25 2.25 0 012 4.629V2.34a.75.75 0 01.628-.74z" clip-rule="evenodd" />' +
+          '</svg>' +
+          '<span class="fi-ta-filter-badge">0</span>' +
+        '</button>' +
+        '<div class="fi-ta-filter-popover">' +
+          '<div class="fi-ta-filter-head">' +
+            '<span class="fi-ta-filter-title">Filter</span>' +
+            '<button type="button" class="fi-ta-filter-reset">Reset</button>' +
+          '</div>' +
+          '<div class="fi-ta-filter-body"></div>' +
+          '<div class="fi-ta-filter-actions">' +
+            '<button type="button" class="fi-ta-filter-apply" style="width:100%;">Terapkan filter</button>' +
+          '</div>' +
+        '</div>';
+
+      var filterBtn = filterWrap.querySelector('.fi-ta-filter-btn');
+      var filterBadge = filterWrap.querySelector('.fi-ta-filter-badge');
+      var filterPopover = filterWrap.querySelector('.fi-ta-filter-popover');
+      var filterBody = filterWrap.querySelector('.fi-ta-filter-body');
+      var filterResetBtn = filterWrap.querySelector('.fi-ta-filter-reset');
+      var filterApplyBtn = filterWrap.querySelector('.fi-ta-filter-apply');
+
+      // Populate Filter Popover from server <form> controls OR auto-detected client column filters
+      var syncedServerControls = [];
+      var clientColumnFilters = [];
+
+      if (origForm) {
+        var formControls = Array.from(origForm.querySelectorAll('select, input[type="date"], input[type="month"]'));
+        formControls.forEach(function (ctrl) {
+          if (!ctrl.name || ctrl.name === 'search') return;
+          var fieldWrap = document.createElement('div');
+          fieldWrap.className = 'fi-ta-filter-field';
+          var lbl = document.createElement('label');
+          lbl.className = 'fi-ta-filter-label';
+          lbl.textContent = humanizeFilterLabel(ctrl);
+
+          var clone = ctrl.cloneNode(true);
+          clone.removeAttribute('id');
+          clone.removeAttribute('onchange');
+          clone.removeAttribute('style');
+          clone.className = ctrl.tagName === 'SELECT' ? 'fi-ta-filter-select' : 'fi-ta-filter-input';
+          clone.value = ctrl.value;
+
+          fieldWrap.appendChild(lbl);
+          fieldWrap.appendChild(clone);
+          filterBody.appendChild(fieldWrap);
+          syncedServerControls.push({ orig: ctrl, proxy: clone });
+        });
+      }
+
+      // If no server select/date controls exist, build smart client-side column filter(s)
+      if (syncedServerControls.length === 0) {
+        var headerCells = Array.from(headRow.cells);
+        headerCells.forEach(function (th, colIdx) {
+          if (colIdx === 0 || clientColumnFilters.length >= 2) return;
+          var hText = (th.textContent || '').replace(/\s+/g, ' ').trim();
+          if (!hText || /^(no|#|urutan|aksi|nama|guru|pengguna|tanggal|materi|keterangan)/i.test(hText)) return;
+
+          var uniqVals = [];
+          rowMeta.forEach(function (m) {
+            var cell = m.tr.cells[colIdx];
+            if (!cell) return;
+            var val = (cell.textContent || '').replace(/\s+/g, ' ').trim();
+            if (val && val !== '-' && val.length <= 32 && uniqVals.indexOf(val) === -1) {
+              uniqVals.push(val);
+            }
+          });
+
+          if (uniqVals.length >= 2 && uniqVals.length <= 12) {
+            var fieldWrap = document.createElement('div');
+            fieldWrap.className = 'fi-ta-filter-field';
+            var lbl = document.createElement('label');
+            lbl.className = 'fi-ta-filter-label';
+            lbl.textContent = hText;
+
+            var sel = document.createElement('select');
+            sel.className = 'fi-ta-filter-select';
+            var optAll = document.createElement('option');
+            optAll.value = '';
+            optAll.textContent = 'Semua ' + hText;
+            sel.appendChild(optAll);
+
+            uniqVals.sort().forEach(function (v) {
+              var o = document.createElement('option');
+              o.value = v.toLowerCase();
+              o.textContent = v;
+              sel.appendChild(o);
+            });
+
+            fieldWrap.appendChild(lbl);
+            fieldWrap.appendChild(sel);
+            filterBody.appendChild(fieldWrap);
+            clientColumnFilters.push({ colIdx: colIdx, select: sel, appliedValue: '' });
+          }
+        });
+
+        // Always ensure at least 1 filter control exists in popover
+        if (clientColumnFilters.length === 0) {
+          var fallbackWrap = document.createElement('div');
+          fallbackWrap.className = 'fi-ta-filter-field';
+          fallbackWrap.innerHTML =
+            '<label class="fi-ta-filter-label">Kata Kunci Spesifik</label>' +
+            '<input type="text" class="fi-ta-filter-input" data-fi-keyword-filter placeholder="Filter teks kolom...">';
+          filterBody.appendChild(fallbackWrap);
+        }
+      }
+
+      var keywordFilterInput = filterBody.querySelector('[data-fi-keyword-filter]');
+      var appliedKeywordFilter = '';
+
+      function updateFilterBadge() {
+        var activeCount = 0;
+        syncedServerControls.forEach(function (pair) {
+          var v = (pair.orig.value || '').trim();
+          if (v !== '' && v.toLowerCase() !== 'all') activeCount++;
+        });
+        clientColumnFilters.forEach(function (cf) {
+          if (cf.appliedValue !== '') activeCount++;
+        });
+        if (appliedKeywordFilter !== '') activeCount++;
+
+        filterBadge.textContent = String(activeCount);
+        filterBadge.classList.toggle('has-active', activeCount > 0);
+        filterBtn.classList.toggle('has-filters', activeCount > 0);
+      }
+      updateFilterBadge();
+
+      // Hide docked original filter bar cleanly while keeping its <form> in DOM for submission
+      if (filterContainer) {
+        filterContainer.classList.add('fi-filter-docked');
+      }
+
+      toolbarRight.appendChild(searchWrap);
+      toolbarRight.appendChild(filterWrap);
+      toolbar.appendChild(toolbarLeft);
+      toolbar.appendChild(toolbarRight);
+
+      // Selection Indicator Strip (Gambar 5: X dipilih | Pilih semua Z | Batalkan pilihan)
+      var selectionBar = document.createElement('div');
+      selectionBar.className = 'fi-ta-selection-bar';
+      selectionBar.innerHTML =
+        '<span class="fi-ta-selection-count">0 data dipilih</span>' +
+        '<div class="fi-ta-selection-links">' +
+          '<button type="button" class="fi-ta-link-select-all">Pilih semua</button>' +
+          '<button type="button" class="fi-ta-link-deselect">Batalkan pilihan</button>' +
+        '</div>';
+
+      var selCountLabel = selectionBar.querySelector('.fi-ta-selection-count');
+      var btnSelectAllFiltered = selectionBar.querySelector('.fi-ta-link-select-all');
+      var btnDeselectAll = selectionBar.querySelector('.fi-ta-link-deselect');
+
+      card.insertBefore(selectionBar, card.firstChild);
+      card.insertBefore(toolbar, selectionBar);
+
+      // Client-side Pagination Footer (when no Laravel server-side pagination is present)
+      var hasServerPages = !!desktopServerPagination;
+      var currentPage = 1;
+      var perPage = 10;
+      var footerInfoEl = null;
+      var perPageSelect = null;
+      var pagesWrapEl = null;
+
+      if (desktopServerPagination) {
+        desktopServerPagination.classList.add('fi-ta-footer');
+        desktopServerPagination.style.padding = '12px 16px';
+      } else {
+        var footer = document.createElement('div');
+        footer.className = 'fi-ta-footer';
+        footer.innerHTML =
+          '<div class="fi-ta-footer-info">Menampilkan 0 data</div>' +
+          '<div class="fi-ta-perpage">' +
+            '<span class="fi-ta-perpage-label">Per halaman</span>' +
+            '<select class="fi-ta-perpage-select" aria-label="Per halaman">' +
+              '<option value="10" selected>10</option>' +
+              '<option value="25">25</option>' +
+              '<option value="50">50</option>' +
+              '<option value="9999">Semua</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="fi-ta-pages"></div>';
+        card.appendChild(footer);
+        footerInfoEl = footer.querySelector('.fi-ta-footer-info');
+        perPageSelect = footer.querySelector('.fi-ta-perpage-select');
+        pagesWrapEl = footer.querySelector('.fi-ta-pages');
+
+        perPageSelect.addEventListener('change', function () {
+          perPage = parseInt(perPageSelect.value, 10) || 10;
+          currentPage = 1;
+          renderTableState();
+        });
+      }
+
+      // Dynamic client-side empty search row
+      var noMatchRow = document.createElement('tr');
+      noMatchRow.style.display = 'none';
+      var noMatchTd = document.createElement('td');
+      noMatchTd.colSpan = headRow.cells.length;
+      noMatchTd.style.cssText = 'padding:36px 16px; text-align:center; color:#6B7280; font-size:13.5px;';
+      noMatchTd.textContent = 'Tidak ada data yang cocok dengan pencarian atau filter.';
+      noMatchRow.appendChild(noMatchTd);
+      if (dataRows.length > 0) {
+        tbody.appendChild(noMatchRow);
+      }
+
+      function getFilteredMeta() {
+        var q = (searchInput.value || '').trim().toLowerCase();
+        // If search matches initial server-filtered query and user hasn't typed anything new, don't double-exclude rows whose server match was on a hidden field
+        var effectiveQ = (origSearchInput && q === initialSearchVal.trim().toLowerCase()) ? '' : q;
+
+        return rowMeta.filter(function (m) {
+          if (effectiveQ && m.searchText.indexOf(effectiveQ) === -1) return false;
+          if (appliedKeywordFilter && m.searchText.indexOf(appliedKeywordFilter) === -1) return false;
+
+          for (var i = 0; i < clientColumnFilters.length; i++) {
+            var cf = clientColumnFilters[i];
+            if (cf.appliedValue) {
+              var cell = m.tr.cells[cf.colIdx];
+              var cText = cell ? (cell.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase() : '';
+              if (cText !== cf.appliedValue) return false;
+            }
+          }
+          return true;
+        });
+      }
+
+      function getPageMeta(filtered) {
+        if (hasServerPages) return filtered;
+        var totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+        if (currentPage > totalPages) currentPage = totalPages;
+        var start = (currentPage - 1) * perPage;
+        return filtered.slice(start, start + perPage);
+      }
+
+      function syncSelectionUI(filtered, pageItems) {
+        var selectedCount = 0;
+        rowMeta.forEach(function (m) {
+          if (m.selected) selectedCount++;
+          m.cb.checked = m.selected;
+          m.tr.classList.toggle('is-selected', m.selected);
+          if (m.mCb) m.mCb.checked = m.selected;
+          if (m.mCard) m.mCard.classList.toggle('is-selected', m.selected);
+        });
+
+        var allPageChecked = pageItems.length > 0 && pageItems.every(function (m) { return m.selected; });
+        var somePageChecked = pageItems.some(function (m) { return m.selected; });
+        masterCheck.checked = allPageChecked;
+        masterCheck.indeterminate = !allPageChecked && somePageChecked;
+
+        var countBadge = bulkBtn.querySelector('.fi-ta-bulk-count');
+        if (selectedCount > 0) {
+          bulkBtn.disabled = false;
+          bulkBtn.classList.remove('is-disabled');
+          bulkBtn.classList.add('is-active-selection');
+          countBadge.style.display = 'inline-flex';
+          countBadge.textContent = String(selectedCount);
+          selectionBar.classList.add('is-visible');
+          selCountLabel.textContent = selectedCount + ' data dipilih';
+          btnSelectAllFiltered.textContent = 'Pilih semua ' + filtered.length;
+        } else {
+          bulkBtn.disabled = true;
+          bulkBtn.classList.add('is-disabled');
+          bulkBtn.classList.remove('is-active-selection');
+          countBadge.style.display = 'none';
+          bulkMenu.classList.remove('is-open');
+          selectionBar.classList.remove('is-visible');
+        }
+      }
+
+      function renderPaginationControls(totalFiltered) {
+        if (hasServerPages || !footerInfoEl) return;
+
+        if (totalFiltered === 0) {
+          footerInfoEl.textContent = 'Menampilkan 0 data';
+          pagesWrapEl.style.display = 'none';
+          return;
+        }
+
+        var totalPages = Math.max(1, Math.ceil(totalFiltered / perPage));
+        if (currentPage > totalPages) currentPage = totalPages;
+        var from = (currentPage - 1) * perPage + 1;
+        var to = Math.min(currentPage * perPage, totalFiltered);
+        footerInfoEl.textContent = 'Menampilkan ' + from + ' sampai ' + to + ' dari ' + totalFiltered + ' data';
+
+        if (totalPages <= 1) {
+          pagesWrapEl.style.display = 'none';
+          pagesWrapEl.innerHTML = '';
+          return;
+        }
+
+        pagesWrapEl.style.display = 'inline-flex';
+        pagesWrapEl.innerHTML = '';
+
+        function addPageBtn(label, targetPage, disabled, active) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'fi-ta-page-btn' + (active ? ' is-active' : '');
+          b.disabled = !!disabled;
+          b.textContent = label;
+          if (!disabled && !active) {
+            b.addEventListener('click', function () {
+              currentPage = targetPage;
+              renderTableState();
+            });
+          }
+          pagesWrapEl.appendChild(b);
+        }
+
+        addPageBtn('‹', currentPage - 1, currentPage <= 1, false);
+        for (var p = 1; p <= totalPages; p++) {
+          if (totalPages <= 7 || p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1) {
+            addPageBtn(String(p), p, false, p === currentPage);
+          } else if (pagesWrapEl.lastChild && pagesWrapEl.lastChild.textContent !== '…') {
+            addPageBtn('…', p, true, false);
+          }
+        }
+        addPageBtn('›', currentPage + 1, currentPage >= totalPages, false);
+      }
+
+      function renderTableState() {
+        var filtered = getFilteredMeta();
+        var pageItems = getPageMeta(filtered);
+        var visibleSet = new Set(pageItems);
+
+        rowMeta.forEach(function (m) {
+          var show = visibleSet.has(m);
+          m.tr.style.display = show ? '' : 'none';
+          if (m.mCard) m.mCard.style.display = show ? '' : 'none';
+        });
+
+        if (dataRows.length > 0) {
+          noMatchRow.style.display = filtered.length === 0 ? '' : 'none';
+        }
+
+        renderPaginationControls(filtered.length);
+        syncSelectionUI(filtered, pageItems);
+      }
+
+      // Wire row & mobile checkboxes
+      rowMeta.forEach(function (m) {
+        m.cb.addEventListener('change', function () {
+          m.selected = m.cb.checked;
+          var filtered = getFilteredMeta();
+          syncSelectionUI(filtered, getPageMeta(filtered));
+        });
+        if (m.mCb) {
+          m.mCb.addEventListener('change', function () {
+            m.selected = m.mCb.checked;
+            var filtered = getFilteredMeta();
+            syncSelectionUI(filtered, getPageMeta(filtered));
+          });
+        }
+      });
+
+      masterCheck.addEventListener('change', function () {
+        var filtered = getFilteredMeta();
+        var pageItems = getPageMeta(filtered);
+        pageItems.forEach(function (m) {
+          m.selected = masterCheck.checked;
+        });
+        syncSelectionUI(filtered, pageItems);
+      });
+
+      btnSelectAllFiltered.addEventListener('click', function () {
+        var filtered = getFilteredMeta();
+        filtered.forEach(function (m) { m.selected = true; });
+        syncSelectionUI(filtered, getPageMeta(filtered));
+      });
+
+      function clearAllSelections() {
+        rowMeta.forEach(function (m) { m.selected = false; });
+        var filtered = getFilteredMeta();
+        syncSelectionUI(filtered, getPageMeta(filtered));
+      }
+
+      btnDeselectAll.addEventListener('click', clearAllSelections);
+      bulkClearBtn.addEventListener('click', function () {
+        bulkMenu.classList.remove('is-open');
+        clearAllSelections();
+      });
+
+      // Wire Bulk Actions Menu toggle & outside click
+      bulkBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (bulkBtn.disabled) return;
+        filterPopover.classList.remove('is-open');
+        bulkMenu.classList.toggle('is-open');
+      });
+
+      // Wire Search Input (live client filter + Enter submits server search if present)
+      searchInput.addEventListener('input', function () {
+        searchClear.classList.toggle('is-visible', searchInput.value.length > 0);
+        if (origSearchInput) origSearchInput.value = searchInput.value;
+        currentPage = 1;
+        renderTableState();
+      });
+
+      searchInput.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' && origForm) {
+          ev.preventDefault();
+          if (origSearchInput) origSearchInput.value = searchInput.value;
+          origForm.submit();
+        }
+      });
+
+      searchClear.addEventListener('click', function () {
+        searchInput.value = '';
+        searchClear.classList.remove('is-visible');
+        if (origSearchInput && initialSearchVal && origForm) {
+          origSearchInput.value = '';
+          origForm.submit();
+          return;
+        }
+        currentPage = 1;
+        renderTableState();
+      });
+
+      // Wire Filter Funnel Popover
+      filterBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        bulkMenu.classList.remove('is-open');
+        filterPopover.classList.toggle('is-open');
+      });
+
+      filterPopover.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+      });
+
+      filterApplyBtn.addEventListener('click', function () {
+        if (origForm && syncedServerControls.length > 0) {
+          syncedServerControls.forEach(function (pair) {
+            pair.orig.value = pair.proxy.value;
+          });
+          if (origSearchInput) origSearchInput.value = searchInput.value;
+          origForm.submit();
+          return;
+        }
+
+        clientColumnFilters.forEach(function (cf) {
+          cf.appliedValue = (cf.select.value || '').trim().toLowerCase();
+        });
+        if (keywordFilterInput) {
+          appliedKeywordFilter = (keywordFilterInput.value || '').trim().toLowerCase();
+        }
+        currentPage = 1;
+        updateFilterBadge();
+        filterPopover.classList.remove('is-open');
+        renderTableState();
+      });
+
+      filterResetBtn.addEventListener('click', function () {
+        if (origResetLink && origResetLink.href) {
+          window.location.href = origResetLink.href;
+          return;
+        }
+        if (origForm && syncedServerControls.length > 0) {
+          syncedServerControls.forEach(function (pair) {
+            pair.proxy.value = '';
+            pair.orig.value = '';
+          });
+          if (origSearchInput) origSearchInput.value = '';
+          origForm.submit();
+          return;
+        }
+        clientColumnFilters.forEach(function (cf) {
+          cf.select.value = '';
+          cf.appliedValue = '';
+        });
+        if (keywordFilterInput) {
+          keywordFilterInput.value = '';
+          appliedKeywordFilter = '';
+        }
+        searchInput.value = '';
+        searchClear.classList.remove('is-visible');
+        currentPage = 1;
+        updateFilterBadge();
+        filterPopover.classList.remove('is-open');
+        renderTableState();
+      });
+
+      document.addEventListener('click', function (ev) {
+        if (!bulkWrap.contains(ev.target)) bulkMenu.classList.remove('is-open');
+        if (!filterWrap.contains(ev.target)) filterPopover.classList.remove('is-open');
+      });
+
+      // Column Sorting (Gambar 3 Chevron Sort)
+      var currentSortCol = -1;
+      var currentSortAsc = true;
+      Array.from(headRow.cells).forEach(function (th, colIdx) {
+        if (colIdx === 0) return;
+        var labelTxt = (th.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!labelTxt || /^aksi/i.test(labelTxt)) return;
+
+        var sortBtn = document.createElement('button');
+        sortBtn.type = 'button';
+        sortBtn.className = 'fi-ta-th-sort';
+        sortBtn.innerHTML =
+          '<span>' + labelTxt + '</span>' +
+          '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
+            '<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />' +
+          '</svg>';
+
+        th.textContent = '';
+        th.appendChild(sortBtn);
+
+        sortBtn.addEventListener('click', function () {
+          if (currentSortCol === colIdx) {
+            currentSortAsc = !currentSortAsc;
+          } else {
+            currentSortCol = colIdx;
+            currentSortAsc = true;
+          }
+
+          headRow.querySelectorAll('.fi-ta-th-sort').forEach(function (b) {
+            b.classList.remove('is-sorted');
+            var svg = b.querySelector('svg');
+            if (svg) svg.style.transform = '';
+          });
+          sortBtn.classList.add('is-sorted');
+          var activeSvg = sortBtn.querySelector('svg');
+          if (activeSvg) activeSvg.style.transform = currentSortAsc ? 'rotate(180deg)' : 'rotate(0deg)';
+
+          rowMeta.sort(function (a, b) {
+            var aTxt = a.tr.cells[colIdx] ? (a.tr.cells[colIdx].textContent || '').trim() : '';
+            var bTxt = b.tr.cells[colIdx] ? (b.tr.cells[colIdx].textContent || '').trim() : '';
+            var aNum = parseFloat(aTxt.replace(/[^\d.-]/g, ''));
+            var bNum = parseFloat(bTxt.replace(/[^\d.-]/g, ''));
+            var cmp = (!isNaN(aNum) && !isNaN(bNum) && /^\d/.test(aTxt) && /^\d/.test(bTxt))
+              ? (aNum - bNum)
+              : aTxt.localeCompare(bTxt, 'id', { sensitivity: 'base' });
+            return currentSortAsc ? cmp : -cmp;
+          });
+
+          rowMeta.forEach(function (m) {
+            tbody.insertBefore(m.tr, noMatchRow);
+            if (m.mCard && mobileList) mobileList.appendChild(m.mCard);
+          });
+          renderTableState();
+        });
+      });
+
+      renderTableState();
+    });
+  }
+
+  initFilamentTables();
 });
