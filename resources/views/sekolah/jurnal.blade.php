@@ -81,8 +81,13 @@
                     <label for="select_kelas" class="form-label">Pilih Kelas <span class="required-mark">*</span></label>
                     <select name="kelas" id="select_kelas" class="form-select" required onchange="renderSiswaByKelas(this.value)">
                         @foreach($kelasList as $kelasOption)
-                            <option value="{{ $kelasOption }}" {{ old('kelas', $kelasList[0] ?? '') === $kelasOption ? 'selected' : '' }}>
-                                Kelas {{ $kelasOption }}
+                            @php
+                                $isSel = old('kelas', $kelasList[0] ?? '') === $kelasOption
+                                    || (old('kelas') && \App\Http\Controllers\PlottingKelasController::isSameClass(old('kelas'), $kelasOption));
+                                $displayK = \App\Http\Controllers\PlottingKelasController::toRomanDisplay($kelasOption);
+                            @endphp
+                            <option value="{{ $kelasOption }}" {{ $isSel ? 'selected' : '' }}>
+                                Kelas {{ $displayK }}
                             </option>
                         @endforeach
                     </select>
@@ -251,13 +256,66 @@
         'alpa': 'Alpa'
     };
 
+    function toRomanDisplayJs(namaKelas) {
+        if (!namaKelas) return '';
+        let clean = String(namaKelas).replace(/^Kelas\s+/i, '').trim();
+        const map = [
+            [/^7([A-Za-z0-9\s_-].*|$)/, 'VII$1'],
+            [/^8([A-Za-z0-9\s_-].*|$)/, 'VIII$1'],
+            [/^9([A-Za-z0-9\s_-].*|$)/, 'IX$1'],
+            [/^10([A-Za-z0-9\s_-].*|$)/, 'X$1'],
+            [/^11([A-Za-z0-9\s_-].*|$)/, 'XI$1'],
+            [/^12([A-Za-z0-9\s_-].*|$)/, 'XII$1']
+        ];
+        for (const [pattern, replacement] of map) {
+            if (pattern.test(clean)) {
+                let formatted = clean.replace(pattern, replacement);
+                return formatted.replace(/^(VII|VIII|IX|X|XI|XII)([A-Za-z])$/, '$1 $2');
+            }
+        }
+        return clean;
+    }
+
+    function findSiswaByKelas(kelasName) {
+        if (!kelasName) return [];
+        if (dataSiswasByKelas[kelasName] && dataSiswasByKelas[kelasName].length > 0) {
+            return dataSiswasByKelas[kelasName];
+        }
+        const clean = String(kelasName).replace(/^Kelas\s+/i, '').trim();
+        if (dataSiswasByKelas[clean] && dataSiswasByKelas[clean].length > 0) {
+            return dataSiswasByKelas[clean];
+        }
+        const roman = toRomanDisplayJs(clean);
+        if (dataSiswasByKelas[roman] && dataSiswasByKelas[roman].length > 0) {
+            return dataSiswasByKelas[roman];
+        }
+        const normKey = (str) => {
+            let s = String(str || '').replace(/^Kelas\s+/i, '').trim();
+            s = s.replace(/\bVII\b/gi, '7')
+                 .replace(/\bVIII\b/gi, '8')
+                 .replace(/\bIX\b/gi, '9')
+                 .replace(/\bX\b/gi, '10')
+                 .replace(/\bXI\b/gi, '11')
+                 .replace(/\bXII\b/gi, '12');
+            return s.replace(/[\s\-_]/g, '').toUpperCase();
+        };
+        const targetNorm = normKey(kelasName);
+        for (const [key, val] of Object.entries(dataSiswasByKelas)) {
+            if (normKey(key) === targetNorm && val && val.length > 0) {
+                return val;
+            }
+        }
+        return dataSiswasByKelas[kelasName] || [];
+    }
+
     // 1. Render Siswa saat kelas dipilih
     function renderSiswaByKelas(kelasName) {
         const tbody = document.getElementById('siswaTbody');
         const labelKelas = document.getElementById('label_nama_kelas');
-        labelKelas.textContent = kelasName || '-';
+        const displayLabel = toRomanDisplayJs(kelasName) || kelasName || '-';
+        labelKelas.textContent = displayLabel;
 
-        const list = dataSiswasByKelas[kelasName] || [];
+        const list = findSiswaByKelas(kelasName);
         tbody.innerHTML = '';
 
         if (list.length === 0) {
@@ -270,7 +328,7 @@
                                 <line x1="12" y1="8" x2="12" y2="12"></line>
                                 <line x1="12" y1="16" x2="12.01" y2="16"></line>
                             </svg>
-                            <span style="font-size:13.5px; font-weight:500;">Belum ada data siswa terdaftar di Kelas ${kelasName}</span>
+                            <span style="font-size:13.5px; font-weight:500;">Belum ada data siswa terdaftar di Kelas ${displayLabel}</span>
                         </div>
                     </td>
                 </tr>

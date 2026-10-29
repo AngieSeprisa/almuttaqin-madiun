@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Classroom;
 use App\Models\Jurnal;
 use App\Models\JurnalAbsensi;
 use App\Models\Lembaga;
@@ -15,23 +16,154 @@ use Illuminate\Support\Facades\DB;
 class SekolahController extends Controller
 {
     /**
-     * Daftar kelas default berdasarkan jenjang
+     * Dapatkan semua variasi penulisan nama kelas yang ekuivalen (Romawi, Angka, dengan/tanpa spasi, atau prefix 'Kelas')
+     */
+    public static function getEquivalentClassNames(?string $namaKelas): array
+    {
+        if (!$namaKelas) {
+            return [];
+        }
+
+        $raw = trim($namaKelas);
+        $clean = trim(str_ireplace('kelas', '', $raw));
+
+        $variants = [
+            $raw,
+            $clean,
+            'Kelas ' . $clean,
+            str_replace(' ', '', $clean),
+        ];
+
+        // Format Romawi
+        $roman = PlottingKelasController::toRomanDisplay($clean);
+        $cleanRoman = trim(str_ireplace('kelas', '', $roman));
+        $variants[] = $roman;
+        $variants[] = $cleanRoman;
+        $variants[] = 'Kelas ' . $cleanRoman;
+        $variants[] = str_replace(' ', '', $cleanRoman);
+
+        // Format Angka Arab (7, 8, 9, 10, 11, 12)
+        $map = [
+            'VII' => '7', 'VIII' => '8', 'IX' => '9',
+            'X' => '10', 'XI' => '11', 'XII' => '12',
+        ];
+        $arabic = preg_replace_callback('/\b(VII|VIII|IX|X|XI|XII)\b/i', fn($m) => $map[strtoupper($m[1])] ?? $m[1], $cleanRoman);
+        $cleanArabic = trim(str_ireplace('kelas', '', $arabic));
+        $variants[] = $arabic;
+        $variants[] = $cleanArabic;
+        $variants[] = 'Kelas ' . $cleanArabic;
+        $variants[] = str_replace(' ', '', $cleanArabic);
+
+        // Cek juga dari data yang tersimpan nyata di database siswas & jurnals
+        try {
+            $dbClasses = DB::table('siswas')
+                ->whereNotNull('kelas')
+                ->where('kelas', '!=', '')
+                ->distinct()
+                ->pluck('kelas');
+
+            foreach ($dbClasses as $dbc) {
+                if (PlottingKelasController::isSameClass($dbc, $namaKelas)) {
+                    $variants[] = $dbc;
+                }
+            }
+
+            $jurnalClasses = DB::table('jurnals')
+                ->whereNotNull('kelas')
+                ->where('kelas', '!=', '')
+                ->distinct()
+                ->pluck('kelas');
+
+            foreach ($jurnalClasses as $jc) {
+                if (PlottingKelasController::isSameClass($jc, $namaKelas)) {
+                    $variants[] = $jc;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
+
+        return array_values(array_unique(array_filter($variants)));
+    }
+
+    /**
+     * Daftar kelas berdasarkan jenjang (sinkron dengan tabel classrooms & siswas yang aktif, fallback kelas standar)
      */
     public static function daftarKelas(?string $activeRoom = null): array
     {
-        $smp = ['VII A', 'VII B', 'VIII A', 'VIII B', 'IX A', 'IX B'];
-        $sma = ['X A', 'X B', 'XI A', 'XI B', 'XII A', 'XII B'];
+        $room = strtolower($activeRoom ?? session('active_lembaga', ''));
+        $classes = [];
 
-        if ($activeRoom === 'smp') {
-            return $smp;
+        // 1. Ambil dari master ruang kelas (Classroom)
+        try {
+            $query = Classroom::query()->where('is_active', true);
+            if ($room === 'smp') {
+                $query->where('jenjang', 'SMP');
+            } elseif ($room === 'sma') {
+                $query->where('jenjang', 'SMA');
+            }
+            $classes = $query->orderBy('urutan')->orderBy('nama_kelas')->pluck('nama_kelas')->toArray();
+        } catch (\Throwable $e) {
+            $classes = [];
         }
 
-        if ($activeRoom === 'sma') {
-            return $sma;
+        // 2. Ambil juga dari kelas yang sudah ditempati siswa aktif non-reguler
+        try {
+            $siswaQuery = Siswa::where('status', 'aktif')
+                ->whereNotNull('kelas')
+                ->where('kelas', '!=', '')
+                ->where('kelas', '!=', '-')
+                ->whereRaw('LOWER(jenjang) != ?', ['reguler']);
+
+            if ($room === 'smp') {
+                $siswaQuery->where('jenjang', 'SMP');
+            } elseif ($room === 'sma') {
+                $siswaQuery->where('jenjang', 'SMA');
+            }
+            $siswaClasses = $siswaQuery->distinct()->pluck('kelas')->toArray();
+            foreach ($siswaClasses as $sc) {
+                $exists = false;
+                foreach ($classes as $c) {
+                    if (PlottingKelasController::isSameClass($c, $sc)) {
+                        $exists = true;
+                        break;
+                    }
+                }
+                if (!$exists) {
+                    $classes[] = $sc;
+                }
+            }
+        } catch (\Throwable $e) {
         }
 
-        // Jika yayasan atau pondok, tampilkan semua kelas
-        return array_merge($smp, $sma);
+        // 3. Fallback jika kosong atau lengkapi kelas standar
+        $smpStandar = ['VII A', 'VII B', 'VIII A', 'VIII B', 'IX A', 'IX B'];
+        $smaStandar = ['X A', 'X B', 'XI A', 'XI B', 'XII A', 'XII B'];
+
+        if (empty($classes)) {
+            if ($room === 'smp') {
+                return $smpStandar;
+            }
+            if ($room === 'sma') {
+                return $smaStandar;
+            }
+            return array_merge($smpStandar, $smaStandar);
+        }
+
+        $standardPool = ($room === 'smp') ? $smpStandar : (($room === 'sma') ? $smaStandar : array_merge($smpStandar, $smaStandar));
+        foreach ($standardPool as $std) {
+            $matched = false;
+            foreach ($classes as $c) {
+                if (PlottingKelasController::isSameClass($c, $std)) {
+                    $matched = true;
+                    break;
+                }
+            }
+            if (!$matched) {
+                $classes[] = $std;
+            }
+        }
+
+        return array_values(array_unique($classes));
     }
 
     /**
@@ -100,15 +232,51 @@ class SekolahController extends Controller
 
         $gurus = $guruQuery->orderBy('name')->get();
 
-        // Ambil seluruh siswa yang memiliki kelas dan kelompokkan per kelas
+        // Ambil seluruh siswa aktif non-reguler yang memiliki kelas dan kelompokkan per kelas
         $siswas = Siswa::where('status', 'aktif')
             ->whereNotNull('kelas')
+            ->where('kelas', '!=', '')
+            ->where('kelas', '!=', '-')
+            ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
             ->orderBy('nama_lengkap')
             ->get(['id', 'nama_lengkap', 'kelas', 'jenjang']);
 
         $siswasByKelas = [];
         foreach ($kelasList as $k) {
-            $siswasByKelas[$k] = $siswas->where('kelas', $k)->values();
+            $matched = $siswas->filter(function ($s) use ($k) {
+                return PlottingKelasController::isSameClass($s->kelas, $k);
+            })->values();
+
+            // Store by original list key
+            $siswasByKelas[$k] = $matched;
+
+            // Store by all possible aliases
+            $cleanK = trim(str_ireplace('kelas', '', $k));
+            $siswasByKelas[$cleanK] = $matched;
+
+            $roman = PlottingKelasController::toRomanDisplay($cleanK);
+            $siswasByKelas[$roman] = $matched;
+            $siswasByKelas['Kelas ' . $roman] = $matched;
+            $siswasByKelas[str_replace(' ', '', $roman)] = $matched;
+
+            $mapArab = [
+                'VII' => '7', 'VIII' => '8', 'IX' => '9',
+                'X' => '10', 'XI' => '11', 'XII' => '12',
+            ];
+            $arabic = preg_replace_callback('/\b(VII|VIII|IX|X|XI|XII)\b/i', fn($m) => $mapArab[strtoupper($m[1])] ?? $m[1], $roman);
+            $cleanArabic = trim(str_ireplace('kelas', '', $arabic));
+            $siswasByKelas[$cleanArabic] = $matched;
+            $siswasByKelas['Kelas ' . $cleanArabic] = $matched;
+            $siswasByKelas[str_replace(' ', '', $cleanArabic)] = $matched;
+        }
+
+        // Tambahkan juga key langsung dari data kelas siswa yang ada
+        foreach ($siswas as $s) {
+            if (!empty($s->kelas) && !isset($siswasByKelas[$s->kelas])) {
+                $siswasByKelas[$s->kelas] = $siswas->filter(function ($other) use ($s) {
+                    return PlottingKelasController::isSameClass($other->kelas, $s->kelas);
+                })->values();
+            }
         }
 
         return view('sekolah.jurnal', compact(
@@ -245,9 +413,10 @@ class SekolahController extends Controller
             });
         }
 
-        // Filter Kelas
+        // Filter Kelas (fleksibel mendukung varian Romawi, Angka, dan spasi)
         if ($request->filled('kelas')) {
-            $query->where('kelas', $request->kelas);
+            $matchingKelas = self::getEquivalentClassNames($request->kelas);
+            $query->whereIn('kelas', $matchingKelas);
         }
 
         // Filter Tanggal
@@ -414,10 +583,11 @@ class SekolahController extends Controller
 
         $tahun = $request->filled('tahun') ? (int) $request->tahun : (int) date('Y');
 
-        // Query Jurnal untuk kelas terpilih
+        // Query Jurnal untuk kelas terpilih (fleksibel mendukung varian Romawi, Angka, dll)
         $jurnalQuery = Jurnal::with(['guru', 'lembaga']);
         if ($selectedKelas) {
-            $jurnalQuery->where('kelas', $selectedKelas);
+            $matchingKelas = self::getEquivalentClassNames($selectedKelas);
+            $jurnalQuery->whereIn('kelas', $matchingKelas);
         }
         if ($bulan) {
             $jurnalQuery->whereMonth('tanggal', $bulan);
@@ -456,10 +626,12 @@ class SekolahController extends Controller
             $tanggalGroups[$tgl]['jurnals'][] = $jurnal;
         }
 
-        // Ambil data siswa di kelas terpilih
-        $siswaQuery = Siswa::with('pendaftaran')->where('status', 'aktif');
+        // Ambil data siswa di kelas terpilih (hanya siswa aktif non-reguler)
+        $siswaQuery = Siswa::with('pendaftaran')->where('status', 'aktif')
+            ->whereRaw('LOWER(jenjang) != ?', ['reguler']);
         if ($selectedKelas) {
-            $siswaQuery->where('kelas', $selectedKelas);
+            $matchingKelas = self::getEquivalentClassNames($selectedKelas);
+            $siswaQuery->whereIn('kelas', $matchingKelas);
         }
 
         if ($request->filled('search')) {

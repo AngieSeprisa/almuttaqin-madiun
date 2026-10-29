@@ -184,7 +184,9 @@ class ClassroomController extends Controller
         }
 
         // Cek keterkaitan siswa
-        $siswaCount = Siswa::where('kelas', $kela->nama_kelas)->count();
+        $siswaCount = Siswa::where('status', 'aktif')->get()->filter(function ($s) use ($kela) {
+            return PlottingKelasController::isSameClass($s->kelas, $kela->nama_kelas);
+        })->count();
         if ($siswaCount > 0) {
             return redirect()->back()->with('error', "Ruang kelas {$kela->nama_kelas} masih memiliki {$siswaCount} siswa terdaftar. Silakan mutasikan siswa terlebih dahulu pada menu Plotting Kelas.");
         }

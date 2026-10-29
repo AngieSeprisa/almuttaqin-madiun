@@ -29,8 +29,12 @@
                     </div>
                     <select name="kelas" class="form-select filter-select" onchange="this.form.submit()">
                         @foreach($kelasList as $k)
-                            <option value="{{ $k }}" {{ $selectedKelas === $k ? 'selected' : '' }}>
-                                Kelas {{ $k }}
+                            @php
+                                $isKSelected = $selectedKelas === $k || \App\Http\Controllers\PlottingKelasController::isSameClass($selectedKelas, $k);
+                                $dispK = \App\Http\Controllers\PlottingKelasController::toRomanDisplay($k);
+                            @endphp
+                            <option value="{{ $k }}" {{ $isKSelected ? 'selected' : '' }}>
+                                Kelas {{ $dispK }}
                             </option>
                         @endforeach
                     </select>
