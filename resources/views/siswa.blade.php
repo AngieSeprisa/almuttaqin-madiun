@@ -108,6 +108,20 @@
     transform: translateY(-1px);
 }
 
+/* Action button print */
+.action-btn.action-btn-print {
+    color: #0284c7;
+    background: rgba(2, 132, 199, 0.1);
+    border-color: rgba(2, 132, 199, 0.3);
+}
+
+.action-btn.action-btn-print:hover {
+    background: #0284c7;
+    color: #ffffff;
+    border-color: #0284c7;
+    transform: translateY(-1px);
+}
+
 /* Banner Notifikasi Kelengkapan Data */
 .alert-incomplete-info {
     display: flex;
@@ -500,6 +514,7 @@
 
     .mobile-action-btn svg { width: 15px; height: 15px; }
     .mobile-action-btn.btn-view { color: #64748b; }
+    .mobile-action-btn.btn-print { color: #0284c7; }
     .mobile-action-btn.btn-edit { color: #64748b; }
     .mobile-action-btn.btn-delete { color: #ef4444; }
 
@@ -918,16 +933,16 @@
                         $p = $item->pendaftaran;
                         $isLengkap = $item->isDataLengkap();
                         $missingFields = !$isLengkap ? $item->field_belum_lengkap : [];
-                        $targetCetakUrl = $item->pendaftaran_id
-                            ? route('pendaftaran.cetak', ['id' => $item->pendaftaran_id, 'from' => 'siswa'])
-                            : route('siswa.show', $item->id);
+                        $targetViewUrl = route('siswa.show', $item->id);
                         $targetEditUrl = route('siswa.edit', $item->id);
+                        $targetCetakUrl = route('siswa.cetak', $item->id);
                     @endphp
                     <tr class="{{ !$isLengkap ? 'row-incomplete' : '' }}"
                         data-id="{{ $item->id }}"
                         data-nama="{{ $item->nama_lengkap }}"
-                        data-view-url="{{ $targetCetakUrl }}"
-                        data-edit-url="{{ $targetEditUrl }}">
+                        data-view-url="{{ $targetViewUrl }}"
+                        data-edit-url="{{ $targetEditUrl }}"
+                        data-cetak-url="{{ $targetCetakUrl }}">
                         <td class="cell-nama">
                             <div class="nama-wrapper">
                                 <div class="nama-text">{{ $item->nama_lengkap }}</div>
@@ -1030,8 +1045,8 @@
                                 </button>
                                 @endif
 
-                                {{-- Tombol Lihat (Hanya Icon Mata -> Menampilkan Formulir Cetak Seperti Gambar 2) --}}
-                                <a href="{{ $targetCetakUrl }}" class="action-btn action-btn-view btn-view" title="Lihat Formulir Siswa" aria-label="Lihat Formulir {{ $item->nama_lengkap }}">
+                                {{-- Tombol Lihat (Halaman View Penuh / Full Page ViewRecord) --}}
+                                <a href="{{ $targetViewUrl }}" class="action-btn action-btn-view btn-view" title="Lihat Formulir Siswa" aria-label="Lihat Formulir {{ $item->nama_lengkap }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                         <circle cx="12" cy="12" r="3"></circle>
@@ -1039,7 +1054,17 @@
                                     <span class="sr-only" style="display:none;">Lihat</span>
                                 </a>
 
-                                {{-- Tombol Edit / Koreksi (Icon Pensil -> Menuju Formulir Pendaftaran) --}}
+                                {{-- Tombol Cetak (Format Formulir Cetak A4) --}}
+                                <a href="{{ $targetCetakUrl }}" target="_blank" class="action-btn action-btn-print btn-print" title="Cetak Formulir / Biodata" aria-label="Cetak Formulir {{ $item->nama_lengkap }}">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                                        <rect x="6" y="14" width="12" height="8"></rect>
+                                    </svg>
+                                    <span class="sr-only" style="display:none;">Cetak</span>
+                                </a>
+
+                                {{-- Tombol Edit / Koreksi (Halaman Edit Penuh / Full Page EditRecord) --}}
                                 @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
                                 <a href="{{ $targetEditUrl }}"
                                    class="action-btn btn-edit {{ !$isLengkap ? 'action-btn-koreksi' : 'action-btn-edit' }}"
@@ -1103,15 +1128,18 @@
         @php
             $isLengkap = $item->isDataLengkap();
             $missingFields = !$isLengkap ? $item->field_belum_lengkap : [];
-            $targetCetakUrl = $item->pendaftaran_id
-                ? route('pendaftaran.cetak', ['id' => $item->pendaftaran_id, 'from' => 'siswa'])
-                : route('siswa.show', $item->id);
+            $targetViewUrl = route('siswa.show', $item->id);
+            $targetEditUrl = route('siswa.edit', $item->id);
+            $targetCetakUrl = route('siswa.cetak', $item->id);
             $jenjangText = $item->jenjang ?? ($item->pendaftaran?->jenjang ?? 'Reguler');
             $kamarText = $item->kamar ?? '-';
             $statusText = ucfirst($item->status ?? 'aktif');
             $statusKey = strtolower($item->status ?? 'aktif');
         @endphp
-        <div class="mobile-siswa-card {{ !$isLengkap ? 'row-incomplete' : '' }}">
+        <div class="mobile-siswa-card {{ !$isLengkap ? 'row-incomplete' : '' }}"
+             data-view-url="{{ $targetViewUrl }}"
+             data-edit-url="{{ $targetEditUrl }}"
+             data-cetak-url="{{ $targetCetakUrl }}">
             {{-- Sisi Kiri: Nama & Kolom Jenjang, Kamar, Status --}}
             <div class="mobile-siswa-info">
                 <div class="mobile-siswa-nama-wrap">
@@ -1173,17 +1201,26 @@
                     </button>
                     @endif
 
-                    {{-- Tombol Lihat (Mata - Biru) --}}
-                    <a href="{{ $targetCetakUrl }}" class="mobile-action-btn btn-view" title="Lihat Formulir Siswa" aria-label="Lihat Formulir {{ $item->nama_lengkap }}">
+                    {{-- Tombol Lihat (Halaman View Penuh) --}}
+                    <a href="{{ $targetViewUrl }}" class="mobile-action-btn btn-view" title="Lihat Formulir Siswa" aria-label="Lihat Formulir {{ $item->nama_lengkap }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                             <circle cx="12" cy="12" r="3"></circle>
                         </svg>
                     </a>
 
-                    {{-- Tombol Edit / Koreksi (Pensil - Kuning) --}}
+                    {{-- Tombol Cetak (Format Formulir Cetak A4) --}}
+                    <a href="{{ $targetCetakUrl }}" target="_blank" class="mobile-action-btn btn-print" title="Cetak Formulir / Biodata" aria-label="Cetak Formulir {{ $item->nama_lengkap }}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                            <rect x="6" y="14" width="12" height="8"></rect>
+                        </svg>
+                    </a>
+
+                    {{-- Tombol Edit / Koreksi (Halaman Edit Penuh) --}}
                     @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
-                    <a href="{{ route('siswa.edit', $item->id) }}"
+                    <a href="{{ $targetEditUrl }}"
                        class="mobile-action-btn btn-edit {{ !$isLengkap ? 'is-koreksi' : '' }}"
                        title="{{ !$isLengkap ? 'Edit & Koreksi Kelengkapan Data Santri (' . implode(', ', $missingFields) . ')' : 'Edit Formulir Pendaftaran Siswa' }}"
                        aria-label="{{ !$isLengkap ? 'Edit & Koreksi Data ' . $item->nama_lengkap : 'Edit Formulir ' . $item->nama_lengkap }}">

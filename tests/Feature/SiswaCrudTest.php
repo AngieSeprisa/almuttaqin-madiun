@@ -37,8 +37,61 @@ class SiswaCrudTest extends TestCase
         $response->assertSee('Kamar A1');
         $response->assertSee('Aksi');
         $response->assertSee('Lihat');
+        $response->assertSee('Cetak');
         $response->assertSee('Edit');
         $response->assertSee('Hapus');
+    }
+
+    public function test_klik_tombol_lihat_pada_siswa_mengalihkan_ke_halaman_view_record_penuh(): void
+    {
+        $siswa = Siswa::create([
+            'nama_lengkap' => 'Santri Uji View',
+            'jenjang'      => 'SMP',
+            'kamar'        => 'Kamar A1',
+            'status'       => 'aktif',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('siswa'));
+        $response->assertStatus(200);
+        $response->assertSee(route('siswa.show', $siswa->id));
+
+        $responseView = $this->actingAs($this->admin)->get(route('siswa.show', $siswa->id));
+        $responseView->assertRedirect();
+        $this->assertStringContainsString('/pendaftaran/', $responseView->headers->get('Location'));
+        $this->assertStringContainsString('from=siswa', $responseView->headers->get('Location'));
+
+        $responseShow = $this->actingAs($this->admin)->get($responseView->headers->get('Location'));
+        $responseShow->assertStatus(200);
+        $responseShow->assertSee('Santri Uji View');
+        $responseShow->assertSee('Kembali ke Siswa');
+        $responseShow->assertSee('Edit Formulir');
+        $responseShow->assertSee('Cetak Formulir');
+    }
+
+    public function test_klik_tombol_cetak_pada_siswa_mengalihkan_ke_formulir_cetak_a4(): void
+    {
+        $siswa = Siswa::create([
+            'nama_lengkap' => 'Santri Uji Cetak',
+            'jenjang'      => 'SMP',
+            'kamar'        => 'Kamar A1',
+            'status'       => 'aktif',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('siswa'));
+        $response->assertStatus(200);
+        $response->assertSee(route('siswa.cetak', $siswa->id));
+
+        $responseCetak = $this->actingAs($this->admin)->get(route('siswa.cetak', $siswa->id));
+        $responseCetak->assertRedirect();
+        $this->assertStringContainsString('/cetak', $responseCetak->headers->get('Location'));
+        $this->assertStringContainsString('from=siswa', $responseCetak->headers->get('Location'));
+        $this->assertStringContainsString('print=1', $responseCetak->headers->get('Location'));
+
+        $responsePaper = $this->actingAs($this->admin)->get($responseCetak->headers->get('Location'));
+        $responsePaper->assertStatus(200);
+        $responsePaper->assertSee('Santri Uji Cetak');
+        $responsePaper->assertSee('Pratinjau Formulir Cetak');
+        $responsePaper->assertSee('Ukuran kertas A4');
     }
 
     public function test_dapat_menambahkan_siswa_baru(): void

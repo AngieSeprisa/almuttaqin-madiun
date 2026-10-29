@@ -165,25 +165,10 @@ class SiswaController extends Controller
     }
 
     /**
-     * Menampilkan detail data siswa (mengalihkan ke formulir cetak).
+     * Dapatkan atau sinkronkan data pendaftaran dari data siswa.
      */
-    public function show($id)
+    protected function getOrCreatePendaftaran(Siswa $siswa): Pendaftaran
     {
-        return $this->cetak($id);
-    }
-
-    /**
-     * Menampilkan tampilan formulir cetak santri.
-     */
-    public function cetak($id)
-    {
-        $siswa = Siswa::findOrFail($id);
-
-        if (request()->wantsJson()) {
-            return response()->json($siswa);
-        }
-
-        // Cari atau hubungkan pendaftaran
         $pendaftaran = $siswa->pendaftaran;
         if (!$pendaftaran && !empty($siswa->pendaftaran_id)) {
             $pendaftaran = Pendaftaran::find($siswa->pendaftaran_id);
@@ -203,6 +188,7 @@ class SiswaController extends Controller
             $panggilan = explode(' ', trim($siswa->nama_lengkap))[0] ?? 'Santri';
 
             $pendaftaran = Pendaftaran::create([
+                'jenjang' => $siswa->jenjang ?? 'Reguler',
                 'no_induk' => "PSB-{$tahun}-{$urut}",
                 'nik' => '3519' . str_pad($siswa->id % 99, 2, '0', STR_PAD_LEFT) . date('dmy') . rand(1000, 9999),
                 'nama_lengkap' => $siswa->nama_lengkap,
@@ -256,7 +242,39 @@ class SiswaController extends Controller
             $siswa->update(['pendaftaran_id' => $pendaftaran->id]);
         }
 
-        return redirect()->route('pendaftaran.cetak', ['id' => $pendaftaran->id, 'from' => 'siswa']);
+        return $pendaftaran;
+    }
+
+    /**
+     * Menampilkan detail data siswa (membuka halaman View Pendaftaran santri secara penuh).
+     */
+    public function show($id)
+    {
+        $siswa = Siswa::findOrFail($id);
+
+        if (request()->wantsJson()) {
+            return response()->json($siswa);
+        }
+
+        $pendaftaran = $this->getOrCreatePendaftaran($siswa);
+
+        return redirect()->route('pendaftaran.show', ['id' => $pendaftaran->id, 'from' => 'siswa']);
+    }
+
+    /**
+     * Menampilkan tampilan formulir cetak santri (kertas A4 / print preview).
+     */
+    public function cetak($id)
+    {
+        $siswa = Siswa::findOrFail($id);
+
+        if (request()->wantsJson()) {
+            return response()->json($siswa);
+        }
+
+        $pendaftaran = $this->getOrCreatePendaftaran($siswa);
+
+        return redirect()->route('pendaftaran.cetak', ['id' => $pendaftaran->id, 'from' => 'siswa', 'print' => 1]);
     }
 
     /**
@@ -270,35 +288,7 @@ class SiswaController extends Controller
             return response()->json($siswa);
         }
 
-        // Cari atau hubungkan data pendaftaran
-        $pendaftaran = $siswa->pendaftaran;
-        if (!$pendaftaran && !empty($siswa->pendaftaran_id)) {
-            $pendaftaran = Pendaftaran::find($siswa->pendaftaran_id);
-        }
-
-        if (!$pendaftaran) {
-            $pendaftaran = Pendaftaran::where('nama_lengkap', $siswa->nama_lengkap)->first();
-            if ($pendaftaran) {
-                $siswa->update(['pendaftaran_id' => $pendaftaran->id]);
-            }
-        }
-
-        if (!$pendaftaran) {
-            $tahun = date('Y');
-            $count = Pendaftaran::whereYear('created_at', $tahun)->count() + 1;
-            $urut = str_pad($count, 4, '0', STR_PAD_LEFT);
-            $panggilan = explode(' ', trim($siswa->nama_lengkap))[0] ?? 'Santri';
-
-            $pendaftaran = Pendaftaran::create([
-                'jenjang' => $siswa->jenjang ?? 'Reguler',
-                'no_induk' => "PSB-{$tahun}-{$urut}",
-                'nama_lengkap' => $siswa->nama_lengkap,
-                'nama_panggilan' => $panggilan,
-                'status_pendaftaran' => 'Diterima',
-            ]);
-
-            $siswa->update(['pendaftaran_id' => $pendaftaran->id]);
-        }
+        $pendaftaran = $this->getOrCreatePendaftaran($siswa);
 
         return redirect()->route('pendaftaran.edit', ['id' => $pendaftaran->id, 'from' => 'siswa']);
     }

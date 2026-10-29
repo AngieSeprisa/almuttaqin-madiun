@@ -1054,8 +1054,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (selectedCount === 1) {
           var selMeta = selectedItems[0];
           var tr = selMeta.tr;
-          var viewLnk = tr.querySelector('a.action-btn-view, a.btn-view, a[title*="Lihat"], a[href*="show"], a[href*="cetak"]');
-          var editLnk = tr.querySelector('a.action-btn-edit, a.btn-edit, a.action-btn-koreksi, a[title*="Edit"], a[href*="edit"]');
+          var viewLnk = tr.querySelector('a.action-btn-view, a.btn-view, a[title*="Lihat"], a[href*="show"]') || (tr.dataset && tr.dataset.viewUrl ? { href: tr.dataset.viewUrl } : null);
+          var printLnk = tr.querySelector('a.action-btn-print, a.btn-print, a[title*="Cetak"], a[href*="cetak"]') || (tr.dataset && tr.dataset.cetakUrl ? { href: tr.dataset.cetakUrl } : null);
+          var editLnk = tr.querySelector('a.action-btn-edit, a.btn-edit, a.action-btn-koreksi, a[title*="Edit"], a[href*="edit"]') || (tr.dataset && tr.dataset.editUrl ? { href: tr.dataset.editUrl } : null);
           var rfidBtn = tr.querySelector('button.btn-rfid-pair, button[data-uid], button[title*="RFID"]');
           var delBtn = tr.querySelector('.action-btn-delete, .btn-delete, button.js-swal-confirm');
 
@@ -1073,7 +1074,23 @@ document.addEventListener('DOMContentLoaded', function () {
             bulkMenu.appendChild(aView);
           }
 
-          // 2. Edit Data Siswa
+          // 2. Cetak Formulir / Biodata
+          if (printLnk) {
+            var aPrint = document.createElement('a');
+            aPrint.className = 'fi-ta-bulk-item';
+            aPrint.href = printLnk.href;
+            aPrint.target = '_blank';
+            aPrint.innerHTML =
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="6 9 6 2 18 2 18 9"></polyline>' +
+                '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>' +
+                '<rect x="6" y="14" width="12" height="8"></rect>' +
+              '</svg>' +
+              '<span>Cetak Formulir / Biodata</span>';
+            bulkMenu.appendChild(aPrint);
+          }
+
+          // 3. Edit Data Siswa
           if (editLnk) {
             var aEdit = document.createElement('a');
             aEdit.className = 'fi-ta-bulk-item';
@@ -1087,7 +1104,7 @@ document.addEventListener('DOMContentLoaded', function () {
             bulkMenu.appendChild(aEdit);
           }
 
-          // 3. Pairing Kartu RFID
+          // 4. Pairing Kartu RFID
           if (rfidBtn) {
             var bRfid = document.createElement('button');
             bRfid.type = 'button';
@@ -1105,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', function () {
             bulkMenu.appendChild(bRfid);
           }
 
-          if (viewLnk || editLnk || rfidBtn) {
+          if (viewLnk || printLnk || editLnk || rfidBtn) {
             var div1 = document.createElement('div');
             div1.className = 'fi-ta-bulk-divider';
             bulkMenu.appendChild(div1);

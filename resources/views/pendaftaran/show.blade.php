@@ -3,16 +3,21 @@
 @section('title', 'Verifikasi Pendaftaran: ' . $pendaftaran->nama_lengkap)
 
 @section('header-actions')
+@php
+    $from = request('from', 'pendaftaran');
+    $backUrl = $from === 'siswa' ? route('siswa') : route('pendaftaran.index');
+    $backLabel = $from === 'siswa' ? 'Kembali ke Siswa' : 'Kembali';
+@endphp
 <div style="display:flex; gap:10px; align-items:center;">
-    <a href="{{ route('pendaftaran.index') }}" class="btn btn-secondary">
+    <a href="{{ $backUrl }}" class="btn btn-secondary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
         </svg>
-        Kembali
+        {{ $backLabel }}
     </a>
     @if(!auth()->check() || auth()->user()->canDo('pendaftaran', 'edit'))
-    <a href="{{ route('pendaftaran.edit', $pendaftaran->id) }}" class="btn btn-secondary">
+    <a href="{{ route('pendaftaran.edit', ['id' => $pendaftaran->id, 'from' => $from]) }}" class="btn btn-secondary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -20,13 +25,13 @@
         Edit Formulir
     </a>
     @endif
-    <a href="{{ route('pendaftaran.cetak', $pendaftaran->id) }}" target="_blank" class="btn btn-primary">
+    <a href="{{ route('pendaftaran.cetak', ['id' => $pendaftaran->id, 'from' => $from, 'print' => 1]) }}" target="_blank" class="btn btn-primary" title="Cetak Formulir / Biodata">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
             <polyline points="6 9 6 2 18 2 18 9"></polyline>
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
             <rect x="6" y="14" width="12" height="8"></rect>
         </svg>
-        Cetak / Unduh Formulir
+        Cetak Formulir
     </a>
 </div>
 @endsection
