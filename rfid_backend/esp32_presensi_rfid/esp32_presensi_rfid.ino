@@ -112,31 +112,41 @@ void beepWarning() {
     digitalWrite(BUZZER_PIN, LOW);
 }
 
+// ================= HELPER RATA TENGAH LCD 16X2 =================
+void printCenter(String teks, int baris) {
+    teks.trim();
+    if (teks.length() > 16) {
+        teks = teks.substring(0, 16);
+    }
+    int offset = (16 - teks.length()) / 2;
+    if (offset < 0) offset = 0;
+    lcd.setCursor(0, baris);
+    lcd.print("                ");
+    lcd.setCursor(offset, baris);
+    lcd.print(teks);
+}
+
 // ================= TAMPILAN STANDBY / SESI AKTIF ===============
 void showStandbyScreen() {
     lcd.clear();
     if (!hasActiveSesi) {
-        // Spesifikasi 1: Tidak ada sesi -> Baris 1 "TIDAK ADA SESI", Baris 2 kosong
-        lcd.setCursor(0, 0);
-        lcd.print("TIDAK ADA SESI");
-        lcd.setCursor(0, 1);
-        lcd.print("                ");
+        // Spesifikasi 1: Tidak ada sesi -> Baris 0 "TIDAK ADA SESI", Baris 1 kosong
+        printCenter("TIDAK ADA SESI", 0);
+        printCenter("", 1);
     } else {
-        // Spesifikasi 2: Ada sesi -> Baris 1 Kategori, Baris 2 Nama Sesi
+        // Spesifikasi 2: Ada sesi -> Baris 0 Kategori, Baris 1 Nama Sesi
         String kat = currentKategori;
         String ses = currentSesiName;
         kat.trim();
         ses.trim();
 
-        lcd.setCursor(0, 0);
-        lcd.print(kat.substring(0, 16));
+        printCenter(kat, 0);
 
-        lcd.setCursor(0, 1);
-        // Jika kategori dan nama sesi sama (atau nama kosong), kosongkan baris 2
+        // Jika kategori dan nama sesi sama (atau nama kosong), kosongkan baris 1
         if (kat.equalsIgnoreCase(ses) || ses.length() == 0) {
-            lcd.print("                ");
+            printCenter("", 1);
         } else {
-            lcd.print(ses.substring(0, 16));
+            printCenter(ses, 1);
         }
     }
     showingResult = false;
@@ -204,10 +214,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         String status = doc["status"] | "BERHASIL ABSEN";
 
         lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print(nama.substring(0, 16));
-        lcd.setCursor(0, 1);
-        lcd.print(status.substring(0, 16));
+        printCenter(nama, 0);
+        printCenter(status, 1);
 
         if (status.equalsIgnoreCase("BERHASIL ABSEN")) {
             beepSuccess();
@@ -227,10 +235,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 // ================= KONEKSI WIFI & MQTT =========================
 void connectWiFi() {
     lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Menghubungkan");
-    lcd.setCursor(0, 1);
-    lcd.print("WiFi...");
+    printCenter("MENGHUBUNGKAN", 0);
+    printCenter("WIFI...", 1);
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -292,10 +298,8 @@ void setup() {
 
     // Tampilkan Device ID saat pertama kali dinyalakan
     lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("ALAT AKTIF:");
-    lcd.setCursor(0, 1);
-    lcd.print(activeDeviceId.substring(0, 16));
+    printCenter("ALAT AKTIF:", 0);
+    printCenter(activeDeviceId, 1);
     beepTap();
     delay(2000);
 
@@ -318,11 +322,15 @@ void loop() {
     }
     mqttClient.loop();
 
-    // 1. Timeout Proteksi Tap: Jika 3 detik tidak ada respon dari server, kembalikan ke standby
+    // 1. Timeout Proteksi Tap: Jika 3 detik tidak ada respon dari server, tampilkan timeout
     if (waitingResponse && (millis() - tapSentAtMs >= 3000)) {
         waitingResponse = false;
         beepWarning();
-        showStandbyScreen();
+        lcd.clear();
+        printCenter("SERVER TIMEOUT", 0);
+        printCenter("COBA LAGI", 1);
+        showingResult = true;
+        lcdResetAtMs = millis() + 2000;
     }
 
     // 2. Kembalikan layar LCD ke standby setelah 3 detik menampilkan hasil tap
@@ -378,10 +386,8 @@ void loop() {
 
     // Tampilkan pesan proses
     lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("MEMPROSES KARTU ");
-    lcd.setCursor(0, 1);
-    lcd.print("MOHON TUNGGU... ");
+    printCenter("MEMPROSES KARTU", 0);
+    printCenter("MOHON TUNGGU...", 1);
 
     waitingResponse = true;
     tapSentAtMs = millis();
