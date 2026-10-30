@@ -1139,35 +1139,55 @@
                 searchDropdown.style.display = 'block';
             }
 
+            var searchAbort = null;
+
             if (searchInput) {
                 searchInput.addEventListener('input', function() {
                     var q = searchInput.value.trim();
                     if (searchTimer) clearTimeout(searchTimer);
+                    if (searchAbort) searchAbort.abort();
+
                     if (!q) {
                         if (searchSpinner) searchSpinner.style.display = 'none';
                         if (searchDropdown) searchDropdown.style.display = 'none';
                         return;
                     }
                     if (searchCache[q]) {
+                        if (searchSpinner) searchSpinner.style.display = 'none';
                         renderQuickSearch(searchCache[q], q);
                         return;
                     }
                     if (searchSpinner) searchSpinner.style.display = 'block';
+
+                    if (searchResults && searchDropdown.style.display === 'block') {
+                        searchResults.innerHTML = '<div class="topbar-search-empty" style="color:var(--text-muted); padding:16px; text-align:center;">Mencari "' + esc(q) + '"...</div>';
+                    }
+
                     searchTimer = setTimeout(function() {
+                        searchAbort = new AbortController();
                         fetch('{{ route("quick-search") }}?q=' + encodeURIComponent(q), {
+                            signal: searchAbort.signal,
                             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                         })
-                        .then(function(r) { return r.json(); })
+                        .then(function(r) { 
+                            if (!r.ok) throw new Error('HTTP ' + r.status);
+                            return r.json(); 
+                        })
                         .then(function(data) {
+                            if (searchInput.value.trim() !== q) return;
                             if (searchSpinner) searchSpinner.style.display = 'none';
                             var cats = data.results || [];
                             searchCache[q] = cats;
                             renderQuickSearch(cats, q);
                         })
-                        .catch(function() {
-                            if (searchSpinner) searchSpinner.style.display = 'none';
+                        .catch(function(err) {
+                            if (err.name === 'AbortError') return;
+                            if (searchInput.value.trim() === q) {
+                                if (searchSpinner) searchSpinner.style.display = 'none';
+                                renderQuickSearch([], q);
+                            }
                         });
-                    }, 220);
+                    }, 200);
                 });
             }
 

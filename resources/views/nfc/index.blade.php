@@ -841,6 +841,18 @@ document.addEventListener('DOMContentLoaded', function () {
         checkInputCompleteness();
     });
 
+    function formatKamar(kamar) {
+        if (!kamar) return '';
+        kamar = String(kamar).trim();
+        return /^kamar\b/i.test(kamar) ? kamar : 'Kamar ' + kamar;
+    }
+
+    function formatKelas(kelas) {
+        if (!kelas) return '';
+        kelas = String(kelas).trim();
+        return /^kelas\b/i.test(kelas) ? kelas : 'Kelas ' + kelas;
+    }
+
     function showSiswaDropdown(query) {
         const q = query.toLowerCase();
         let matches = siswasData;
@@ -866,9 +878,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const item = document.createElement('div');
             item.className = 'nfc-dropdown-item';
             
-            const metaInfo = [s.jenjang || 'Pondok', s.kelas ? 'Kelas ' + s.kelas : null, s.kamar ? 'Kamar: ' + s.kamar : null]
-                .filter(Boolean)
-                .join(' • ');
+            const metaInfo = [
+                s.jenjang || 'Pondok', 
+                s.kelas ? formatKelas(s.kelas) : null, 
+                s.kamar ? formatKamar(s.kamar) : null
+            ].filter(Boolean).join(' • ');
 
             const badgeHtml = s.rfid_uid
                 ? `<span class="nfc-item-badge nfc-badge-has">Kartu: ${s.rfid_uid}</span>`
@@ -893,9 +907,11 @@ document.addEventListener('DOMContentLoaded', function () {
         inputSiswaId.value = s.id;
         prevNama.textContent = s.nama_lengkap;
         
-        const metaInfo = [s.jenjang || 'Pondok', s.kelas ? 'Kelas ' + s.kelas : null, s.kamar ? 'Kamar ' + s.kamar : null]
-            .filter(Boolean)
-            .join(' • ');
+        const metaInfo = [
+            s.jenjang || 'Pondok', 
+            s.kelas ? formatKelas(s.kelas) : null, 
+            s.kamar ? formatKamar(s.kamar) : null
+        ].filter(Boolean).join(' • ');
         prevMeta.textContent = metaInfo;
 
         selectedSiswaCard.style.display = 'flex';
@@ -975,7 +991,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 // Update data memori lokal
                 const found = siswasData.find(s => s.id == siswaId);
-                if (found) found.rfid_uid = serial;
+                if (found) found.rfid_uid = (data.siswa && data.siswa.rfid_uid) ? data.siswa.rfid_uid : serial;
 
                 // Update indikator statistik
                 const statTerdaftar = document.getElementById('statTerdaftar');

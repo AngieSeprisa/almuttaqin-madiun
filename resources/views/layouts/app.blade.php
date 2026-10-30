@@ -748,13 +748,21 @@
 
                     if (searchSpinner) searchSpinner.style.display = 'block';
 
+                    // Update pratinjau dropdown agar tidak tertinggal teks query lama
+                    if (searchResults && searchDropdown.style.display === 'block') {
+                        searchResults.innerHTML = '<div class="topbar-search-empty" style="color:var(--text-muted); padding:16px; text-align:center;">Mencari "' + escapeHtml(q) + '"...</div>';
+                    }
+
                     searchDebounceTimer = setTimeout(function() {
                         searchAbort = new AbortController();
                         fetch('{{ route("quick-search") }}?q=' + encodeURIComponent(q), {
                             signal: searchAbort.signal,
                             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                         })
-                        .then(function(res) { return res.json(); })
+                        .then(function(res) { 
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
+                            return res.json(); 
+                        })
                         .then(function(data) {
                             if (searchInput.value.trim() !== q) return;
                             if (searchSpinner) searchSpinner.style.display = 'none';
@@ -764,8 +772,9 @@
                         })
                         .catch(function(err) {
                             if (err.name === 'AbortError') return;
-                            if (searchInput.value.trim() === q && searchSpinner) {
-                                searchSpinner.style.display = 'none';
+                            if (searchInput.value.trim() === q) {
+                                if (searchSpinner) searchSpinner.style.display = 'none';
+                                renderSearchResults([], q);
                             }
                             console.error('Quick search error:', err);
                         });

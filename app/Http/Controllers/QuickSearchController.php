@@ -258,105 +258,149 @@ class QuickSearchController extends Controller
             || $authUser->canDo('siswa', 'view');
 
         if ($canSearchSiswa) {
-            $siswas = Siswa::query()
-                ->where(function($query) use ($q, $qLower) {
-                    $query->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$qLower}%"])
-                        ->orWhere('nama_lengkap', 'like', "%{$q}%")
-                        ->orWhere('kelas', 'like', "%{$q}%")
-                        ->orWhere('kamar', 'like', "%{$q}%")
-                        ->orWhere('rfid_uid', 'like', "%{$q}%")
-                        ->orWhereHas('pendaftaran', function($p) use ($q, $qLower) {
-                            $p->where('nik', 'like', "%{$q}%")
-                              ->orWhere('nisn', 'like', "%{$q}%")
-                              ->orWhere('no_induk', 'like', "%{$q}%")
-                              ->orWhereRaw('LOWER(nama_panggilan) LIKE ?', ["%{$qLower}%"]);
-                        });
-                })
-                ->limit(6)
-                ->get();
+            try {
+                $siswas = Siswa::query()
+                    ->where(function($query) use ($q, $qLower) {
+                        $query->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$qLower}%"])
+                            ->orWhere('nama_lengkap', 'like', "%{$q}%")
+                            ->orWhere('kelas', 'like', "%{$q}%")
+                            ->orWhere('kamar', 'like', "%{$q}%")
+                            ->orWhere('rfid_uid', 'like', "%{$q}%")
+                            ->orWhereHas('pendaftaran', function($p) use ($q, $qLower) {
+                                $p->where('nik', 'like', "%{$q}%")
+                                  ->orWhere('nisn', 'like', "%{$q}%")
+                                  ->orWhere('no_induk', 'like', "%{$q}%")
+                                  ->orWhereRaw('LOWER(nama_panggilan) LIKE ?', ["%{$qLower}%"]);
+                            });
+                    })
+                    ->limit(6)
+                    ->get();
 
-            if ($siswas->isNotEmpty()) {
-                $siswaItems = [];
-                foreach ($siswas as $s) {
-                    $siswaItems[] = [
-                        'title' => $s->nama_lengkap,
-                        'subtitle' => 'Jenjang: ' . strtoupper($s->jenjang ?? '-') . ' • Kelas: ' . ($s->kelas ?? '-') . ' • Kamar: ' . ($s->kamar ?? '-'),
-                        'url' => route('siswa', ['search' => $s->nama_lengkap]),
-                        'badge' => ucfirst($s->status ?? 'Santri'),
-                        'icon' => 'user',
+                if ($siswas->isNotEmpty()) {
+                    $siswaItems = [];
+                    foreach ($siswas as $s) {
+                        $siswaItems[] = [
+                            'title' => $s->nama_lengkap,
+                            'subtitle' => 'Jenjang: ' . strtoupper($s->jenjang ?? '-') . ' • Kelas: ' . ($s->kelas ?? '-') . ' • Kamar: ' . ($s->kamar ?? '-'),
+                            'url' => route('siswa', ['search' => $s->nama_lengkap]),
+                            'badge' => ucfirst($s->status ?? 'Santri'),
+                            'icon' => 'user',
+                        ];
+                    }
+                    $groups[] = [
+                        'name' => 'Data Siswa',
+                        'items' => $siswaItems,
                     ];
                 }
-                $groups[] = [
-                    'name' => 'Data Siswa',
-                    'items' => $siswaItems,
-                ];
+            } catch (\Throwable $e) {
+                // Fallback query tanpa relasi jika schema relasi belum termigrasi
+                try {
+                    $siswas = Siswa::query()
+                        ->where(function($query) use ($q, $qLower) {
+                            $query->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$qLower}%"])
+                                ->orWhere('nama_lengkap', 'like', "%{$q}%")
+                                ->orWhere('kelas', 'like', "%{$q}%")
+                                ->orWhere('kamar', 'like', "%{$q}%")
+                                ->orWhere('rfid_uid', 'like', "%{$q}%");
+                        })
+                        ->limit(6)
+                        ->get();
+
+                    if ($siswas->isNotEmpty()) {
+                        $siswaItems = [];
+                        foreach ($siswas as $s) {
+                            $siswaItems[] = [
+                                'title' => $s->nama_lengkap,
+                                'subtitle' => 'Jenjang: ' . strtoupper($s->jenjang ?? '-') . ' • Kelas: ' . ($s->kelas ?? '-') . ' • Kamar: ' . ($s->kamar ?? '-'),
+                                'url' => route('siswa', ['search' => $s->nama_lengkap]),
+                                'badge' => ucfirst($s->status ?? 'Santri'),
+                                'icon' => 'user',
+                            ];
+                        }
+                        $groups[] = [
+                            'name' => 'Data Siswa',
+                            'items' => $siswaItems,
+                        ];
+                    }
+                } catch (\Throwable $e2) {
+                    \Illuminate\Support\Facades\Log::warning('QuickSearch siswa error: ' . $e2->getMessage());
+                }
             }
         }
 
         // 3. Guru & Pegawai
         $canSearchGuru = !$authUser || $authUser->canDo('guru_sekolah', 'view') || $authUser->canDo('pengguna', 'view') || $authUser->isYayasan() || in_array($authUser->role, ['admin_lembaga', 'guru']);
         if ($canSearchGuru) {
-            $users = User::query()
-                ->where(function($query) use ($q, $qLower) {
-                    $query->whereRaw('LOWER(name) LIKE ?', ["%{$qLower}%"])
-                        ->orWhere('name', 'like', "%{$q}%")
-                        ->orWhere('nip', 'like', "%{$q}%")
-                        ->orWhere('mata_pelajaran', 'like', "%{$q}%")
-                        ->orWhere('email', 'like', "%{$q}%");
-                })
-                ->limit(4)
-                ->get();
+            try {
+                $users = User::query()
+                    ->where(function($query) use ($q, $qLower) {
+                        $query->whereRaw('LOWER(name) LIKE ?', ["%{$qLower}%"])
+                            ->orWhere('name', 'like', "%{$q}%")
+                            ->orWhere('nip', 'like', "%{$q}%")
+                            ->orWhere('mata_pelajaran', 'like', "%{$q}%")
+                            ->orWhere('email', 'like', "%{$q}%");
+                    })
+                    ->limit(4)
+                    ->get();
 
-            if ($users->isNotEmpty()) {
-                $userItems = [];
-                foreach ($users as $u) {
-                    $sub = [];
-                    if ($u->mata_pelajaran) $sub[] = 'Mapel: ' . $u->mata_pelajaran;
-                    if ($u->nip) $sub[] = 'NIP: ' . $u->nip;
-                    if (empty($sub)) $sub[] = $u->email;
+                if ($users->isNotEmpty()) {
+                    $userItems = [];
+                    foreach ($users as $u) {
+                        $sub = [];
+                        if ($u->mata_pelajaran) $sub[] = 'Mapel: ' . $u->mata_pelajaran;
+                        if ($u->nip) $sub[] = 'NIP: ' . $u->nip;
+                        if (empty($sub)) $sub[] = $u->email;
 
-                    $userItems[] = [
-                        'title' => $u->name,
-                        'subtitle' => implode(' • ', $sub),
-                        'url' => route('guru-sekolah.index'),
-                        'badge' => str_replace('_', ' ', $u->role),
-                        'icon' => 'award',
+                        $userItems[] = [
+                            'title' => $u->name,
+                            'subtitle' => implode(' • ', $sub),
+                            'url' => route('guru-sekolah.index'),
+                            'badge' => str_replace('_', ' ', $u->role),
+                            'icon' => 'award',
+                        ];
+                    }
+                    $groups[] = [
+                        'name' => 'Guru & Pegawai',
+                        'items' => $userItems,
                     ];
                 }
-                $groups[] = [
-                    'name' => 'Guru & Pegawai',
-                    'items' => $userItems,
-                ];
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('QuickSearch guru error: ' . $e->getMessage());
             }
         }
 
         // 4. Data Pendaftaran Santri Baru
         if (!$authUser || $authUser->canDo('pendaftaran', 'view') || $authUser->isYayasan()) {
-            $pendaftar = Pendaftaran::query()
-                ->where(function($query) use ($q, $qLower) {
-                    $query->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$qLower}%"])
-                        ->orWhere('nama_lengkap', 'like', "%{$q}%")
-                        ->orWhere('nomor_pendaftaran', 'like', "%{$q}%")
-                        ->orWhere('no_induk', 'like', "%{$q}%");
-                })
-                ->limit(3)
-                ->get();
+            try {
+                $pendaftar = Pendaftaran::query()
+                    ->where(function($query) use ($q, $qLower) {
+                        $query->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$qLower}%"])
+                            ->orWhere('nama_lengkap', 'like', "%{$q}%")
+                            ->orWhere('no_induk', 'like', "%{$q}%")
+                            ->orWhere('nik', 'like', "%{$q}%")
+                            ->orWhere('nisn', 'like', "%{$q}%");
+                    })
+                    ->limit(3)
+                    ->get();
 
-            if ($pendaftar->isNotEmpty()) {
-                $pendaftarItems = [];
-                foreach ($pendaftar as $p) {
-                    $pendaftarItems[] = [
-                        'title' => $p->nama_lengkap,
-                        'subtitle' => 'No: ' . ($p->nomor_pendaftaran ?? '-') . ' • Jenjang: ' . strtoupper($p->jenjang ?? '-'),
-                        'url' => route('pendaftaran.show', $p->id),
-                        'badge' => ucfirst($p->status ?? 'Pendaftar'),
-                        'icon' => 'user-plus',
+                if ($pendaftar->isNotEmpty()) {
+                    $pendaftarItems = [];
+                    foreach ($pendaftar as $p) {
+                        $pendaftarItems[] = [
+                            'title' => $p->nama_lengkap,
+                            'subtitle' => 'No: ' . ($p->no_induk ?? '-') . ' • Jenjang: ' . strtoupper($p->jenjang ?? '-'),
+                            'url' => route('pendaftaran.show', $p->id),
+                            'badge' => ucfirst($p->status ?? 'Pendaftar'),
+                            'icon' => 'user-plus',
+                        ];
+                    }
+                    $groups[] = [
+                        'name' => 'Pendaftaran Santri Baru',
+                        'items' => $pendaftarItems,
                     ];
                 }
-                $groups[] = [
-                    'name' => 'Pendaftaran Santri Baru',
-                    'items' => $pendaftarItems,
-                ];
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('QuickSearch pendaftaran error: ' . $e->getMessage());
             }
         }
 

@@ -152,6 +152,52 @@ class TopNavbarLiveSearchProfileTest extends TestCase
         $this->assertEmpty($responseNoMatch->json('results'));
     }
 
+    public function test_quick_search_as_yayasan_handles_pendaftar_without_crashing(): void
+    {
+        \App\Models\Pendaftaran::create([
+            'no_induk' => 'PSB-2026-9999',
+            'nik' => '3519000000000099',
+            'nama_lengkap' => 'Ahza Fikri',
+            'nama_panggilan' => 'Ahza',
+            'tempat_lahir' => 'Madiun',
+            'tanggal_lahir' => '2010-01-01',
+            'jenis_kelamin' => 'Laki-laki',
+            'anak_ke' => 1,
+            'jumlah_saudara' => 2,
+            'tinggal_bersama' => 'Orang Tua',
+            'alamat_jalan' => 'Jl. Merdeka',
+            'rt_rw' => '01/01',
+            'desa_kelurahan' => 'Kanigoro',
+            'kecamatan' => 'Kartoharjo',
+            'kab_kota' => 'Kota Madiun',
+            'kode_pos' => '63111',
+            'provinsi' => 'Jawa Timur',
+            'kelompok' => 'Kelompok 1',
+            'desa' => 'Desa 1',
+            'daerah' => 'Daerah 1',
+            'pendidikan_terakhir' => 'SD',
+            'status' => 'Pending',
+            'jenjang' => 'SMP',
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson(route('quick-search', ['q' => 'ahza']));
+        $response->assertStatus(200);
+
+        $data = $response->json();
+        $this->assertNotEmpty($data['results']);
+
+        $foundAhza = false;
+        foreach ($data['results'] as $group) {
+            foreach ($group['items'] as $item) {
+                if (str_contains($item['title'], 'Ahza Fikri')) {
+                    $foundAhza = true;
+                    break 2;
+                }
+            }
+        }
+        $this->assertTrue($foundAhza, 'Pendaftar Ahza Fikri should be found without SQL errors');
+    }
+
     public function test_user_profile_photo_upload_and_delete_flow(): void
     {
         Storage::fake('public');
