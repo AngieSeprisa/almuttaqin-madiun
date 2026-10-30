@@ -152,4 +152,65 @@ class NfcInputTest extends TestCase
         $siswa->refresh();
         $this->assertNull($siswa->rfid_uid);
     }
+
+    public function test_format_usb_reader_split_dan_interoperabilitas_esp32(): void
+    {
+        $siswa = Siswa::create([
+            'nama_lengkap' => 'Santri USB Tap',
+            'jenjang' => 'SMP',
+            'kamar' => 'Kamar D4',
+            'status' => 'aktif',
+        ]);
+
+        // 1. Simpan menggunakan format output USB reader: ;42992,47057
+        $response = $this->actingAs($this->admin)->postJson(route('nfc.assign'), [
+            'rfid_uid' => ';42992,47057',
+            'siswa_id' => $siswa->id,
+        ]);
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $siswa->refresh();
+        $this->assertEquals(';42992,47057', $siswa->rfid_uid);
+
+        // 2. Cek kartu menggunakan format HEX ESP32 (A7F0B7D1) -> harus terdeteksi milik santri yang sama
+        $respHex = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => 'A7F0B7D1']));
+        $respHex->assertStatus(200);
+        $respHex->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $siswa->id,
+                'nama_lengkap' => 'Santri USB Tap',
+            ],
+        ]);
+
+        // 3. Cek kartu menggunakan format tanpa titik koma (42992,47057)
+        $respNoSemi = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => '42992,47057']));
+        $respNoSemi->assertStatus(200);
+        $respNoSemi->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $siswa->id,
+            ],
+        ]);
+
+        // 4. Santri kedua mendaftar dengan format HEX A7F0B7D1 -> kartu santri pertama otomatis dialihkan
+        $siswa2 = Siswa::create([
+            'nama_lengkap' => 'Santri Kedua',
+            'jenjang' => 'SMA',
+            'status' => 'aktif',
+        ]);
+
+        $response2 = $this->actingAs($this->admin)->postJson(route('nfc.assign'), [
+            'rfid_uid' => 'A7F0B7D1',
+            'siswa_id' => $siswa2->id,
+        ]);
+        $response2->assertStatus(200);
+
+        $siswa->refresh();
+        $siswa2->refresh();
+        $this->assertNull($siswa->rfid_uid);
+        $this->assertEquals('A7F0B7D1', $siswa2->rfid_uid);
+    }
 }
+

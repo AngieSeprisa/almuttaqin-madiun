@@ -206,13 +206,63 @@ def get_active_sesi(cursor, device_id: str, current_time: str):
 
     return sesi
 
+def get_uid_variants(raw_uid: str) -> list:
+    """
+    Menghasilkan semua kemungkinan varian format serial kartu RFID/NFC:
+    1. Raw UID apa adanya (misal: ';42992,47057' atau 'A7F0B7D1')
+    2. Format tanpa titik koma: '42992,47057'
+    3. Format angka gabungan: '4299247057'
+    4. Format HEX 8-karakter: 'A7F0B7D1'
+    5. Format desimal 32-bit: '2817570769'
+    """
+    import re
+    clean = str(raw_uid).strip().rstrip('?').upper()
+    if not clean:
+        return []
+
+    variants = [clean]
+    if clean.startswith(';'):
+        variants.append(clean[1:])
+
+    # Format split desimal: ;42992,47057 atau 42992,47057
+    m = re.match(r'^;?(\d{1,5}),(\d{1,5})$', clean)
+    if m:
+        w1, w2 = int(m.group(1)), int(m.group(2))
+        variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{m.group(1)}{m.group(2)}"])
+        h1 = f"{w1:04X}"
+        h2 = f"{w2:04X}"
+        hex_val = (h1 + h2).upper()
+        variants.append(hex_val)
+        try:
+            variants.append(str(int(hex_val, 16)))
+        except ValueError:
+            pass
+    # Format HEX 8-digit dari ESP32 (misal A7F0B7D1)
+    elif re.match(r'^[0-9A-F]{8}$', clean):
+        try:
+            w1 = int(clean[:4], 16)
+            w2 = int(clean[4:], 16)
+            variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
+            variants.append(str(int(clean, 16)))
+        except ValueError:
+            pass
+
+    return list(dict.fromkeys(variants))
+
 def find_entity_by_uid(cursor, clean_uid: str):
     """
     Mencari entitas pemilik kartu:
     1. Cek tabel siswas (santri/siswa)
     2. Cek tabel users (guru/pegawai)
+    Mendukung varian format UID: HEX, desimal Wiegand split (;42992,47057), maupun angka murni.
     """
-    cursor.execute("SELECT id, nama_lengkap, kamar, status FROM siswas WHERE UPPER(TRIM(rfid_uid)) = %s LIMIT 1", (clean_uid,))
+    variants = get_uid_variants(clean_uid)
+    if not variants:
+        variants = [clean_uid.strip().upper()]
+
+    placeholders = ", ".join(["%s"] * len(variants))
+    query_siswa = f"SELECT id, nama_lengkap, kamar, status FROM siswas WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) LIMIT 1"
+    cursor.execute(query_siswa, tuple(variants))
     santri = cursor.fetchone()
     if santri:
         return {
@@ -222,7 +272,8 @@ def find_entity_by_uid(cursor, clean_uid: str):
             "sub": santri.get("kamar", "Santri")
         }
 
-    cursor.execute("SELECT id, name, email FROM users WHERE UPPER(TRIM(rfid_uid)) = %s LIMIT 1", (clean_uid,))
+    query_user = f"SELECT id, name, email FROM users WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) LIMIT 1"
+    cursor.execute(query_user, tuple(variants))
     user = cursor.fetchone()
     if user:
         return {

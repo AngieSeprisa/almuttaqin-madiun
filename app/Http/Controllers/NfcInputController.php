@@ -41,11 +41,62 @@ class NfcInputController extends Controller
     }
 
     /**
+     * Menghasilkan semua varian representasi format serial RFID / NFC:
+     * 1. Format raw apa adanya (misal: ';42992,47057' atau 'A7F0B7D1')
+     * 2. Format tanpa titik koma: '42992,47057'
+     * 3. Format angka saja: '4299247057'
+     * 4. Format HEX 8-karakter (Wiegand 26/32-bit): 'A7F0B7D1'
+     * 5. Format desimal 32-bit: '2817570769'
+     */
+    public static function getUidVariants(string $uid): array
+    {
+        $uid = rtrim(trim($uid), '?');
+        if (empty($uid)) {
+            return [];
+        }
+
+        $variants = [$uid];
+        $upper = strtoupper($uid);
+        $variants[] = $upper;
+
+        // Jika diawali titik koma (;42992,47057)
+        if (str_starts_with($uid, ';')) {
+            $variants[] = substr($uid, 1);
+        }
+
+        // Jika format split desimal: ;42992,47057 atau 42992,47057
+        if (preg_match('/^;?(\d{1,5}),(\d{1,5})$/', $uid, $m)) {
+            $w1 = (int)$m[1];
+            $w2 = (int)$m[2];
+            $variants[] = ";{$w1},{$w2}";
+            $variants[] = "{$w1},{$w2}";
+            $variants[] = "{$m[1]}{$m[2]}";
+
+            $hex1 = str_pad(dechex($w1), 4, '0', STR_PAD_LEFT);
+            $hex2 = str_pad(dechex($w2), 4, '0', STR_PAD_LEFT);
+            $hex = strtoupper($hex1 . $hex2);
+            $variants[] = $hex;
+            $variants[] = (string)hexdec($hex);
+        }
+        // Jika format HEX 8-digit dari ESP32 (misal: A7F0B7D1)
+        elseif (preg_match('/^[0-9A-Fa-f]{8}$/', $uid)) {
+            $w1 = hexdec(substr($uid, 0, 4));
+            $w2 = hexdec(substr($uid, 4, 4));
+            $variants[] = ";{$w1},{$w2}";
+            $variants[] = "{$w1},{$w2}";
+            $variants[] = "{$w1}{$w2}";
+            $variants[] = (string)hexdec($uid);
+        }
+
+        return array_values(array_unique(array_filter($variants)));
+    }
+
+    /**
      * Cek status nomor serial kartu (apakah baru atau sudah terdaftar).
      */
     public function checkCard(Request $request)
     {
-        $serial = trim($request->input('serial', ''));
+        $serial = rtrim(trim($request->input('serial', '')), '?');
 
         if (empty($serial)) {
             return response()->json([
@@ -54,7 +105,8 @@ class NfcInputController extends Controller
             ]);
         }
 
-        $siswa = Siswa::where('rfid_uid', $serial)->first();
+        $variants = self::getUidVariants($serial);
+        $siswa = Siswa::whereIn('rfid_uid', $variants)->first();
 
         if ($siswa) {
             return response()->json([
@@ -92,17 +144,19 @@ class NfcInputController extends Controller
             'siswa_id.exists'   => 'Data santri tidak ditemukan.',
         ]);
 
-        $serial = trim($request->rfid_uid);
+        $serial = rtrim(trim($request->rfid_uid), '?');
         $siswa = Siswa::findOrFail($request->siswa_id);
 
-        // Jika kartu ini sebelumnya ada di santri lain, lepas dari santri lama agar tidak duplikat
-        $previousOwner = Siswa::where('rfid_uid', $serial)
+        $variants = self::getUidVariants($serial);
+
+        // Jika kartu ini sebelumnya ada di santri lain (dalam varian apapun), lepas dari santri lama agar tidak duplikat
+        $previousOwner = Siswa::whereIn('rfid_uid', $variants)
             ->where('id', '!=', $siswa->id)
             ->first();
 
-        if ($previousOwner) {
-            $previousOwner->update(['rfid_uid' => null]);
-        }
+        Siswa::whereIn('rfid_uid', $variants)
+            ->where('id', '!=', $siswa->id)
+            ->update(['rfid_uid' => null]);
 
         $siswa->update(['rfid_uid' => $serial]);
 
@@ -155,3 +209,4 @@ class NfcInputController extends Controller
         return redirect()->route('nfc.index')->with('success', $msg);
     }
 }
+

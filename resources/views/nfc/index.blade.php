@@ -30,7 +30,7 @@
 
     {{-- Form Utama Pairing Kartu (Filament Style Card) --}}
     <div class="fi-section-card">
-        <form id="nfcAssignForm" action="{{ route('nfc.assign') }}" method="POST" autocomplete="off">
+        <form id="nfcAssignForm" action="{{ route('nfc.assign', [], false) }}" method="POST" autocomplete="off">
             @csrf
 
             <div class="nfc-form-grid">
@@ -779,8 +779,8 @@ document.addEventListener('DOMContentLoaded', function () {
         badgeStatus.className = 'nfc-live-badge ready';
         badgeStatus.innerHTML = '<span class="pulse-indicator"></span><span>Kartu Terbaca</span>';
 
-        // Cek ke server apakah kartu sudah terdaftar
-        fetch(`{{ route('nfc.check-card') }}?serial=${encodeURIComponent(serial)}`, {
+        // Cek ke server apakah kartu sudah terdaftar (gunakan relative URL agar tidak bentrok dengan APP_URL localhost)
+        fetch(`{{ route('nfc.check-card', [], false) }}?serial=${encodeURIComponent(serial)}`, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(res => res.json())
@@ -936,7 +936,7 @@ document.addEventListener('DOMContentLoaded', function () {
         btnSubmitForm.disabled = true;
         btnSubmitForm.innerHTML = '<span>Menyimpan...</span>';
 
-        fetch('{{ route("nfc.assign") }}', {
+        fetch('{{ route("nfc.assign", [], false) }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -945,7 +945,14 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             body: JSON.stringify({ rfid_uid: serial, siswa_id: siswaId })
         })
-        .then(res => res.json())
+        .then(async res => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const errMsg = data.message || (data.errors ? Object.values(data.errors).flat().join(', ') : 'HTTP error ' + res.status);
+                throw new Error(errMsg);
+            }
+            return data;
+        })
         .then(data => {
             if (data.success) {
                 // Notifikasi Sukses
@@ -959,6 +966,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         toast: true,
                         position: 'top-end'
                     });
+                } else {
+                    alert(data.message);
                 }
 
                 // Tambahkan baris baru ke tabel riwayat
@@ -987,7 +996,9 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .catch(err => {
             console.error('Submit error:', err);
-            alert('Terjadi kesalahan saat menyimpan kartu.');
+            if (confirm('Gagal menyimpan via AJAX: ' + err.message + '\n\nApakah Anda ingin mencoba simpan langsung formulir?')) {
+                nfcForm.submit();
+            }
         })
         .finally(() => {
             btnSubmitForm.disabled = false;
@@ -1011,7 +1022,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const serial = btn.dataset.serial;
 
         const confirmAction = () => {
-            fetch('{{ route("nfc.unpair") }}', {
+            fetch('{{ route("nfc.unpair", [], false) }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1136,3 +1147,4 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 @endsection
+
