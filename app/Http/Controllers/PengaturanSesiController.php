@@ -127,7 +127,7 @@ class PengaturanSesiController extends Controller
             'device_id_target' => ['nullable', 'string', 'max:50', 'exists:master_devices,device_id'],
             'kategori' => ['nullable', Rule::in(['sholat', 'pengajian', 'sekolah', 'makan', 'pegawai'])],
             'target_kategori' => ['nullable', Rule::in(['semua_santri', 'kamar_khusus', 'sekolah', 'pegawai'])],
-            'target_filter' => ['nullable', 'string', 'max:100'],
+            'target_filter' => ['nullable'],
         ], [
             'kode_sesi.required' => 'Kode sesi wajib diisi.',
             'kode_sesi.unique' => 'Kode sesi tersebut sudah digunakan, silakan pilih kode lain.',
@@ -137,9 +137,18 @@ class PengaturanSesiController extends Controller
         ]);
 
         $targetKategori = $validated['target_kategori'] ?? 'semua_santri';
-        $targetFilter = in_array($targetKategori, ['kamar_khusus', 'sekolah'], true)
-            ? (trim((string) ($validated['target_filter'] ?? '')) ?: null)
-            : null;
+        $rawTargetFilter = $request->input('target_filter');
+
+        if (in_array($targetKategori, ['kamar_khusus', 'sekolah'], true)) {
+            if (is_array($rawTargetFilter)) {
+                $filtered = array_filter(array_map('trim', $rawTargetFilter));
+                $targetFilter = !empty($filtered) ? implode(', ', $filtered) : null;
+            } else {
+                $targetFilter = trim((string) $rawTargetFilter) ?: null;
+            }
+        } else {
+            $targetFilter = null;
+        }
 
         DB::table('master_sesis')->insert([
             'device_id_target' => !empty($validated['device_id_target']) ? $validated['device_id_target'] : null,
@@ -183,13 +192,22 @@ class PengaturanSesiController extends Controller
             'device_id_target' => ['nullable', 'string', 'max:50', 'exists:master_devices,device_id'],
             'kategori' => ['required', Rule::in(['sholat', 'pengajian', 'sekolah', 'makan', 'pegawai'])],
             'target_kategori' => ['required', Rule::in(['semua_santri', 'kamar_khusus', 'sekolah', 'pegawai'])],
-            'target_filter' => ['nullable', 'string', 'max:100'],
+            'target_filter' => ['nullable'],
         ]);
 
         $targetKategori = $validated['target_kategori'];
-        $targetFilter = in_array($targetKategori, ['kamar_khusus', 'sekolah'], true)
-            ? (trim((string) ($validated['target_filter'] ?? '')) ?: null)
-            : null;
+        $rawTargetFilter = $request->input('target_filter');
+
+        if (in_array($targetKategori, ['kamar_khusus', 'sekolah'], true)) {
+            if (is_array($rawTargetFilter)) {
+                $filtered = array_filter(array_map('trim', $rawTargetFilter));
+                $targetFilter = !empty($filtered) ? implode(', ', $filtered) : null;
+            } else {
+                $targetFilter = trim((string) $rawTargetFilter) ?: null;
+            }
+        } else {
+            $targetFilter = null;
+        }
 
         $updatePayload = [
             'device_id_target' => !empty($validated['device_id_target']) ? $validated['device_id_target'] : null,

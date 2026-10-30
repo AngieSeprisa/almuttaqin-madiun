@@ -223,4 +223,64 @@ class PengaturanSesiTest extends TestCase
         $this->assertStringContainsString('SMP', $sekolahData['sub']);
         $this->assertFalse($sekolahData['is_hadir']);
     }
+
+    public function test_mendukung_target_filter_multiple_kamar_dan_jenjang(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        // 1. Store dengan payload array untuk multiple kamar
+        $responseArray = $this->actingAs($yayasan)->post(route('pengaturan.sesi.store'), [
+            'kode_sesi' => 'sesi_multi_kamar',
+            'nama_sesi' => 'Sesi Multi Kamar Putri',
+            'jam_mulai' => '19:00',
+            'jam_selesai' => '20:30',
+            'toleransi_menit' => 15,
+            'kategori' => 'pengajian',
+            'target_kategori' => 'kamar_khusus',
+            'target_filter' => ['Kelas 8 Putri', 'Kelas 9 Putri'],
+        ]);
+
+        $responseArray->assertRedirect(route('pengaturan.sesi'));
+        $this->assertDatabaseHas('master_sesis', [
+            'kode_sesi' => 'SESI_MULTI_KAMAR',
+            'target_filter' => 'Kelas 8 Putri, Kelas 9 Putri',
+        ]);
+
+        // 2. Update dengan string comma-separated
+        $sesi = DB::table('master_sesis')->where('kode_sesi', 'SESI_MULTI_KAMAR')->first();
+        $responseString = $this->actingAs($yayasan)->put(route('pengaturan.sesi.update', $sesi->id), [
+            'kode_sesi' => 'SESI_MULTI_KAMAR',
+            'nama_sesi' => 'Sesi Multi Kamar Putri & Putra',
+            'jam_mulai' => '19:00',
+            'jam_selesai' => '20:30',
+            'toleransi_menit' => 15,
+            'kategori' => 'pengajian',
+            'target_kategori' => 'kamar_khusus',
+            'target_filter' => 'Kelas 8 Putri, Kelas 9 Putri, Kelas 8 Putra',
+        ]);
+
+        $responseString->assertRedirect(route('pengaturan.sesi'));
+        $this->assertDatabaseHas('master_sesis', [
+            'kode_sesi' => 'SESI_MULTI_KAMAR',
+            'target_filter' => 'Kelas 8 Putri, Kelas 9 Putri, Kelas 8 Putra',
+        ]);
+
+        // 3. Store dengan multiple jenjang sekolah
+        $responseSekolah = $this->actingAs($yayasan)->post(route('pengaturan.sesi.store'), [
+            'kode_sesi' => 'apel_gabungan_smp_sma',
+            'nama_sesi' => 'Apel Gabungan SMP & SMA',
+            'jam_mulai' => '07:00',
+            'jam_selesai' => '07:30',
+            'toleransi_menit' => 5,
+            'kategori' => 'sekolah',
+            'target_kategori' => 'sekolah',
+            'target_filter' => ['SMP', 'SMA'],
+        ]);
+
+        $responseSekolah->assertRedirect(route('pengaturan.sesi'));
+        $this->assertDatabaseHas('master_sesis', [
+            'kode_sesi' => 'APEL_GABUNGAN_SMP_SMA',
+            'target_filter' => 'SMP, SMA',
+        ]);
+    }
 }

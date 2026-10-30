@@ -1557,4 +1557,370 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   initFilamentTables();
+
+  /* ========================================================
+     FILAMENT 3.x STANDARDIZED SELECT DROPDOWN ENGINE (NATIVE: FALSE)
+     Upgrades <select> elements into searchable custom dropdowns with:
+     - Searchbox with live instant filter
+     - Prefix icons (user, home-modern, cpu-chip, clock, academic-cap, tag, etc.)
+     - Multiple selection pills with remove badges
+     - Preloaded options and interactive empty status messages
+     - Full two-way synchronization with native <select> & forms
+     ======================================================== */
+  function getFilamentIconSvg(name) {
+    switch (name) {
+      case 'user':
+        return '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z"/></svg>';
+      case 'home-modern':
+        return '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9.293 2.293a1 1 0 011.414 0l7 7A1 1 0 0117 11h-1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3a1 1 0 00-1-1H9a1 1 0 00-1 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-6H3a1 1 0 01-.707-1.707l7-7z" clip-rule="evenodd"/></svg>';
+      case 'cpu-chip':
+        return '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M13 7H7v6h6V7z"/><path fill-rule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clip-rule="evenodd"/></svg>';
+      case 'clock':
+        return '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clip-rule="evenodd"/></svg>';
+      case 'academic-cap':
+        return '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01-.25-2.762zM9.3 11.712l-2.05-.879v3.407a10.96 10.96 0 005.5 0v-3.407l-2.05.879a1.002 1.002 0 01-.9 0zM15 10.12l1.69-.723a11.115 11.115 0 01-.25 2.762 1 1 0 01-.89.89 8.968 8.968 0 00-1.05.174V10.12z"/></svg>';
+      case 'tag':
+        return '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.5 2A2.5 2.5 0 002 4.5v3.879a2.5 2.5 0 00.732 1.767l7.5 7.5a2.5 2.5 0 003.536 0l3.878-3.878a2.5 2.5 0 000-3.536l-7.5-7.5A2.5 2.5 0 008.38 2H4.5zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>';
+      case 'calendar':
+        return '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>';
+      case 'building':
+        return '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 01-1 1h-2a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clip-rule="evenodd"/></svg>';
+      default:
+        return '';
+    }
+  }
+
+  function detectSelectPrefixIcon(el) {
+    var explicit = el.getAttribute('data-prefix-icon');
+    if (explicit) return explicit;
+    var key = ((el.name || '') + ' ' + (el.id || '') + ' ' + (el.className || '')).toLowerCase();
+    if (/kamar|room/i.test(key)) return 'home-modern';
+    if (/siswa|santri|user|pegawai|guru|wali|pemilik/i.test(key)) return 'user';
+    if (/device|perangkat|esp32|rfid|chip/i.test(key)) return 'cpu-chip';
+    if (/sesi|jam|waktu|time|clock/i.test(key)) return 'clock';
+    if (/kelas|jenjang|mapel|sekolah|jurusan/i.test(key)) return 'academic-cap';
+    if (/status|kondisi|kategori/i.test(key)) return 'tag';
+    if (/tanggal|date|tgl|bulan|tahun/i.test(key)) return 'calendar';
+    if (/lembaga|gedung|kantor|asrama/i.test(key)) return 'building';
+    return '';
+  }
+
+  function initFilamentSelects() {
+    var selector = 'select.form-select, select.filter-select, select.pk-form-select, select.mstr-form-control, select[data-filament-select]';
+    var selects = document.querySelectorAll(selector);
+
+    selects.forEach(function (selectEl) {
+      if (selectEl.dataset.fiSelectEnhanced === 'true' || selectEl.classList.contains('no-fi-select')) {
+        return;
+      }
+      selectEl.dataset.fiSelectEnhanced = 'true';
+
+      var isMultiple = selectEl.multiple || selectEl.hasAttribute('multiple') || /\[\]$/.test(selectEl.name);
+      var isSearchable = selectEl.getAttribute('data-searchable') !== 'false';
+      var iconName = detectSelectPrefixIcon(selectEl);
+      var iconSvg = getFilamentIconSvg(iconName);
+      var searchPrompt = selectEl.getAttribute('data-search-prompt') || 'Cari opsi...';
+      var noResultsMsg = selectEl.getAttribute('data-no-results-message') || 'Tidak ada hasil yang cocok';
+
+      // Container wrap
+      var wrap = document.createElement('div');
+      wrap.className = 'fi-select-wrap';
+      if (selectEl.disabled) wrap.classList.add('is-disabled');
+
+      // Trigger button
+      var trigger = document.createElement('div');
+      trigger.className = 'fi-select-trigger';
+      trigger.tabIndex = 0;
+      if (selectEl.disabled) trigger.classList.add('is-disabled');
+
+      var main = document.createElement('div');
+      main.className = 'fi-select-main';
+
+      if (iconSvg) {
+        var prefixIconEl = document.createElement('span');
+        prefixIconEl.className = 'fi-select-prefix-icon';
+        prefixIconEl.innerHTML = iconSvg;
+        main.appendChild(prefixIconEl);
+      }
+
+      var labelWrap = document.createElement('div');
+      labelWrap.className = 'fi-select-label-wrap';
+      main.appendChild(labelWrap);
+      trigger.appendChild(main);
+
+      // Actions (Clear button & Chevron)
+      var actions = document.createElement('div');
+      actions.className = 'fi-select-actions';
+
+      var clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'fi-select-clear';
+      clearBtn.innerHTML = '&times;';
+      clearBtn.title = 'Hapus pilihan';
+      clearBtn.style.display = 'none';
+      actions.appendChild(clearBtn);
+
+      var chevron = document.createElement('span');
+      chevron.className = 'fi-select-chevron';
+      chevron.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>';
+      actions.appendChild(chevron);
+      trigger.appendChild(actions);
+
+      // Popover
+      var popover = document.createElement('div');
+      popover.className = 'fi-select-popover';
+
+      var searchBox = document.createElement('div');
+      searchBox.className = 'fi-select-search-box';
+      var searchInput = document.createElement('input');
+      searchInput.type = 'text';
+      searchInput.className = 'fi-select-search-input';
+      searchInput.placeholder = searchPrompt;
+      searchInput.autocomplete = 'off';
+      searchBox.appendChild(searchInput);
+      if (isSearchable) {
+        popover.appendChild(searchBox);
+      }
+
+      var optionsList = document.createElement('div');
+      optionsList.className = 'fi-select-options-list';
+      popover.appendChild(optionsList);
+
+      var emptyEl = document.createElement('div');
+      emptyEl.className = 'fi-select-empty';
+      emptyEl.textContent = noResultsMsg;
+      emptyEl.style.display = 'none';
+      popover.appendChild(emptyEl);
+
+      wrap.appendChild(trigger);
+      wrap.appendChild(popover);
+
+      // Hide native select visually while keeping in form
+      selectEl.style.display = 'none';
+      selectEl.parentNode.insertBefore(wrap, selectEl.nextSibling);
+
+      // Helper function to render options list
+      function renderOptions() {
+        optionsList.innerHTML = '';
+        var rawOptions = Array.from(selectEl.options);
+
+        rawOptions.forEach(function (opt) {
+          var item = document.createElement('div');
+          item.className = 'fi-select-option';
+          if (opt.selected) item.classList.add('is-selected');
+          if (opt.disabled) item.classList.add('is-disabled');
+          item.dataset.value = opt.value;
+
+          var itemLabel = document.createElement('span');
+          itemLabel.className = 'fi-select-option-label';
+          itemLabel.textContent = opt.text || opt.value || '(Kosong)';
+          item.appendChild(itemLabel);
+
+          var checkSvg = document.createElement('span');
+          checkSvg.className = 'fi-select-option-check';
+          checkSvg.innerHTML = '<svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>';
+          item.appendChild(checkSvg);
+
+          item.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (opt.disabled) return;
+
+            if (isMultiple) {
+              opt.selected = !opt.selected;
+              syncFromNative();
+              selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+              selectEl.dispatchEvent(new Event('input', { bubbles: true }));
+            } else {
+              selectEl.value = opt.value;
+              syncFromNative();
+              closePopover();
+              selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+              selectEl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          });
+
+          optionsList.appendChild(item);
+        });
+      }
+
+      // Sync trigger display and option checkmarks from native <select>
+      function syncFromNative() {
+        var selectedOpts = Array.from(selectEl.selectedOptions);
+        labelWrap.innerHTML = '';
+
+        if (isMultiple) {
+          if (selectedOpts.length === 0) {
+            var placeholder = document.createElement('span');
+            placeholder.className = 'fi-select-placeholder';
+            placeholder.textContent = selectEl.getAttribute('data-placeholder') || 'Pilih opsi...';
+            labelWrap.appendChild(placeholder);
+            clearBtn.style.display = 'none';
+          } else {
+            var pillsWrap = document.createElement('div');
+            pillsWrap.className = 'fi-select-pills-wrap';
+            selectedOpts.forEach(function (opt) {
+              var pill = document.createElement('span');
+              pill.className = 'fi-select-pill';
+              pill.textContent = opt.text;
+
+              var removeBtn = document.createElement('button');
+              removeBtn.type = 'button';
+              removeBtn.className = 'fi-select-pill-remove';
+              removeBtn.innerHTML = '&times;';
+              removeBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                opt.selected = false;
+                syncFromNative();
+                selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+                selectEl.dispatchEvent(new Event('input', { bubbles: true }));
+              });
+
+              pill.appendChild(removeBtn);
+              pillsWrap.appendChild(pill);
+            });
+            labelWrap.appendChild(pillsWrap);
+            clearBtn.style.display = 'inline-flex';
+          }
+        } else {
+          var sel = selectEl.selectedIndex >= 0 ? selectEl.options[selectEl.selectedIndex] : null;
+          if (sel && sel.value !== '') {
+            var valEl = document.createElement('span');
+            valEl.className = 'fi-select-single-value';
+            valEl.textContent = sel.text;
+            labelWrap.appendChild(valEl);
+            clearBtn.style.display = selectEl.hasAttribute('required') ? 'none' : 'inline-flex';
+          } else {
+            var pl = document.createElement('span');
+            pl.className = 'fi-select-placeholder';
+            pl.textContent = (sel && sel.text) ? sel.text : (selectEl.getAttribute('data-placeholder') || 'Pilih opsi...');
+            labelWrap.appendChild(pl);
+            clearBtn.style.display = 'none';
+          }
+        }
+
+        // Update .is-selected on rendered options
+        Array.from(optionsList.children).forEach(function (optItem) {
+          var val = optItem.dataset.value;
+          var opt = Array.from(selectEl.options).find(function (o) { return o.value === val; });
+          if (opt && opt.selected) {
+            optItem.classList.add('is-selected');
+          } else {
+            optItem.classList.remove('is-selected');
+          }
+        });
+      }
+
+      function openPopover() {
+        if (selectEl.disabled) return;
+        // Close all other open fi-selects
+        document.querySelectorAll('.fi-select-wrap.is-open').forEach(function (w) {
+          if (w !== wrap) w.classList.remove('is-open');
+        });
+        wrap.classList.add('is-open');
+        renderOptions();
+        syncFromNative();
+        searchInput.value = '';
+        filterOptions('');
+        if (isSearchable) {
+          setTimeout(function () { searchInput.focus(); }, 50);
+        }
+      }
+
+      function closePopover() {
+        wrap.classList.remove('is-open');
+      }
+
+      function filterOptions(query) {
+        var q = (query || '').toLowerCase().trim();
+        var count = 0;
+        Array.from(optionsList.children).forEach(function (child) {
+          var txt = (child.textContent || '').toLowerCase();
+          if (!q || txt.includes(q)) {
+            child.style.display = '';
+            count++;
+          } else {
+            child.style.display = 'none';
+          }
+        });
+        emptyEl.style.display = count === 0 ? 'block' : 'none';
+      }
+
+      // Event handlers
+      trigger.addEventListener('click', function (e) {
+        if (e.target.closest('.fi-select-clear') || e.target.closest('.fi-select-pill-remove')) return;
+        if (wrap.classList.contains('is-open')) {
+          closePopover();
+        } else {
+          openPopover();
+        }
+      });
+
+      trigger.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (wrap.classList.contains('is-open')) {
+            closePopover();
+          } else {
+            openPopover();
+          }
+        } else if (e.key === 'Escape') {
+          closePopover();
+        }
+      });
+
+      clearBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        if (isMultiple) {
+          Array.from(selectEl.options).forEach(function (opt) { opt.selected = false; });
+        } else {
+          selectEl.value = '';
+        }
+        syncFromNative();
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        selectEl.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+
+      searchInput.addEventListener('input', function () {
+        filterOptions(this.value);
+      });
+
+      searchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          closePopover();
+        }
+      });
+
+      // Synchronize when native select changes programmatically
+      selectEl.addEventListener('change', function () {
+        syncFromNative();
+      });
+
+      // Initial render
+      renderOptions();
+      syncFromNative();
+    });
+
+    // Global click outside listener
+    if (!window._fiSelectGlobalClickBound) {
+      window._fiSelectGlobalClickBound = true;
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('.fi-select-wrap')) {
+          document.querySelectorAll('.fi-select-wrap.is-open').forEach(function (w) {
+            w.classList.remove('is-open');
+          });
+        }
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          document.querySelectorAll('.fi-select-wrap.is-open').forEach(function (w) {
+            w.classList.remove('is-open');
+          });
+        }
+      });
+    }
+  }
+
+  window.initFilamentSelects = initFilamentSelects;
+  initFilamentSelects();
 });
