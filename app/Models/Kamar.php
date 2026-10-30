@@ -82,18 +82,41 @@ class Kamar extends Model
         }
 
         $merged = collect();
+        $seenKeys = [];
+
         foreach ($masterKamars->concat($siswaKamars) as $nama) {
             $clean = trim((string) $nama);
             if ($clean === '' || $clean === '-') {
                 continue;
             }
-            $exists = $merged->contains(fn ($existing) => mb_strtolower($existing) === mb_strtolower($clean));
-            if (!$exists) {
+
+            // Bersihkan duplikasi kata "Kamar Kamar" jika ada
+            $clean = preg_replace('/^(kamar\s+)+/iu', 'Kamar ', $clean);
+
+            // Kunci perbandingan tanpa awalan "Kamar "
+            $baseName = trim((string) preg_replace('/^kamar\s+/iu', '', $clean));
+            $key = mb_strtolower($baseName);
+
+            if (!isset($seenKeys[$key])) {
+                $seenKeys[$key] = $clean;
                 $merged->push($clean);
+            } else {
+                // Jika versi yang tersimpan belum berawalan "Kamar " dan varian baru berawalan "Kamar ",
+                // gunakan varian berawalan "Kamar " agar seragam dan formal
+                $existingVal = $seenKeys[$key];
+                if (!str_starts_with(mb_strtolower($existingVal), 'kamar ') && str_starts_with(mb_strtolower($clean), 'kamar ')) {
+                    $idx = $merged->search($existingVal);
+                    if ($idx !== false) {
+                        $merged[$idx] = $clean;
+                    }
+                    $seenKeys[$key] = $clean;
+                }
             }
         }
 
-        return $merged->values();
+        return $merged->sort(function ($a, $b) {
+            return strnatcasecmp($a, $b);
+        })->values();
     }
 }
 

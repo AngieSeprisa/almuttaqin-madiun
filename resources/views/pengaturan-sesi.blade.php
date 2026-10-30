@@ -1026,102 +1026,173 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                             </select>
                         </div>
 
-                        <!-- Filter Target Dinamis (Mendukung Multi-Select Filament Style) -->
+                        <!-- Filter Target Dinamis (Mendukung Multi-Select Gaya Gambar 2) -->
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label class="block text-xs font-semibold text-gray-700">Filter Target (Kamar / Jenjang)</label>
-                                <span x-show="form.target_kategori === 'kamar_khusus'" class="text-[11px] text-[#0052FF] font-medium">Bisa memilih lebih dari 1 kamar</span>
+                                <span x-show="form.target_kategori === 'kamar_khusus'" class="text-[11px] text-amber-700 font-medium">Bisa memilih lebih dari 1 kamar</span>
                             </div>
                             <input type="hidden"
                                    name="target_filter"
                                    :value="(form.target_kategori === 'kamar_khusus' || form.target_kategori === 'sekolah') ? form.target_filter : ''">
 
-                            <!-- Mode Kamar Khusus (Multi-Select Filament Pills) -->
-                            <div x-show="form.target_kategori === 'kamar_khusus'">
-                                <!-- Pill Badge Container -->
-                                <div class="flex flex-wrap gap-1.5 mb-2 p-2 rounded-lg bg-gray-50 border border-gray-200 min-h-[38px] items-center"
-                                     x-show="getTargetFilterList().length > 0">
-                                    <template x-for="item in getTargetFilterList()" :key="item">
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-[#0052FF]/10 text-[#0052FF] border border-[#0052FF]/20 shadow-sm">
-                                            <span x-text="item"></span>
-                                            <button type="button"
-                                                    @click="removeTargetFilter(item)"
-                                                    class="text-xs hover:bg-[#0052FF]/20 rounded-full w-4 h-4 flex items-center justify-center transition"
-                                                    title="Hapus filter kamar ini">&times;</button>
-                                        </span>
-                                    </template>
+                            <!-- Mode Kamar Khusus (Multi-Select Container Persis Gambar 2) -->
+                            <div x-show="form.target_kategori === 'kamar_khusus'" class="relative" x-data="{
+                                isOpen: false,
+                                search: '',
+                                options: @js($kamars->values()),
+                                get filteredOptions() {
+                                    if (!this.search.trim()) return this.options;
+                                    const q = this.search.toLowerCase().trim();
+                                    return this.options.filter(o => o.toLowerCase().includes(q));
+                                }
+                            }" @click.outside="isOpen = false">
+
+                                <!-- Box Input (Persis Gambar 2: border-2 rounded-xl, pills di baris atas, input & chevron) -->
+                                <div class="w-full min-h-[46px] p-2.5 rounded-xl border-2 transition cursor-pointer bg-white"
+                                     :class="isOpen ? 'border-[#F59E0B] shadow-sm' : 'border-gray-200 hover:border-gray-300'"
+                                     @click="isOpen = true; $nextTick(() => $refs.kamarSearchInput?.focus())">
+
+                                    <!-- Pills Container (Gaya Gambar 2: krem/amber muda dengan teks cokelat & silang x) -->
+                                    <div class="flex flex-wrap items-center gap-1.5" x-show="getTargetFilterList().length > 0">
+                                        <template x-for="item in getTargetFilterList()" :key="item">
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A] shadow-xs select-none">
+                                                <span x-text="item"></span>
+                                                <button type="button"
+                                                        @click.stop="removeTargetFilter(item)"
+                                                        class="text-[#B45309] hover:text-[#78350F] text-xs font-bold leading-none w-3.5 h-3.5 inline-flex items-center justify-center cursor-pointer"
+                                                        title="Hapus pilihan">&times;</button>
+                                            </span>
+                                        </template>
+                                    </div>
+
+                                    <!-- Input Row: Text placeholder & Chevron Icon -->
+                                    <div class="flex items-center justify-between gap-2" :class="getTargetFilterList().length > 0 ? 'mt-2' : 'py-0.5'">
+                                        <input type="text"
+                                               x-ref="kamarSearchInput"
+                                               x-model="search"
+                                               @focus="isOpen = true"
+                                               @keydown.escape="isOpen = false"
+                                               @keydown.enter.prevent="if (filteredOptions.length > 0) { toggleTargetFilter(filteredOptions[0]); search = ''; }"
+                                               :placeholder="getTargetFilterList().length === 0 ? 'Select an option' : 'Cari / tambah kamar lain...'"
+                                               class="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none border-none p-0 focus:ring-0">
+
+                                        <button type="button"
+                                                @click.stop="isOpen = !isOpen"
+                                                class="text-gray-400 hover:text-gray-600 focus:outline-none p-0.5 transition">
+                                            <svg class="w-4 h-4 transition-transform duration-200"
+                                                 :class="isOpen ? 'rotate-180 text-amber-600' : ''"
+                                                 viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <input type="text"
-                                       x-model="form.target_filter"
-                                       list="daftarKamarSantri"
-                                       placeholder="Pilih kamar di bawah atau ketik manual pisahkan dengan koma"
-                                       class="w-full px-3.5 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm text-gray-900 placeholder-gray-400 outline-none transition">
-                                <datalist id="daftarKamarSantri">
-                                    @foreach($kamars as $kamar)
-                                        <option value="{{ $kamar }}"></option>
-                                    @endforeach
-                                </datalist>
-                                @if($kamars->isNotEmpty())
-                                    <div class="flex flex-wrap gap-1.5 mt-2 max-h-32 overflow-y-auto p-1">
-                                        @foreach($kamars as $kamar)
-                                            <button type="button"
-                                                    @click="toggleTargetFilter(@js($kamar))"
-                                                    :class="isTargetFilterSelected(@js($kamar)) ? 'bg-[#0052FF] text-white border-[#0052FF] shadow-sm' : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300'"
-                                                    class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold border transition">
-                                                <svg x-show="isTargetFilterSelected(@js($kamar))" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                                </svg>
-                                                <span>{{ $kamar }}</span>
-                                            </button>
-                                        @endforeach
+                                <!-- Dropdown Popover (Floating Card persis Gambar 2) -->
+                                <div x-show="isOpen"
+                                     x-transition:enter="transition ease-out duration-150"
+                                     x-transition:enter-start="opacity-0 translate-y-1"
+                                     x-transition:enter-end="opacity-100 translate-y-0"
+                                     x-transition:leave="transition ease-in duration-100"
+                                     x-transition:leave-start="opacity-100 translate-y-0"
+                                     x-transition:leave-end="opacity-0 translate-y-1"
+                                     class="absolute left-0 right-0 mt-1.5 z-50 bg-white rounded-xl border border-gray-200 shadow-lg p-1.5 max-h-56 overflow-y-auto"
+                                     style="display: none;">
+
+                                    <template x-for="opt in filteredOptions" :key="opt">
+                                        <div @click="toggleTargetFilter(opt); search = ''"
+                                             :class="isTargetFilterSelected(opt) ? 'bg-amber-50/70 text-amber-900 font-semibold' : 'text-gray-800 hover:bg-gray-100 font-normal'"
+                                             class="px-3 py-2 text-sm rounded-lg cursor-pointer transition flex items-center justify-between my-0.5">
+                                            <span x-text="opt"></span>
+                                            <span x-show="isTargetFilterSelected(opt)" class="text-amber-600 font-bold text-xs">✓</span>
+                                        </div>
+                                    </template>
+
+                                    <div x-show="filteredOptions.length === 0"
+                                         class="px-3 py-3 text-xs text-gray-400 text-center">
+                                        Tidak ada kamar yang cocok
                                     </div>
-                                @endif
+                                </div>
                             </div>
 
-                            <!-- Mode Siswa Sekolah (Multi-Select Jenjang) -->
-                            <div x-show="form.target_kategori === 'sekolah'">
-                                <div class="flex flex-wrap gap-1.5 mb-2 p-2 rounded-lg bg-gray-50 border border-gray-200 min-h-[38px] items-center"
-                                     x-show="getTargetFilterList().length > 0">
-                                    <template x-for="item in getTargetFilterList()" :key="item">
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-[#0052FF]/10 text-[#0052FF] border border-[#0052FF]/20 shadow-sm">
-                                            <span x-text="item === 'ALL' ? 'ALL (SMP & SMA)' : item"></span>
-                                            <button type="button"
-                                                    @click="removeTargetFilter(item)"
-                                                    class="text-xs hover:bg-[#0052FF]/20 rounded-full w-4 h-4 flex items-center justify-center transition">&times;</button>
-                                        </span>
-                                    </template>
+                            <!-- Mode Siswa Sekolah (Multi-Select Container Persis Gambar 2) -->
+                            <div x-show="form.target_kategori === 'sekolah'" class="relative" x-data="{
+                                isOpen: false,
+                                search: '',
+                                options: ['SMP', 'SMA'],
+                                get filteredOptions() {
+                                    if (!this.search.trim()) return this.options;
+                                    const q = this.search.toLowerCase().trim();
+                                    return this.options.filter(o => o.toLowerCase().includes(q));
+                                }
+                            }" @click.outside="isOpen = false">
+
+                                <!-- Box Input -->
+                                <div class="w-full min-h-[46px] p-2.5 rounded-xl border-2 transition cursor-pointer bg-white"
+                                     :class="isOpen ? 'border-[#F59E0B] shadow-sm' : 'border-gray-200 hover:border-gray-300'"
+                                     @click="isOpen = true; $nextTick(() => $refs.sekolahSearchInput?.focus())">
+
+                                    <!-- Pills Container -->
+                                    <div class="flex flex-wrap items-center gap-1.5" x-show="getTargetFilterList().length > 0">
+                                        <template x-for="item in getTargetFilterList()" :key="item">
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A] shadow-xs select-none">
+                                                <span x-text="item === 'ALL' ? 'ALL (SMP & SMA)' : item"></span>
+                                                <button type="button"
+                                                        @click.stop="removeTargetFilter(item)"
+                                                        class="text-[#B45309] hover:text-[#78350F] text-xs font-bold leading-none w-3.5 h-3.5 inline-flex items-center justify-center cursor-pointer"
+                                                        title="Hapus pilihan">&times;</button>
+                                            </span>
+                                        </template>
+                                    </div>
+
+                                    <!-- Input Row -->
+                                    <div class="flex items-center justify-between gap-2" :class="getTargetFilterList().length > 0 ? 'mt-2' : 'py-0.5'">
+                                        <input type="text"
+                                               x-ref="sekolahSearchInput"
+                                               x-model="search"
+                                               @focus="isOpen = true"
+                                               @keydown.escape="isOpen = false"
+                                               :placeholder="getTargetFilterList().length === 0 ? 'Select an option' : 'Pilih jenjang...'"
+                                               class="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none border-none p-0 focus:ring-0">
+
+                                        <button type="button"
+                                                @click.stop="isOpen = !isOpen"
+                                                class="text-gray-400 hover:text-gray-600 focus:outline-none p-0.5 transition">
+                                            <svg class="w-4 h-4 transition-transform duration-200"
+                                                 :class="isOpen ? 'rotate-180 text-amber-600' : ''"
+                                                 viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
 
-                                <input type="text"
-                                       x-model="form.target_filter"
-                                       placeholder="Pilih jenjang di bawah atau ketik SMP, SMA, ALL"
-                                       class="w-full px-3.5 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm text-gray-900 placeholder-gray-400 outline-none transition">
-                                <div class="flex flex-wrap gap-2 mt-2">
-                                    <button type="button"
-                                            @click="toggleTargetFilter('SMP')"
-                                            :class="isTargetFilterSelected('SMP') ? 'bg-[#0052FF] text-white border-[#0052FF] font-bold' : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300 font-semibold'"
-                                            class="inline-flex items-center gap-1 px-3 py-1 rounded text-xs border transition">
-                                        <svg x-show="isTargetFilterSelected('SMP')" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                        </svg>
-                                        <span>SMP</span>
-                                    </button>
-                                    <button type="button"
-                                            @click="toggleTargetFilter('SMA')"
-                                            :class="isTargetFilterSelected('SMA') ? 'bg-[#0052FF] text-white border-[#0052FF] font-bold' : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300 font-semibold'"
-                                            class="inline-flex items-center gap-1 px-3 py-1 rounded text-xs border transition">
-                                        <svg x-show="isTargetFilterSelected('SMA')" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                        </svg>
-                                        <span>SMA</span>
-                                    </button>
-                                    <button type="button"
-                                            @click="form.target_filter = 'ALL'"
-                                            :class="form.target_filter === 'ALL' ? 'bg-[#0052FF] text-white border-[#0052FF] font-bold' : 'bg-gray-100 text-gray-700 border-gray-200 hover:border-gray-300 font-semibold'"
-                                            class="inline-flex items-center gap-1 px-3 py-1 rounded text-xs border transition">
+                                <!-- Dropdown Popover -->
+                                <div x-show="isOpen"
+                                     x-transition:enter="transition ease-out duration-150"
+                                     x-transition:enter-start="opacity-0 translate-y-1"
+                                     x-transition:enter-end="opacity-100 translate-y-0"
+                                     x-transition:leave="transition ease-in duration-100"
+                                     x-transition:leave-start="opacity-100 translate-y-0"
+                                     x-transition:leave-end="opacity-0 translate-y-1"
+                                     class="absolute left-0 right-0 mt-1.5 z-50 bg-white rounded-xl border border-gray-200 shadow-lg p-1.5 max-h-56 overflow-y-auto"
+                                     style="display: none;">
+
+                                    <template x-for="opt in filteredOptions" :key="opt">
+                                        <div @click="toggleTargetFilter(opt); search = ''"
+                                             :class="isTargetFilterSelected(opt) ? 'bg-amber-50/70 text-amber-900 font-semibold' : 'text-gray-800 hover:bg-gray-100 font-normal'"
+                                             class="px-3 py-2 text-sm rounded-lg cursor-pointer transition flex items-center justify-between my-0.5">
+                                            <span x-text="opt"></span>
+                                            <span x-show="isTargetFilterSelected(opt)" class="text-amber-600 font-bold text-xs">✓</span>
+                                        </div>
+                                    </template>
+                                    <div @click="form.target_filter = 'ALL'; isOpen = false; search = ''"
+                                         :class="form.target_filter === 'ALL' ? 'bg-amber-50/70 text-amber-900 font-semibold' : 'text-gray-800 hover:bg-gray-100 font-normal'"
+                                         class="px-3 py-2 text-sm rounded-lg cursor-pointer transition flex items-center justify-between my-0.5">
                                         <span>ALL (SMP &amp; SMA)</span>
-                                    </button>
+                                        <span x-show="form.target_filter === 'ALL'" class="text-amber-600 font-bold text-xs">✓</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1695,11 +1766,7 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
             },
 
             onTargetKategoriChange() {
-                if (this.form.target_kategori === 'kamar_khusus' && !this.form.target_filter) {
-                    this.form.target_filter = 'Reguler';
-                } else if (this.form.target_kategori === 'sekolah' && !this.form.target_filter) {
-                    this.form.target_filter = 'SMP';
-                } else if (this.form.target_kategori === 'semua_santri' || this.form.target_kategori === 'pegawai') {
+                if (this.form.target_kategori === 'semua_santri' || this.form.target_kategori === 'pegawai') {
                     this.form.target_filter = '';
                 }
             },

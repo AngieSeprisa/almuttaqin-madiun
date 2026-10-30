@@ -283,4 +283,35 @@ class PengaturanSesiTest extends TestCase
             'target_filter' => 'SMP, SMA',
         ]);
     }
+
+    public function test_daftar_nama_kamar_aktif_menghapus_duplikasi_kamar(): void
+    {
+        // Masukkan data siswa dengan nama kamar ganda dan varian "Kamar Kelas 9 Putri" vs "Kelas 9 Putri"
+        Siswa::create([
+            'nama_lengkap' => 'Santri 1',
+            'kamar' => 'Kelas 9 Putri',
+            'status' => 'aktif',
+        ]);
+        Siswa::create([
+            'nama_lengkap' => 'Santri 2',
+            'kamar' => 'Kamar Kelas 9 Putri',
+            'status' => 'aktif',
+        ]);
+        Siswa::create([
+            'nama_lengkap' => 'Santri 3',
+            'kamar' => 'Kamar Kamar Kelas 8 Putra',
+            'status' => 'aktif',
+        ]);
+
+        $kamars = \App\Models\Kamar::daftarNamaKamarAktif();
+
+        // Pastikan "Kelas 9 Putri" digabungkan sehingga hanya muncul 1 kali sebagai "Kamar Kelas 9 Putri"
+        $kelas9PutriCount = $kamars->filter(fn ($k) => stripos($k, 'Kelas 9 Putri') !== false)->count();
+        $this->assertSame(1, $kelas9PutriCount);
+        $this->assertTrue($kamars->contains('Kamar Kelas 9 Putri'));
+
+        // Pastikan duplikasi kata "Kamar Kamar" dibersihkan menjadi "Kamar Kelas 8 Putra"
+        $this->assertTrue($kamars->contains('Kamar Kelas 8 Putra'));
+        $this->assertFalse($kamars->contains('Kamar Kamar Kelas 8 Putra'));
+    }
 }
