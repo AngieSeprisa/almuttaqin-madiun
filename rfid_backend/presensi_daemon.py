@@ -15,6 +15,7 @@ import sys
 import json
 import time
 import logging
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -179,12 +180,13 @@ def sync_device_presence(cursor, device_id: str, ip_addr: str = "") -> dict:
 
     return device
 
-def get_active_sesi(cursor, device_id: str, current_time: str):
+def get_active_sesi(cursor, device_id: str, current_time: str, strict: bool = True):
     """
     Mencari sesi aktif di master_sesis yang cocok dengan device_id dan jam saat ini.
+    Jika strict=True, hanya kembalikan sesi jika waktu sekarang benar-benar berada dalam rentang sesi.
     """
     query = """
-        SELECT id, kode_sesi, nama_sesi, jam_mulai, jam_selesai, toleransi_menit, kategori
+        SELECT id, kode_sesi, nama_sesi, jam_mulai, jam_selesai, toleransi_menit, kategori, device_id_target
         FROM master_sesis
         WHERE (device_id_target = %s OR device_id_target IS NULL)
           AND (
@@ -198,13 +200,62 @@ def get_active_sesi(cursor, device_id: str, current_time: str):
     cursor.execute(query, (device_id, current_time, current_time, current_time, device_id))
     sesi = cursor.fetchone()
 
-    # Jika tidak ada sesi terjadwal pada jam ini, gunakan sesi fallback default
-    if not sesi:
-        fallback_query = "SELECT id, kode_sesi, nama_sesi, jam_mulai, jam_selesai, toleransi_menit, kategori FROM master_sesis ORDER BY id ASC LIMIT 1"
+    # Jika strict=False dan tidak ada sesi pada jam ini, gunakan sesi fallback pertama
+    if not sesi and not strict:
+        fallback_query = "SELECT id, kode_sesi, nama_sesi, jam_mulai, jam_selesai, toleransi_menit, kategori, device_id_target FROM master_sesis ORDER BY id ASC LIMIT 1"
         cursor.execute(fallback_query)
         sesi = cursor.fetchone()
 
     return sesi
+
+def broadcast_device_session(client, db, device_id: str):
+    """
+    Mengirimkan informasi sesi aktif ke topik MQTT per-device dan global.
+    Jika ada sesi aktif:
+      status="aktif", ada_sesi=True, kategori="...", nama_sesi="..."
+    Jika tidak ada sesi:
+      status="tidak_ada_sesi", ada_sesi=False, kategori="", nama_sesi=""
+    """
+    try:
+        cur = db.cursor(dictionary=True)
+        now_time = datetime.now().strftime("%H:%M:%S")
+        sesi = get_active_sesi(cur, device_id, now_time, strict=True)
+        cur.close()
+
+        if sesi:
+            kat_raw = sesi.get("kategori") or "Presensi"
+            kat_title = kat_raw.capitalize() if isinstance(kat_raw, str) else "Presensi"
+            nama_raw = sesi.get("nama_sesi") or kat_title
+
+            payload = {
+                "status": "aktif",
+                "ada_sesi": True,
+                "device_id": device_id,
+                "kategori": kat_title,
+                "nama_sesi": nama_raw,
+                "kode_sesi": sesi.get("kode_sesi", ""),
+                "jam_mulai": str(sesi.get("jam_mulai", "")),
+                "jam_selesai": str(sesi.get("jam_selesai", ""))
+            }
+        else:
+            payload = {
+                "status": "tidak_ada_sesi",
+                "ada_sesi": False,
+                "device_id": device_id,
+                "kategori": "",
+                "nama_sesi": "",
+                "kode_sesi": ""
+            }
+
+        payload_json = json.dumps(payload)
+        # 1. Topik per-device (retained agar ESP32 yang baru boot/reconnect langsung menerima)
+        client.publish(f"presensi/devices/{device_id}/sesi", payload_json, qos=1, retain=True)
+        client.publish(f"presensi/sesi/{device_id}", payload_json, qos=1, retain=True)
+        # 2. Topik global
+        client.publish("presensi/sesi_aktif", payload_json, qos=1, retain=True)
+        logging.info(f"[BROADCAST SESI] {device_id} -> ada_sesi={payload['ada_sesi']}, sesi='{payload.get('nama_sesi', '-')}'")
+    except Exception as ex:
+        logging.error(f"Gagal broadcast sesi {device_id}: {ex}")
 
 def get_uid_variants(raw_uid: str) -> list:
     """
@@ -244,6 +295,18 @@ def get_uid_variants(raw_uid: str) -> list:
             w2 = int(clean[4:], 16)
             variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
             variants.append(str(int(clean, 16)))
+        except ValueError:
+            pass
+    # Format desimal 32-bit (angka murni, misal 2817570769)
+    elif re.match(r'^\d{5,12}$', clean):
+        try:
+            dec_val = int(clean)
+            if 0 < dec_val <= 4294967295:
+                hex_val = f"{dec_val:08X}".upper()
+                variants.append(hex_val)
+                w1 = int(hex_val[:4], 16)
+                w2 = int(hex_val[4:], 16)
+                variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
         except ValueError:
             pass
 
@@ -312,15 +375,11 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
         return {
             "device_id": device_id,
             "nama": "Alat Nonaktif",
-            "status": "Hubungi Admin"
+            "status": "AKSES DITOLAK",
+            "kode": "DISABLED"
         }
 
-    # 2. Penentuan Sesi Dinamis
-    sesi = get_active_sesi(cursor, device_id, current_time)
-    sesi_id = sesi["id"] if sesi else 1
-    sesi_name = sesi["nama_sesi"] if sesi else "Presensi"
-
-    # 3. Pengecekan Entitas Pemilik Kartu (Santri atau Guru/Pegawai)
+    # 2. Pengecekan Entitas Pemilik Kartu (Santri atau Guru/Pegawai)
     entity = find_entity_by_uid(cursor, clean_uid)
 
     if not entity:
@@ -330,7 +389,8 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
         return {
             "device_id": device_id,
             "nama": "Tak Terdaftar",
-            "status": "Hubungi Pamong"
+            "status": "TIDAK TERDAFTAR",
+            "kode": "UNREGISTERED"
         }
 
     entity_name = entity["nama"]
@@ -339,6 +399,21 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
     lcd_name = format_lcd_name(entity_name)
 
     save_last_tap_info(clean_uid, device_id, is_registered=True, name=entity_name, ip_addr=ip_addr)
+
+    # 3. Penentuan Sesi Dinamis (Strict: hanya sesi yang benar-benar aktif saat ini)
+    sesi = get_active_sesi(cursor, device_id, current_time, strict=True)
+    if not sesi:
+        cursor.close()
+        logging.warning(f"[NO ACTIVE SESSION] Tap dari '{entity_name}' ditolak karena tidak ada sesi aktif pada jam {current_time}.")
+        return {
+            "device_id": device_id,
+            "nama": lcd_name,
+            "status": "AKSES DITOLAK",
+            "kode": "NO_SESSION"
+        }
+
+    sesi_id = sesi["id"]
+    sesi_name = sesi["nama_sesi"]
 
     # 4. Anti-Duplikasi Per Sesi
     query_check = """
@@ -355,7 +430,9 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
         return {
             "device_id": device_id,
             "nama": lcd_name,
-            "status": "Sudah Hadir"
+            "status": "SUDAH ABSEN",
+            "kode": "DUPLICATE",
+            "sesi": sesi_name
         }
 
     # 5. Tentukan Status Kehadiran (Tepat Waktu vs Terlambat)
@@ -393,22 +470,62 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
 
     logging.info(f"[SUCCESS] Presensi '{entity_name}' tercatat pada sesi '{sesi_name}' via '{device_id}' ({status_kehadiran}).")
 
-    short_sesi = sesi.get("kode_sesi", "HADIR") if sesi else "HADIR"
-    lcd_status = format_lcd_text(f"{short_sesi}: Hadir", 16)
-
     return {
         "device_id": device_id,
         "nama": lcd_name,
-        "status": lcd_status
+        "status": "BERHASIL ABSEN",
+        "kode": "SUCCESS",
+        "sesi": sesi_name
     }
+
+# ================= BACKGROUND PERIODIC RUNNER =================
+def periodic_session_broadcaster(client, userdata):
+    """
+    Secara periodik memeriksa dan mem-broadcast status sesi aktif
+    ke seluruh perangkat ESP32 setiap 20 detik via MQTT.
+    """
+    while True:
+        time.sleep(20)
+        try:
+            db = userdata.get("db") if userdata else None
+            if db and db.is_connected():
+                cur = db.cursor(dictionary=True)
+                cur.execute("SELECT device_id FROM master_devices WHERE status_aktif = 1")
+                rows = cur.fetchall()
+                cur.close()
+
+                target_devs = [r["device_id"] for r in rows if r.get("device_id")]
+                if "tap_masjid" not in target_devs:
+                    target_devs.append("tap_masjid")
+
+                for dev_id in target_devs:
+                    broadcast_device_session(client, db, dev_id)
+        except Exception as err:
+            logging.debug(f"Periodic broadcast loop error: {err}")
 
 # ================= MQTT CALLBACKS =================
 def on_connect(client, userdata, flags, rc, properties=None):
     if rc == 0:
         logging.info(f"Terhubung ke Broker MQTT ({MQTT_BROKER}:{MQTT_PORT})!")
+        # 1. Topik tap kartu
         client.subscribe(MQTT_TOPIC_TAP, qos=1)
+        client.subscribe("presensi/devices/+/tap", qos=1)
+
+        # 2. Topik heartbeat & ping status alat
         client.subscribe(MQTT_TOPIC_HEARTBEAT, qos=1)
-        logging.info(f"Berlangganan topik tap: '{MQTT_TOPIC_TAP}' & heartbeat: '{MQTT_TOPIC_HEARTBEAT}'")
+        client.subscribe("presensi/devices/+/heartbeat", qos=1)
+        client.subscribe("presensi/devices/+/ping", qos=1)
+
+        # 3. Topik permintaan sesi aktif
+        client.subscribe("presensi/get_sesi", qos=1)
+        client.subscribe("presensi/devices/+/get_sesi", qos=1)
+
+        logging.info("Berlangganan topik tap, heartbeat, ping, & get_sesi.")
+
+        # Broadcast sesi awal untuk tap_masjid saat daemon baru terkoneksi
+        db = userdata.get("db") if userdata else None
+        if db:
+            broadcast_device_session(client, db, "tap_masjid")
     else:
         logging.error(f"Koneksi MQTT Gagal dengan kode: {rc}")
 
@@ -423,8 +540,8 @@ def on_message(client, userdata, msg):
             logging.warning(f"Payload bukan JSON valid: {payload_raw}")
             return
 
-        # Prioritaskan serial unik hardware ESP32 (serial / chip_id / device_id)
-        raw_device_id = data.get("serial") or data.get("chip_id") or data.get("device_id") or "ESP32_UNKNOWN"
+        # Prioritaskan device_id eksplisit yang didaftarkan (misal tap_masjid) atau serial unik hardware
+        raw_device_id = data.get("device_id") or data.get("serial") or data.get("chip_id") or "tap_masjid"
         device_id = str(raw_device_id).strip()
         ip_addr = str(data.get("ip", "")).strip()
 
@@ -435,18 +552,28 @@ def on_message(client, userdata, msg):
             db = create_db_connection()
             userdata["db"] = db
 
-        # Jika pesan adalah HEARTBEAT / BOOT CHECK-IN dari ESP32 (tanpa perlu tap kartu)
-        if msg.topic == MQTT_TOPIC_HEARTBEAT:
+        # Jika pesan adalah HEARTBEAT / BOOT / PING / PERMINTAAN SESI dari ESP32
+        is_heartbeat_or_sesi_req = (
+            msg.topic == MQTT_TOPIC_HEARTBEAT
+            or msg.topic.endswith("/heartbeat")
+            or msg.topic.endswith("/ping")
+            or msg.topic == "presensi/get_sesi"
+            or msg.topic.endswith("/get_sesi")
+        )
+
+        if is_heartbeat_or_sesi_req:
             save_last_device_info(device_id, ip_addr=ip_addr, event=str(data.get("event", "heartbeat")))
             if db:
                 cur = db.cursor(dictionary=True)
                 sync_device_presence(cur, device_id, ip_addr)
                 cur.close()
+                # Segera balas dengan sesi aktif terbaru untuk perangkat tersebut
+                broadcast_device_session(client, db, device_id)
             return
 
-        uid = data.get("uid") or data.get("rfid_uid")
+        uid = data.get("rfid_uid") or data.get("uid")
         if not uid:
-            logging.warning("Pesan tap diterima tanpa parameter 'uid'. Diabaikan.")
+            logging.warning("Pesan tap diterima tanpa parameter 'rfid_uid' / 'uid'. Diabaikan.")
             return
 
         clean_uid = str(uid).strip().upper()
@@ -466,17 +593,18 @@ def on_message(client, userdata, msg):
             response_payload = {
                 "device_id": device_id,
                 "nama": "Server Offline",
-                "status": "Coba Sesaat Lagi"
+                "status": "AKSES DITOLAK",
+                "kode": "SERVER_OFFLINE"
             }
         else:
             response_payload = process_tap(db, clean_uid, device_id, ip_addr)
 
-        # Kirim balasan ke topik spesifik serial alat DAN topik umum (kompatibilitas firmware lama)
+        # Kirim balasan ke topik spesifik per-device DAN topik umum
         response_json = json.dumps(response_payload)
-        specific_topic = f"{MQTT_TOPIC_RESPONSE}/{device_id}"
-        client.publish(specific_topic, response_json, qos=1)
+        client.publish(f"presensi/santri/response/{device_id}", response_json, qos=1)
+        client.publish(f"presensi/devices/{device_id}/response", response_json, qos=1)
         client.publish(MQTT_TOPIC_RESPONSE, response_json, qos=1)
-        logging.info(f"Respons dikirim ke [{specific_topic}]: {response_json}")
+        logging.info(f"Respons dikirim ke [presensi/santri/response/{device_id} & presensi/devices/{device_id}/response]: {response_json}")
 
     except Exception as ex:
         logging.error(f"Error memproses pesan MQTT: {ex}", exc_info=True)
@@ -498,17 +626,19 @@ def main():
             logging.warning(f"Menunggu koneksi DB... percobaan #{retry_count} dalam 5 detik.")
             time.sleep(5)
 
+    userdata = {"db": db}
+
     try:
         from paho.mqtt.enums import CallbackAPIVersion
         client = mqtt.Client(
             CallbackAPIVersion.VERSION2,
             client_id=MQTT_CLIENT_ID,
-            userdata={"db": db}
+            userdata=userdata
         )
     except (ImportError, AttributeError):
         client = mqtt.Client(
             client_id=MQTT_CLIENT_ID,
-            userdata={"db": db}
+            userdata=userdata
         )
 
     client.on_connect = on_connect
@@ -516,6 +646,16 @@ def main():
 
     try:
         client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
+
+        # Jalankan background thread broadcast berkala sesi aktif ke ESP32
+        broadcaster_thread = threading.Thread(
+            target=periodic_session_broadcaster,
+            args=(client, userdata),
+            daemon=True
+        )
+        broadcaster_thread.start()
+        logging.info("Background thread broadcast sesi aktif berhasil dijalankan.")
+
         client.loop_forever()
     except KeyboardInterrupt:
         logging.info("Daemon dihentikan oleh pengguna.")

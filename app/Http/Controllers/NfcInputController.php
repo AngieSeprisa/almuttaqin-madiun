@@ -41,10 +41,49 @@ class NfcInputController extends Controller
     }
 
     /**
+     * Konversi berbagai format serial RFID / NFC ke Format Desimal 32-bit:
+     * - Wiegand Split (;42992,47057 atau 42992,47057) -> 2817570769
+     * - HEX 8-digit (A7F0B7D1)                        -> 2817570769
+     * - Desimal 32-bit murni (2817570769)             -> 2817570769
+     */
+    public static function toDecimal32(string $uid): string
+    {
+        $clean = rtrim(trim($uid), '?');
+        if (empty($clean)) {
+            return '';
+        }
+
+        // Format split desimal: ;42992,47057 atau 42992,47057
+        if (preg_match('/^;?(\d{1,5}),(\d{1,5})$/', $clean, $m)) {
+            $w1 = (int)$m[1];
+            $w2 = (int)$m[2];
+            $hex = str_pad(dechex($w1), 4, '0', STR_PAD_LEFT) . str_pad(dechex($w2), 4, '0', STR_PAD_LEFT);
+            return (string)hexdec($hex);
+        }
+
+        // Format HEX 8-digit dari ESP32 (misal A7F0B7D1)
+        if (preg_match('/^[0-9A-Fa-f]{8}$/', $clean) && !ctype_digit($clean)) {
+            return (string)hexdec($clean);
+        }
+
+        // Format angka murni (sudah desimal 32-bit atau serial angka)
+        if (preg_match('/^\d+$/', $clean)) {
+            return $clean;
+        }
+
+        // Format HEX umum
+        if (preg_match('/^[0-9A-Fa-f]{4,16}$/', $clean)) {
+            return (string)hexdec($clean);
+        }
+
+        return $clean;
+    }
+
+    /**
      * Menghasilkan semua varian representasi format serial RFID / NFC:
      * 1. Format raw apa adanya (misal: ';42992,47057' atau 'A7F0B7D1')
      * 2. Format tanpa titik koma: '42992,47057'
-     * 3. Format angka saja: '4299247057'
+     * 3. Format angka gabungan: '4299247057'
      * 4. Format HEX 8-karakter (Wiegand 26/32-bit): 'A7F0B7D1'
      * 5. Format desimal 32-bit: '2817570769'
      */
@@ -86,6 +125,19 @@ class NfcInputController extends Controller
             $variants[] = "{$w1},{$w2}";
             $variants[] = "{$w1}{$w2}";
             $variants[] = (string)hexdec($uid);
+        }
+        // Jika format desimal 32-bit (angka murni, misal 2817570769)
+        elseif (preg_match('/^\d{5,12}$/', $uid)) {
+            $decVal = (int)$uid;
+            if ($decVal > 0 && $decVal <= 4294967295) {
+                $hex = strtoupper(str_pad(dechex($decVal), 8, '0', STR_PAD_LEFT));
+                $variants[] = $hex;
+                $w1 = hexdec(substr($hex, 0, 4));
+                $w2 = hexdec(substr($hex, 4, 4));
+                $variants[] = ";{$w1},{$w2}";
+                $variants[] = "{$w1},{$w2}";
+                $variants[] = "{$w1}{$w2}";
+            }
         }
 
         return array_values(array_unique(array_filter($variants)));
@@ -158,9 +210,10 @@ class NfcInputController extends Controller
             ->where('id', '!=', $siswa->id)
             ->update(['rfid_uid' => null]);
 
-        $siswa->update(['rfid_uid' => $serial]);
+        $decimalSerial = self::toDecimal32($serial);
+        $siswa->update(['rfid_uid' => $decimalSerial]);
 
-        $msg = "Kartu {$serial} berhasil dipasangkan ke {$siswa->nama_lengkap}.";
+        $msg = "Kartu {$decimalSerial} berhasil dipasangkan ke {$siswa->nama_lengkap}.";
         if ($previousOwner) {
             $msg .= " (Dialihkan dari {$previousOwner->nama_lengkap})";
         }

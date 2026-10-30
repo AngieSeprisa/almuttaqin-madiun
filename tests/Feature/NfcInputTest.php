@@ -171,7 +171,7 @@ class NfcInputTest extends TestCase
         $response->assertJson(['success' => true]);
 
         $siswa->refresh();
-        $this->assertEquals(';42992,47057', $siswa->rfid_uid);
+        $this->assertEquals('2817570769', $siswa->rfid_uid);
 
         // 2. Cek kartu menggunakan format HEX ESP32 (A7F0B7D1) -> harus terdeteksi milik santri yang sama
         $respHex = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => 'A7F0B7D1']));
@@ -194,7 +194,7 @@ class NfcInputTest extends TestCase
             ],
         ]);
 
-        // 4. Santri kedua mendaftar dengan format HEX A7F0B7D1 -> kartu santri pertama otomatis dialihkan
+        // 4. Santri kedua mendaftar dengan format HEX A7F0B7D1 -> kartu santri pertama otomatis dialihkan dan disimpan sebagai desimal 32-bit
         $siswa2 = Siswa::create([
             'nama_lengkap' => 'Santri Kedua',
             'jenjang' => 'SMA',
@@ -210,7 +210,7 @@ class NfcInputTest extends TestCase
         $siswa->refresh();
         $siswa2->refresh();
         $this->assertNull($siswa->rfid_uid);
-        $this->assertEquals('A7F0B7D1', $siswa2->rfid_uid);
+        $this->assertEquals('2817570769', $siswa2->rfid_uid);
     }
 }
 

@@ -335,7 +335,8 @@ class SiswaController extends Controller
             'rfid_uid.unique' => 'UID RFID ini sudah terdaftar untuk santri lain!',
         ]);
 
-        $uid = !empty($validated['rfid_uid']) ? strtoupper(trim($validated['rfid_uid'])) : null;
+        $rawUid = !empty($validated['rfid_uid']) ? trim($validated['rfid_uid']) : null;
+        $uid = $rawUid ? NfcInputController::toDecimal32($rawUid) : null;
         $siswa->update(['rfid_uid' => $uid]);
 
         if ($request->wantsJson()) {
