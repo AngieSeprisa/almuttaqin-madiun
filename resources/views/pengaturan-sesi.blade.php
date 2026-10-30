@@ -270,18 +270,6 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                         </button>
                     </div>
                 </div>
-
-                <!-- Quick Category Pills -->
-                <div class="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-gray-100/80 border border-gray-200/70">
-                    <template x-for="kat in kategoriFilters" :key="kat.value">
-                        <button type="button"
-                                @click="filterKategori = kat.value; draftKategori = kat.value; sesiPage = 1"
-                                :class="filterKategori === kat.value ? 'bg-white text-[#0052FF] font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
-                                class="px-2.5 py-1 rounded-md text-xs transition"
-                                x-text="kat.label">
-                        </button>
-                    </template>
-                </div>
             </div>
 
             <!-- Right: Search Input + Funnel Filter Button (Persis Gambar 3 & 4) -->
