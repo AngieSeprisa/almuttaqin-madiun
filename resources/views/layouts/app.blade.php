@@ -674,6 +674,7 @@
             // Quick Search Interactive Logic
             var searchDebounceTimer = null;
             var searchCache = {};
+            var searchAbort = null;
 
             function getCategoryIcon(catKey) {
                 switch(catKey) {
@@ -731,6 +732,7 @@
                 searchInput.addEventListener('input', function() {
                     var q = searchInput.value.trim();
                     if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+                    if (searchAbort) searchAbort.abort();
 
                     if (q.length === 0) {
                         if (searchSpinner) searchSpinner.style.display = 'none';
@@ -739,6 +741,7 @@
                     }
 
                     if (searchCache[q]) {
+                        if (searchSpinner) searchSpinner.style.display = 'none';
                         renderSearchResults(searchCache[q], q);
                         return;
                     }
@@ -746,21 +749,27 @@
                     if (searchSpinner) searchSpinner.style.display = 'block';
 
                     searchDebounceTimer = setTimeout(function() {
+                        searchAbort = new AbortController();
                         fetch('{{ route("quick-search") }}?q=' + encodeURIComponent(q), {
+                            signal: searchAbort.signal,
                             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                         })
                         .then(function(res) { return res.json(); })
                         .then(function(data) {
+                            if (searchInput.value.trim() !== q) return;
                             if (searchSpinner) searchSpinner.style.display = 'none';
                             var categories = data.results || [];
                             searchCache[q] = categories;
                             renderSearchResults(categories, q);
                         })
                         .catch(function(err) {
-                            if (searchSpinner) searchSpinner.style.display = 'none';
+                            if (err.name === 'AbortError') return;
+                            if (searchInput.value.trim() === q && searchSpinner) {
+                                searchSpinner.style.display = 'none';
+                            }
                             console.error('Quick search error:', err);
                         });
-                    }, 220);
+                    }, 200);
                 });
 
                 searchInput.addEventListener('focus', function() {
