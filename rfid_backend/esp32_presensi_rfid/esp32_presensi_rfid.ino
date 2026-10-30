@@ -349,17 +349,32 @@ void loop() {
     }
     uidHex.toUpperCase();
 
-    // Hitung Format Desimal 32-bit dari 4-byte kartu Mifare
+    // Hitung Format Desimal 32-bit dari 4-byte kartu Mifare (normal & byte-reversed)
     uint32_t uidDec32 = 0;
+    uint32_t uidDec32Rev = 0;
+    String uidHexRev = "";
     if (rfid.uid.size >= 4) {
+        // Format Normal RC522
         uidDec32 = ((uint32_t)rfid.uid.uidByte[0] << 24) |
                    ((uint32_t)rfid.uid.uidByte[1] << 16) |
                    ((uint32_t)rfid.uid.uidByte[2] << 8)  |
                    ((uint32_t)rfid.uid.uidByte[3]);
+
+        // Format Byte-Reversed (Big-Endian sesuai USB Desktop Reader)
+        uidDec32Rev = ((uint32_t)rfid.uid.uidByte[3] << 24) |
+                      ((uint32_t)rfid.uid.uidByte[2] << 16) |
+                      ((uint32_t)rfid.uid.uidByte[1] << 8)  |
+                      ((uint32_t)rfid.uid.uidByte[0]);
+
+        for (int i = (int)rfid.uid.size - 1; i >= 0; i--) {
+            if (rfid.uid.uidByte[i] < 0x10) uidHexRev += "0";
+            uidHexRev += String(rfid.uid.uidByte[i], HEX);
+        }
+        uidHexRev.toUpperCase();
     }
 
     beepTap();
-    Serial.println("Tap HEX: " + uidHex + " | DEC32: " + String(uidDec32) + " | Device: " + activeDeviceId);
+    Serial.println("Tap HEX: " + uidHex + " (Rev: " + uidHexRev + ") | DEC: " + String(uidDec32) + " (Rev: " + String(uidDec32Rev) + ") | Device: " + activeDeviceId);
 
     // Tampilkan pesan proses
     lcd.clear();
@@ -372,12 +387,14 @@ void loop() {
     tapSentAtMs = millis();
 
     // Kirim payload ke MQTT
-    StaticJsonDocument<256> doc;
-    doc["device_id"] = activeDeviceId;
-    doc["serial"]    = activeDeviceId;
-    doc["uid"]       = uidHex;
-    doc["rfid_uid"]  = String(uidDec32);
-    doc["ip"]        = WiFi.localIP().toString();
+    StaticJsonDocument<384> doc;
+    doc["device_id"]    = activeDeviceId;
+    doc["serial"]       = activeDeviceId;
+    doc["uid"]          = uidHex;
+    doc["rfid_uid"]     = String(uidDec32);
+    doc["uid_rev"]      = uidHexRev;
+    doc["rfid_uid_rev"] = String(uidDec32Rev);
+    doc["ip"]           = WiFi.localIP().toString();
 
     char payload[256];
     serializeJson(doc, payload);

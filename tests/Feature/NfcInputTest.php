@@ -194,7 +194,29 @@ class NfcInputTest extends TestCase
             ],
         ]);
 
-        // 4. Santri kedua mendaftar dengan format HEX A7F0B7D1 -> kartu santri pertama otomatis dialihkan dan disimpan sebagai desimal 32-bit
+        // 4. Cek kartu menggunakan varian Byte-Reversed ESP32 RC522:
+        //    USB Reader: A7F0B7D1 (DEC: 2817570769) <-> ESP32 RC522: D1B7F0A7 (DEC: 3518492839)
+        $respEspHexRev = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => 'D1B7F0A7']));
+        $respEspHexRev->assertStatus(200);
+        $respEspHexRev->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $siswa->id,
+                'nama_lengkap' => 'Santri USB Tap',
+            ],
+        ]);
+
+        $respEspDecRev = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => '3518492839']));
+        $respEspDecRev->assertStatus(200);
+        $respEspDecRev->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $siswa->id,
+                'nama_lengkap' => 'Santri USB Tap',
+            ],
+        ]);
+
+        // 5. Santri kedua mendaftar dengan format HEX A7F0B7D1 -> kartu santri pertama otomatis dialihkan dan disimpan sebagai desimal 32-bit
         $siswa2 = Siswa::create([
             'nama_lengkap' => 'Santri Kedua',
             'jenjang' => 'SMA',
@@ -211,6 +233,66 @@ class NfcInputTest extends TestCase
         $siswa2->refresh();
         $this->assertNull($siswa->rfid_uid);
         $this->assertEquals('2817570769', $siswa2->rfid_uid);
+    }
+
+    public function test_pencocokan_dua_arah_endianness_usb_reader_dan_esp32(): void
+    {
+        // Santri didaftarkan menggunakan pembacaan Little-Endian ESP32 (3518492839)
+        $siswa = Siswa::create([
+            'nama_lengkap' => 'Santri Endianness Test',
+            'jenjang' => 'SMP',
+            'kamar' => 'Kamar B1',
+            'status' => 'aktif',
+            'rfid_uid' => '3518492839',
+        ]);
+
+        // Dicek menggunakan format USB Reader (;42992,47057) -> harus langsung terdeteksi
+        $respUsb = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => ';42992,47057']));
+        $respUsb->assertStatus(200);
+        $respUsb->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $siswa->id,
+                'nama_lengkap' => 'Santri Endianness Test',
+            ],
+        ]);
+
+        // Dicek menggunakan format desimal USB Reader (2817570769) -> harus langsung terdeteksi
+        $respUsbDec = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => '2817570769']));
+        $respUsbDec->assertStatus(200);
+        $respUsbDec->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $siswa->id,
+            ],
+        ]);
+
+        // Kasus Kartu Kedua: 6116F1A7 (DEC: 1628893607) <-> A7F11661 (DEC: 2817594977)
+        $siswaKartu2 = Siswa::create([
+            'nama_lengkap' => 'Santri Kartu 6116F1A7',
+            'jenjang' => 'SMA',
+            'status' => 'aktif',
+            'rfid_uid' => '1628893607',
+        ]);
+
+        $respRev2 = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => 'A7F11661']));
+        $respRev2->assertStatus(200);
+        $respRev2->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $siswaKartu2->id,
+                'nama_lengkap' => 'Santri Kartu 6116F1A7',
+            ],
+        ]);
+
+        $respDecRev2 = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => '2817594977']));
+        $respDecRev2->assertStatus(200);
+        $respDecRev2->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $siswaKartu2->id,
+            ],
+        ]);
     }
 }
 

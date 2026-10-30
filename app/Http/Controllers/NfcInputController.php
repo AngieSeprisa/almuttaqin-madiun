@@ -80,12 +80,28 @@ class NfcInputController extends Controller
     }
 
     /**
+     * Membalik urutan byte dalam string HEX 8-digit (Big-Endian <-> Little-Endian).
+     * Contoh: A7F0B7D1 -> D1B7F0A7
+     */
+    public static function reverseBytesHex(string $hex): string
+    {
+        $hex = strtoupper(trim($hex));
+        if (strlen($hex) !== 8) {
+            return $hex;
+        }
+        return substr($hex, 6, 2) . substr($hex, 4, 2) . substr($hex, 2, 2) . substr($hex, 0, 2);
+    }
+
+    /**
      * Menghasilkan semua varian representasi format serial RFID / NFC:
      * 1. Format raw apa adanya (misal: ';42992,47057' atau 'A7F0B7D1')
      * 2. Format tanpa titik koma: '42992,47057'
      * 3. Format angka gabungan: '4299247057'
      * 4. Format HEX 8-karakter (Wiegand 26/32-bit): 'A7F0B7D1'
      * 5. Format desimal 32-bit: '2817570769'
+     * 6. Varian Byte-Reversed (Big-Endian <-> Little-Endian):
+     *    - USB Reader membaca : 2817570769 (Hex: A7F0B7D1, Split: ;42992,47057)
+     *    - ESP32 RC522 membaca: 3518492839 (Hex: D1B7F0A7, Split: ;53687,61607)
      */
     public static function getUidVariants(string $uid): array
     {
@@ -97,13 +113,24 @@ class NfcInputController extends Controller
         $variants = [$uid];
         $upper = strtoupper($uid);
         $variants[] = $upper;
+        $variants[] = strtolower($uid);
 
         // Jika diawali titik koma (;42992,47057)
         if (str_starts_with($uid, ';')) {
             $variants[] = substr($uid, 1);
         }
 
-        // Jika format split desimal: ;42992,47057 atau 42992,47057
+        $clean = ltrim($uid, ';');
+        if (str_starts_with(strtoupper($clean), '0X')) {
+            $clean = substr($clean, 2);
+        }
+        $variants[] = $clean;
+        $variants[] = strtoupper($clean);
+        $variants[] = strtolower($clean);
+
+        $hexCandidates = [];
+
+        // 1. Jika format split desimal: ;42992,47057 atau 42992,47057
         if (preg_match('/^;?(\d{1,5}),(\d{1,5})$/', $uid, $m)) {
             $w1 = (int)$m[1];
             $w2 = (int)$m[2];
@@ -113,30 +140,47 @@ class NfcInputController extends Controller
 
             $hex1 = str_pad(dechex($w1), 4, '0', STR_PAD_LEFT);
             $hex2 = str_pad(dechex($w2), 4, '0', STR_PAD_LEFT);
-            $hex = strtoupper($hex1 . $hex2);
-            $variants[] = $hex;
-            $variants[] = (string)hexdec($hex);
+            $hexCandidates[] = strtoupper($hex1 . $hex2);
         }
-        // Jika format HEX 8-digit dari ESP32 (misal: A7F0B7D1)
-        elseif (preg_match('/^[0-9A-Fa-f]{8}$/', $uid)) {
-            $w1 = hexdec(substr($uid, 0, 4));
-            $w2 = hexdec(substr($uid, 4, 4));
+        // 2. Jika format HEX 8-digit dari ESP32 (misal: A7F0B7D1 atau D1B7F0A7)
+        elseif (preg_match('/^[0-9A-Fa-f]{8}$/', $clean) && !ctype_digit($clean)) {
+            $hexCandidates[] = strtoupper($clean);
+        }
+        // 3. Jika format desimal 32-bit (angka murni, misal 2817570769 atau 3518492839)
+        elseif (preg_match('/^\d{5,12}$/', $clean)) {
+            $decVal = (float)$clean;
+            if ($decVal > 0 && $decVal <= 4294967295) {
+                $hexCandidates[] = strtoupper(str_pad(dechex((int)$decVal), 8, '0', STR_PAD_LEFT));
+            }
+        }
+
+        // Kembangkan setiap kandidat HEX ke representasi normal dan byte-reversed
+        foreach ($hexCandidates as $hex) {
+            $hex = str_pad(strtoupper($hex), 8, '0', STR_PAD_LEFT);
+            $variants[] = $hex;
+            $variants[] = strtolower($hex);
+
+            $dec = hexdec($hex);
+            $variants[] = (string)$dec;
+            $w1 = hexdec(substr($hex, 0, 4));
+            $w2 = hexdec(substr($hex, 4, 4));
             $variants[] = ";{$w1},{$w2}";
             $variants[] = "{$w1},{$w2}";
             $variants[] = "{$w1}{$w2}";
-            $variants[] = (string)hexdec($uid);
-        }
-        // Jika format desimal 32-bit (angka murni, misal 2817570769)
-        elseif (preg_match('/^\d{5,12}$/', $uid)) {
-            $decVal = (int)$uid;
-            if ($decVal > 0 && $decVal <= 4294967295) {
-                $hex = strtoupper(str_pad(dechex($decVal), 8, '0', STR_PAD_LEFT));
-                $variants[] = $hex;
-                $w1 = hexdec(substr($hex, 0, 4));
-                $w2 = hexdec(substr($hex, 4, 4));
-                $variants[] = ";{$w1},{$w2}";
-                $variants[] = "{$w1},{$w2}";
-                $variants[] = "{$w1}{$w2}";
+
+            // Varian Byte-Reversed (B0 B1 B2 B3 <-> B3 B2 B1 B0)
+            if (strlen($hex) === 8) {
+                $hexRev = self::reverseBytesHex($hex);
+                $variants[] = $hexRev;
+                $variants[] = strtolower($hexRev);
+
+                $decRev = hexdec($hexRev);
+                $variants[] = (string)$decRev;
+                $w1Rev = hexdec(substr($hexRev, 0, 4));
+                $w2Rev = hexdec(substr($hexRev, 4, 4));
+                $variants[] = ";{$w1Rev},{$w2Rev}";
+                $variants[] = "{$w1Rev},{$w2Rev}";
+                $variants[] = "{$w1Rev}{$w2Rev}";
             }
         }
 

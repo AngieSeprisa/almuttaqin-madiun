@@ -257,6 +257,16 @@ def broadcast_device_session(client, db, device_id: str):
     except Exception as ex:
         logging.error(f"Gagal broadcast sesi {device_id}: {ex}")
 
+def reverse_bytes_hex(hex_str: str) -> str:
+    """
+    Membalik urutan byte dalam string HEX 8-digit (Big-Endian <-> Little-Endian).
+    Contoh: A7F0B7D1 -> D1B7F0A7
+    """
+    clean_hex = str(hex_str).strip().upper()
+    if len(clean_hex) != 8:
+        return clean_hex
+    return clean_hex[6:8] + clean_hex[4:6] + clean_hex[2:4] + clean_hex[0:2]
+
 def get_uid_variants(raw_uid: str) -> list:
     """
     Menghasilkan semua kemungkinan varian format serial kartu RFID/NFC:
@@ -265,6 +275,10 @@ def get_uid_variants(raw_uid: str) -> list:
     3. Format angka gabungan: '4299247057'
     4. Format HEX 8-karakter uppercase & lowercase: '6116F1A7', '6116f1a7'
     5. Format desimal 32-bit: '1628893607'
+    6. Varian Byte-Reversed (Big-Endian <-> Little-Endian):
+       Mendukung perbedaan pembacaan antara USB Desktop Reader dan RC522 ESP32:
+       - USB Reader membaca : 2817570769 (HEX: A7F0B7D1, Split: ;42992,47057)
+       - ESP32 RC522 membaca: 3518492839 (HEX: D1B7F0A7, Split: ;53687,61607)
     """
     import re
     raw_str = str(raw_uid).strip().rstrip('?')
@@ -280,6 +294,8 @@ def get_uid_variants(raw_uid: str) -> list:
 
     variants.extend([clean, clean.upper(), clean.lower()])
 
+    hex_candidates = []
+
     # 1. Format split desimal: ;42992,47057 atau 42992,47057
     m = re.match(r'^;?(\d{1,5}),(\d{1,5})$', raw_str)
     if m:
@@ -288,14 +304,9 @@ def get_uid_variants(raw_uid: str) -> list:
         h1 = f"{w1:04X}"
         h2 = f"{w2:04X}"
         hex_val = (h1 + h2).upper()
-        variants.extend([hex_val, hex_val.lower()])
-        try:
-            dec32 = str((w1 << 16) | w2)
-            variants.append(dec32)
-        except Exception:
-            pass
+        hex_candidates.append(hex_val)
 
-    # 2. Format HEX (misal: 6116F1A7 atau A7F0B7D1)
+    # 2. Format HEX (misal: 6116F1A7, A7F0B7D1, D1B7F0A7)
     is_hex = bool(re.match(r'^[0-9A-Fa-f]{4,16}$', clean))
     is_pure_digits = bool(re.match(r'^\d+$', clean))
 
@@ -305,26 +316,46 @@ def get_uid_variants(raw_uid: str) -> list:
             variants.append(str(dec_from_hex))
             if 0 <= dec_from_hex <= 0xFFFFFFFF:
                 hex8 = f"{dec_from_hex:08X}".upper()
-                variants.extend([hex8, hex8.lower()])
-                w1 = (dec_from_hex >> 16) & 0xFFFF
-                w2 = dec_from_hex & 0xFFFF
-                variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
+                hex_candidates.append(hex8)
         except ValueError:
             pass
 
-    # 3. Format desimal murni (misal: 1628893607 atau 2817570769)
+    # 3. Format desimal murni (misal: 1628893607, 2817570769, 3518492839)
     if is_pure_digits:
         try:
             dec_val = int(clean)
             variants.append(str(dec_val))
             if 0 <= dec_val <= 0xFFFFFFFF:
                 hex8 = f"{dec_val:08X}".upper()
-                variants.extend([hex8, hex8.lower()])
-                w1 = (dec_val >> 16) & 0xFFFF
-                w2 = dec_val & 0xFFFF
-                variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
+                hex_candidates.append(hex8)
         except ValueError:
             pass
+
+    # Kembangkan setiap kandidat HEX ke varian normal & byte-reversed (Big-Endian <-> Little-Endian)
+    for h in list(hex_candidates):
+        h_upper = h.upper().zfill(8)
+        variants.extend([h_upper, h_upper.lower()])
+        try:
+            d_val = int(h_upper, 16)
+            variants.append(str(d_val))
+            w1 = (d_val >> 16) & 0xFFFF
+            w2 = d_val & 0xFFFF
+            variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
+        except Exception:
+            pass
+
+        # Balik urutan 4-byte (B0 B1 B2 B3 <-> B3 B2 B1 B0)
+        if len(h_upper) == 8:
+            h_rev = reverse_bytes_hex(h_upper)
+            variants.extend([h_rev, h_rev.lower()])
+            try:
+                d_rev = int(h_rev, 16)
+                variants.append(str(d_rev))
+                w1_rev = (d_rev >> 16) & 0xFFFF
+                w2_rev = d_rev & 0xFFFF
+                variants.extend([f";{w1_rev},{w2_rev}", f"{w1_rev},{w2_rev}", f"{w1_rev}{w2_rev}"])
+            except Exception:
+                pass
 
     return list(dict.fromkeys(filter(None, variants)))
 
@@ -613,7 +644,7 @@ def on_message(client, userdata, msg):
                 broadcast_device_session(client, db, device_id)
             return
 
-        uid = data.get("rfid_uid") or data.get("uid")
+        uid = data.get("rfid_uid") or data.get("uid") or data.get("rfid_uid_rev") or data.get("uid_rev")
         if not uid:
             logging.warning("Pesan tap diterima tanpa parameter 'rfid_uid' / 'uid'. Diabaikan.")
             return
