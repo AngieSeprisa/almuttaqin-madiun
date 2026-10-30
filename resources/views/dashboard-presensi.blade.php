@@ -161,36 +161,13 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
         <!-- KOLOM UTAMA (8 Kolom): TABEL PESERTA GAYA FILAMENT V4 -->
         <div class="xl:col-span-8 bg-white border border-gray-200 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
 
-            <!-- Toolbar Atas Kartu Tabel (Filter Pills + Search + Funnel Filter) -->
+            <!-- Toolbar Atas Kartu Tabel (Search + Funnel Filter) -->
             <div class="px-4 py-3.5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 bg-white">
-                <!-- Quick Status Filter Tabs -->
-                <div class="inline-flex items-center p-1 rounded-lg bg-gray-100/80 border border-gray-200/70 text-xs">
-                    <button type="button"
-                            @click="statusFilter = 'all'; currentPage = 1"
-                            :class="statusFilter === 'all' ? 'bg-white text-gray-900 font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
-                            class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5">
-                        <span>Semua</span>
-                        <span class="px-1.5 py-0.2 rounded text-[11px] font-mono bg-gray-100 text-gray-700" x-text="summary.totalTarget">0</span>
-                    </button>
-                    <button type="button"
-                            @click="statusFilter = 'belum'; currentPage = 1"
-                            :class="statusFilter === 'belum' ? 'bg-white text-rose-600 font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
-                            class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5">
-                        <span>Belum Tap</span>
-                        <span class="px-1.5 py-0.2 rounded text-[11px] font-mono bg-rose-50 text-rose-600" x-text="waitingList.length">0</span>
-                    </button>
-                    <button type="button"
-                            @click="statusFilter = 'hadir'; currentPage = 1"
-                            :class="statusFilter === 'hadir' ? 'bg-white text-emerald-700 font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
-                            class="px-2.5 py-1 rounded-md transition flex items-center gap-1.5">
-                        <span>Sudah Hadir</span>
-                        <span class="px-1.5 py-0.2 rounded text-[11px] font-mono bg-emerald-50 text-emerald-700" x-text="hadirList.length">0</span>
-                    </button>
-                </div>
+                <div class="flex items-center gap-2"></div>
 
                 <!-- Search Input + Funnel Button (Persis Gambar Referensi) -->
-                <div class="flex items-center gap-2.5 ml-auto">
-                    <div class="relative w-56 sm:w-64">
+                <div class="flex items-center gap-2.5 ml-auto w-full sm:w-auto">
+                    <div class="relative flex-1 sm:w-64 sm:flex-none">
                         <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
@@ -210,10 +187,11 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                     </div>
 
                     <!-- Funnel Filter Button with Electric Blue Badge -->
-                    <div class="relative" @click.outside="showFilterMenu = false">
+                    <div class="relative shrink-0" @click.outside="showFilterMenu = false">
                         <button type="button"
                                 @click="showFilterMenu = !showFilterMenu"
-                                class="relative w-9 h-9 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-800 flex items-center justify-center transition"
+                                :class="(showFilterMenu || activeFilterCount() > 0) ? 'border-[#0052FF] bg-[#EFF4FF]/60 text-[#0052FF]' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-800'"
+                                class="relative w-9 h-9 rounded-lg border flex items-center justify-center transition"
                                 title="Filter Status">
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 01.628.74v2.288a2.25 2.25 0 01-.659 1.59l-4.682 4.683a2.25 2.25 0 00-.659 1.59v3.037c0 .684-.31 1.33-.844 1.757l-1.937 1.55A.75.75 0 018 18.25v-5.757a2.25 2.25 0 00-.659-1.591L2.659 6.22A2.25 2.25 0 012 4.629V2.34a.75.75 0 01.628-.74z" clip-rule="evenodd" />
@@ -225,24 +203,28 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
 
                         <!-- Filter Popover -->
                         <div x-show="showFilterMenu" x-cloak x-transition
-                             class="absolute right-0 mt-2 w-60 bg-white border border-gray-200 rounded-xl shadow-lg p-3.5 z-30 space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs font-bold text-gray-900">Filter Tabel</span>
+                             class="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-40 overflow-hidden">
+                            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                                <span class="text-sm font-bold text-gray-900">Filter Peserta</span>
                                 <button type="button"
                                         @click="statusFilter = 'all'; sortField = 'status'; sortAsc = true; currentPage = 1"
-                                        class="text-xs font-semibold text-[#0052FF] hover:underline">Reset</button>
+                                        class="text-xs font-semibold text-rose-600 hover:underline">Reset</button>
                             </div>
-                            <div>
-                                <label class="block text-[11px] font-semibold text-gray-500 mb-1">Status Presensi</label>
-                                <select x-model="statusFilter" @change="currentPage = 1"
-                                        class="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-800 outline-none focus:border-[#0052FF]">
-                                    <option value="all">Semua Peserta</option>
-                                    <option value="belum">Belum Tap (Waiting List)</option>
-                                    <option value="hadir">Sudah Tap Hadir</option>
-                                </select>
+                            <div class="p-4 space-y-3.5">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700 mb-1.5">Status Presensi</label>
+                                    <select x-model="statusFilter" @change="currentPage = 1"
+                                            class="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-800 outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 transition">
+                                        <option value="all">Semua Peserta</option>
+                                        <option value="belum">Belum Tap (Waiting List)</option>
+                                        <option value="hadir">Sudah Hadir</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
                 </div>
             </div>
 

@@ -645,30 +645,12 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
              class="bg-white border border-gray-200 rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
 
         <!-- Card Top Toolbar -->
-        <div class="px-4 py-3.5 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 bg-white">
-            <div class="inline-flex items-center gap-1 p-1 rounded-lg bg-gray-100/80 border border-gray-200/70 text-xs">
-                <button type="button"
-                        @click="deviceStatusFilter = 'all'"
-                        :class="deviceStatusFilter === 'all' ? 'bg-white text-[#0052FF] font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
-                        class="px-2.5 py-1 rounded-md transition">
-                    Semua ({{ $allDevices->count() }})
-                </button>
-                <button type="button"
-                        @click="deviceStatusFilter = 'aktif'"
-                        :class="deviceStatusFilter === 'aktif' ? 'bg-white text-emerald-700 font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
-                        class="px-2.5 py-1 rounded-md transition">
-                    Aktif ({{ $devices->count() }})
-                </button>
-                <button type="button"
-                        @click="deviceStatusFilter = 'nonaktif'"
-                        :class="deviceStatusFilter === 'nonaktif' ? 'bg-white text-gray-800 font-semibold shadow-2xs border border-gray-200/80' : 'text-gray-600 hover:text-gray-900 font-medium border border-transparent'"
-                        class="px-2.5 py-1 rounded-md transition">
-                    Nonaktif ({{ max(0, $allDevices->count() - $devices->count()) }})
-                </button>
-            </div>
+        <div class="px-4 py-3.5 border-b border-gray-200 rounded-t-xl flex flex-wrap items-center justify-between gap-3 bg-white">
+            <div class="flex items-center gap-2"></div>
 
-            <div class="flex items-center gap-2.5 ml-auto">
-                <div class="relative w-56 sm:w-64">
+            <!-- Right: Search Input + Funnel Filter Button -->
+            <div class="flex items-center gap-2 ml-auto w-full sm:w-auto">
+                <div class="relative flex-1 sm:w-64 sm:flex-none">
                     <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
@@ -684,6 +666,60 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
+                </div>
+
+                <!-- Funnel Filter Button with Active Count Badge -->
+                <div class="relative shrink-0" @click.outside="showDeviceFilterPopover = false">
+                    <button type="button"
+                            @click="draftDeviceStatus = deviceStatusFilter; draftDeviceArea = deviceAreaFilter; showDeviceFilterPopover = !showDeviceFilterPopover"
+                            :class="(showDeviceFilterPopover || activeDeviceFilterCount() > 0) ? 'border-[#0052FF] bg-[#EFF4FF]/60 text-[#0052FF]' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-800'"
+                            class="relative w-9 h-9 rounded-lg border flex items-center justify-center transition"
+                            title="Filter Perangkat">
+                        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 01.628.74v2.288a2.25 2.25 0 01-.659 1.59l-4.682 4.683a2.25 2.25 0 00-.659 1.59v3.037c0 .684-.31 1.33-.844 1.757l-1.937 1.55A.75.75 0 018 18.25v-5.757a2.25 2.25 0 00-.659-1.591L2.659 6.22A2.25 2.25 0 012 4.629V2.34a.75.75 0 01.628-.74z" clip-rule="evenodd" />
+                        </svg>
+                        <span class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-md text-[10px] font-bold flex items-center justify-center border"
+                              :class="activeDeviceFilterCount() > 0 ? 'bg-[#0052FF] text-white border-[#0052FF]' : 'bg-[#EFF4FF] text-[#0052FF] border-[#0052FF]/20'"
+                              x-text="activeDeviceFilterCount()">0</span>
+                    </button>
+
+                    <!-- Popover Filter -->
+                    <div x-show="showDeviceFilterPopover" x-cloak x-transition
+                         class="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-40 overflow-hidden">
+                        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                            <span class="text-sm font-bold text-gray-900">Filter</span>
+                            <button type="button"
+                                    @click="resetDeviceFilters()"
+                                    class="text-xs font-semibold text-rose-600 hover:underline">Reset</button>
+                        </div>
+                        <div class="p-4 space-y-3.5">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1.5">Status Perangkat</label>
+                                <select x-model="draftDeviceStatus"
+                                        class="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-800 outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 transition">
+                                    <option value="all">Semua Status ({{ $allDevices->count() }})</option>
+                                    <option value="aktif">Aktif / Online ({{ $devices->count() }})</option>
+                                    <option value="nonaktif">Nonaktif ({{ max(0, $allDevices->count() - $devices->count()) }})</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1.5">Kategori Area</label>
+                                <select x-model="draftDeviceArea"
+                                        class="w-full px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-800 outline-none focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 transition">
+                                    <option value="all">Semua Area</option>
+                                    <option value="pondok">Pondok / Asrama</option>
+                                    <option value="sekolah">Sekolah Formal</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="px-4 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+                            <button type="button"
+                                    @click="applyDeviceFilters()"
+                                    class="px-4 py-2 rounded-lg bg-[#0052FF] hover:bg-[#0043D4] text-white text-xs font-semibold shadow-sm shadow-[#0052FF]/20 transition">
+                                Terapkan filter
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1457,6 +1493,10 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
             },
             deviceSearchQuery: '',
             deviceStatusFilter: 'all',
+            deviceAreaFilter: 'all',
+            draftDeviceStatus: 'all',
+            draftDeviceArea: 'all',
+            showDeviceFilterPopover: false,
             showModal: false,
             showDeviceModal: false,
             deviceModalMode: 'create',
@@ -1671,11 +1711,33 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                 return `Menampilkan ${from} sampai ${to} dari ${total} jadwal sesi`;
             },
 
+            activeDeviceFilterCount() {
+                let count = 0;
+                if (this.deviceStatusFilter !== 'all') count++;
+                if (this.deviceAreaFilter !== 'all') count++;
+                return count;
+            },
+
+            applyDeviceFilters() {
+                this.deviceStatusFilter = this.draftDeviceStatus;
+                this.deviceAreaFilter = this.draftDeviceArea;
+                this.showDeviceFilterPopover = false;
+            },
+
+            resetDeviceFilters() {
+                this.draftDeviceStatus = 'all';
+                this.draftDeviceArea = 'all';
+                this.deviceStatusFilter = 'all';
+                this.deviceAreaFilter = 'all';
+                this.showDeviceFilterPopover = false;
+            },
+
             matchesDeviceFilter(id) {
                 const d = this.devicesData.find(item => Number(item.id) === Number(id));
                 if (!d) return true;
                 if (this.deviceStatusFilter === 'aktif' && !d.status_aktif) return false;
                 if (this.deviceStatusFilter === 'nonaktif' && d.status_aktif) return false;
+                if (this.deviceAreaFilter !== 'all' && (d.kategori_area || '').toLowerCase() !== this.deviceAreaFilter.toLowerCase()) return false;
                 const q = this.deviceSearchQuery.trim().toLowerCase();
                 if (!q) return true;
                 return (d.device_id && d.device_id.toLowerCase().includes(q))
