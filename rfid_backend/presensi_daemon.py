@@ -184,9 +184,10 @@ def get_active_sesi(cursor, device_id: str, current_time: str, strict: bool = Tr
     """
     Mencari sesi aktif di master_sesis yang cocok dengan device_id dan jam saat ini.
     Jika strict=True, hanya kembalikan sesi jika waktu sekarang benar-benar berada dalam rentang sesi.
+    Memuat seluruh kolom sesi (termasuk target_kategori/target_partisipan dan target_filter/filter_target).
     """
     query = """
-        SELECT id, kode_sesi, nama_sesi, jam_mulai, jam_selesai, toleransi_menit, kategori, device_id_target
+        SELECT *
         FROM master_sesis
         WHERE (device_id_target = %s OR device_id_target IS NULL OR device_id_target = '')
           AND (
@@ -202,7 +203,7 @@ def get_active_sesi(cursor, device_id: str, current_time: str, strict: bool = Tr
 
     # Jika strict=False dan tidak ada sesi pada jam ini, gunakan sesi fallback pertama
     if not sesi and not strict:
-        fallback_query = "SELECT id, kode_sesi, nama_sesi, jam_mulai, jam_selesai, toleransi_menit, kategori, device_id_target FROM master_sesis ORDER BY id ASC LIMIT 1"
+        fallback_query = "SELECT * FROM master_sesis ORDER BY id ASC LIMIT 1"
         cursor.execute(fallback_query)
         sesi = cursor.fetchone()
 
@@ -359,6 +360,57 @@ def get_uid_variants(raw_uid: str) -> list:
 
     return list(dict.fromkeys(filter(None, variants)))
 
+def normalize_room_name(name: str) -> str:
+    """
+    Menormalkan nama kamar santri atau target sesi untuk perbandingan fleksibel.
+    Menghapus kata 'kamar' / 'room' dan merapikan spasi.
+    Contoh: 'Kamar Kelas 8 Putri' -> 'kelas 8 putri'
+    """
+    if not name:
+        return ""
+    s = str(name).strip().lower()
+    s = re.sub(r'\b(kamar|room)\b', '', s, flags=re.IGNORECASE)
+    return ' '.join(s.split())
+
+def is_target_room_matched(santri_kamar: str, target_filter: str) -> bool:
+    """
+    Mengecek apakah kamar santri cocok dengan filter target sesi.
+    Mendukung kecocokan langsung, normalisasi kata awalan 'kamar', dan multi-kamar dipisah koma.
+    """
+    if not target_filter:
+        return True
+
+    tf_clean = str(target_filter).strip()
+    if tf_clean.lower() in ["", "all", "semua", "semua santri", "semua_santri", "-"]:
+        return True
+
+    sk_clean = str(santri_kamar or "").strip()
+    if not sk_clean:
+        # Santri belum memiliki data kamar, tolak jika sesi spesifik kamar
+        return False
+
+    # Perbandingan langsung (case-insensitive)
+    if sk_clean.lower() == tf_clean.lower():
+        return True
+
+    norm_santri = normalize_room_name(sk_clean)
+
+    # Pisahkan kemungkinan multi-target (misal dipisah koma/titik koma)
+    target_items = [t.strip() for t in re.split(r'[,;]+', tf_clean) if t.strip()]
+    for item in target_items:
+        if item.lower() in ["all", "semua", "semua santri", "semua_santri"]:
+            return True
+        if sk_clean.lower() == item.lower():
+            return True
+        norm_item = normalize_room_name(item)
+        if norm_santri == norm_item:
+            return True
+        if norm_santri and norm_item:
+            if norm_santri in norm_item or norm_item in norm_santri:
+                return True
+
+    return False
+
 def find_entity_by_uid(cursor, clean_uid: str):
     """
     Mencari entitas pemilik kartu:
@@ -374,7 +426,7 @@ def find_entity_by_uid(cursor, clean_uid: str):
 
     placeholders = ", ".join(["%s"] * len(variants))
     query_siswa = f"""
-        SELECT id, nama_lengkap, kamar, status, rfid_uid 
+        SELECT id, nama_lengkap, kamar, jenjang, status, rfid_uid 
         FROM siswas 
         WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) 
            OR TRIM(rfid_uid) IN ({placeholders})
@@ -388,7 +440,9 @@ def find_entity_by_uid(cursor, clean_uid: str):
             "type": "santri",
             "id": santri["id"],
             "nama": santri["nama_lengkap"],
-            "sub": santri.get("kamar", "Santri")
+            "sub": santri.get("kamar") or "Santri",
+            "kamar": santri.get("kamar") or "",
+            "jenjang": santri.get("jenjang") or ""
         }
 
     query_user = f"""
@@ -479,7 +533,59 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
     sesi_id = sesi["id"]
     sesi_name = sesi["nama_sesi"]
 
-    # 4. Anti-Duplikasi Per Sesi
+    # 4. Validasi Filter Target Sesi (Kamar / Jenjang)
+    # Periksa kolom target_partisipan / target_kategori dan filter_target / target_filter
+    target_partisipan = str(sesi.get("target_partisipan") or sesi.get("target_kategori") or "").strip().lower()
+    filter_target = str(sesi.get("filter_target") or sesi.get("target_filter") or "").strip()
+
+    is_kamar_session = target_partisipan in ["kamar", "kamar_khusus", "kamar khusus"]
+    has_target_filter = bool(filter_target) and filter_target.lower() not in ["", "semua_santri", "semua santri", "all", "semua", "-"]
+
+    if is_kamar_session or has_target_filter:
+        if entity_type == "santri":
+            santri_kamar = entity.get("kamar") or ""
+            # Jika target berupa kamar atau filter_target diisi nama kamar
+            if is_kamar_session or (target_partisipan not in ["sekolah", "jenjang", "pegawai"] and has_target_filter):
+                if not is_target_room_matched(santri_kamar, filter_target):
+                    cursor.close()
+                    logging.warning(
+                        f"[REJECT] Santri '{entity_name}' dari kamar '{santri_kamar}' tidak terdaftar pada sesi kamar '{filter_target}'."
+                    )
+                    return {
+                        "device_id": device_id,
+                        "nama": lcd_name,
+                        "status": "AKSES DITOLAK",
+                        "kode": "WRONG_ROOM",
+                        "sesi": sesi_name
+                    }
+            elif target_partisipan in ["sekolah", "jenjang"] and has_target_filter:
+                santri_jenjang = entity.get("jenjang") or ""
+                if santri_jenjang.lower() != filter_target.lower():
+                    cursor.close()
+                    logging.warning(
+                        f"[REJECT] Santri '{entity_name}' dari jenjang '{santri_jenjang}' tidak terdaftar pada sesi sekolah '{filter_target}'."
+                    )
+                    return {
+                        "device_id": device_id,
+                        "nama": lcd_name,
+                        "status": "AKSES DITOLAK",
+                        "kode": "WRONG_LEVEL",
+                        "sesi": sesi_name
+                    }
+        elif entity_type != "santri" and (is_kamar_session or target_partisipan in ["semua_santri", "kamar", "kamar_khusus"]):
+            cursor.close()
+            logging.warning(
+                f"[REJECT] Pegawai '{entity_name}' tidak terdaftar pada sesi santri/kamar '{sesi_name}'."
+            )
+            return {
+                "device_id": device_id,
+                "nama": lcd_name,
+                "status": "AKSES DITOLAK",
+                "kode": "WRONG_ROLE",
+                "sesi": sesi_name
+            }
+
+    # 5. Anti-Duplikasi Per Sesi
     query_check = """
         SELECT id FROM presensis
         WHERE sesi_id = %s AND tipe_entitas = %s AND entitas_id = %s AND DATE(waktu_tap) = %s
@@ -499,7 +605,7 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
             "sesi": sesi_name
         }
 
-    # 5. Tentukan Status Kehadiran (Tepat Waktu vs Terlambat)
+    # 6. Tentukan Status Kehadiran (Tepat Waktu vs Terlambat)
     status_kehadiran = "tepat_waktu"
     if sesi and sesi.get("toleransi_menit"):
         try:
@@ -513,7 +619,7 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
     if sesi and sesi.get("kategori") == "makan":
         status_kehadiran = "sudah_makan"
 
-    # 6. Simpan ke Tabel Konsolidasi Terpadu `presensis`
+    # 7. Simpan ke Tabel Konsolidasi Terpadu `presensis`
     query_insert = """
         INSERT INTO presensis (device_id, sesi_id, tipe_entitas, entitas_id, rfid_uid, waktu_tap, status_kehadiran, created_at, updated_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
