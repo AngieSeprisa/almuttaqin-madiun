@@ -13,9 +13,9 @@ use Illuminate\Validation\Rule;
 class PlottingKelasPengajianController extends Controller
 {
     /**
-     * Normalisasi input siswa_id (mendukung single ID, array siswa_id[], maupun string dipisah koma).
+     * Normalisasi input siswa_id / kelas_id (mendukung single ID, array, maupun string dipisah koma).
      */
-    protected function parseSiswaIds(mixed $raw): array
+    protected function parseIds(mixed $raw): array
     {
         if (is_array($raw)) {
             $items = $raw;
@@ -34,7 +34,7 @@ class PlottingKelasPengajianController extends Controller
     }
 
     /**
-     * Tampilkan halaman Plotting Kelas Pengajian & Manajemen Master Kelas.
+     * Tampilkan halaman Plotting Kelas Pengajian bergaya Plotting Kamar (Daftar Kelas & Belum Terdaftar).
      */
     public function index(Request $request)
     {
@@ -53,86 +53,46 @@ class PlottingKelasPengajianController extends Controller
             MasterKelasPengajian::seedStandar();
         }
 
-        $masterKelasList = MasterKelasPengajian::withCount(['siswas' => function ($q) {
-            $q->where('status', 'aktif');
-        }])->orderBy('id')->get();
+        $dbMasterKelas = MasterKelasPengajian::orderBy('id')->get();
 
-        // Query seluruh santri aktif beserta relasi pendaftaran dan kelas pengajian
-        $query = Siswa::where('status', 'aktif')
-            ->with(['pendaftaran', 'kelasPengajian']);
+        // Ambil seluruh santri aktif beserta relasi pendaftaran dan kelas pengajian
+        $allActiveSiswa = Siswa::where('status', 'aktif')
+            ->with(['pendaftaran', 'kelasPengajian'])
+            ->orderBy('nama_lengkap')
+            ->get();
 
-        // 1. Filter Pencarian Cepat
-        if ($request->filled('search')) {
-            $search = mb_strtolower(trim($request->search));
-            $query->where(function ($q) use ($search) {
-                $q->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$search}%"])
-                  ->orWhereRaw('LOWER(kamar) LIKE ?', ["%{$search}%"])
-                  ->orWhereRaw('LOWER(kelas) LIKE ?', ["%{$search}%"])
-                  ->orWhereHas('pendaftaran', function ($p) use ($search) {
-                      $p->whereRaw('LOWER(nisn) LIKE ?', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(no_induk) LIKE ?', ["%{$search}%"]);
-                  })
-                  ->orWhereHas('kelasPengajian', function ($kp) use ($search) {
-                      $kp->whereRaw('LOWER(nama_kelas) LIKE ?', ["%{$search}%"]);
-                  });
-            });
+        // Susun data kelas beserta anggota santri di dalamnya
+        $dataKelas = [];
+        foreach ($dbMasterKelas as $mk) {
+            $anggota = $allActiveSiswa->filter(fn ($s) => (int) $s->kelas_pengajian_id === (int) $mk->id)->values();
+
+            $dataKelas[] = (object) [
+                'id'           => $mk->id,
+                'kelas'        => $mk,
+                'nama_kelas'   => $mk->nama_kelas,
+                'kode_kelas'   => $mk->kode_kelas,
+                'jenjang'      => $mk->jenjang,
+                'jumlah_siswa' => $anggota->count(),
+                'anggota'      => $anggota,
+            ];
         }
 
-        // 2. Filter Kelas Pengajian
-        if ($request->filled('kelas_pengajian_id')) {
-            $filterKelas = $request->kelas_pengajian_id;
-            if ($filterKelas === 'unassigned') {
-                $query->whereNull('kelas_pengajian_id');
-            } elseif ($filterKelas === 'assigned') {
-                $query->whereNotNull('kelas_pengajian_id');
-            } elseif (is_numeric($filterKelas) && (int) $filterKelas > 0) {
-                $query->where('kelas_pengajian_id', (int) $filterKelas);
-            }
+        // Santri aktif yang belum terdaftar di kelas pengajian manapun
+        $belumTerdaftar = $allActiveSiswa->filter(function ($s) {
+            return empty($s->kelas_pengajian_id);
+        })->values();
+
+        $activeTab = $request->get('tab', 'kelas');
+        if (!in_array($activeTab, ['kelas', 'belum_terdaftar'], true)) {
+            $activeTab = 'kelas';
         }
-
-        // 3. Filter Gender (Putra/Putri dari data santri pendaftaran)
-        if ($request->filled('gender')) {
-            $g = strtolower(trim($request->gender));
-            if (in_array($g, ['l', 'laki-laki', 'putra'])) {
-                $query->whereHas('pendaftaran', function ($p) {
-                    $p->where('jenis_kelamin', 'laki-laki');
-                });
-            } elseif (in_array($g, ['p', 'perempuan', 'putri'])) {
-                $query->whereHas('pendaftaran', function ($p) {
-                    $p->where('jenis_kelamin', 'perempuan');
-                });
-            }
-        }
-
-        // 4. Filter Jenjang Sekolah (SMP, SMA, Reguler)
-        if ($request->filled('jenjang')) {
-            $j = strtolower(trim($request->jenjang));
-            if ($j !== 'all' && $j !== '') {
-                $query->whereRaw('LOWER(jenjang) = ?', [$j]);
-            }
-        }
-
-        $allSantri = $query->orderBy('nama_lengkap')->get();
-
-        // Statistik Keseluruhan Santri Aktif
-        $totalSantriOverall = Siswa::where('status', 'aktif')->count();
-        $totalTerplotting = Siswa::where('status', 'aktif')->whereNotNull('kelas_pengajian_id')->count();
-        $totalBelumTerplotting = Siswa::where('status', 'aktif')->whereNull('kelas_pengajian_id')->count();
-        $totalKelas = $masterKelasList->count();
-
-        // Hitung persentase plotting
-        $persenTerplotting = $totalSantriOverall > 0
-            ? round(($totalTerplotting / $totalSantriOverall) * 100)
-            : 0;
 
         return view('plotting-pengajian.index', compact(
-            'masterKelasList',
-            'allSantri',
-            'totalSantriOverall',
-            'totalTerplotting',
-            'totalBelumTerplotting',
-            'totalKelas',
-            'persenTerplotting'
+            'dbMasterKelas',
+            'dataKelas',
+            'belumTerdaftar',
+            'allActiveSiswa',
+            'activeTab'
         ));
     }
 
@@ -155,7 +115,7 @@ class PlottingKelasPengajianController extends Controller
             'kelas_pengajian_id' => 'nullable',
         ]);
 
-        $siswaIds = $this->parseSiswaIds($request->siswa_id);
+        $siswaIds = $this->parseIds($request->siswa_id);
 
         if (empty($siswaIds)) {
             return back()->with('error', 'Tidak ada santri yang dipilih untuk ditetapkan.');
@@ -170,11 +130,12 @@ class PlottingKelasPengajianController extends Controller
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => true,
-                    'message' => "{$count} santri berhasil dikeluarkan dari kelas pengajian (Belum Diplot).",
+                    'message' => "{$count} santri berhasil dikeluarkan dari kelas pengajian (Belum Terdaftar).",
                 ]);
             }
 
-            return back()->with('success', "{$count} santri berhasil dikeluarkan dari kelas pengajian (Belum Diplot).");
+            return redirect()->route('plotting-pengajian.index', ['tab' => 'belum_terdaftar'])
+                ->with('success', "{$count} santri berhasil dikeluarkan dari kelas pengajian (Belum Terdaftar).");
         }
 
         $kelas = MasterKelasPengajian::find($targetId);
@@ -187,16 +148,17 @@ class PlottingKelasPengajianController extends Controller
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => "{$count} santri berhasil ditetapkan ke {$kelas->nama_kelas}.",
+                'message' => "{$count} santri berhasil ditempatkan ke {$kelas->nama_kelas}.",
                 'kelas'   => $kelas->nama_kelas,
             ]);
         }
 
-        return back()->with('success', "{$count} santri berhasil ditetapkan ke {$kelas->nama_kelas}.");
+        return redirect()->route('plotting-pengajian.index', ['tab' => 'kelas'])
+            ->with('success', "{$count} santri berhasil ditempatkan ke {$kelas->nama_kelas}.");
     }
 
     /**
-     * Keluarkan santri dari kelas pengajian (unassign).
+     * Keluarkan santri dari kelas pengajian (unassign -> pindah ke Belum Terdaftar).
      */
     public function unassign(Request $request)
     {
@@ -213,7 +175,7 @@ class PlottingKelasPengajianController extends Controller
             'siswa_id' => 'required',
         ]);
 
-        $siswaIds = $this->parseSiswaIds($request->siswa_id);
+        $siswaIds = $this->parseIds($request->siswa_id);
         if (empty($siswaIds)) {
             return back()->with('error', 'Tidak ada santri yang dipilih.');
         }
@@ -227,7 +189,8 @@ class PlottingKelasPengajianController extends Controller
             ]);
         }
 
-        return back()->with('success', "{$count} santri berhasil dikeluarkan dari kelas pengajian.");
+        return redirect()->back()
+            ->with('success', "{$count} santri berhasil dikeluarkan dari kelas pengajian.");
     }
 
     /**
@@ -264,8 +227,8 @@ class PlottingKelasPengajianController extends Controller
             'jenjang'    => $validated['jenjang'],
         ]);
 
-        return redirect()->route('plotting-pengajian.index')
-            ->with('success', "Master {$kelas->nama_kelas} berhasil ditambahkan.");
+        return redirect()->route('plotting-pengajian.index', ['tab' => 'kelas'])
+            ->with('success', "Kelas {$kelas->nama_kelas} berhasil ditambahkan dan siap ditempati santri.");
     }
 
     /**
@@ -294,8 +257,8 @@ class PlottingKelasPengajianController extends Controller
             'jenjang'    => $validated['jenjang'],
         ]);
 
-        return redirect()->route('plotting-pengajian.index')
-            ->with('success', "Data {$kelas->nama_kelas} berhasil diperbarui.");
+        return redirect()->route('plotting-pengajian.index', ['tab' => 'kelas'])
+            ->with('success', "Data kelas {$kelas->nama_kelas} berhasil diperbarui.");
     }
 
     /**
@@ -314,14 +277,72 @@ class PlottingKelasPengajianController extends Controller
 
         $santriCount = $kelas->siswas()->where('status', 'aktif')->count();
         if ($santriCount > 0) {
-            return back()->with('error', "Kelas \"{$kelas->nama_kelas}\" tidak dapat dihapus karena masih memiliki {$santriCount} santri aktif. Silakan mutasikan santri ke kelas lain terlebih dahulu.");
+            return redirect()->back()->with(
+                'error',
+                "Kelas \"{$kelas->nama_kelas}\" tidak dapat dihapus karena masih memiliki {$santriCount} santri aktif. Silakan pindahkan santri terlebih dahulu."
+            );
         }
 
         $nama = $kelas->nama_kelas;
         $kelas->delete();
 
-        return redirect()->route('plotting-pengajian.index')
+        return redirect()->route('plotting-pengajian.index', ['tab' => 'kelas'])
             ->with('success', "Kelas \"{$nama}\" berhasil dihapus.");
+    }
+
+    /**
+     * Hapus kelas pengajian terpilih secara massal (dengan proteksi santri aktif).
+     */
+    public function destroyBulkKelas(Request $request)
+    {
+        /** @var User $authUser */
+        $authUser = Auth::user();
+
+        if (!$authUser->isYayasan()
+            && !$authUser->canDo('plotting_pengajian', 'delete')
+            && !$authUser->canDo('plotting_kamar', 'delete')) {
+            abort(403, 'Anda tidak memiliki hak akses untuk menghapus kelas pengajian.');
+        }
+
+        $request->validate([
+            'kelas_ids' => 'required',
+        ]);
+
+        $ids = $this->parseIds($request->kelas_ids);
+        if (empty($ids)) {
+            return redirect()->back()->with('error', 'Tidak ada kelas yang dipilih untuk dihapus.');
+        }
+
+        $classes = MasterKelasPengajian::whereIn('id', $ids)->get();
+        $deletedCount = 0;
+        $blockedNames = [];
+
+        foreach ($classes as $c) {
+            $santriCount = $c->siswas()->where('status', 'aktif')->count();
+            if ($santriCount > 0) {
+                $blockedNames[] = "{$c->nama_kelas} ({$santriCount} santri)";
+                continue;
+            }
+            $c->delete();
+            $deletedCount++;
+        }
+
+        if ($deletedCount > 0 && empty($blockedNames)) {
+            return redirect()->route('plotting-pengajian.index', ['tab' => 'kelas'])
+                ->with('success', "{$deletedCount} kelas terpilih berhasil dihapus.");
+        }
+
+        if ($deletedCount > 0 && !empty($blockedNames)) {
+            return redirect()->route('plotting-pengajian.index', ['tab' => 'kelas'])->with(
+                'success',
+                "{$deletedCount} kelas kosong berhasil dihapus. Kelas berikut dilewati karena masih memiliki santri: " . implode(', ', $blockedNames) . '.'
+            );
+        }
+
+        return redirect()->route('plotting-pengajian.index', ['tab' => 'kelas'])->with(
+            'error',
+            'Kelas terpilih tidak dapat dihapus karena masih memiliki santri aktif: ' . implode(', ', $blockedNames) . '.'
+        );
     }
 
     /**
@@ -340,7 +361,38 @@ class PlottingKelasPengajianController extends Controller
 
         $added = MasterKelasPengajian::seedStandar();
 
-        return redirect()->route('plotting-pengajian.index')
+        return redirect()->route('plotting-pengajian.index', ['tab' => 'kelas'])
             ->with('success', "Berhasil memeriksa dan menambahkan {$added} kelas pengajian standar.");
+    }
+
+    /**
+     * Endpoint JSON data santri anggota kelas pengajian tertentu (untuk modal anggota).
+     */
+    public function anggota(MasterKelasPengajian $kelas)
+    {
+        $anggota = Siswa::where('status', 'aktif')
+            ->where('kelas_pengajian_id', $kelas->id)
+            ->with(['pendaftaran', 'kelasPengajian'])
+            ->orderBy('nama_lengkap')
+            ->get()
+            ->map(function ($s) {
+                $gender = strtolower((string) ($s->pendaftaran?->jenis_kelamin ?? ''));
+                $genderLabel = in_array($gender, ['p', 'perempuan', 'putri']) ? 'Putri (P)' : 'Putra (L)';
+
+                return [
+                    'id'            => $s->id,
+                    'nama_lengkap'  => $s->nama_lengkap,
+                    'nisn'          => $s->pendaftaran?->nisn ?: ($s->pendaftaran?->no_induk ?: '-'),
+                    'jenis_kelamin' => $genderLabel,
+                    'kamar'         => $s->kamar ?: '-',
+                    'kelas'         => $s->kelas ?: '-',
+                    'jenjang'       => strtoupper($s->jenjang ?: 'Reguler'),
+                ];
+            });
+
+        return response()->json([
+            'kelas'   => $kelas,
+            'anggota' => $anggota,
+        ]);
     }
 }

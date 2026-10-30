@@ -48,7 +48,7 @@ class PlottingKelasPengajianTest extends TestCase
             'jenjang'    => 'smp',
         ]);
 
-        $response->assertRedirect(route('plotting-pengajian.index'));
+        $response->assertRedirect(route('plotting-pengajian.index', ['tab' => 'kelas']));
         $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('master_kelas_pengajians', [
@@ -172,7 +172,7 @@ class PlottingKelasPengajianTest extends TestCase
         $this->assertDatabaseMissing('master_kelas_pengajians', ['id' => $kelas->id]);
     }
 
-    public function test_filter_gender_dan_status_kelas_pengajian(): void
+    public function test_anggota_kelas_pengajian_dan_tab_belum_terdaftar(): void
     {
         $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
         $kelas = MasterKelasPengajian::where('kode_kelas', 'KLS_REGULER')->firstOrFail();
@@ -190,30 +190,30 @@ class PlottingKelasPengajianTest extends TestCase
             'status'        => 'Diterima',
         ]);
 
-        Siswa::create([
+        $siswaPutra = Siswa::create([
             'nama_lengkap'       => 'Santri Ahmad Putra',
             'pendaftaran_id'     => $pPutra->id,
             'status'             => 'aktif',
             'kelas_pengajian_id' => $kelas->id,
         ]);
 
-        Siswa::create([
+        $siswaPutri = Siswa::create([
             'nama_lengkap'       => 'Santri Aisyah Putri',
             'pendaftaran_id'     => $pPutri->id,
             'status'             => 'aktif',
             'kelas_pengajian_id' => null,
         ]);
 
-        // Cek filter putra
-        $respPutra = $this->actingAs($yayasan)->get(route('plotting-pengajian.index', ['gender' => 'laki-laki']));
-        $respPutra->assertStatus(200);
-        $respPutra->assertSee('Santri Ahmad Putra');
-        $respPutra->assertDontSee('Santri Aisyah Putri');
+        // 1. Santri belum terdaftar muncul di tab belum_terdaftar
+        $respBelum = $this->actingAs($yayasan)->get(route('plotting-pengajian.index', ['tab' => 'belum_terdaftar']));
+        $respBelum->assertStatus(200);
+        $respBelum->assertSee('Santri Aisyah Putri');
+        $respBelum->assertDontSee('Santri Ahmad Putra');
 
-        // Cek filter unassigned
-        $respUnassigned = $this->actingAs($yayasan)->get(route('plotting-pengajian.index', ['kelas_pengajian_id' => 'unassigned']));
-        $respUnassigned->assertStatus(200);
-        $respUnassigned->assertSee('Santri Aisyah Putri');
-        $respUnassigned->assertDontSee('Santri Ahmad Putra');
+        // 2. Santri yang sudah diplot muncul di endpoint anggota kelas untuk modal
+        $respAnggota = $this->actingAs($yayasan)->getJson(route('plotting-pengajian.anggota', $kelas->id));
+        $respAnggota->assertStatus(200);
+        $respAnggota->assertJsonFragment(['nama_lengkap' => 'Santri Ahmad Putra']);
     }
 }
+

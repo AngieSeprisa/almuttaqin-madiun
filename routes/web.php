@@ -343,6 +343,9 @@ Route::middleware('auth')->group(function () {
         Route::delete('/kelas/{kelas}', [PlottingKelasPengajianController::class, 'destroyKelas'])
             ->middleware('permission:plotting_pengajian|plotting_kamar,delete')
             ->name('destroy-kelas');
+        Route::post('/kelas-bulk-delete', [PlottingKelasPengajianController::class, 'destroyBulkKelas'])
+            ->middleware('permission:plotting_pengajian|plotting_kamar,delete')
+            ->name('destroy-bulk-kelas');
         Route::post('/muat-standar', [PlottingKelasPengajianController::class, 'muatStandar'])
             ->middleware('permission:plotting_pengajian|plotting_kamar,create')
             ->name('muat-standar');
@@ -352,6 +355,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/unassign', [PlottingKelasPengajianController::class, 'unassign'])
             ->middleware('permission:plotting_pengajian|plotting_kamar,edit')
             ->name('unassign');
+        Route::get('/anggota/{kelas}', [PlottingKelasPengajianController::class, 'anggota'])
+            ->middleware('permission:plotting_pengajian|plotting_kamar|pengaturan_pondok,view')
+            ->name('anggota');
     });
 
     // Menu Manajemen Pengguna & Hak Akses

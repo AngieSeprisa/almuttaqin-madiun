@@ -47,3 +47,4 @@ return new class extends Migration
         Schema::dropIfExists('master_kelas_pengajians');
     }
 };
+

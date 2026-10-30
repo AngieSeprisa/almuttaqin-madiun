@@ -15,3 +15,4 @@ class MasterKelasPengajianSeeder extends Seeder
         MasterKelasPengajian::seedStandar();
     }
 }
+

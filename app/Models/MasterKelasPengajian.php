@@ -75,3 +75,4 @@ class MasterKelasPengajian extends Model
         return $added;
     }
 }
+
