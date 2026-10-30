@@ -188,7 +188,7 @@ def get_active_sesi(cursor, device_id: str, current_time: str, strict: bool = Tr
     query = """
         SELECT id, kode_sesi, nama_sesi, jam_mulai, jam_selesai, toleransi_menit, kategori, device_id_target
         FROM master_sesis
-        WHERE (device_id_target = %s OR device_id_target IS NULL)
+        WHERE (device_id_target = %s OR device_id_target IS NULL OR device_id_target = '')
           AND (
             (jam_mulai <= jam_selesai AND %s BETWEEN jam_mulai AND jam_selesai)
             OR
@@ -251,83 +251,108 @@ def broadcast_device_session(client, db, device_id: str):
         # 1. Topik per-device (retained agar ESP32 yang baru boot/reconnect langsung menerima)
         client.publish(f"presensi/devices/{device_id}/sesi", payload_json, qos=1, retain=True)
         client.publish(f"presensi/sesi/{device_id}", payload_json, qos=1, retain=True)
-        # 2. Topik global
+        # 2. Topik global (retained)
         client.publish("presensi/sesi_aktif", payload_json, qos=1, retain=True)
-        logging.info(f"[BROADCAST SESI] {device_id} -> ada_sesi={payload['ada_sesi']}, sesi='{payload.get('nama_sesi', '-')}'")
+        logging.info(f"[BROADCAST SESI] {device_id} -> ada_sesi={payload['ada_sesi']}, sesi='{payload.get('nama_sesi', '-')}' ({payload.get('jam_mulai')}-{payload.get('jam_selesai')})")
     except Exception as ex:
         logging.error(f"Gagal broadcast sesi {device_id}: {ex}")
 
 def get_uid_variants(raw_uid: str) -> list:
     """
     Menghasilkan semua kemungkinan varian format serial kartu RFID/NFC:
-    1. Raw UID apa adanya (misal: ';42992,47057' atau 'A7F0B7D1')
+    1. Raw UID apa adanya (misal: ';42992,47057' atau '6116F1A7' atau '1628893607')
     2. Format tanpa titik koma: '42992,47057'
     3. Format angka gabungan: '4299247057'
-    4. Format HEX 8-karakter: 'A7F0B7D1'
-    5. Format desimal 32-bit: '2817570769'
+    4. Format HEX 8-karakter uppercase & lowercase: '6116F1A7', '6116f1a7'
+    5. Format desimal 32-bit: '1628893607'
     """
     import re
-    clean = str(raw_uid).strip().rstrip('?').upper()
-    if not clean:
+    raw_str = str(raw_uid).strip().rstrip('?')
+    if not raw_str:
         return []
 
-    variants = [clean]
-    if clean.startswith(';'):
-        variants.append(clean[1:])
+    variants = [raw_str, raw_str.upper(), raw_str.lower()]
 
-    # Format split desimal: ;42992,47057 atau 42992,47057
-    m = re.match(r'^;?(\d{1,5}),(\d{1,5})$', clean)
+    # Hapus prefix titik koma atau 0x jika ada
+    clean = raw_str.lstrip(';').strip()
+    if clean.upper().startswith("0X"):
+        clean = clean[2:].strip()
+
+    variants.extend([clean, clean.upper(), clean.lower()])
+
+    # 1. Format split desimal: ;42992,47057 atau 42992,47057
+    m = re.match(r'^;?(\d{1,5}),(\d{1,5})$', raw_str)
     if m:
         w1, w2 = int(m.group(1)), int(m.group(2))
         variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{m.group(1)}{m.group(2)}"])
         h1 = f"{w1:04X}"
         h2 = f"{w2:04X}"
         hex_val = (h1 + h2).upper()
-        variants.append(hex_val)
+        variants.extend([hex_val, hex_val.lower()])
         try:
-            variants.append(str(int(hex_val, 16)))
-        except ValueError:
+            dec32 = str((w1 << 16) | w2)
+            variants.append(dec32)
+        except Exception:
             pass
-    # Format HEX 8-digit dari ESP32 (misal A7F0B7D1)
-    elif re.match(r'^[0-9A-F]{8}$', clean):
+
+    # 2. Format HEX (misal: 6116F1A7 atau A7F0B7D1)
+    is_hex = bool(re.match(r'^[0-9A-Fa-f]{4,16}$', clean))
+    is_pure_digits = bool(re.match(r'^\d+$', clean))
+
+    if is_hex and (not is_pure_digits or len(clean) == 8):
         try:
-            w1 = int(clean[:4], 16)
-            w2 = int(clean[4:], 16)
-            variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
-            variants.append(str(int(clean, 16)))
-        except ValueError:
-            pass
-    # Format desimal 32-bit (angka murni, misal 2817570769)
-    elif re.match(r'^\d{5,12}$', clean):
-        try:
-            dec_val = int(clean)
-            if 0 < dec_val <= 4294967295:
-                hex_val = f"{dec_val:08X}".upper()
-                variants.append(hex_val)
-                w1 = int(hex_val[:4], 16)
-                w2 = int(hex_val[4:], 16)
+            dec_from_hex = int(clean, 16)
+            variants.append(str(dec_from_hex))
+            if 0 <= dec_from_hex <= 0xFFFFFFFF:
+                hex8 = f"{dec_from_hex:08X}".upper()
+                variants.extend([hex8, hex8.lower()])
+                w1 = (dec_from_hex >> 16) & 0xFFFF
+                w2 = dec_from_hex & 0xFFFF
                 variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
         except ValueError:
             pass
 
-    return list(dict.fromkeys(variants))
+    # 3. Format desimal murni (misal: 1628893607 atau 2817570769)
+    if is_pure_digits:
+        try:
+            dec_val = int(clean)
+            variants.append(str(dec_val))
+            if 0 <= dec_val <= 0xFFFFFFFF:
+                hex8 = f"{dec_val:08X}".upper()
+                variants.extend([hex8, hex8.lower()])
+                w1 = (dec_val >> 16) & 0xFFFF
+                w2 = dec_val & 0xFFFF
+                variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
+        except ValueError:
+            pass
+
+    return list(dict.fromkeys(filter(None, variants)))
 
 def find_entity_by_uid(cursor, clean_uid: str):
     """
     Mencari entitas pemilik kartu:
     1. Cek tabel siswas (santri/siswa)
     2. Cek tabel users (guru/pegawai)
-    Mendukung varian format UID: HEX, desimal Wiegand split (;42992,47057), maupun angka murni.
+    Mendukung varian format UID: HEX (6116F1A7), desimal 32-bit (1628893607), maupun split (;24854,61863).
     """
     variants = get_uid_variants(clean_uid)
     if not variants:
         variants = [clean_uid.strip().upper()]
 
+    logging.info(f"[SEARCH UID] Mencari pemilik kartu '{clean_uid}', varian diperiksa: {variants}")
+
     placeholders = ", ".join(["%s"] * len(variants))
-    query_siswa = f"SELECT id, nama_lengkap, kamar, status FROM siswas WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) LIMIT 1"
-    cursor.execute(query_siswa, tuple(variants))
+    query_siswa = f"""
+        SELECT id, nama_lengkap, kamar, status, rfid_uid 
+        FROM siswas 
+        WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) 
+           OR TRIM(rfid_uid) IN ({placeholders})
+        LIMIT 1
+    """
+    cursor.execute(query_siswa, tuple(variants) + tuple(variants))
     santri = cursor.fetchone()
     if santri:
+        logging.info(f"[MATCH FOUND] Kartu '{clean_uid}' cocok dengan santri: '{santri['nama_lengkap']}' (DB rfid_uid: '{santri.get('rfid_uid')}')")
         return {
             "type": "santri",
             "id": santri["id"],
@@ -335,10 +360,17 @@ def find_entity_by_uid(cursor, clean_uid: str):
             "sub": santri.get("kamar", "Santri")
         }
 
-    query_user = f"SELECT id, name, email FROM users WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) LIMIT 1"
-    cursor.execute(query_user, tuple(variants))
+    query_user = f"""
+        SELECT id, name, email, rfid_uid 
+        FROM users 
+        WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) 
+           OR TRIM(rfid_uid) IN ({placeholders})
+        LIMIT 1
+    """
+    cursor.execute(query_user, tuple(variants) + tuple(variants))
     user = cursor.fetchone()
     if user:
+        logging.info(f"[MATCH FOUND] Kartu '{clean_uid}' cocok dengan user: '{user['name']}' (DB rfid_uid: '{user.get('rfid_uid')}')")
         return {
             "type": "guru_pegawai",
             "id": user["id"],
@@ -346,6 +378,7 @@ def find_entity_by_uid(cursor, clean_uid: str):
             "sub": "Guru/Pegawai"
         }
 
+    logging.warning(f"[UNREGISTERED] UID '{clean_uid}' tidak ditemukan di tabel siswas maupun users (varian: {variants}).")
     return None
 
 def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
@@ -482,12 +515,20 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
 def periodic_session_broadcaster(client, userdata):
     """
     Secara periodik memeriksa dan mem-broadcast status sesi aktif
-    ke seluruh perangkat ESP32 setiap 20 detik via MQTT.
+    ke seluruh perangkat ESP32 setiap 15 detik via MQTT.
     """
+    logging.info("[BROADCASTER] Background thread broadcast sesi aktif dimulai.")
     while True:
-        time.sleep(20)
         try:
             db = userdata.get("db") if userdata else None
+            if not db or not db.is_connected():
+                try:
+                    db = create_db_connection()
+                    if userdata:
+                        userdata["db"] = db
+                except Exception:
+                    pass
+
             if db and db.is_connected():
                 cur = db.cursor(dictionary=True)
                 cur.execute("SELECT device_id FROM master_devices WHERE status_aktif = 1")
@@ -502,6 +543,7 @@ def periodic_session_broadcaster(client, userdata):
                     broadcast_device_session(client, db, dev_id)
         except Exception as err:
             logging.debug(f"Periodic broadcast loop error: {err}")
+        time.sleep(15)
 
 # ================= MQTT CALLBACKS =================
 def on_connect(client, userdata, flags, rc, properties=None):

@@ -38,8 +38,8 @@
 const char* DEVICE_ID = "tap_masjid";
 
 // ================= KONFIGURASI WIFI & VPS MQTT =================
-const char* WIFI_SSID     = "NAMA_WIFI_PONDOK";
-const char* WIFI_PASSWORD = "PASSWORD_WIFI_PONDOK";
+const char* WIFI_SSID     = "Kota_pintar_kls_LT.1";
+const char* WIFI_PASSWORD = "12345678";
 
 const char* MQTT_SERVER   = "202.155.17.96";
 const int   MQTT_PORT     = 1883;
