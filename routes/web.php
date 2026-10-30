@@ -9,6 +9,7 @@ use App\Http\Controllers\GuruSekolahController;
 use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\LembagaController;
+use App\Http\Controllers\NfcInputController;
 use App\Http\Controllers\PendaftaranController;
 use App\Http\Controllers\PengaturanAbsensiController;
 use App\Http\Controllers\PengaturanSesiController;
@@ -75,6 +76,17 @@ Route::middleware('auth')->group(function () {
     Route::delete('/siswa/{id}', [SiswaController::class, 'destroy'])
         ->middleware('permission:siswa,delete')
         ->name('siswa.destroy');
+
+    // Menu Khusus Input Kartu NFC
+    Route::middleware('permission:siswa|nfc,view')->group(function () {
+        Route::get('/nfc-input', [NfcInputController::class, 'index'])->name('nfc.index');
+        Route::get('/nfc-input/check-card', [NfcInputController::class, 'checkCard'])->name('nfc.check-card');
+    });
+
+    Route::middleware('permission:siswa|nfc,edit')->group(function () {
+        Route::post('/nfc-input/assign', [NfcInputController::class, 'assign'])->name('nfc.assign');
+        Route::post('/nfc-input/unpair', [NfcInputController::class, 'unpair'])->name('nfc.unpair');
+    });
 
     // Menu Pendaftaran Santri Baru (PSB)
     Route::middleware('permission:pendaftaran,view')->prefix('pendaftaran')->name('pendaftaran.')->group(function () {

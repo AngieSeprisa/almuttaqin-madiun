@@ -196,6 +196,11 @@ class User extends Authenticatable
             return true;
         }
 
+        // Menu NFC mengikuti perizinan modul siswa
+        if ($menuCode === 'nfc') {
+            return $this->canDo('siswa', $action);
+        }
+
         // Admin Lembaga & Guru memiliki akses default ke modul sekolah & jadwal pelajaran
         if (in_array($this->role, ['admin_lembaga', 'guru']) && in_array($menuCode, ['sekolah', 'jadwal_pelajaran'])) {
             return true;

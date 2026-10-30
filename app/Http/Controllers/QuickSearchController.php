@@ -51,6 +51,14 @@ class QuickSearchController extends Controller
                 'permission' => 'siswa',
             ],
             [
+                'title' => 'Input Kartu NFC',
+                'description' => 'Pairing dan registrasi kartu santri via USB reader',
+                'url' => route('nfc.index'),
+                'icon' => 'credit-card',
+                'keywords' => 'nfc rfid kartu serial tap pairing input santri',
+                'permission' => 'siswa',
+            ],
+            [
                 'title' => 'Jurnal Pembelajaran',
                 'description' => 'Input jurnal mengajar harian guru',
                 'url' => route('sekolah.jurnal'),
