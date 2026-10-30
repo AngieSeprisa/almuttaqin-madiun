@@ -15,7 +15,7 @@
 @endsection
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:20px;">
+<div style="display:flex; flex-direction:column; gap:20px; width:100%; max-width:100%; min-width:0;">
 
     {{-- Feedback Alerts --}}
     @if (session('success'))
@@ -167,14 +167,14 @@
             <table class="modern-table">
                 <thead>
                     <tr>
-                        <th>No. Induk / NIK</th>
-                        <th>Nama Calon Santri</th>
-                        <th>Jenjang</th>
-                        <th>JK & Usia</th>
-                        <th>Sambung Asal</th>
-                        <th>Status Pendaftaran</th>
-                        <th>Tanggal Daftar</th>
-                        <th style="text-align:center; width:110px;">Aksi</th>
+                        <th style="min-width: 140px; white-space: nowrap;">No. Induk / NIK</th>
+                        <th style="min-width: 180px;">Nama Calon Santri</th>
+                        <th style="min-width: 80px; white-space: nowrap;">Jenjang</th>
+                        <th style="min-width: 90px; white-space: nowrap;">JK & Usia</th>
+                        <th style="min-width: 130px;">Sambung Asal</th>
+                        <th style="min-width: 120px; white-space: nowrap;">Status Pendaftaran</th>
+                        <th style="min-width: 110px; white-space: nowrap;">Tanggal Daftar</th>
+                        <th style="text-align:center; min-width: 90px; width: 100px; white-space: nowrap;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
