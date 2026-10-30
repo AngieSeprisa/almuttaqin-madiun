@@ -206,8 +206,8 @@ class User extends Authenticatable
             return true;
         }
 
-        // Admin Lembaga Pondok memiliki akses default ke modul Pengaturan Pondok & Plotting Kamar
-        if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, ['pengaturan_pondok', 'plotting_kamar'])) {
+        // Admin Lembaga Pondok memiliki akses default ke modul Pengaturan Pondok & Plotting Kamar / Pengajian
+        if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, ['pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian'])) {
             return true;
         }
 

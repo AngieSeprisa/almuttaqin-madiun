@@ -13,9 +13,18 @@ class Siswa extends Model
         'jenjang',
         'kelas',
         'kamar',
+        'kelas_pengajian_id',
         'status',
         'pendaftaran_id',
     ];
+
+    /**
+     * Relasi ke data Master Kelas Pengajian
+     */
+    public function kelasPengajian()
+    {
+        return $this->belongsTo(MasterKelasPengajian::class, 'kelas_pengajian_id');
+    }
 
     /**
      * Relasi ke data formulir pendaftaran

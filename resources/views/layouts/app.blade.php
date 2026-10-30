@@ -371,10 +371,10 @@
                 </div>
                 @endif
 
-                {{-- Menu Pengaturan Pondok dengan Submenu Plotting Kamar --}}
-                @if(!$authUser || $authUser->canDo('pengaturan_pondok', 'view') || $authUser->canDo('plotting_kamar', 'view'))
-                <div class="nav-group {{ request()->routeIs('plotting-kamar.*') ? 'open' : '' }}" id="navGroupPengaturanPondok">
-                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('plotting-kamar.*') ? 'active' : '' }}" id="togglePengaturanPondok" title="Pengaturan Pondok">
+                {{-- Menu Pengaturan Pondok dengan Submenu Plotting Kamar & Plotting Pengajian --}}
+                @if(!$authUser || $authUser->canDo('pengaturan_pondok', 'view') || $authUser->canDo('plotting_kamar', 'view') || $authUser->canDo('plotting_pengajian', 'view'))
+                <div class="nav-group {{ (request()->routeIs('plotting-kamar.*') || request()->routeIs('plotting-pengajian.*')) ? 'open' : '' }}" id="navGroupPengaturanPondok">
+                    <button type="button" class="nav-item nav-item-has-sub {{ (request()->routeIs('plotting-kamar.*') || request()->routeIs('plotting-pengajian.*')) ? 'active' : '' }}" id="togglePengaturanPondok" title="Pengaturan Pondok">
                         <span class="nav-item-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -393,6 +393,13 @@
                         <a href="{{ route('plotting-kamar.index') }}" class="subnav-item {{ request()->routeIs('plotting-kamar*') ? 'active' : '' }}" title="Plotting Kamar">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Plotting Kamar</span>
+                        </a>
+                        @endif
+
+                        @if(!$authUser || $authUser->canDo('plotting_pengajian', 'view') || $authUser->canDo('plotting_kamar', 'view') || $authUser->canDo('pengaturan_pondok', 'view'))
+                        <a href="{{ route('plotting-pengajian.index') }}" class="subnav-item {{ request()->routeIs('plotting-pengajian*') ? 'active' : '' }}" title="Plotting Pengajian">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Plotting Pengajian</span>
                         </a>
                         @endif
                     </div>

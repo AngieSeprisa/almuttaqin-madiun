@@ -15,6 +15,7 @@ use App\Http\Controllers\PengaturanAbsensiController;
 use App\Http\Controllers\PengaturanSesiController;
 use App\Http\Controllers\PlottingKamarController;
 use App\Http\Controllers\PlottingKelasController;
+use App\Http\Controllers\PlottingKelasPengajianController;
 use App\Http\Controllers\PlottingMapelController;
 use App\Http\Controllers\PerizinanController;
 use App\Http\Controllers\PresensiController;
@@ -326,6 +327,31 @@ Route::middleware('auth')->group(function () {
         Route::get('/anggota/{kamar}', [PlottingKamarController::class, 'anggota'])
             ->middleware('permission:plotting_kamar|pengaturan_pondok,view')
             ->name('anggota');
+    });
+
+    // Menu Pengaturan Pondok: Plotting Kelas Pengajian
+    Route::prefix('plotting-pengajian')->name('plotting-pengajian.')->group(function () {
+        Route::get('/', [PlottingKelasPengajianController::class, 'index'])
+            ->middleware('permission:plotting_pengajian|plotting_kamar|pengaturan_pondok,view')
+            ->name('index');
+        Route::post('/kelas', [PlottingKelasPengajianController::class, 'storeKelas'])
+            ->middleware('permission:plotting_pengajian|plotting_kamar,create')
+            ->name('store-kelas');
+        Route::put('/kelas/{kelas}', [PlottingKelasPengajianController::class, 'updateKelas'])
+            ->middleware('permission:plotting_pengajian|plotting_kamar,edit')
+            ->name('update-kelas');
+        Route::delete('/kelas/{kelas}', [PlottingKelasPengajianController::class, 'destroyKelas'])
+            ->middleware('permission:plotting_pengajian|plotting_kamar,delete')
+            ->name('destroy-kelas');
+        Route::post('/muat-standar', [PlottingKelasPengajianController::class, 'muatStandar'])
+            ->middleware('permission:plotting_pengajian|plotting_kamar,create')
+            ->name('muat-standar');
+        Route::post('/mutasi', [PlottingKelasPengajianController::class, 'mutasi'])
+            ->middleware('permission:plotting_pengajian|plotting_kamar,edit')
+            ->name('mutasi');
+        Route::post('/unassign', [PlottingKelasPengajianController::class, 'unassign'])
+            ->middleware('permission:plotting_pengajian|plotting_kamar,edit')
+            ->name('unassign');
     });
 
     // Menu Manajemen Pengguna & Hak Akses
