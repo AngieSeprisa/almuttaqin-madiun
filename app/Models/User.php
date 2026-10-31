@@ -206,14 +206,19 @@ class User extends Authenticatable
             return true;
         }
 
-        // Admin Lembaga Pondok memiliki akses default ke modul Pengaturan Pondok & Plotting Kamar / Pengajian
-        if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, ['pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian'])) {
+        // Admin Lembaga Pondok memiliki akses default ke modul Pengaturan Pondok & Plotting Kamar / Pengajian & Rekap Pondok
+        if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, ['pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian', 'rekap_pondok', 'rekap_absensi'])) {
+            return true;
+        }
+
+        // Guru Pondok memiliki akses lihat ke Rekap Pondok
+        if ($this->role === 'guru' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, ['rekap_pondok', 'rekap_absensi']) && $action === 'view') {
             return true;
         }
 
         // Admin Lembaga memiliki akses default ke modul absensi, guru sekolah, plotting & master data
         if ($this->role === 'admin_lembaga' && in_array($menuCode, [
-            'presensi', 'rekap_absensi', 'pengaturan_absensi', 'guru_sekolah', 
+            'presensi', 'rekap_absensi', 'rekap_pondok', 'pengaturan_absensi', 'guru_sekolah', 
             'plotting_mapel', 'plotting_kelas', 'jadwal_pelajaran',
             'data_master', 'master_kelas', 'master_jam', 'master_lembaga', 'master_import_siswa'
         ])) {

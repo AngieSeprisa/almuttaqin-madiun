@@ -22,6 +22,7 @@ use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuickSearchController;
 use App\Http\Controllers\RekapAbsensiController;
+use App\Http\Controllers\RekapPondokController;
 use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\SiswaController;
 use App\Http\Controllers\TimeSlotController;
@@ -175,7 +176,14 @@ Route::middleware('auth')->group(function () {
     Route::patch('/pengaturan-sesi/device/{id}/toggle', [PengaturanSesiController::class, 'toggleDevice'])->whereNumber('id')->name('pengaturan.sesi.device.toggle');
     Route::delete('/pengaturan-sesi/device/{id}', [PengaturanSesiController::class, 'destroyDevice'])->whereNumber('id')->name('pengaturan.sesi.device.destroy');
 
-    // Menu Rekap (Sekolah & Guru)
+    // Menu Rekap (Pondok, Sekolah & Guru)
+    Route::get('/rekap-absensi/pondok', [RekapPondokController::class, 'index'])
+        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
+        ->name('rekap.pondok.index');
+    Route::get('/rekap-absensi/pondok/export', [RekapPondokController::class, 'export'])
+        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
+        ->name('rekap.pondok.export');
+
     Route::prefix('rekap-absensi')->name('rekap-absensi.')->group(function () {
         Route::get('/sekolah', [SekolahController::class, 'rekapAbsensi'])
             ->middleware('permission:sekolah,view')
