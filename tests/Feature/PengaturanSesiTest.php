@@ -481,4 +481,104 @@ class PengaturanSesiTest extends TestCase
             'target_filter' => 'Kamar Kelas 7 Putri, Kamar Kelas 8 Putri',
         ]);
     }
+
+    public function test_siswa_gender_accessor_dan_sinkronisasi_jenis_kelamin(): void
+    {
+        // 1. Santri dengan kamar putri tanpa jenis_kelamin eksplisit -> terdeteksi Perempuan
+        $siswaPutri = Siswa::create([
+            'nama_lengkap' => 'Aisyah Putri',
+            'kamar' => 'Kamar Kelas 8 Putri',
+            'status' => 'aktif',
+        ]);
+        $this->assertSame('Perempuan', $siswaPutri->jenis_kelamin);
+        $this->assertSame('Perempuan', $siswaPutri->gender);
+
+        // 2. Santri dengan kamar putra tanpa jenis_kelamin eksplisit -> terdeteksi Laki-laki
+        $siswaPutra = Siswa::create([
+            'nama_lengkap' => 'Fauzi Putra',
+            'kamar' => 'Kamar Kelas 9 Putra',
+            'status' => 'aktif',
+        ]);
+        $this->assertSame('Laki-laki', $siswaPutra->jenis_kelamin);
+        $this->assertSame('Laki-laki', $siswaPutra->gender);
+
+        // 3. Santri dengan nilai jenis_kelamin eksplisit
+        $siswaLangsung = Siswa::create([
+            'nama_lengkap' => 'Zahra',
+            'kamar' => 'Reguler',
+            'jenis_kelamin' => 'Perempuan',
+            'status' => 'aktif',
+        ]);
+        $this->assertSame('Perempuan', $siswaLangsung->jenis_kelamin);
+    }
+
+    public function test_prioritas_alokasi_perangkat_menghindari_tabrakan_sesi(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        // 1. Daftarkan perangkat tap_masjid dan tap_masjid_utara
+        DB::table('master_devices')->insert([
+            ['device_id' => 'tap_masjid', 'nama_lokasi' => 'Pintu Masjid Putri', 'kategori_area' => 'pondok', 'status_aktif' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['device_id' => 'tap_masjid_utara', 'nama_lokasi' => 'Pintu Masjid Putra', 'kategori_area' => 'pondok', 'status_aktif' => 1, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // 2. Ada sesi lama Dzuhur global (tanpa device spesifik)
+        $sesiLamaId = DB::table('master_sesis')->insertGetId([
+            'kode_sesi' => 'DZUHUR_OLD',
+            'nama_sesi' => 'Sholat Dzuhur Lama',
+            'jam_mulai' => '11:30:00',
+            'jam_selesai' => '12:30:00',
+            'toleransi_menit' => 15,
+            'kategori' => 'sholat',
+            'target_kategori' => 'semua_santri',
+            'created_at' => now()->subDay(),
+            'updated_at' => now()->subDay(),
+        ]);
+
+        // 3. Admin mengatur sesi baru Dzuhur dengan alokasi khusus (Putri di tap_masjid, Putra di tap_masjid_utara)
+        $allocations = [
+            [
+                'device_id' => 'tap_masjid',
+                'target_kategori' => 'gender',
+                'target_gender' => 'P',
+                'target_filter' => null,
+            ],
+            [
+                'device_id' => 'tap_masjid_utara',
+                'target_kategori' => 'gender',
+                'target_gender' => 'L',
+                'target_filter' => null,
+            ],
+        ];
+
+        $resp = $this->actingAs($yayasan)->post(route('pengaturan.sesi.store'), [
+            'kode_sesi' => 'DZUHUR_MULTI_DEVICE',
+            'nama_sesi' => 'Sholat Dzuhur Berjamaah Santri',
+            'jam_mulai' => '11:30',
+            'jam_selesai' => '12:30',
+            'toleransi_menit' => 10,
+            'kategori' => 'sholat',
+            'allocations_json' => json_encode($allocations),
+        ]);
+        $resp->assertRedirect(route('pengaturan.sesi'));
+
+        $sesiBaru = DB::table('master_sesis')->where('kode_sesi', 'DZUHUR_MULTI_DEVICE')->first();
+        $this->assertNotNull($sesiBaru);
+
+        // Pastikan alokasi tap_masjid pada sesi baru tersimpan dengan target_gender P
+        $allocPutri = DB::table('sesi_device_allocations')
+            ->where('master_sesi_id', $sesiBaru->id)
+            ->where('device_id', 'tap_masjid')
+            ->first();
+        $this->assertNotNull($allocPutri);
+        $this->assertSame('P', $allocPutri->target_gender);
+
+        // Pastikan alokasi tap_masjid_utara pada sesi baru tersimpan dengan target_gender L
+        $allocPutra = DB::table('sesi_device_allocations')
+            ->where('master_sesi_id', $sesiBaru->id)
+            ->where('device_id', 'tap_masjid_utara')
+            ->first();
+        $this->assertNotNull($allocPutra);
+        $this->assertSame('L', $allocPutra->target_gender);
+    }
 }

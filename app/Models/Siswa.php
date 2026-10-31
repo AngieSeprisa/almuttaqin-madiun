@@ -13,10 +13,41 @@ class Siswa extends Model
         'jenjang',
         'kelas',
         'kamar',
+        'jenis_kelamin',
         'kelas_pengajian_id',
         'status',
         'pendaftaran_id',
     ];
+
+    /**
+     * Accessor jenis kelamin dengan fallback ke formulir pendaftaran dan kamar
+     */
+    public function getJenisKelaminAttribute($value): ?string
+    {
+        if (!empty($value)) {
+            return $value;
+        }
+        if ($this->pendaftaran && !empty($this->pendaftaran->jenis_kelamin)) {
+            return $this->pendaftaran->jenis_kelamin;
+        }
+        if (!empty($this->kamar)) {
+            if (stripos($this->kamar, 'putri') !== false || stripos($this->kamar, 'banat') !== false) {
+                return 'Perempuan';
+            }
+            if (stripos($this->kamar, 'putra') !== false || stripos($this->kamar, 'banin') !== false) {
+                return 'Laki-laki';
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Accessor alias gender -> jenis_kelamin
+     */
+    public function getGenderAttribute(): ?string
+    {
+        return $this->jenis_kelamin;
+    }
 
     /**
      * Relasi ke data Master Kelas Pengajian
