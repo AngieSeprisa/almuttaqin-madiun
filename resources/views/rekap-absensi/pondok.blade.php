@@ -1,9 +1,85 @@
 @extends('layouts.app')
 
-@section('title', 'Rekap Presensi Sholat')
+@section('title', 'Rekap Presensi Pondok (Sholat & Pengajian)')
 
 @section('content')
 <style>
+    /* Root styling */
+    .rp-page-container {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    /* Top Stats Grid (Filament 3.x Style) */
+    .rp-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 14px;
+    }
+    @media (max-width: 1200px) {
+        .rp-stats-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 768px) {
+        .rp-stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 480px) {
+        .rp-stats-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .rp-stat-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 14px 18px;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .rp-stat-card:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07);
+    }
+    .rp-stat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+    }
+    .rp-stat-label {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .rp-stat-icon-wrap {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .rp-stat-value {
+        font-size: 26px;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.1;
+        margin-bottom: 2px;
+    }
+    .rp-stat-desc {
+        font-size: 11px;
+        color: #94a3b8;
+    }
+
     /* Filament 3.x Table Container */
     .fi-ta-ctn {
         background-color: #ffffff;
@@ -13,9 +89,9 @@
         overflow: hidden;
     }
 
-    /* Filters Section Above Content (Filament Style - Gambar 1) */
+    /* Filters Section Above Content (Filament Style) */
     .fi-ta-filters {
-        padding: 18px 24px 20px;
+        padding: 16px 22px 18px;
         background: #ffffff;
     }
     .fi-ta-filters-header {
@@ -46,19 +122,19 @@
         text-decoration: underline;
     }
 
-    /* Grid Filter Fields */
+    /* Grid Filter Fields (Responsive 4 columns) */
     .fi-ta-filters-grid {
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
         align-items: end;
     }
     @media (max-width: 1200px) {
         .fi-ta-filters-grid {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
     }
-    @media (max-width: 768px) {
+    @media (max-width: 640px) {
         .fi-ta-filters-grid {
             grid-template-columns: 1fr;
         }
@@ -67,10 +143,10 @@
     .fi-filter-item {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 5px;
     }
     .fi-filter-label {
-        font-size: 12.5px;
+        font-size: 12px;
         font-weight: 600;
         color: #374151;
     }
@@ -78,7 +154,7 @@
         width: 100%;
         height: 38px;
         padding: 7px 12px;
-        font-size: 13.5px;
+        font-size: 13px;
         line-height: 1.4;
         color: #111827;
         background-color: #ffffff;
@@ -113,8 +189,8 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 14px 24px;
-        gap: 16px;
+        padding: 12px 22px;
+        gap: 14px;
         flex-wrap: wrap;
         background: #ffffff;
     }
@@ -148,13 +224,13 @@
     }
     .fi-ta-search-wrap {
         position: relative;
-        width: 250px;
+        width: 240px;
     }
     .fi-ta-search-input {
         width: 100%;
         height: 38px;
         padding: 7px 12px 7px 36px;
-        font-size: 13.5px;
+        font-size: 13px;
         border: 1px solid #d1d5db;
         border-radius: 8px;
         background: #ffffff;
@@ -190,8 +266,52 @@
         color: #4b5563;
         cursor: pointer;
         transition: all 0.15s ease;
+        text-decoration: none;
     }
     .fi-btn-icon:hover {
+        background: #f9fafb;
+        border-color: #9ca3af;
+        color: #111827;
+    }
+
+    /* Buttons */
+    .fi-btn-wa {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 38px;
+        padding: 0 14px;
+        border-radius: 8px;
+        background: #16a34a;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background-color 0.15s ease;
+    }
+    .fi-btn-wa:hover {
+        background: #15803d;
+        color: #ffffff;
+    }
+    .fi-btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 38px;
+        padding: 0 12px;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #374151;
+        font-size: 13px;
+        font-weight: 600;
+        border: 1px solid #d1d5db;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+    .fi-btn-secondary:hover {
         background: #f9fafb;
         border-color: #9ca3af;
         color: #111827;
@@ -229,7 +349,7 @@
         color: #6b7280;
         font-size: 12.5px;
         font-weight: 600;
-        padding: 12px 24px;
+        padding: 12px 22px;
         border-bottom: 1px solid #e5e7eb;
         text-align: left;
     }
@@ -240,7 +360,7 @@
         background-color: #f9fafb;
     }
     .fi-table tbody td {
-        padding: 14px 24px;
+        padding: 13px 22px;
         border-bottom: 1px solid #f3f4f6;
         color: #1f2937;
         vertical-align: middle;
@@ -261,12 +381,12 @@
         text-decoration: underline;
     }
 
-    /* Filament Card Footer & Pagination */
+    /* Filament Footer & Pagination */
     .fi-ta-footer {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 14px 24px;
+        padding: 12px 22px;
         border-top: 1px solid #e5e7eb;
         background: #ffffff;
         gap: 12px;
@@ -308,7 +428,7 @@
         color: #9ca3af;
     }
 
-    /* Modal Pop-up Rincian Kehadiran Siswa (Gambar 2) */
+    /* Modal Backdrop & Dialog */
     .rp-modal-backdrop {
         position: fixed !important;
         top: 0 !important;
@@ -329,7 +449,7 @@
     }
     .rp-modal-dialog {
         width: 100%;
-        max-width: 620px;
+        max-width: 640px;
         background: #ffffff;
         border-radius: 16px;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
@@ -343,17 +463,17 @@
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        padding: 18px 24px 14px;
+        padding: 16px 22px 14px;
         border-bottom: 1px solid #f3f4f6;
     }
     .rp-modal-title {
-        font-size: 16px;
+        font-size: 15.5px;
         font-weight: 700;
         color: #111827;
         margin: 0;
     }
     .rp-modal-sub {
-        font-size: 12.5px;
+        font-size: 12px;
         color: #6b7280;
         margin-top: 3px;
     }
@@ -372,11 +492,11 @@
         color: #111827;
     }
     .rp-modal-body {
-        padding: 18px 24px;
+        padding: 16px 22px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 14px;
     }
     .rp-metrics-box {
         border: 1px solid #e5e7eb;
@@ -443,38 +563,23 @@
         text-transform: uppercase;
         letter-spacing: 0.2px;
     }
-    .status-badge-alpa {
-        background: #fee2e2;
-        color: #dc2626;
-    }
-    .status-badge-hadir {
-        background: #dcfce7;
-        color: #15803d;
-    }
-    .status-badge-terlambat {
-        background: #fef3c7;
-        color: #b45309;
-    }
-    .status-badge-izin {
-        background: #dbeafe;
-        color: #1d4ed8;
-    }
-    .status-badge-sakit {
-        background: #f3e8ff;
-        color: #7e22ce;
-    }
-    .status-badge-belum {
-        background: #f3f4f6;
-        color: #9ca3af;
-    }
+    .status-badge-alpa { background: #fee2e2; color: #dc2626; }
+    .status-badge-hadir { background: #dcfce7; color: #15803d; }
+    .status-badge-terlambat { background: #fef3c7; color: #b45309; }
+    .status-badge-izin { background: #dbeafe; color: #1d4ed8; }
+    .status-badge-sakit { background: #f3e8ff; color: #7e22ce; }
+    .status-badge-belum { background: #f3f4f6; color: #9ca3af; }
+
     .rp-modal-footer {
-        padding: 12px 24px 16px;
+        padding: 12px 22px 16px;
         border-top: 1px solid #f3f4f6;
         display: flex;
+        align-items: center;
         justify-content: flex-end;
+        gap: 10px;
     }
     .rp-btn-tutup {
-        padding: 7px 20px;
+        padding: 7px 18px;
         border-radius: 8px;
         border: 1px solid #d1d5db;
         background: #ffffff;
@@ -488,268 +593,429 @@
         background: #f9fafb;
         border-color: #9ca3af;
     }
+
+    /* WhatsApp Textarea */
+    .rp-wa-textarea {
+        width: 100%;
+        height: 250px;
+        padding: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12.5px;
+        line-height: 1.5;
+        color: #111827;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        outline: none;
+        resize: vertical;
+        box-sizing: border-box;
+        white-space: pre-wrap;
+    }
+    .rp-wa-textarea:focus {
+        border-color: #16a34a;
+        box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+        background: #ffffff;
+    }
 </style>
 
-<div class="fi-ta-ctn">
+<div class="rp-page-container">
 
-    {{-- 1. FILAMENT TABLE FILTERS (ABOVE CONTENT - GAMBAR 1 RESMI) --}}
-    <form action="{{ route('rekap.sholat.index') }}" method="GET" id="formFilamentFilters">
-        <input type="hidden" name="search" id="filterHiddenSearch" value="{{ $search }}">
-        <input type="hidden" name="per_page" value="{{ $perPage }}">
-
-        <div class="fi-ta-filters">
-            <div class="fi-ta-filters-header">
-                <h4 class="fi-ta-filters-heading">Filters</h4>
-                <a href="{{ route('rekap.sholat.index') }}" class="fi-ta-filters-reset-btn">Reset</a>
-            </div>
-
-            <div class="fi-ta-filters-grid">
-                {{-- Filter 1: Rentang Waktu --}}
-                <div class="fi-filter-item">
-                    <label class="fi-filter-label">Rentang Waktu</label>
-                    <select name="rentang" class="fi-select" onchange="this.form.submit()">
-                        <option value="harian" {{ $rentang === 'harian' ? 'selected' : '' }}>Harian</option>
-                        <option value="mingguan" {{ $rentang === 'mingguan' ? 'selected' : '' }}>Mingguan</option>
-                        <option value="bulanan" {{ $rentang === 'bulanan' ? 'selected' : '' }}>Bulanan</option>
-                    </select>
-                </div>
-
-                {{-- Filter 2: Tanggal / Bulan --}}
-                <div class="fi-filter-item">
-                    @if($rentang !== 'bulanan')
-                        <label class="fi-filter-label">Tanggal</label>
-                        <input type="date" name="tanggal" value="{{ $tanggal }}" class="fi-input" onchange="this.form.submit()">
-                    @else
-                        <label class="fi-filter-label">Bulan &amp; Tahun</label>
-                        <div style="display:flex;gap:6px;">
-                            <select name="bulan" class="fi-select" style="flex:1.3;" onchange="this.form.submit()">
-                                @foreach($namaBulanList as $num => $lbl)
-                                    <option value="{{ $num }}" {{ (int) $bulan === (int) $num ? 'selected' : '' }}>{{ $lbl }}</option>
-                                @endforeach
-                            </select>
-                            <select name="tahun" class="fi-select" style="flex:1;" onchange="this.form.submit()">
-                                @for($y = date('Y') + 1; $y >= 2023; $y--)
-                                    <option value="{{ $y }}" {{ (int) $tahun === (int) $y ? 'selected' : '' }}>{{ $y }}</option>
-                                @endfor
-                            </select>
-                        </div>
-                    @endif
-                </div>
-
-                {{-- Filter 3: Sesi Sholat --}}
-                <div class="fi-filter-item">
-                    <label class="fi-filter-label">Sesi Sholat</label>
-                    <select name="sesi_sholat" class="fi-select" onchange="this.form.submit()">
-                        <option value="semua" {{ $filterSesiSholat === 'semua' ? 'selected' : '' }}>Semua Sholat</option>
-                        <option value="subuh" {{ $filterSesiSholat === 'subuh' ? 'selected' : '' }}>Subuh</option>
-                        <option value="dzuhur" {{ $filterSesiSholat === 'dzuhur' ? 'selected' : '' }}>Dzuhur</option>
-                        <option value="ashar" {{ $filterSesiSholat === 'ashar' ? 'selected' : '' }}>Asar</option>
-                        <option value="maghrib" {{ $filterSesiSholat === 'maghrib' ? 'selected' : '' }}>Maghrib</option>
-                        <option value="isya" {{ $filterSesiSholat === 'isya' ? 'selected' : '' }}>Isya</option>
-                    </select>
-                </div>
-
-                {{-- Filter 4: Kamar Santri --}}
-                <div class="fi-filter-item">
-                    <label class="fi-filter-label">Kamar Santri</label>
-                    <select name="kamar" class="fi-select" onchange="this.form.submit()">
-                        <option value="">Semua Kamar</option>
-                        @foreach($kamarList as $kmr)
-                            <option value="{{ $kmr }}" {{ $filterKamar === $kmr ? 'selected' : '' }}>{{ $kmr }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                {{-- Filter 5: Jenjang --}}
-                <div class="fi-filter-item">
-                    <label class="fi-filter-label">Jenjang</label>
-                    <select name="jenjang" class="fi-select" onchange="this.form.submit()">
-                        <option value="semua" {{ $filterJenjang === 'semua' ? 'selected' : '' }}>Semua Jenjang</option>
-                        <option value="smp" {{ $filterJenjang === 'smp' ? 'selected' : '' }}>SMP</option>
-                        <option value="sma" {{ $filterJenjang === 'sma' ? 'selected' : '' }}>SMA</option>
-                        <option value="reguler" {{ $filterJenjang === 'reguler' ? 'selected' : '' }}>Reguler</option>
-                    </select>
+    {{-- 1. KARTU STATISTIK RINGKASAN (STATS CARDS) --}}
+    <div class="rp-stats-grid">
+        {{-- Card 1: Total Target Santri --}}
+        <div class="rp-stat-card">
+            <div class="rp-stat-header">
+                <span class="rp-stat-label">Total Target Santri</span>
+                <div class="rp-stat-icon-wrap" style="background:#eff6ff;color:#2563eb;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
                 </div>
             </div>
-        </div>
-    </form>
-
-    <div class="fi-ta-divider"></div>
-
-    {{-- 2. TOOLBAR SEARCH & ACTIONS --}}
-    <div class="fi-ta-toolbar">
-        <div class="fi-ta-title-wrap">
-            <h3 class="fi-ta-title">Data Presensi Sholat</h3>
-            <span class="fi-ta-badge">{{ $stats['total_target'] }} Santri</span>
+            <div class="rp-stat-value">{{ $stats['total_target'] }}</div>
+            <div class="rp-stat-desc">Santri aktif dalam sasaran sesi</div>
         </div>
 
-        <div class="fi-ta-actions">
-            {{-- Search Bar Filament --}}
-            <div class="fi-ta-search-wrap">
-                <svg class="fi-ta-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input type="text"
-                       id="filamentLiveSearch"
-                       value="{{ $search }}"
-                       placeholder="Search"
-                       class="fi-ta-search-input">
+        {{-- Card 2: Hadir Tepat Waktu --}}
+        <div class="rp-stat-card">
+            <div class="rp-stat-header">
+                <span class="rp-stat-label">Hadir Tepat Waktu</span>
+                <div class="rp-stat-icon-wrap" style="background:#f0fdf4;color:#16a34a;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                </div>
             </div>
+            <div class="rp-stat-value" style="color:#15803d;">{{ $stats['hadir'] }}</div>
+            <div class="rp-stat-desc">Tap sebelum batas toleransi</div>
+        </div>
 
-            {{-- Refresh Button --}}
-            <a href="{{ route('rekap.sholat.index') }}" class="fi-btn-icon" title="Reset / Reload">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                </svg>
-            </a>
+        {{-- Card 3: Terlambat --}}
+        <div class="rp-stat-card">
+            <div class="rp-stat-header">
+                <span class="rp-stat-label">Terlambat</span>
+                <div class="rp-stat-icon-wrap" style="background:#fffbeb;color:#d97706;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
+            </div>
+            <div class="rp-stat-value" style="color:#b45309;">{{ $stats['terlambat'] }}</div>
+            <div class="rp-stat-desc">Melewati toleransi batas sesi</div>
+        </div>
 
-            {{-- Unduh Rekap Button --}}
-            <a href="{{ route('rekap.sholat.export', array_merge(request()->query(), ['format' => 'excel'])) }}"
-               class="fi-btn-primary"
-               title="Unduh Rekap Excel / CSV">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                <span>Unduh Rekap</span>
-            </a>
+        {{-- Card 4: Izin / Sakit --}}
+        <div class="rp-stat-card">
+            <div class="rp-stat-header">
+                <span class="rp-stat-label">Sakit / Izin</span>
+                <div class="rp-stat-icon-wrap" style="background:#f5f3ff;color:#7c3aed;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                </div>
+            </div>
+            <div class="rp-stat-value" style="color:#6d28d9;">{{ $stats['izin_sakit'] }}</div>
+            <div class="rp-stat-desc">Izin: {{ $stats['izin'] }} &bull; Sakit: {{ $stats['sakit'] }}</div>
+        </div>
+
+        {{-- Card 5: Tidak Hadir / Alfa --}}
+        <div class="rp-stat-card">
+            <div class="rp-stat-header">
+                <span class="rp-stat-label">Alpha / Tidak Hadir</span>
+                <div class="rp-stat-icon-wrap" style="background:#fef2f2;color:#dc2626;">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                </div>
+            </div>
+            <div class="rp-stat-value" style="color:#b91c1c;">{{ $stats['alfa'] }}</div>
+            <div class="rp-stat-desc">Belum tap &amp; tanpa izin</div>
         </div>
     </div>
 
-    {{-- 3. FILAMENT TABLE (HANYA NAMA, HADIR, TELAT, IZIN, ALFA) --}}
-    <div style="overflow-x:auto;">
-        <table class="fi-table" id="tablePresensiSholatFilament">
-            <thead>
-                <tr>
-                    <th style="width:40%;">Nama</th>
-                    <th style="text-align:center;width:15%;">Hadir</th>
-                    <th style="text-align:center;width:15%;">Telat</th>
-                    <th style="text-align:center;width:15%;">Izin</th>
-                    <th style="text-align:center;width:15%;">Alfa</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($paginatedRows as $row)
-                <tr class="fi-row-santri" data-search="{{ mb_strtolower($row['nama_lengkap'] . ' ' . $row['nisn'] . ' ' . $row['kamar']) }}">
-                    {{-- Nama Santri Clickable (Memicu Modal Pop-up Gambar 2) --}}
-                    <td>
-                        <a href="javascript:void(0)"
-                           class="fi-nama-link js-trigger-detail"
-                           onclick="showRincianSantri({{ $row['siswa_id'] }})"
-                           data-siswa-id="{{ $row['siswa_id'] }}">
-                            {{ $row['nama_lengkap'] }}
-                        </a>
-                    </td>
+    {{-- 2. FILAMENT TABLE CONTAINER (FILTERS + TOOLBAR + TABLE) --}}
+    <div class="fi-ta-ctn">
 
-                    {{-- Hadir --}}
-                    <td style="text-align:center;font-weight:600;color:#111827;">
-                        {{ $row['total_h'] }}
-                    </td>
+        {{-- FILAMENT TABLE FILTERS (ABOVE CONTENT) --}}
+        <form action="{{ route('rekap.pondok.index') }}" method="GET" id="formFilamentFilters">
+            <input type="hidden" name="search" id="filterHiddenSearch" value="{{ $search }}">
+            <input type="hidden" name="per_page" value="{{ $perPage }}">
 
-                    {{-- Telat --}}
-                    <td style="text-align:center;font-weight:600;color:#111827;">
-                        {{ $row['total_t'] }}
-                    </td>
+            <div class="fi-ta-filters">
+                <div class="fi-ta-filters-header">
+                    <h4 class="fi-ta-filters-heading">Filters</h4>
+                    <a href="{{ route('rekap.pondok.index') }}" class="fi-ta-filters-reset-btn">Reset</a>
+                </div>
 
-                    {{-- Izin (Izin + Sakit) --}}
-                    <td style="text-align:center;font-weight:600;color:#111827;">
-                        {{ $row['total_i'] + $row['total_s'] }}
-                    </td>
+                <div class="fi-ta-filters-grid">
+                    {{-- Filter 1: Kategori Kegiatan --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Kategori Kegiatan</label>
+                        <select name="kategori" class="fi-select" onchange="this.form.submit()">
+                            @foreach($kategoriList as $kKey => $kLabel)
+                                <option value="{{ $kKey }}" {{ $kategori === $kKey ? 'selected' : '' }}>{{ $kLabel }}</option>
+                            @endforeach
+                        </select>
+                    </div>
 
-                    {{-- Alfa --}}
-                    <td style="text-align:center;font-weight:600;color:#111827;">
-                        {{ $row['total_a'] }}
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="5" style="text-align:center;padding:48px 16px;color:#9ca3af;">
-                        Tidak ada data presensi sholat santri yang ditemukan.
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+                    {{-- Filter 2: Sesi Spesifik --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Sesi Presensi Spesifik</label>
+                        <select name="sesi_id" class="fi-select" onchange="this.form.submit()">
+                            @foreach($sesiOptions as $sId => $sLabel)
+                                <option value="{{ $sId }}" {{ (string) $sesi_id === (string) $sId ? 'selected' : '' }}>{{ $sLabel }}</option>
+                            @endforeach
+                        </select>
+                    </div>
 
-    {{-- 4. FOOTER PAGINATION (GAMBAR 1) --}}
-    <div class="fi-ta-footer">
-        <div>
-            @php
-                $from = $paginatedRows->total() > 0 ? ($paginatedRows->currentPage() - 1) * $paginatedRows->perPage() + 1 : 0;
-                $to = min($paginatedRows->currentPage() * $paginatedRows->perPage(), $paginatedRows->total());
-            @endphp
-            Showing {{ $from }} to {{ $to }} of {{ $paginatedRows->total() }} results
-        </div>
+                    {{-- Filter 3: Rentang Waktu --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Rentang Waktu</label>
+                        <select name="rentang" class="fi-select" onchange="this.form.submit()">
+                            <option value="harian" {{ $rentang === 'harian' ? 'selected' : '' }}>Harian</option>
+                            <option value="mingguan" {{ $rentang === 'mingguan' ? 'selected' : '' }}>Mingguan</option>
+                            <option value="bulanan" {{ $rentang === 'bulanan' ? 'selected' : '' }}>Bulanan</option>
+                        </select>
+                    </div>
 
-        <div style="display:flex;align-items:center;gap:16px;">
-            {{-- Per Page Dropdown --}}
-            <div style="display:flex;align-items:center;gap:6px;">
-                <span>Per page</span>
-                <select class="fi-select"
-                        style="width:auto;height:32px;padding:4px 28px 4px 8px;font-size:12.5px;"
-                        onchange="changePerPage(this.value)">
-                    <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
-                    <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
-                    <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
-                    <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
-                </select>
+                    {{-- Filter 4: Tanggal / Bulan --}}
+                    <div class="fi-filter-item">
+                        @if($rentang !== 'bulanan')
+                            <label class="fi-filter-label">Tanggal</label>
+                            <input type="date" name="tanggal" value="{{ $tanggal }}" class="fi-input" onchange="this.form.submit()">
+                        @else
+                            <label class="fi-filter-label">Bulan &amp; Tahun</label>
+                            <div style="display:flex;gap:6px;">
+                                <select name="bulan" class="fi-select" style="flex:1.3;" onchange="this.form.submit()">
+                                    @foreach($namaBulanList as $num => $lbl)
+                                        <option value="{{ $num }}" {{ (int) $bulan === (int) $num ? 'selected' : '' }}>{{ $lbl }}</option>
+                                    @endforeach
+                                </select>
+                                <select name="tahun" class="fi-select" style="flex:1;" onchange="this.form.submit()">
+                                    @for($y = date('Y') + 1; $y >= 2023; $y--)
+                                        <option value="{{ $y }}" {{ (int) $tahun === (int) $y ? 'selected' : '' }}>{{ $y }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Filter 5: Kelas Sekolah --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Kelas Sekolah</label>
+                        <select name="kelas" class="fi-select" onchange="this.form.submit()">
+                            <option value="semua">Semua Kelas</option>
+                            @foreach($kelasList as $kls)
+                                <option value="{{ $kls }}" {{ $kelas === $kls ? 'selected' : '' }}>Kelas {{ $kls }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Filter 6: Kamar Asrama --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Kamar Santri</label>
+                        <select name="kamar" class="fi-select" onchange="this.form.submit()">
+                            <option value="">Semua Kamar</option>
+                            @foreach($kamarList as $kmr)
+                                <option value="{{ $kmr }}" {{ $kamar === $kmr ? 'selected' : '' }}>{{ $kmr }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Filter 7: Kelas Pengajian --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Kelas Pengajian</label>
+                        <select name="kelas_pengajian_id" class="fi-select" onchange="this.form.submit()">
+                            <option value="semua">Semua Kelas Pengajian</option>
+                            @foreach($kelasPengajianList as $kp)
+                                <option value="{{ $kp->id }}" {{ (string) $kelas_pengajian_id === (string) $kp->id ? 'selected' : '' }}>{{ $kp->nama_kelas }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Filter 8: Gender --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Gender (Jenis Kelamin)</label>
+                        <select name="gender" class="fi-select" onchange="this.form.submit()">
+                            @foreach($genderList as $gKey => $gLabel)
+                                <option value="{{ $gKey }}" {{ $gender === $gKey ? 'selected' : '' }}>{{ $gLabel }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div class="fi-ta-divider"></div>
+
+        {{-- TOOLBAR SEARCH & ACTIONS --}}
+        <div class="fi-ta-toolbar">
+            <div class="fi-ta-title-wrap">
+                <h3 class="fi-ta-title">Data Presensi Pondok</h3>
+                <span class="fi-ta-badge">{{ $stats['total_target'] }} Santri</span>
             </div>
 
-            {{-- Pagination Links --}}
-            <div class="fi-pagination">
-                @if($paginatedRows->onFirstPage())
-                    <span class="fi-page-btn" style="opacity:0.35;cursor:default;">&lt;</span>
-                @else
-                    <a href="{{ $paginatedRows->previousPageUrl() }}" class="fi-page-btn">&lt;</a>
-                @endif
+            <div class="fi-ta-actions">
+                {{-- Live Search --}}
+                <div class="fi-ta-search-wrap">
+                    <svg class="fi-ta-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text"
+                           id="filamentLiveSearch"
+                           value="{{ $search }}"
+                           placeholder="Cari nama atau NISN"
+                           class="fi-ta-search-input">
+                </div>
 
+                {{-- Refresh Button --}}
+                <a href="{{ route('rekap.pondok.index') }}" class="fi-btn-icon" title="Reset / Reload">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                </a>
+
+                {{-- Tombol Laporan WhatsApp --}}
+                <button type="button" class="fi-btn-wa" onclick="openWaModal()" title="Buka &amp; Salin Format Laporan WhatsApp">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.41 1.56 1.56 2.41 3.63 2.41 5.83s-.85 4.27-2.41 5.83c-1.55 1.55-3.62 2.41-5.82 2.41-1.5 0-2.97-.39-4.27-1.13l-.3-.17-3.17.83.85-3.09-.2-.31c-.81-1.33-1.25-2.88-1.25-4.47 0-2.2 0.86-4.27 2.42-5.83 1.56-1.55 3.63-2.41 5.82-2.41m-2.64 5.34c-.16 0-.39.06-.6.28-.2.22-.79.77-.79 1.88s.81 2.18.92 2.33c.12.16 1.57 2.4 3.82 3.37.53.23.95.37 1.28.47.54.17 1.03.15 1.42.09.43-.06 1.33-.54 1.52-1.07.19-.52.19-.97.13-1.07-.06-.09-.22-.16-.47-.28-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.65.81-.8 1-.15.19-.3.21-.55.09-.25-.12-1.07-.39-2.04-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.28.37-.42.12-.15.16-.25.25-.42.08-.16.04-.31-.02-.43s-.56-1.36-.77-1.86c-.2-.48-.41-.42-.56-.43h-.48z"/>
+                    </svg>
+                    <span>Laporan WhatsApp</span>
+                </button>
+
+                {{-- Unduh Rekap Excel / CSV --}}
+                <a href="{{ route('rekap.pondok.export', array_merge(request()->query(), ['format' => 'excel'])) }}"
+                   class="fi-btn-secondary"
+                   title="Unduh Rekap Excel / CSV">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Unduh Rekap</span>
+                </a>
+
+                {{-- Cetak / PDF --}}
+                <a href="{{ route('rekap.pondok.export', array_merge(request()->query(), ['format' => 'pdf'])) }}"
+                   target="_blank"
+                   class="fi-btn-secondary"
+                   title="Cetak Laporan / Simpan PDF">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                        <rect x="6" y="14" width="12" height="8"></rect>
+                    </svg>
+                    <span>Cetak PDF</span>
+                </a>
+            </div>
+        </div>
+
+        {{-- FILAMENT TABLE (HANYA NAMA, HADIR, TELAT, IZIN, ALFA) --}}
+        <div style="overflow-x:auto;">
+            <table class="fi-table" id="tablePresensiPondokFilament">
+                <thead>
+                    <tr>
+                        <th style="width:40%;">Nama</th>
+                        <th style="text-align:center;width:15%;">Hadir</th>
+                        <th style="text-align:center;width:15%;">Telat</th>
+                        <th style="text-align:center;width:15%;">Izin</th>
+                        <th style="text-align:center;width:15%;">Alfa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($paginatedRows as $row)
+                    <tr class="fi-row-santri" data-search="{{ mb_strtolower($row['nama_lengkap'] . ' ' . $row['nisn'] . ' ' . $row['kamar'] . ' ' . $row['kelas']) }}">
+                        {{-- Nama Santri Clickable (Memicu Modal Pop-up) --}}
+                        <td>
+                            <a href="javascript:void(0)"
+                               class="fi-nama-link js-trigger-detail"
+                               onclick="showRincianSantri({{ $row['siswa_id'] }})"
+                               data-siswa-id="{{ $row['siswa_id'] }}">
+                                {{ $row['nama_lengkap'] }}
+                            </a>
+                            <div style="font-size:11.5px;color:#9ca3af;margin-top:2px;">
+                                {{ $row['kamar'] }} &bull; {{ $row['kelas'] ? 'Kelas ' . $row['kelas'] : $row['jenjang'] }}
+                            </div>
+                        </td>
+
+                        {{-- Hadir --}}
+                        <td style="text-align:center;font-weight:600;color:#15803d;">
+                            {{ $row['total_h'] }}
+                        </td>
+
+                        {{-- Telat --}}
+                        <td style="text-align:center;font-weight:600;color:#b45309;">
+                            {{ $row['total_t'] }}
+                        </td>
+
+                        {{-- Izin (Izin + Sakit) --}}
+                        <td style="text-align:center;font-weight:600;color:#4338ca;">
+                            {{ $row['total_i'] + $row['total_s'] }}
+                        </td>
+
+                        {{-- Alfa --}}
+                        <td style="text-align:center;font-weight:600;color:#dc2626;">
+                            {{ $row['total_a'] }}
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="5" style="text-align:center;padding:48px 16px;color:#9ca3af;">
+                            Tidak ada data presensi pondok santri yang ditemukan sesuai filter.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        {{-- FOOTER PAGINATION --}}
+        <div class="fi-ta-footer">
+            <div>
                 @php
-                    $last = $paginatedRows->lastPage();
-                    $curr = $paginatedRows->currentPage();
-                    $pages = [];
-                    if ($last <= 7) {
-                        $pages = range(1, $last);
-                    } else {
-                        if ($curr <= 3) {
-                            $pages = [1, 2, 3, 4, '...', $last];
-                        } elseif ($curr >= $last - 2) {
-                            $pages = [1, '...', $last - 3, $last - 2, $last - 1, $last];
-                        } else {
-                            $pages = [1, '...', $curr - 1, $curr, $curr + 1, '...', $last];
-                        }
-                    }
+                    $from = $paginatedRows->total() > 0 ? ($paginatedRows->currentPage() - 1) * $paginatedRows->perPage() + 1 : 0;
+                    $to = min($paginatedRows->currentPage() * $paginatedRows->perPage(), $paginatedRows->total());
                 @endphp
+                Showing {{ $from }} to {{ $to }} of {{ $paginatedRows->total() }} results
+            </div>
 
-                @foreach($pages as $p)
-                    @if($p === '...')
-                        <span class="fi-page-ellipsis">&hellip;</span>
-                    @elseif((int) $p === (int) $curr)
-                        <span class="fi-page-btn active">{{ $p }}</span>
+            <div style="display:flex;align-items:center;gap:16px;">
+                {{-- Per Page Dropdown --}}
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span>Per page</span>
+                    <select class="fi-select"
+                            style="width:auto;height:32px;padding:4px 28px 4px 8px;font-size:12.5px;"
+                            onchange="changePerPage(this.value)">
+                        <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
+                        <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
+                        <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
+                        <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
+                    </select>
+                </div>
+
+                {{-- Pagination Links --}}
+                <div class="fi-pagination">
+                    @if($paginatedRows->onFirstPage())
+                        <span class="fi-page-btn" style="opacity:0.35;cursor:default;">&lt;</span>
                     @else
-                        <a href="{{ $paginatedRows->url($p) }}" class="fi-page-btn">{{ $p }}</a>
+                        <a href="{{ $paginatedRows->previousPageUrl() }}" class="fi-page-btn">&lt;</a>
                     @endif
-                @endforeach
 
-                @if($paginatedRows->hasMorePages())
-                    <a href="{{ $paginatedRows->nextPageUrl() }}" class="fi-page-btn">&gt;</a>
-                @else
-                    <span class="fi-page-btn" style="opacity:0.35;cursor:default;">&gt;</span>
-                @endif
+                    @php
+                        $last = $paginatedRows->lastPage();
+                        $curr = $paginatedRows->currentPage();
+                        $pages = [];
+                        if ($last <= 7) {
+                            $pages = range(1, $last);
+                        } else {
+                            if ($curr <= 3) {
+                                $pages = [1, 2, 3, 4, '...', $last];
+                            } elseif ($curr >= $last - 2) {
+                                $pages = [1, '...', $last - 3, $last - 2, $last - 1, $last];
+                            } else {
+                                $pages = [1, '...', $curr - 1, $curr, $curr + 1, '...', $last];
+                            }
+                        }
+                    @endphp
+
+                    @foreach($pages as $p)
+                        @if($p === '...')
+                            <span class="fi-page-ellipsis">&hellip;</span>
+                        @elseif((int) $p === (int) $curr)
+                            <span class="fi-page-btn active">{{ $p }}</span>
+                        @else
+                            <a href="{{ $paginatedRows->url($p) }}" class="fi-page-btn">{{ $p }}</a>
+                        @endif
+                    @endforeach
+
+                    @if($paginatedRows->hasMorePages())
+                        <a href="{{ $paginatedRows->nextPageUrl() }}" class="fi-page-btn">&gt;</a>
+                    @else
+                        <span class="fi-page-btn" style="opacity:0.35;cursor:default;">&gt;</span>
+                    @endif
+                </div>
             </div>
         </div>
+
     </div>
 
 </div>
 
-{{-- MODAL POP-UP RINCIAN KEHADIRAN SISWA (GAMBAR 2) --}}
+{{-- MODAL 1: RINCIAN KEHADIRAN SISWA --}}
 <div id="modalRincianSiswa" class="rp-modal-backdrop" style="display:none;">
     <div class="rp-modal-dialog">
-
-        {{-- Modal Header --}}
         <div class="rp-modal-header">
             <div>
                 <h3 class="rp-modal-title">Rincian Kehadiran Siswa</h3>
@@ -757,11 +1023,7 @@
             </div>
             <button type="button" class="rp-modal-close-btn" onclick="closeRincianModal()">&times;</button>
         </div>
-
-        {{-- Modal Body --}}
         <div class="rp-modal-body">
-
-            {{-- Kotak Metrik 5 Kolom Rounded --}}
             <div class="rp-metrics-box">
                 <div class="rp-metric-item">
                     <span class="rp-metric-label">HADIR</span>
@@ -785,7 +1047,6 @@
                 </div>
             </div>
 
-            {{-- Tabel Riwayat Sesi Sholat --}}
             <div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
                 <table class="rp-modal-table">
                     <thead>
@@ -796,19 +1057,74 @@
                             <th style="width:32%;">KETERANGAN</th>
                         </tr>
                     </thead>
-                    <tbody id="modalRiwayatTableBody">
-                        {{-- Diisi secara dinamis oleh JavaScript --}}
-                    </tbody>
+                    <tbody id="modalRiwayatTableBody"></tbody>
                 </table>
             </div>
-
         </div>
-
-        {{-- Modal Footer --}}
         <div class="rp-modal-footer">
             <button type="button" class="rp-btn-tutup" onclick="closeRincianModal()">Tutup</button>
         </div>
+    </div>
+</div>
 
+{{-- MODAL 2: LAPORAN WHATSAPP (FORMAT BERSIH SESUAI STANDAR) --}}
+<div id="modalLaporanWA" class="rp-modal-backdrop" style="display:none;">
+    <div class="rp-modal-dialog">
+        <div class="rp-modal-header">
+            <div>
+                <h3 class="rp-modal-title" style="display:flex;align-items:center;gap:8px;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="color:#16a34a;">
+                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.41 1.56 1.56 2.41 3.63 2.41 5.83s-.85 4.27-2.41 5.83c-1.55 1.55-3.62 2.41-5.82 2.41-1.5 0-2.97-.39-4.27-1.13l-.3-.17-3.17.83.85-3.09-.2-.31c-.81-1.33-1.25-2.88-1.25-4.47 0-2.2 0.86-4.27 2.42-5.83 1.56-1.55 3.63-2.41 5.82-2.41m-2.64 5.34c-.16 0-.39.06-.6.28-.2.22-.79.77-.79 1.88s.81 2.18.92 2.33c.12.16 1.57 2.4 3.82 3.37.53.23.95.37 1.28.47.54.17 1.03.15 1.42.09.43-.06 1.33-.54 1.52-1.07.19-.52.19-.97.13-1.07-.06-.09-.22-.16-.47-.28-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.65.81-.8 1-.15.19-.3.21-.55.09-.25-.12-1.07-.39-2.04-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.28.37-.42.12-.15.16-.25.25-.42.08-.16.04-.31-.02-.43s-.56-1.36-.77-1.86c-.2-.48-.41-.42-.56-.43h-.48z"/>
+                    </svg>
+                    Laporan WhatsApp Presensi
+                </h3>
+                <div class="rp-modal-sub">Format baku siap kirim ke WhatsApp tanpa embel-embel jenjang sekolah</div>
+            </div>
+            <button type="button" class="rp-modal-close-btn" onclick="closeWaModal()">&times;</button>
+        </div>
+        <div class="rp-modal-body">
+            {{-- Pilihan Sesi untuk Laporan WhatsApp --}}
+            @if(!empty($waSessions) && count($waSessions) > 1)
+            <div class="fi-filter-item">
+                <label class="fi-filter-label">Pilih Sesi untuk Digenerate:</label>
+                <select id="waSessionSelect" class="fi-select" onchange="switchWaSession(this.value)">
+                    @foreach($waSessions as $sKey => $sMeta)
+                        <option value="{{ $sKey }}" {{ $sKey === $waPrimarySlot ? 'selected' : '' }}>
+                            {{ $sMeta['header_kegiatan'] }}: {{ $sMeta['label'] }} (Hadir: {{ $sMeta['total_hadir'] }}, Telat/Izin: {{ $sMeta['total_izin_terlambat'] }}, Alfa: {{ $sMeta['total_alpa'] }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            @endif
+
+            {{-- Textarea Pratinjau Teks WhatsApp --}}
+            <div>
+                <label class="fi-filter-label" style="margin-bottom:6px;display:block;">Teks Pesan WhatsApp:</label>
+                <textarea id="waMessageTextarea" class="rp-wa-textarea" spellcheck="false">{{ $waText }}</textarea>
+            </div>
+
+            <div id="waCopyNotification" style="display:none;padding:8px 12px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:8px;font-size:12.5px;font-weight:600;text-align:center;">
+                Format WhatsApp berhasil disalin ke clipboard! Siap dipaste ke grup WhatsApp.
+            </div>
+        </div>
+        <div class="rp-modal-footer">
+            <button type="button" class="rp-btn-tutup" onclick="closeWaModal()">Tutup</button>
+            <button type="button" class="fi-btn-secondary" onclick="openWhatsAppWeb()" title="Buka WhatsApp Web di tab baru">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                <span>Buka WhatsApp Web</span>
+            </button>
+            <button type="button" class="fi-btn-wa" id="btnSalinWa" onclick="copyWaText()">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span id="btnSalinWaText">Salin Format WA</span>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -818,6 +1134,7 @@
             'nama'      => $item['nama_lengkap'],
             'nisn'      => $item['nisn'],
             'kamar'     => $item['kamar'],
+            'kelas'     => $item['kelas'],
             'jenjang'   => $item['jenjang'],
             'hadir'     => $item['total_h'],
             'terlambat' => $item['total_t'],
@@ -829,9 +1146,10 @@
     });
 @endphp
 
-{{-- SCRIPT LANGSUNG DI DALAM VIEW --}}
 <script>
-    window.REKAP_SHOLAT_DATA = {!! json_encode($santriMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!};
+    window.REKAP_PONDOK_DATA = {!! json_encode($santriMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!};
+    window.REKAP_SHOLAT_DATA = window.REKAP_PONDOK_DATA; // Kompatibilitas alias
+    window.WA_SESSIONS_DATA = {!! json_encode($waSessions, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!};
 
     function changePerPage(val) {
         var url = new URL(window.location.href);
@@ -840,20 +1158,18 @@
         window.location.href = url.toString();
     }
 
+    // Modal 1: Rincian Kehadiran Siswa
     function showRincianSantri(id) {
-        if (!window.REKAP_SHOLAT_DATA || !window.REKAP_SHOLAT_DATA[id]) {
+        if (!window.REKAP_PONDOK_DATA || !window.REKAP_PONDOK_DATA[id]) {
             console.warn('Data santri tidak ditemukan untuk ID:', id);
             return;
         }
-        openRincianModal(window.REKAP_SHOLAT_DATA[id]);
+        openRincianModal(window.REKAP_PONDOK_DATA[id]);
     }
 
     function openRincianModal(data) {
         var modal = document.getElementById('modalRincianSiswa');
-        if (!modal) {
-            console.error('Modal #modalRincianSiswa tidak ditemukan');
-            return;
-        }
+        if (!modal) return;
 
         document.getElementById('modalSubtitleText').textContent = (data.nama || '-') + ' • NISN: ' + (data.nisn || '-');
         document.getElementById('modalMetricHadir').textContent = data.hadir || 0;
@@ -867,7 +1183,7 @@
 
         var riwayat = data.riwayat || [];
         if (riwayat.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:18px;color:#9ca3af;">Tidak ada data riwayat sholat.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:18px;color:#9ca3af;">Tidak ada data riwayat presensi sesi.</td></tr>';
         } else {
             riwayat.forEach(function (item) {
                 var tr = document.createElement('tr');
@@ -891,11 +1207,85 @@
         }
     }
 
-    // Pindahkan modal ke root <body>
+    // Modal 2: Laporan WhatsApp
+    function openWaModal() {
+        var modal = document.getElementById('modalLaporanWA');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        var notif = document.getElementById('waCopyNotification');
+        if (notif) notif.style.display = 'none';
+
+        var btnText = document.getElementById('btnSalinWaText');
+        if (btnText) btnText.textContent = 'Salin Format WA';
+    }
+
+    function closeWaModal() {
+        var modal = document.getElementById('modalLaporanWA');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    }
+
+    function switchWaSession(slotKey) {
+        if (!window.WA_SESSIONS_DATA || !window.WA_SESSIONS_DATA[slotKey]) return;
+        var textarea = document.getElementById('waMessageTextarea');
+        if (textarea) {
+            textarea.value = window.WA_SESSIONS_DATA[slotKey].text || '';
+        }
+    }
+
+    function copyWaText() {
+        var textarea = document.getElementById('waMessageTextarea');
+        if (!textarea) return;
+
+        textarea.select();
+        textarea.setSelectionRange(0, 99999);
+
+        var text = textarea.value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                showCopyFeedback();
+            }).catch(function () {
+                document.execCommand('copy');
+                showCopyFeedback();
+            });
+        } else {
+            document.execCommand('copy');
+            showCopyFeedback();
+        }
+    }
+
+    function showCopyFeedback() {
+        var notif = document.getElementById('waCopyNotification');
+        if (notif) notif.style.display = 'block';
+
+        var btnText = document.getElementById('btnSalinWaText');
+        if (btnText) btnText.textContent = 'Tersalin! ✓';
+
+        setTimeout(function () {
+            if (btnText) btnText.textContent = 'Salin Format WA';
+        }, 3000);
+    }
+
+    function openWhatsAppWeb() {
+        var textarea = document.getElementById('waMessageTextarea');
+        var text = textarea ? textarea.value : '';
+        var url = 'https://web.whatsapp.com/send?text=' + encodeURIComponent(text);
+        window.open(url, '_blank');
+    }
+
+    // Pindahkan modals ke root <body>
     function setupModalDom() {
-        var modal = document.getElementById('modalRincianSiswa');
-        if (modal && modal.parentElement !== document.body) {
-            document.body.appendChild(modal);
+        var modal1 = document.getElementById('modalRincianSiswa');
+        if (modal1 && modal1.parentElement !== document.body) {
+            document.body.appendChild(modal1);
+        }
+        var modal2 = document.getElementById('modalLaporanWA');
+        if (modal2 && modal2.parentElement !== document.body) {
+            document.body.appendChild(modal2);
         }
     }
 
@@ -905,26 +1295,32 @@
         setupModalDom();
     }
 
-    // Event delegation cadangan jika elemen di-klik
+    // Event delegation klik
     document.addEventListener('click', function (e) {
         var trigger = e.target.closest('.js-trigger-detail');
         if (trigger) {
             e.preventDefault();
             var id = trigger.getAttribute('data-siswa-id');
-            if (id && window.REKAP_SHOLAT_DATA && window.REKAP_SHOLAT_DATA[id]) {
-                openRincianModal(window.REKAP_SHOLAT_DATA[id]);
+            if (id && window.REKAP_PONDOK_DATA && window.REKAP_PONDOK_DATA[id]) {
+                openRincianModal(window.REKAP_PONDOK_DATA[id]);
             }
         }
 
-        var modal = document.getElementById('modalRincianSiswa');
-        if (modal && e.target === modal) {
+        var modal1 = document.getElementById('modalRincianSiswa');
+        if (modal1 && e.target === modal1) {
             closeRincianModal();
+        }
+
+        var modal2 = document.getElementById('modalLaporanWA');
+        if (modal2 && e.target === modal2) {
+            closeWaModal();
         }
     });
 
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             closeRincianModal();
+            closeWaModal();
         }
     });
 
@@ -933,7 +1329,7 @@
     if (searchInput) {
         searchInput.addEventListener('input', function () {
             var q = (this.value || '').toLowerCase().trim();
-            var rows = document.querySelectorAll('#tablePresensiSholatFilament tbody tr.fi-row-santri');
+            var rows = document.querySelectorAll('#tablePresensiPondokFilament tbody tr.fi-row-santri');
             rows.forEach(function (tr) {
                 var hay = tr.getAttribute('data-search') || '';
                 tr.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';

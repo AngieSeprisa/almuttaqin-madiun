@@ -176,21 +176,21 @@ Route::middleware('auth')->group(function () {
     Route::patch('/pengaturan-sesi/device/{id}/toggle', [PengaturanSesiController::class, 'toggleDevice'])->whereNumber('id')->name('pengaturan.sesi.device.toggle');
     Route::delete('/pengaturan-sesi/device/{id}', [PengaturanSesiController::class, 'destroyDevice'])->whereNumber('id')->name('pengaturan.sesi.device.destroy');
 
-    // Menu Rekap (Sholat, Sekolah & Guru)
-    Route::get('/rekap-absensi/sholat', [RekapPondokController::class, 'index'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
-        ->name('rekap.sholat.index');
-    Route::get('/rekap-absensi/sholat/export', [RekapPondokController::class, 'export'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
-        ->name('rekap.sholat.export');
-
-    // Alias kompatibilitas rute lama /rekap-absensi/pondok
+    // Menu Rekap (Pondok, Sekolah & Guru)
     Route::get('/rekap-absensi/pondok', [RekapPondokController::class, 'index'])
         ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
         ->name('rekap.pondok.index');
     Route::get('/rekap-absensi/pondok/export', [RekapPondokController::class, 'export'])
         ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
         ->name('rekap.pondok.export');
+
+    // Alias kompatibilitas rute /rekap-absensi/sholat
+    Route::get('/rekap-absensi/sholat', [RekapPondokController::class, 'index'])
+        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
+        ->name('rekap.sholat.index');
+    Route::get('/rekap-absensi/sholat/export', [RekapPondokController::class, 'export'])
+        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
+        ->name('rekap.sholat.export');
 
     Route::prefix('rekap-absensi')->name('rekap-absensi.')->group(function () {
         Route::get('/sekolah', [SekolahController::class, 'rekapAbsensi'])

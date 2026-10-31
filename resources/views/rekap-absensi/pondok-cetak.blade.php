@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cetak Rekap Presensi Sholat — Yayasan Pondok Pesantren Al-Muttaqin</title>
+    <title>Cetak Rekap Presensi Pondok — Yayasan Pondok Pesantren Al-Muttaqin</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -78,7 +78,7 @@
 <body>
     <div class="print-toolbar">
         <div>
-            <strong>Pratinjau Cetak / PDF Rekap Presensi Sholat</strong>
+            <strong>Pratinjau Cetak / PDF Rekap Presensi Pondok</strong>
             <span style="color:#64748b;margin-left:8px;">
                 @if($rentang === 'harian')
                     (Harian &mdash; {{ $tanggalCarbon->translatedFormat('d F Y') }})
@@ -95,7 +95,7 @@
     <div class="kop">
         <h2>Yayasan Pondok Pesantren Al-Muttaqin</h2>
         <p>
-            Laporan Rekapitulasi Presensi Sholat Santri &mdash;
+            Laporan Rekapitulasi Presensi Pondok (Sholat &amp; Pengajian) Santri &mdash;
             @if($rentang === 'harian')
                 Tanggal {{ $tanggalCarbon->translatedFormat('d F Y') }}
             @elseif($rentang === 'mingguan')

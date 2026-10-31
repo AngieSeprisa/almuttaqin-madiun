@@ -252,9 +252,9 @@
                     </button>
                     <div class="sidebar-subnav">
                         @if(!$authUser || $authUser->canDo('rekap_absensi', 'view') || $authUser->canDo('rekap_pondok', 'view') || $authUser->canDo('pengaturan_pondok', 'view'))
-                        <a href="{{ route('rekap.sholat.index') }}" class="subnav-item {{ request()->routeIs('rekap.sholat.*') || request()->routeIs('rekap.pondok.*') ? 'active' : '' }}" title="Rekap Presensi Sholat">
+                        <a href="{{ route('rekap.pondok.index') }}" class="subnav-item {{ request()->routeIs('rekap.pondok.*') || request()->routeIs('rekap.sholat.*') ? 'active' : '' }}" title="Rekap Presensi Pondok">
                             <span class="subnav-dot"></span>
-                            <span class="subnav-text">Sholat</span>
+                            <span class="subnav-text">Pondok</span>
                         </a>
                         @endif
 
