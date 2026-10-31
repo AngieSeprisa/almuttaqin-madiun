@@ -676,7 +676,8 @@ class RekapPondokController extends Controller
             $kategori,
             $filterSesiId,
             $selectedSesiModel,
-            $evaluateSlots
+            $evaluateSlots,
+            $filterJenjang
         );
 
         // Active filters count untuk badge icon
@@ -738,6 +739,8 @@ class RekapPondokController extends Controller
             'waEncoded'            => urlencode($waReports['primary']['text'] ?? ''),
             'waSessions'           => $waReports['sessions'] ?? [],
             'waPrimarySlot'        => $waReports['primary_slot'] ?? 'dzuhur',
+            'waDateFormatted'      => $waReports['date_formatted'] ?? '',
+            'waActiveSasaran'      => $waReports['active_sasaran'] ?? '',
         ];
     }
 
@@ -770,7 +773,8 @@ class RekapPondokController extends Controller
         string $kategori,
         string $filterSesiId,
         ?MasterSesi $selectedSesiModel,
-        array $evaluateSlots
+        array $evaluateSlots,
+        string $filterJenjang = 'semua'
     ): array {
         // Tentukan Nama Kelas / Sasaran
         if ($filterKelas !== 'semua' && $filterKelas !== '') {
@@ -780,6 +784,8 @@ class RekapPondokController extends Controller
         } elseif ($filterKelasPengajian !== 'semua' && $filterKelasPengajian !== '') {
             $kp = MasterKelasPengajian::find($filterKelasPengajian);
             $sasaran = strtoupper($kp ? $kp->nama_kelas : $filterKelasPengajian);
+        } elseif ($filterJenjang !== 'semua' && $filterJenjang !== '') {
+            $sasaran = strtoupper($filterJenjang);
         } else {
             $sasaran = 'SEMUA SANTRI';
         }
@@ -877,9 +883,11 @@ class RekapPondokController extends Controller
         }
 
         return [
-            'primary'      => $sessions[$primarySlot] ?? (reset($sessions) ?: ['text' => '']),
-            'primary_slot' => $primarySlot,
-            'sessions'     => $sessions,
+            'primary'        => $sessions[$primarySlot] ?? (reset($sessions) ?: ['text' => '']),
+            'primary_slot'   => $primarySlot,
+            'sessions'       => $sessions,
+            'date_formatted' => $dateFormatted,
+            'active_sasaran' => $sasaran,
         ];
     }
 

@@ -636,7 +636,6 @@
                 </div>
             </div>
             <div class="rp-stat-value">{{ $stats['total_target'] }}</div>
-            <div class="rp-stat-desc">Santri aktif dalam sasaran sesi</div>
         </div>
 
         {{-- Card 2: Hadir Tepat Waktu --}}
@@ -651,7 +650,6 @@
                 </div>
             </div>
             <div class="rp-stat-value" style="color:#15803d;">{{ $stats['hadir'] }}</div>
-            <div class="rp-stat-desc">Tap sebelum batas toleransi</div>
         </div>
 
         {{-- Card 3: Terlambat --}}
@@ -666,7 +664,6 @@
                 </div>
             </div>
             <div class="rp-stat-value" style="color:#b45309;">{{ $stats['terlambat'] }}</div>
-            <div class="rp-stat-desc">Melewati toleransi batas sesi</div>
         </div>
 
         {{-- Card 4: Izin / Sakit --}}
@@ -683,7 +680,6 @@
                 </div>
             </div>
             <div class="rp-stat-value" style="color:#6d28d9;">{{ $stats['izin_sakit'] }}</div>
-            <div class="rp-stat-desc">Izin: {{ $stats['izin'] }} &bull; Sakit: {{ $stats['sakit'] }}</div>
         </div>
 
         {{-- Card 5: Tidak Hadir / Alfa --}}
@@ -699,7 +695,6 @@
                 </div>
             </div>
             <div class="rp-stat-value" style="color:#b91c1c;">{{ $stats['alfa'] }}</div>
-            <div class="rp-stat-desc">Belum tap &amp; tanpa izin</div>
         </div>
     </div>
 
@@ -905,9 +900,6 @@
                                data-siswa-id="{{ $row['siswa_id'] }}">
                                 {{ $row['nama_lengkap'] }}
                             </a>
-                            <div style="font-size:11.5px;color:#9ca3af;margin-top:2px;">
-                                {{ $row['kamar'] }} &bull; {{ $row['kelas'] ? 'Kelas ' . $row['kelas'] : $row['jenjang'] }}
-                            </div>
                         </td>
 
                         {{-- Hadir --}}
@@ -1078,24 +1070,45 @@
                     </svg>
                     Laporan WhatsApp Presensi
                 </h3>
-                <div class="rp-modal-sub">Format baku siap kirim ke WhatsApp tanpa embel-embel jenjang sekolah</div>
             </div>
             <button type="button" class="rp-modal-close-btn" onclick="closeWaModal()">&times;</button>
         </div>
         <div class="rp-modal-body">
-            {{-- Pilihan Sesi untuk Laporan WhatsApp --}}
-            @if(!empty($waSessions) && count($waSessions) > 1)
-            <div class="fi-filter-item">
-                <label class="fi-filter-label">Pilih Sesi untuk Digenerate:</label>
-                <select id="waSessionSelect" class="fi-select" onchange="switchWaSession(this.value)">
-                    @foreach($waSessions as $sKey => $sMeta)
-                        <option value="{{ $sKey }}" {{ $sKey === $waPrimarySlot ? 'selected' : '' }}>
-                            {{ $sMeta['header_kegiatan'] }}: {{ $sMeta['label'] }} (Hadir: {{ $sMeta['total_hadir'] }}, Telat/Izin: {{ $sMeta['total_izin_terlambat'] }}, Alfa: {{ $sMeta['total_alpa'] }})
-                        </option>
-                    @endforeach
-                </select>
+            <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px;">
+                {{-- Dropdown Jenjang --}}
+                <div class="fi-filter-item">
+                    <label class="fi-filter-label">Jenjang</label>
+                    <select id="waJenjangSelect" class="fi-select" onchange="renderWaReportPreview()">
+                        <option value="semua">Semua Jenjang</option>
+                        <option value="smp" {{ strtolower($jenjang ?? '') === 'smp' ? 'selected' : '' }}>SMP</option>
+                        <option value="sma" {{ strtolower($jenjang ?? '') === 'sma' ? 'selected' : '' }}>SMA</option>
+                        <option value="reguler" {{ strtolower($jenjang ?? '') === 'reguler' ? 'selected' : '' }}>Reguler</option>
+                    </select>
+                </div>
+
+                {{-- Dropdown Kamar --}}
+                <div class="fi-filter-item">
+                    <label class="fi-filter-label">Kamar</label>
+                    <select id="waKamarSelect" class="fi-select" onchange="renderWaReportPreview()">
+                        <option value="semua">Semua Kamar</option>
+                        @foreach($kamarList as $kmr)
+                            <option value="{{ $kmr }}" {{ ($kamar ?? '') === $kmr ? 'selected' : '' }}>{{ $kmr }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Dropdown Sesi --}}
+                <div class="fi-filter-item">
+                    <label class="fi-filter-label">Sesi</label>
+                    <select id="waSessionSelect" class="fi-select" onchange="renderWaReportPreview()">
+                        @foreach($waSessions as $sKey => $sMeta)
+                            <option value="{{ $sKey }}" {{ $sKey === $waPrimarySlot ? 'selected' : '' }}>
+                                {{ $sMeta['label'] }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
-            @endif
 
             {{-- Textarea Pratinjau Teks WhatsApp --}}
             <div>
@@ -1131,17 +1144,19 @@
 @php
     $santriMap = collect($rows)->keyBy('siswa_id')->map(function ($item) {
         return [
-            'nama'      => $item['nama_lengkap'],
-            'nisn'      => $item['nisn'],
-            'kamar'     => $item['kamar'],
-            'kelas'     => $item['kelas'],
-            'jenjang'   => $item['jenjang'],
-            'hadir'     => $item['total_h'],
-            'terlambat' => $item['total_t'],
-            'izin'      => $item['total_i'],
-            'sakit'     => $item['total_s'],
-            'alpa'      => $item['total_a'],
-            'riwayat'   => $item['riwayat'],
+            'nama'            => $item['nama_lengkap'],
+            'nama_bersih'     => $item['nama_bersih'] ?? \App\Http\Controllers\RekapPondokController::cleanStudentName($item['nama_lengkap']),
+            'nisn'            => $item['nisn'],
+            'kamar'           => $item['kamar'],
+            'kelas'           => $item['kelas'],
+            'jenjang'         => $item['jenjang'],
+            'hadir'           => $item['total_h'],
+            'terlambat'       => $item['total_t'],
+            'izin'            => $item['total_i'],
+            'sakit'           => $item['total_s'],
+            'alpa'            => $item['total_a'],
+            'riwayat'         => $item['riwayat'],
+            'status_per_sesi' => $item['status_per_sesi'] ?? [],
         ];
     });
 @endphp
@@ -1150,6 +1165,7 @@
     window.REKAP_PONDOK_DATA = {!! json_encode($santriMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!};
     window.REKAP_SHOLAT_DATA = window.REKAP_PONDOK_DATA; // Kompatibilitas alias
     window.WA_SESSIONS_DATA = {!! json_encode($waSessions, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!};
+    window.WA_DATE_FORMATTED = {!! json_encode($waDateFormatted) !!};
 
     function changePerPage(val) {
         var url = new URL(window.location.href);
@@ -1219,6 +1235,9 @@
 
         var btnText = document.getElementById('btnSalinWaText');
         if (btnText) btnText.textContent = 'Salin Format WA';
+
+        // Segarkan pratinjau teks WA sesuai filter aktif
+        renderWaReportPreview();
     }
 
     function closeWaModal() {
@@ -1229,12 +1248,106 @@
         }
     }
 
-    function switchWaSession(slotKey) {
-        if (!window.WA_SESSIONS_DATA || !window.WA_SESSIONS_DATA[slotKey]) return;
+    function renderWaReportPreview() {
+        var jenjangEl = document.getElementById('waJenjangSelect');
+        var kamarEl = document.getElementById('waKamarSelect');
+        var sessionEl = document.getElementById('waSessionSelect');
         var textarea = document.getElementById('waMessageTextarea');
-        if (textarea) {
-            textarea.value = window.WA_SESSIONS_DATA[slotKey].text || '';
+        if (!textarea) return;
+
+        var selJenjang = jenjangEl ? (jenjangEl.value || 'semua').toLowerCase() : 'semua';
+        var selKamar = kamarEl ? (kamarEl.value || 'semua').trim() : 'semua';
+        var selSession = sessionEl ? sessionEl.value : 'dzuhur';
+
+        var sessionMeta = (window.WA_SESSIONS_DATA && window.WA_SESSIONS_DATA[selSession]) ? window.WA_SESSIONS_DATA[selSession] : {};
+        var sessionLabel = sessionMeta.label || selSession.toUpperCase();
+        var headerKegiatan = sessionMeta.header_kegiatan || 'SHOLAT';
+        var headerWaktuLabel = (headerKegiatan === 'PENGAJIAN') ? 'Waktu Pengajian' : 'Waktu Sholat';
+
+        // Filter santri berdasarkan Jenjang & Kamar
+        var matchedStudents = [];
+        var allSantri = Object.values(window.REKAP_PONDOK_DATA || {});
+
+        allSantri.forEach(function (s) {
+            // Filter Jenjang
+            if (selJenjang !== 'semua' && selJenjang !== '') {
+                var j = (s.jenjang || '').toLowerCase();
+                var kmr = (s.kamar || '').toLowerCase();
+                if (selJenjang === 'smp' && j.indexOf('smp') === -1) {
+                    return;
+                }
+                if (selJenjang === 'sma' && j.indexOf('sma') === -1) {
+                    return;
+                }
+                if (selJenjang === 'reguler') {
+                    var isReg = j.indexOf('reguler') !== -1 || kmr.indexOf('reguler') !== -1 || (j.indexOf('smp') === -1 && j.indexOf('sma') === -1);
+                    if (!isReg) return;
+                }
+            }
+
+            // Filter Kamar
+            if (selKamar !== 'semua' && selKamar !== '') {
+                var k = (s.kamar || '').toLowerCase();
+                if (k.indexOf(selKamar.toLowerCase()) === -1) {
+                    return;
+                }
+            }
+
+            matchedStudents.push(s);
+        });
+
+        // Tentukan Sasaran Header
+        var sasaran = 'SEMUA SANTRI';
+        if (selJenjang !== 'semua' && selKamar !== 'semua' && selKamar !== '') {
+            sasaran = selJenjang.toUpperCase() + ' - ' + selKamar.toUpperCase();
+        } else if (selJenjang !== 'semua') {
+            sasaran = selJenjang.toUpperCase();
+        } else if (selKamar !== 'semua' && selKamar !== '') {
+            sasaran = selKamar.toUpperCase();
         }
+
+        var dateLine = window.WA_DATE_FORMATTED ? (window.WA_DATE_FORMATTED + "\n\n") : '';
+        var header = "📅 *LAPORAN ABSENSI " + headerKegiatan + " SISWA KELAS " + sasaran + "*\n" +
+                     dateLine +
+                     "*" + headerWaktuLabel + ":* " + sessionLabel + "\n\n" +
+                     "*Daftar Kehadiran Siswa:*";
+
+        var lines = [];
+        var hadirCount = 0;
+        var izinTerlambatCount = 0;
+        var alpaCount = 0;
+
+        matchedStudents.forEach(function (s, idx) {
+            var sesiStatus = (s.status_per_sesi && s.status_per_sesi[selSession]) ? s.status_per_sesi[selSession] : null;
+            var tag = '❌ - ALPA';
+            if (sesiStatus) {
+                tag = sesiStatus.wa_emoji || '❌ - ALPA';
+                var st = sesiStatus.status;
+                if (st === 'hadir') {
+                    hadirCount++;
+                } else if (st === 'terlambat' || st === 'izin' || st === 'sakit') {
+                    izinTerlambatCount++;
+                } else {
+                    alpaCount++;
+                }
+            } else {
+                alpaCount++;
+            }
+            var cleanName = s.nama_bersih || s.nama || '';
+            lines.push((idx + 1) + '. ' + cleanName + ' ' + tag);
+        });
+
+        var body = lines.length > 0 ? lines.join("\n") : "Tidak ada siswa dalam kelompok ini.";
+        var summary = "*Ringkasan Kehadiran:*\n" +
+                      "• Hadir: " + hadirCount + " Siswa\n" +
+                      "• Sakit/Izin/Terlambat: " + izinTerlambatCount + " Siswa\n" +
+                      "• Alpha: " + alpaCount + " Siswa";
+
+        textarea.value = header + "\n\n" + body + "\n\n" + summary;
+    }
+
+    function switchWaSession(slotKey) {
+        renderWaReportPreview();
     }
 
     function copyWaText() {

@@ -77,6 +77,17 @@ class RekapPondokTest extends TestCase
         // 2. Akses alias route rekap.sholat.index juga harus tetap berfungsi
         $resAlias = $this->actingAs($this->admin)->get(route('rekap.sholat.index'));
         $resAlias->assertStatus(200);
+
+        // 3. Verifikasi dropdown Jenjang, Kamar, dan Sesi di Modal WhatsApp
+        $response->assertSee('id="waJenjangSelect"', false);
+        $response->assertSee('id="waKamarSelect"', false);
+        $response->assertSee('id="waSessionSelect"', false);
+
+        // 4. Verifikasi teks deskripsi berlebih sudah dihilangkan agar tampilan elegan & bersih
+        $response->assertDontSee('Santri aktif dalam sasaran sesi');
+        $response->assertDontSee('Tap sebelum batas toleransi');
+        $response->assertDontSee('Melewati toleransi batas sesi');
+        $response->assertDontSee('Format baku siap kirim ke WhatsApp tanpa embel-embel jenjang sekolah');
     }
 
     public function test_presensi_pondok_harian_menampilkan_status_dan_jam_tap_dengan_benar(): void
@@ -377,6 +388,16 @@ class RekapPondokTest extends TestCase
         $this->assertStringContainsString('• Hadir: 1 Siswa', $waText);
         $this->assertStringContainsString('• Sakit/Izin/Terlambat: 2 Siswa', $waText);
         $this->assertStringContainsString('• Alpha: 1 Siswa', $waText);
+
+        // 8. Uji laporan WhatsApp dengan sasaran jenjang SMP
+        $resJenjang = $this->actingAs($this->admin)->get(route('rekap.pondok.index', [
+            'jenjang' => 'smp',
+            'tanggal' => $tanggal,
+            'sesi_id' => 'dzuhur',
+        ]));
+        $resJenjang->assertStatus(200);
+        $waJenjangText = $resJenjang->viewData('waText');
+        $this->assertStringContainsString('📅 *LAPORAN ABSENSI SHOLAT SISWA KELAS SMP*', $waJenjangText);
     }
 
     public function test_rentang_mingguan_bulanan_dan_ekspor(): void
