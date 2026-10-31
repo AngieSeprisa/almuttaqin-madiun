@@ -255,15 +255,22 @@
 
     /* Modal Rincian Kehadiran Siswa (Gambar 2) */
     .rp-modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.45);
-        backdrop-filter: blur(3px);
-        z-index: 9999;
-        display: flex;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: rgba(15, 23, 42, 0.48) !important;
+        backdrop-filter: blur(4px) !important;
+        -webkit-backdrop-filter: blur(4px) !important;
+        z-index: 999999 !important;
+        display: none;
         align-items: center;
         justify-content: center;
         padding: 16px;
+        box-sizing: border-box;
         animation: rpFadeIn 0.18s ease-out;
     }
     @keyframes rpFadeIn {
@@ -272,15 +279,15 @@
     }
     .rp-modal-dialog {
         width: 100%;
-        max-width: 640px;
+        max-width: 620px;
         background: #ffffff;
         border-radius: 16px;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         overflow: hidden;
         border: 1px solid #e2e8f0;
         display: flex;
         flex-direction: column;
-        max-height: 90vh;
+        max-height: 88vh;
     }
     .rp-modal-header {
         display: flex;
@@ -304,7 +311,7 @@
         background: transparent;
         border: none;
         color: #94a3b8;
-        font-size: 20px;
+        font-size: 22px;
         line-height: 1;
         cursor: pointer;
         padding: 4px;
@@ -348,7 +355,7 @@
         margin-bottom: 4px;
     }
     .rp-metric-value {
-        font-size: 1.15rem;
+        font-size: 1.2rem;
         font-weight: 800;
         color: #0f172a;
         line-height: 1.1;
@@ -361,7 +368,7 @@
     }
     .rp-modal-table thead th {
         text-align: left;
-        padding: 8px 10px;
+        padding: 8px 12px;
         background: #f8fafc;
         color: #475569;
         font-size: 0.73rem;
@@ -371,7 +378,7 @@
         letter-spacing: 0.3px;
     }
     .rp-modal-table tbody td {
-        padding: 10px 10px;
+        padding: 10px 12px;
         border-bottom: 1px solid #f1f5f9;
         color: #334155;
         vertical-align: middle;
@@ -382,7 +389,7 @@
     /* Status Badge Rincian */
     .rp-badge-status {
         display: inline-block;
-        padding: 2px 7px;
+        padding: 2px 8px;
         border-radius: 4px;
         font-size: 0.7rem;
         font-weight: 700;
@@ -420,9 +427,9 @@
         justify-content: flex-end;
     }
     .rp-btn-tutup {
-        padding: 6px 18px;
+        padding: 7px 20px;
         border-radius: 8px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid #cbd5e1;
         background: #ffffff;
         color: #334155;
         font-size: 0.82rem;
@@ -432,7 +439,7 @@
     }
     .rp-btn-tutup:hover {
         background: #f8fafc;
-        border-color: #cbd5e1;
+        border-color: #94a3b8;
     }
 </style>
 
@@ -594,26 +601,13 @@
                 </thead>
                 <tbody>
                     @forelse($paginatedRows as $row)
-                    @php
-                        $jsonDetail = htmlspecialchars(json_encode([
-                            'nama'      => $row['nama_lengkap'],
-                            'nisn'      => $row['nisn'],
-                            'kamar'     => $row['kamar'],
-                            'jenjang'   => $row['jenjang'],
-                            'hadir'     => $row['total_h'],
-                            'terlambat' => $row['total_t'],
-                            'izin'      => $row['total_i'],
-                            'sakit'     => $row['total_s'],
-                            'alpa'      => $row['total_a'],
-                            'riwayat'   => $row['riwayat'],
-                        ]), ENT_QUOTES, 'UTF-8');
-                    @endphp
                     <tr class="filament-row-santri" data-search="{{ mb_strtolower($row['nama_lengkap'] . ' ' . $row['nisn'] . ' ' . $row['kamar']) }}">
                         {{-- Nama Santri Clickable (Memicu Pop-up Modal) --}}
                         <td>
                             <a href="javascript:void(0)"
                                class="col-nama-link js-trigger-detail"
-                               data-detail="{{ $jsonDetail }}">
+                               onclick="showRincianSantri({{ $row['siswa_id'] }})"
+                               data-siswa-id="{{ $row['siswa_id'] }}">
                                 {{ $row['nama_lengkap'] }}
                             </a>
                         </td>
@@ -789,8 +783,27 @@
     </div>
 </div>
 
-@push('scripts')
+@php
+    $santriMap = collect($rows)->keyBy('siswa_id')->map(function ($item) {
+        return [
+            'nama'      => $item['nama_lengkap'],
+            'nisn'      => $item['nisn'],
+            'kamar'     => $item['kamar'],
+            'jenjang'   => $item['jenjang'],
+            'hadir'     => $item['total_h'],
+            'terlambat' => $item['total_t'],
+            'izin'      => $item['total_i'],
+            'sakit'     => $item['total_s'],
+            'alpa'      => $item['total_a'],
+            'riwayat'   => $item['riwayat'],
+        ];
+    });
+@endphp
+
+{{-- SCRIPT LANGSUNG DI DALAM VIEW (TIDAK BERGANTUNG PADA STACK ATAU DOM LOAD TIMING) --}}
 <script>
+    window.REKAP_SHOLAT_DATA = {!! json_encode($santriMap, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!};
+
     function toggleFilterPanel() {
         var p = document.getElementById('filamentFilterPanel');
         if (p) {
@@ -805,9 +818,20 @@
         window.location.href = url.toString();
     }
 
+    function showRincianSantri(id) {
+        if (!window.REKAP_SHOLAT_DATA || !window.REKAP_SHOLAT_DATA[id]) {
+            console.warn('Data santri tidak ditemukan untuk ID:', id);
+            return;
+        }
+        openRincianModal(window.REKAP_SHOLAT_DATA[id]);
+    }
+
     function openRincianModal(data) {
         var modal = document.getElementById('modalRincianSiswa');
-        if (!modal) return;
+        if (!modal) {
+            console.error('Modal #modalRincianSiswa tidak ditemukan');
+            return;
+        }
 
         document.getElementById('modalSubtitleText').textContent = (data.nama || '-') + ' • NISN: ' + (data.nisn || '-');
         document.getElementById('modalMetricHadir').textContent = data.hadir || 0;
@@ -845,61 +869,64 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        // Klik pada Nama Santri memicu modal
-        document.querySelectorAll('.js-trigger-detail').forEach(function (el) {
-            el.addEventListener('click', function (e) {
-                e.preventDefault();
-                var raw = this.getAttribute('data-detail');
-                try {
-                    var data = JSON.parse(raw);
-                    openRincianModal(data);
-                } catch (err) {
-                    console.error('Error parsing detail JSON:', err);
-                }
-            });
-        });
-
-        // Close on backdrop click
+    // Pindahkan modal ke root <body> agar bebas dari stacking context parent
+    function setupModalDom() {
         var modal = document.getElementById('modalRincianSiswa');
-        if (modal) {
-            modal.addEventListener('click', function (e) {
-                if (e.target === modal) {
-                    closeRincianModal();
-                }
-            });
+        if (modal && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupModalDom);
+    } else {
+        setupModalDom();
+    }
+
+    // Event delegation cadangan jika elemen di-klik
+    document.addEventListener('click', function (e) {
+        var trigger = e.target.closest('.js-trigger-detail');
+        if (trigger) {
+            e.preventDefault();
+            var id = trigger.getAttribute('data-siswa-id');
+            if (id && window.REKAP_SHOLAT_DATA && window.REKAP_SHOLAT_DATA[id]) {
+                openRincianModal(window.REKAP_SHOLAT_DATA[id]);
+            }
         }
 
-        // Close on Escape key
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') {
-                closeRincianModal();
-            }
-        });
-
-        // Live Search Input (Client side filter baris yang terlihat + Enter reload server side)
-        var searchInput = document.getElementById('filamentLiveSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', function () {
-                var q = (this.value || '').toLowerCase().trim();
-                var rows = document.querySelectorAll('#tablePresensiSholatFilament tbody tr.filament-row-santri');
-                rows.forEach(function (tr) {
-                    var hay = tr.getAttribute('data-search') || '';
-                    tr.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
-                });
-            });
-
-            searchInput.addEventListener('keydown', function (e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    var url = new URL(window.location.href);
-                    url.searchParams.set('search', this.value.trim());
-                    url.searchParams.set('page', 1);
-                    window.location.href = url.toString();
-                }
-            });
+        var modal = document.getElementById('modalRincianSiswa');
+        if (modal && e.target === modal) {
+            closeRincianModal();
         }
     });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeRincianModal();
+        }
+    });
+
+    // Client-side search & Enter server-side
+    var searchInput = document.getElementById('filamentLiveSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            var q = (this.value || '').toLowerCase().trim();
+            var rows = document.querySelectorAll('#tablePresensiSholatFilament tbody tr.filament-row-santri');
+            rows.forEach(function (tr) {
+                var hay = tr.getAttribute('data-search') || '';
+                tr.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
+            });
+        });
+
+        searchInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                var url = new URL(window.location.href);
+                url.searchParams.set('search', this.value.trim());
+                url.searchParams.set('page', 1);
+                window.location.href = url.toString();
+            }
+        });
+    }
 </script>
-@endpush
 @endsection

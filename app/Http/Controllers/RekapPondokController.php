@@ -424,17 +424,7 @@ class RekapPondokController extends Controller
                         ];
                     } else {
                         // Tidak tap dan tidak ada izin
-                        $sudahLewat = false;
-                        if ($dStr < $todayStr) {
-                            $sudahLewat = true;
-                        } elseif ($dStr === $todayStr) {
-                            $jamAkhir = $slotMeta['jam_akhir'];
-                            if ($nowTimeStr >= $jamAkhir) {
-                                $sudahLewat = true;
-                            }
-                        }
-
-                        if ($sudahLewat) {
+                        if ($dStr <= $todayStr) {
                             $siswaRow['total_a']++;
                             $siswaRow['sholat'][$slotKey]['code'] = 'A';
                             $siswaRow['sholat'][$slotKey]['display'] = 'A';
@@ -447,7 +437,7 @@ class RekapPondokController extends Controller
                                 'keterangan' => 'Tidak Hadir / Belum Absen',
                             ];
                         } else {
-                            // Belum berlangsung
+                            // Belum berlangsung (masa depan)
                             $siswaRow['sholat'][$slotKey]['code'] = '-';
                             $siswaRow['sholat'][$slotKey]['display'] = '-';
 
