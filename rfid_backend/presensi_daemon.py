@@ -427,14 +427,30 @@ def find_entity_by_uid(cursor, clean_uid: str):
 
     placeholders = ", ".join(["%s"] * len(variants))
     query_siswa = f"""
-        SELECT id, nama_lengkap, kamar, jenjang, status, rfid_uid 
-        FROM siswas 
-        WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) 
-           OR TRIM(rfid_uid) IN ({placeholders})
+        SELECT s.id, s.nama_lengkap, s.kamar, s.jenjang, s.status, s.rfid_uid, s.jenis_kelamin, s.kelas_pengajian_id,
+               kp.nama_kelas as nama_kelas_pengajian
+        FROM siswas s
+        LEFT JOIN master_kelas_pengajians kp ON s.kelas_pengajian_id = kp.id
+        WHERE UPPER(TRIM(s.rfid_uid)) IN ({placeholders}) 
+           OR TRIM(s.rfid_uid) IN ({placeholders})
         LIMIT 1
     """
-    cursor.execute(query_siswa, tuple(variants) + tuple(variants))
-    santri = cursor.fetchone()
+    try:
+        cursor.execute(query_siswa, tuple(variants) + tuple(variants))
+        santri = cursor.fetchone()
+    except Exception as ex_siswa:
+        # Fallback jika kolom baru atau tabel belum tersedia
+        logging.warning(f"[QUERY SISWA FALLBACK] {ex_siswa}")
+        query_fallback = f"""
+            SELECT id, nama_lengkap, kamar, jenjang, status, rfid_uid 
+            FROM siswas 
+            WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) 
+               OR TRIM(rfid_uid) IN ({placeholders})
+            LIMIT 1
+        """
+        cursor.execute(query_fallback, tuple(variants) + tuple(variants))
+        santri = cursor.fetchone()
+
     if santri:
         logging.info(f"[MATCH FOUND] Kartu '{clean_uid}' cocok dengan santri: '{santri['nama_lengkap']}' (DB rfid_uid: '{santri.get('rfid_uid')}')")
         return {
@@ -443,7 +459,9 @@ def find_entity_by_uid(cursor, clean_uid: str):
             "nama": santri["nama_lengkap"],
             "sub": santri.get("kamar") or "Santri",
             "kamar": santri.get("kamar") or "",
-            "jenjang": santri.get("jenjang") or ""
+            "jenjang": santri.get("jenjang") or "",
+            "jenis_kelamin": santri.get("jenis_kelamin") or "",
+            "kelas_pengajian": santri.get("nama_kelas_pengajian") or ""
         }
 
     query_user = f"""
@@ -545,8 +563,46 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
     if is_kamar_session or has_target_filter:
         if entity_type == "santri":
             santri_kamar = entity.get("kamar") or ""
-            # Jika target berupa kamar atau filter_target diisi nama kamar
-            if is_kamar_session or (target_partisipan not in ["sekolah", "jenjang", "pegawai"] and has_target_filter):
+            santri_gender = (entity.get("jenis_kelamin") or "").strip().lower()
+            santri_kelas_pengajian = (entity.get("kelas_pengajian") or "").strip().lower()
+
+            if target_partisipan in ["kelas_pengajian", "pengajian"]:
+                # Pengecekan target kelas pengajian & gender
+                matched = True
+                reject_reason = ""
+                target_lower = filter_target.lower()
+
+                # 1. Pengecekan batas Gender jika dispesifikasikan di filter_target
+                if "[gender: putra]" in target_lower:
+                    if santri_gender not in ["l", "putra", "laki-laki", "pria"]:
+                        matched = False
+                        reject_reason = "Sesi khusus santri Putra"
+                elif "[gender: putri]" in target_lower:
+                    if santri_gender not in ["p", "putri", "perempuan", "wanita"]:
+                        matched = False
+                        reject_reason = "Sesi khusus santri Putri"
+
+                # 2. Pengecekan batas Kelas Pengajian jika dispesifikasikan
+                classes_part = re.sub(r'\[gender:\s*(putra|putri)\]', '', filter_target, flags=re.IGNORECASE).strip()
+                target_classes = [c.strip().lower() for c in classes_part.split(',') if c.strip()]
+                if matched and target_classes:
+                    if not santri_kelas_pengajian or not any(tc in santri_kelas_pengajian or santri_kelas_pengajian in tc for tc in target_classes):
+                        matched = False
+                        reject_reason = f"Bukan kelas '{classes_part}'"
+
+                if not matched:
+                    cursor.close()
+                    logging.warning(
+                        f"[REJECT] Santri '{entity_name}' tidak memenuhi syarat sesi pengajian '{filter_target}': {reject_reason}."
+                    )
+                    return {
+                        "device_id": device_id,
+                        "nama": lcd_name,
+                        "status": "AKSES DITOLAK",
+                        "kode": "WRONG_CLASS",
+                        "sesi": sesi_name
+                    }
+            elif is_kamar_session or (target_partisipan not in ["sekolah", "jenjang", "pegawai", "kelas_pengajian", "pengajian"] and has_target_filter):
                 if not is_target_room_matched(santri_kamar, filter_target):
                     cursor.close()
                     logging.warning(

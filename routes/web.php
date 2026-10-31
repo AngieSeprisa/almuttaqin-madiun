@@ -163,6 +163,8 @@ Route::middleware('auth')->group(function () {
 
     // Pengaturan Sesi & Perangkat Presensi RFID
     Route::get('/pengaturan-sesi', [PengaturanSesiController::class, 'index'])->name('pengaturan.sesi');
+    Route::get('/pengaturan-sesi/create', [PengaturanSesiController::class, 'create'])->name('pengaturan.sesi.create');
+    Route::get('/pengaturan-sesi/{id}/edit', [PengaturanSesiController::class, 'edit'])->whereNumber('id')->name('pengaturan.sesi.edit');
     Route::get('/pengaturan-sesi/last-device', [PengaturanSesiController::class, 'lastDetectedDevice'])->name('pengaturan.sesi.last-device');
     Route::post('/pengaturan-sesi/store', [PengaturanSesiController::class, 'store'])->name('pengaturan.sesi.store');
     Route::post('/pengaturan-sesi/bulk-delete', [PengaturanSesiController::class, 'destroyBulk'])->name('pengaturan.sesi.bulk-destroy');

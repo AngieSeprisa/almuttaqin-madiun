@@ -39,9 +39,19 @@ class PengaturanSesiTest extends TestCase
         $response->assertSee('Pengaturan Sesi &amp; Perangkat Presensi', false);
         $response->assertSee('REGULER_HARIAN');
         $response->assertSee('Presensi Kamar Reguler (24 Jam)');
-        $response->assertSee('Semua Perangkat / Global (Belum ada alat terdaftar)');
+        $response->assertSee('Semua Perangkat');
         $response->assertDontSee('ESP32_DAPUR');
         $response->assertSee(route('dashboard-presensi'));
+        $response->assertSee(route('pengaturan.sesi.create'));
+
+        // Akses halaman penuh tambah sesi
+        $createResponse = $this->actingAs($yayasan)->get(route('pengaturan.sesi.create'));
+        $createResponse->assertStatus(200);
+        $createResponse->assertSee('Semua Perangkat / Global (Belum ada alat terdaftar)');
+        $createResponse->assertSee('Tambah Sesi Presensi Baru');
+        $createResponse->assertSee('Informasi Dasar &amp; Rentang Waktu', false);
+        $createResponse->assertSee('Alokasi Perangkat Mesin ESP32', false);
+        $createResponse->assertSee('Target Peserta &amp; Hak Akses Presensi', false);
     }
 
     public function test_dapat_menambahkan_sesi_dengan_serial_hardware_esp32(): void
@@ -313,5 +323,43 @@ class PengaturanSesiTest extends TestCase
         // Pastikan duplikasi kata "Kamar Kamar" dibersihkan menjadi "Kamar Kelas 8 Putra"
         $this->assertTrue($kamars->contains('Kamar Kelas 8 Putra'));
         $this->assertFalse($kamars->contains('Kamar Kamar Kelas 8 Putra'));
+    }
+
+    public function test_halaman_penuh_edit_sesi_dapat_diakses(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+        $sesi = DB::table('master_sesis')->where('kode_sesi', 'SUBUH')->firstOrFail();
+
+        $response = $this->actingAs($yayasan)->get(route('pengaturan.sesi.edit', $sesi->id));
+        $response->assertStatus(200);
+        $response->assertSee('Edit Sesi Presensi');
+        $response->assertSee('Informasi Dasar &amp; Rentang Waktu', false);
+        $response->assertSee($sesi->nama_sesi);
+        $response->assertSee('Simpan Perubahan Sesi');
+    }
+
+    public function test_dapat_menambahkan_sesi_target_kelas_pengajian_dan_gender(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        $response = $this->actingAs($yayasan)->post(route('pengaturan.sesi.store'), [
+            'kode_sesi' => 'pengajian_malam_putra',
+            'nama_sesi' => 'Pengajian Kitab Malam Khusus Putra',
+            'jam_mulai' => '19:30',
+            'jam_selesai' => '21:00',
+            'toleransi_menit' => 15,
+            'kategori' => 'pengajian',
+            'target_kategori' => 'kelas_pengajian',
+            'target_filter_kelas' => ['Kelas Lambatan SMP', 'Kelas Cepatan SMP'],
+            'target_filter_gender' => 'putra',
+        ]);
+
+        $response->assertRedirect(route('pengaturan.sesi'));
+        $this->assertDatabaseHas('master_sesis', [
+            'kode_sesi' => 'PENGAJIAN_MALAM_PUTRA',
+            'nama_sesi' => 'Pengajian Kitab Malam Khusus Putra',
+            'target_kategori' => 'kelas_pengajian',
+            'target_filter' => 'Kelas Lambatan SMP, Kelas Cepatan SMP [Gender: Putra]',
+        ]);
     }
 }

@@ -76,15 +76,14 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
 
         <!-- Primary Action Button: Electric Blue (#0052FF) -->
         <div class="flex items-center gap-2.5 shrink-0">
-            <button type="button"
-                    x-show="activeTab === 'sesi'"
-                    @click="openCreateModal()"
-                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#0052FF] hover:bg-[#0043D4] active:bg-[#0038B3] text-white text-sm font-semibold shadow-sm shadow-[#0052FF]/20 transition">
+            <a href="{{ route('pengaturan.sesi.create') }}"
+               x-show="activeTab === 'sesi'"
+               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#0052FF] hover:bg-[#0043D4] active:bg-[#0038B3] text-white text-sm font-semibold shadow-sm shadow-[#0052FF]/20 transition">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
                 <span>Tambah Sesi Baru</span>
-            </button>
+            </a>
 
             <button type="button"
                     x-show="activeTab === 'devices'"
@@ -557,14 +556,13 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                             <!-- Inline Actions: Electric Blue Edit + Red Delete -->
                             <td class="py-3.5 pl-4 pr-5 whitespace-nowrap text-right" x-show="sesiCols.aksi">
                                 <div class="inline-flex items-center justify-end gap-3.5">
-                                    <button type="button"
-                                            @click="openEditModal({{ $s->id }})"
-                                            class="inline-flex items-center gap-1 text-xs font-semibold text-[#0052FF] hover:text-[#0043D4] transition">
+                                    <a href="{{ route('pengaturan.sesi.edit', $s->id) }}"
+                                       class="inline-flex items-center gap-1 text-xs font-semibold text-[#0052FF] hover:text-[#0043D4] transition">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                         <span>Edit</span>
-                                    </button>
+                                    </a>
 
                                     <button type="button"
                                             @click="confirmDeleteSesi({{ $s->id }}, @js($s->nama_sesi), @js($s->kode_sesi))"
@@ -881,370 +879,7 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
         </div>
     </section>
 
-    <!-- ======================================================= -->
-    <!-- MODAL TAMBAH / EDIT SESI PRESENSI (CLEAN LIGHT + BLUE)  -->
-    <!-- ======================================================= -->
-    <div x-show="showModal" x-cloak
-         class="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
-         @keydown.escape.window="showModal = false">
 
-        <div x-show="showModal"
-             x-transition.opacity
-             @click="showModal = false"
-             class="fixed inset-0 bg-gray-900/45 backdrop-blur-[2px]"></div>
-
-        <div x-show="showModal"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 scale-95 translate-y-2"
-             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-             class="relative w-full max-w-2xl bg-white border border-gray-200 rounded-2xl shadow-2xl overflow-hidden z-10">
-
-            <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white">
-                <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-lg bg-[#EFF4FF] border border-[#0052FF]/15 text-[#0052FF] flex items-center justify-center">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-base font-extrabold text-gray-950"
-                            x-text="modalMode === 'create' ? 'Tambah Sesi Presensi Baru' : 'Perbarui Pengaturan Sesi'"></h3>
-                        <p class="text-xs text-gray-500">Konfigurasi rentang waktu tap kartu, mesin ESP32, dan target peserta.</p>
-                    </div>
-                </div>
-                <button type="button" @click="showModal = false" class="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-
-            <!-- Form Tambah / Update -->
-            <form :action="modalMode === 'create' ? '{{ route('pengaturan.sesi.store') }}' : ('/pengaturan-sesi/' + form.id)" method="POST">
-                @csrf
-                <template x-if="modalMode === 'edit'">
-                    <input type="hidden" name="_method" value="PUT">
-                </template>
-
-                <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto custom-scroll bg-white">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-                        <!-- Kode Sesi -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1.5">
-                                Kode Sesi (Unik) <span class="text-rose-500">*</span>
-                            </label>
-                            <input type="text"
-                                   name="kode_sesi"
-                                   x-model="form.kode_sesi"
-                                   @input="form.kode_sesi = form.kode_sesi.toUpperCase().replace(/\s+/g, '_')"
-                                   placeholder="Contoh: TAHFIDZ_SORE"
-                                   required
-                                   maxlength="30"
-                                   class="w-full px-3.5 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm font-mono font-semibold text-gray-900 placeholder-gray-400 outline-none transition">
-                            <p class="text-[11px] text-gray-500 mt-1">Ditampilkan singkat pada layar LCD 16x2 mesin ESP32.</p>
-                        </div>
-
-                        <!-- Nama Sesi -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1.5">
-                                Nama Sesi <span class="text-rose-500">*</span>
-                            </label>
-                            <input type="text"
-                                   name="nama_sesi"
-                                   x-model="form.nama_sesi"
-                                   placeholder="Contoh: Mengaji Tahfidz Sore"
-                                   required
-                                   maxlength="100"
-                                   class="w-full px-3.5 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm text-gray-900 placeholder-gray-400 outline-none transition">
-                            <p class="text-[11px] text-gray-500 mt-1">Ditampilkan pada header Monitoring NFC Tap.</p>
-                        </div>
-
-                        <!-- Jam Mulai -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1.5">
-                                Jam Mulai <span class="text-rose-500">*</span>
-                            </label>
-                            <input type="time"
-                                   name="jam_mulai"
-                                   x-model="form.jam_mulai"
-                                   required
-                                   class="w-full px-3.5 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm font-mono text-gray-900 outline-none transition">
-                        </div>
-
-                        <!-- Jam Selesai -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1.5">
-                                Jam Selesai <span class="text-rose-500">*</span>
-                            </label>
-                            <input type="time"
-                                   name="jam_selesai"
-                                   x-model="form.jam_selesai"
-                                   required
-                                   class="w-full px-3.5 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm font-mono text-gray-900 outline-none transition">
-                        </div>
-
-                        <!-- Perangkat Khusus (ESP32) -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1.5">
-                                Perangkat ESP32 Target
-                            </label>
-                            <select name="device_id_target"
-                                    x-model="form.device_id_target"
-                                    data-prefix-icon="cpu-chip"
-                                    class="w-full px-3.5 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm text-gray-900 outline-none transition">
-                                @if($devices->isEmpty())
-                                    <option value="">Semua Perangkat / Global (Belum ada alat terdaftar)</option>
-                                @else
-                                    <option value="">Semua Perangkat (Global)</option>
-                                    @foreach($devices as $d)
-                                        <option value="{{ $d->device_id }}">{{ $d->nama_lokasi }} ({{ $d->device_id }})</option>
-                                    @endforeach
-                                @endif
-                            </select>
-                            <p class="text-[11px] text-gray-500 mt-1">
-                                {{ $devices->isEmpty() ? 'Belum ada mesin spesifik terdaftar. Sesi berlaku otomatis untuk alat mana pun yang aktif.' : 'Pilih lokasi & serial spesifik, atau biarkan Global.' }}
-                            </p>
-                        </div>
-
-                        <!-- Toleransi Menit & Kategori -->
-                        <div class="grid grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1.5">Toleransi (Menit)</label>
-                                <input type="number"
-                                       name="toleransi_menit"
-                                       x-model="form.toleransi_menit"
-                                       min="0"
-                                       max="240"
-                                       class="w-full px-3.5 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm font-mono text-gray-900 outline-none transition">
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1.5">Kategori Sesi</label>
-                                <select name="kategori"
-                                        x-model="form.kategori"
-                                        data-prefix-icon="clock"
-                                        class="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm text-gray-900 outline-none transition">
-                                    <option value="sholat">Sholat</option>
-                                    <option value="pengajian">Pengajian</option>
-                                    <option value="sekolah">Sekolah</option>
-                                    <option value="makan">Makan</option>
-                                    <option value="pegawai">Pegawai</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Target Partisipan -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1.5">Target Partisipan</label>
-                            <select name="target_kategori"
-                                    x-model="form.target_kategori"
-                                    data-prefix-icon="user"
-                                    @change="onTargetKategoriChange()"
-                                    class="w-full px-3.5 py-2 rounded-lg bg-white border border-gray-300 focus:border-[#0052FF] focus:ring-2 focus:ring-[#0052FF]/15 text-sm text-gray-900 outline-none transition">
-                                <option value="semua_santri">Semua Santri</option>
-                                <option value="kamar_khusus">Kamar Tertentu (Multi-Pilih)</option>
-                                <option value="sekolah">Siswa Sekolah (SMP / SMA)</option>
-                                <option value="pegawai">Guru &amp; Pegawai</option>
-                            </select>
-                        </div>
-
-                        <!-- Filter Target Dinamis (Mendukung Multi-Select Gaya Gambar 2) -->
-                        <div>
-                            <div class="flex items-center justify-between mb-1.5">
-                                <label class="block text-xs font-semibold text-gray-700">Filter Target (Kamar / Jenjang)</label>
-                                <span x-show="form.target_kategori === 'kamar_khusus'" class="text-[11px] text-amber-700 font-medium">Bisa memilih lebih dari 1 kamar</span>
-                            </div>
-                            <input type="hidden"
-                                   name="target_filter"
-                                   :value="(form.target_kategori === 'kamar_khusus' || form.target_kategori === 'sekolah') ? form.target_filter : ''">
-
-                            <!-- Mode Kamar Khusus (Multi-Select Container Persis Gambar 2) -->
-                            <div x-show="form.target_kategori === 'kamar_khusus'" class="relative" x-data="{
-                                isOpen: false,
-                                search: '',
-                                options: @js($kamars->values()),
-                                get filteredOptions() {
-                                    if (!this.search.trim()) return this.options;
-                                    const q = this.search.toLowerCase().trim();
-                                    return this.options.filter(o => o.toLowerCase().includes(q));
-                                }
-                            }" @click.outside="isOpen = false">
-
-                                <!-- Box Input (Persis Gambar 2: border-2 rounded-xl, pills di baris atas, input & chevron) -->
-                                <div class="w-full min-h-[46px] p-2.5 rounded-xl border-2 transition cursor-pointer bg-white"
-                                     :class="isOpen ? 'border-[#F59E0B] shadow-sm' : 'border-gray-200 hover:border-gray-300'"
-                                     @click="isOpen = true; $nextTick(() => $refs.kamarSearchInput?.focus())">
-
-                                    <!-- Pills Container (Gaya Gambar 2: krem/amber muda dengan teks cokelat & silang x) -->
-                                    <div class="flex flex-wrap items-center gap-1.5" x-show="getTargetFilterList().length > 0">
-                                        <template x-for="item in getTargetFilterList()" :key="item">
-                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A] shadow-xs select-none">
-                                                <span x-text="item"></span>
-                                                <button type="button"
-                                                        @click.stop="removeTargetFilter(item)"
-                                                        class="text-[#B45309] hover:text-[#78350F] text-xs font-bold leading-none w-3.5 h-3.5 inline-flex items-center justify-center cursor-pointer"
-                                                        title="Hapus pilihan">&times;</button>
-                                            </span>
-                                        </template>
-                                    </div>
-
-                                    <!-- Input Row: Text placeholder & Chevron Icon -->
-                                    <div class="flex items-center justify-between gap-2" :class="getTargetFilterList().length > 0 ? 'mt-2' : 'py-0.5'">
-                                        <input type="text"
-                                               x-ref="kamarSearchInput"
-                                               x-model="search"
-                                               @focus="isOpen = true"
-                                               @keydown.escape="isOpen = false"
-                                               @keydown.enter.prevent="if (filteredOptions.length > 0) { toggleTargetFilter(filteredOptions[0]); search = ''; }"
-                                               :placeholder="getTargetFilterList().length === 0 ? 'Select an option' : 'Cari / tambah kamar lain...'"
-                                               class="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none border-none p-0 focus:ring-0">
-
-                                        <button type="button"
-                                                @click.stop="isOpen = !isOpen"
-                                                class="text-gray-400 hover:text-gray-600 focus:outline-none p-0.5 transition">
-                                            <svg class="w-4 h-4 transition-transform duration-200"
-                                                 :class="isOpen ? 'rotate-180 text-amber-600' : ''"
-                                                 viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Dropdown Popover (Floating Card persis Gambar 2) -->
-                                <div x-show="isOpen"
-                                     x-transition:enter="transition ease-out duration-150"
-                                     x-transition:enter-start="opacity-0 translate-y-1"
-                                     x-transition:enter-end="opacity-100 translate-y-0"
-                                     x-transition:leave="transition ease-in duration-100"
-                                     x-transition:leave-start="opacity-100 translate-y-0"
-                                     x-transition:leave-end="opacity-0 translate-y-1"
-                                     class="absolute left-0 right-0 mt-1.5 z-50 bg-white rounded-xl border border-gray-200 shadow-lg p-1.5 max-h-56 overflow-y-auto"
-                                     style="display: none;">
-
-                                    <template x-for="opt in filteredOptions" :key="opt">
-                                        <div @click="toggleTargetFilter(opt); search = ''"
-                                             :class="isTargetFilterSelected(opt) ? 'bg-amber-50/70 text-amber-900 font-semibold' : 'text-gray-800 hover:bg-gray-100 font-normal'"
-                                             class="px-3 py-2 text-sm rounded-lg cursor-pointer transition flex items-center justify-between my-0.5">
-                                            <span x-text="opt"></span>
-                                            <span x-show="isTargetFilterSelected(opt)" class="text-amber-600 font-bold text-xs">✓</span>
-                                        </div>
-                                    </template>
-
-                                    <div x-show="filteredOptions.length === 0"
-                                         class="px-3 py-3 text-xs text-gray-400 text-center">
-                                        Tidak ada kamar yang cocok
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Mode Siswa Sekolah (Multi-Select Container Persis Gambar 2) -->
-                            <div x-show="form.target_kategori === 'sekolah'" class="relative" x-data="{
-                                isOpen: false,
-                                search: '',
-                                options: ['SMP', 'SMA'],
-                                get filteredOptions() {
-                                    if (!this.search.trim()) return this.options;
-                                    const q = this.search.toLowerCase().trim();
-                                    return this.options.filter(o => o.toLowerCase().includes(q));
-                                }
-                            }" @click.outside="isOpen = false">
-
-                                <!-- Box Input -->
-                                <div class="w-full min-h-[46px] p-2.5 rounded-xl border-2 transition cursor-pointer bg-white"
-                                     :class="isOpen ? 'border-[#F59E0B] shadow-sm' : 'border-gray-200 hover:border-gray-300'"
-                                     @click="isOpen = true; $nextTick(() => $refs.sekolahSearchInput?.focus())">
-
-                                    <!-- Pills Container -->
-                                    <div class="flex flex-wrap items-center gap-1.5" x-show="getTargetFilterList().length > 0">
-                                        <template x-for="item in getTargetFilterList()" :key="item">
-                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A] shadow-xs select-none">
-                                                <span x-text="item === 'ALL' ? 'ALL (SMP & SMA)' : item"></span>
-                                                <button type="button"
-                                                        @click.stop="removeTargetFilter(item)"
-                                                        class="text-[#B45309] hover:text-[#78350F] text-xs font-bold leading-none w-3.5 h-3.5 inline-flex items-center justify-center cursor-pointer"
-                                                        title="Hapus pilihan">&times;</button>
-                                            </span>
-                                        </template>
-                                    </div>
-
-                                    <!-- Input Row -->
-                                    <div class="flex items-center justify-between gap-2" :class="getTargetFilterList().length > 0 ? 'mt-2' : 'py-0.5'">
-                                        <input type="text"
-                                               x-ref="sekolahSearchInput"
-                                               x-model="search"
-                                               @focus="isOpen = true"
-                                               @keydown.escape="isOpen = false"
-                                               :placeholder="getTargetFilterList().length === 0 ? 'Select an option' : 'Pilih jenjang...'"
-                                               class="w-full bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none border-none p-0 focus:ring-0">
-
-                                        <button type="button"
-                                                @click.stop="isOpen = !isOpen"
-                                                class="text-gray-400 hover:text-gray-600 focus:outline-none p-0.5 transition">
-                                            <svg class="w-4 h-4 transition-transform duration-200"
-                                                 :class="isOpen ? 'rotate-180 text-amber-600' : ''"
-                                                 viewBox="0 0 20 20" fill="currentColor">
-                                                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Dropdown Popover -->
-                                <div x-show="isOpen"
-                                     x-transition:enter="transition ease-out duration-150"
-                                     x-transition:enter-start="opacity-0 translate-y-1"
-                                     x-transition:enter-end="opacity-100 translate-y-0"
-                                     x-transition:leave="transition ease-in duration-100"
-                                     x-transition:leave-start="opacity-100 translate-y-0"
-                                     x-transition:leave-end="opacity-0 translate-y-1"
-                                     class="absolute left-0 right-0 mt-1.5 z-50 bg-white rounded-xl border border-gray-200 shadow-lg p-1.5 max-h-56 overflow-y-auto"
-                                     style="display: none;">
-
-                                    <template x-for="opt in filteredOptions" :key="opt">
-                                        <div @click="toggleTargetFilter(opt); search = ''"
-                                             :class="isTargetFilterSelected(opt) ? 'bg-amber-50/70 text-amber-900 font-semibold' : 'text-gray-800 hover:bg-gray-100 font-normal'"
-                                             class="px-3 py-2 text-sm rounded-lg cursor-pointer transition flex items-center justify-between my-0.5">
-                                            <span x-text="opt"></span>
-                                            <span x-show="isTargetFilterSelected(opt)" class="text-amber-600 font-bold text-xs">✓</span>
-                                        </div>
-                                    </template>
-                                    <div @click="form.target_filter = 'ALL'; isOpen = false; search = ''"
-                                         :class="form.target_filter === 'ALL' ? 'bg-amber-50/70 text-amber-900 font-semibold' : 'text-gray-800 hover:bg-gray-100 font-normal'"
-                                         class="px-3 py-2 text-sm rounded-lg cursor-pointer transition flex items-center justify-between my-0.5">
-                                        <span>ALL (SMP &amp; SMA)</span>
-                                        <span x-show="form.target_filter === 'ALL'" class="text-amber-600 font-bold text-xs">✓</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Mode Global -->
-                            <div x-show="form.target_kategori === 'semua_santri' || form.target_kategori === 'pegawai'"
-                                 class="px-3.5 py-2 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-500">
-                                Otomatis mencakup seluruh <strong class="text-gray-800" x-text="form.target_kategori === 'pegawai' ? 'Guru & Pegawai' : 'Santri Aktif'"></strong> tanpa filter tambahan.
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                <!-- Modal Footer -->
-                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50/70 flex items-center justify-end gap-2.5">
-                    <button type="button"
-                            @click="showModal = false"
-                            class="px-4 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold border border-gray-300 transition">
-                        Batal
-                    </button>
-                    <button type="submit"
-                            class="px-5 py-2 rounded-lg bg-[#0052FF] hover:bg-[#0043D4] active:bg-[#0038B3] text-white text-sm font-semibold shadow-sm shadow-[#0052FF]/20 transition"
-                            x-text="modalMode === 'create' ? 'Simpan Sesi Baru' : 'Simpan Perubahan'">
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <!-- ======================================================= -->
     <!-- MODAL KONFIRMASI HAPUS SESI TUNGGAL (GAMBAR 5 STYLE)    -->
@@ -1497,7 +1132,6 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
             draftDeviceStatus: 'all',
             draftDeviceArea: 'all',
             showDeviceFilterPopover: false,
-            showModal: false,
             showDeviceModal: false,
             deviceModalMode: 'create',
             devicePollTimer: null,
@@ -1512,7 +1146,6 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                 nama_lokasi: '',
                 kategori_area: 'pondok'
             },
-            modalMode: 'create',
             sesisData: @json($sesisJson),
             devicesData: @json($devicesJson),
             kategoriFilters: [
@@ -1523,18 +1156,6 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                 { value: 'makan', label: 'Makan' },
                 { value: 'pegawai', label: 'Pegawai' }
             ],
-            form: {
-                id: null,
-                kode_sesi: '',
-                nama_sesi: '',
-                jam_mulai: '04:00',
-                jam_selesai: '05:30',
-                toleransi_menit: 15,
-                device_id_target: '',
-                kategori: 'sholat',
-                target_kategori: 'semua_santri',
-                target_filter: ''
-            },
             deleteTarget: {
                 show: false,
                 id: null,
@@ -1750,76 +1371,6 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                 return this.devicesData.filter(d => this.matchesDeviceFilter(d.id)).length;
             },
 
-            openCreateModal() {
-                this.modalMode = 'create';
-                this.form = {
-                    id: null,
-                    kode_sesi: '',
-                    nama_sesi: '',
-                    jam_mulai: '04:00',
-                    jam_selesai: '05:30',
-                    toleransi_menit: 15,
-                    device_id_target: '',
-                    kategori: 'sholat',
-                    target_kategori: 'semua_santri',
-                    target_filter: ''
-                };
-                this.showModal = true;
-            },
-
-            openEditModal(id) {
-                const item = this.sesisData.find(s => Number(s.id) === Number(id));
-                if (!item) return;
-                this.modalMode = 'edit';
-                this.form = {
-                    id: item.id,
-                    kode_sesi: item.kode_sesi,
-                    nama_sesi: item.nama_sesi,
-                    jam_mulai: item.jam_mulai,
-                    jam_selesai: item.jam_selesai,
-                    toleransi_menit: item.toleransi_menit,
-                    device_id_target: item.device_id_target || '',
-                    kategori: item.kategori || 'sholat',
-                    target_kategori: item.target_kategori || 'semua_santri',
-                    target_filter: item.target_filter || ''
-                };
-                this.showModal = true;
-            },
-
-            getTargetFilterList() {
-                if (!this.form.target_filter) return [];
-                return this.form.target_filter.split(',').map(s => s.trim()).filter(Boolean);
-            },
-
-            isTargetFilterSelected(val) {
-                const list = this.getTargetFilterList();
-                return list.some(item => item.toLowerCase() === String(val).toLowerCase().trim());
-            },
-
-            toggleTargetFilter(val) {
-                let list = this.getTargetFilterList();
-                const valTrim = String(val).trim();
-                const idx = list.findIndex(item => item.toLowerCase() === valTrim.toLowerCase());
-                if (idx >= 0) {
-                    list.splice(idx, 1);
-                } else {
-                    list.push(valTrim);
-                }
-                this.form.target_filter = list.join(', ');
-            },
-
-            removeTargetFilter(val) {
-                let list = this.getTargetFilterList();
-                const valTrim = String(val).trim();
-                list = list.filter(item => item.toLowerCase() !== valTrim.toLowerCase());
-                this.form.target_filter = list.join(', ');
-            },
-
-            onTargetKategoriChange() {
-                if (this.form.target_kategori === 'semua_santri' || this.form.target_kategori === 'pegawai') {
-                    this.form.target_filter = '';
-                }
-            },
 
             confirmDeleteSesi(id, nama, kode) {
                 this.deleteTarget = {

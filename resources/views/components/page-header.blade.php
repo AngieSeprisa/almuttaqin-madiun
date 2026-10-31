@@ -57,6 +57,13 @@
                 $bcParent = 'Presensi Guru';
                 $bcParentRoute = route('presensi.index');
                 $bcChild = 'Daftar';
+            } elseif (request()->routeIs('pengaturan.sesi*')) {
+                $customBreadcrumbHtml = null;
+                $breadcrumbsList = [
+                    ['label' => 'Aplikasi', 'url' => route('beranda')],
+                    ['label' => 'Pengaturan Sesi', 'url' => route('pengaturan.sesi')],
+                    ['label' => request()->routeIs('*.create') ? 'Tambah Sesi' : (request()->routeIs('*.edit') ? 'Edit Sesi' : 'Daftar Sesi'), 'url' => null],
+                ];
             } elseif (request()->routeIs('pengaturan-absensi*')) {
                 $bcParent = 'Pengaturan Sekolah';
                 $bcParentRoute = route('pengaturan-absensi.index');

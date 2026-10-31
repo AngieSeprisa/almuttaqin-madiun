@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Kamar;
+use App\Models\MasterKelasPengajian;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -55,6 +56,43 @@ class PengaturanSesiController extends Controller
         $kamars = Kamar::daftarNamaKamarAktif();
 
         return view('pengaturan-sesi', compact('sesis', 'devices', 'allDevices', 'kamars'));
+    }
+
+    /**
+     * Halaman Penuh Tambah Sesi Presensi Baru.
+     */
+    public function create()
+    {
+        $devices = DB::table('master_devices')
+            ->where('status_aktif', 1)
+            ->orderByDesc('last_seen_at')
+            ->orderBy('nama_lokasi')
+            ->get();
+        $kamars = Kamar::daftarNamaKamarAktif();
+        $kelasPengajians = MasterKelasPengajian::orderBy('nama_kelas')->get();
+
+        return view('pengaturan-sesi.form', compact('devices', 'kamars', 'kelasPengajians'));
+    }
+
+    /**
+     * Halaman Penuh Edit Pengaturan Sesi Presensi.
+     */
+    public function edit($id)
+    {
+        $sesi = DB::table('master_sesis')->where('id', $id)->first();
+        if (!$sesi) {
+            return redirect()->route('pengaturan.sesi')->with('error', 'Data sesi tidak ditemukan.');
+        }
+
+        $devices = DB::table('master_devices')
+            ->where('status_aktif', 1)
+            ->orderByDesc('last_seen_at')
+            ->orderBy('nama_lokasi')
+            ->get();
+        $kamars = Kamar::daftarNamaKamarAktif();
+        $kelasPengajians = MasterKelasPengajian::orderBy('nama_kelas')->get();
+
+        return view('pengaturan-sesi.form', compact('sesi', 'devices', 'kamars', 'kelasPengajians'));
     }
 
     /**
@@ -126,7 +164,7 @@ class PengaturanSesiController extends Controller
             'toleransi_menit' => ['nullable', 'integer', 'min:0', 'max:240'],
             'device_id_target' => ['nullable', 'string', 'max:50', 'exists:master_devices,device_id'],
             'kategori' => ['nullable', Rule::in(['sholat', 'pengajian', 'sekolah', 'makan', 'pegawai'])],
-            'target_kategori' => ['nullable', Rule::in(['semua_santri', 'kamar_khusus', 'sekolah', 'pegawai'])],
+            'target_kategori' => ['nullable', Rule::in(['semua_santri', 'kamar_khusus', 'kelas_pengajian', 'sekolah', 'pegawai'])],
             'target_filter' => ['nullable'],
         ], [
             'kode_sesi.required' => 'Kode sesi wajib diisi.',
@@ -145,6 +183,23 @@ class PengaturanSesiController extends Controller
                 $targetFilter = !empty($filtered) ? implode(', ', $filtered) : null;
             } else {
                 $targetFilter = trim((string) $rawTargetFilter) ?: null;
+            }
+        } elseif ($targetKategori === 'kelas_pengajian') {
+            $rawKelas = $request->input('target_filter_kelas', $rawTargetFilter);
+            if (is_array($rawKelas)) {
+                $filteredKelas = array_filter(array_map('trim', $rawKelas));
+                $kelasStr = !empty($filteredKelas) ? implode(', ', $filteredKelas) : '';
+            } else {
+                $kelasStr = trim((string) $rawKelas);
+            }
+
+            $genderInput = strtolower(trim((string) $request->input('target_filter_gender', 'semua')));
+            if ($genderInput === 'putra') {
+                $targetFilter = $kelasStr ? "{$kelasStr} [Gender: Putra]" : '[Gender: Putra]';
+            } elseif ($genderInput === 'putri') {
+                $targetFilter = $kelasStr ? "{$kelasStr} [Gender: Putri]" : '[Gender: Putri]';
+            } else {
+                $targetFilter = $kelasStr ?: null;
             }
         } else {
             $targetFilter = null;
@@ -191,7 +246,7 @@ class PengaturanSesiController extends Controller
             'toleransi_menit' => ['nullable', 'integer', 'min:0', 'max:240'],
             'device_id_target' => ['nullable', 'string', 'max:50', 'exists:master_devices,device_id'],
             'kategori' => ['required', Rule::in(['sholat', 'pengajian', 'sekolah', 'makan', 'pegawai'])],
-            'target_kategori' => ['required', Rule::in(['semua_santri', 'kamar_khusus', 'sekolah', 'pegawai'])],
+            'target_kategori' => ['required', Rule::in(['semua_santri', 'kamar_khusus', 'kelas_pengajian', 'sekolah', 'pegawai'])],
             'target_filter' => ['nullable'],
         ]);
 
@@ -204,6 +259,23 @@ class PengaturanSesiController extends Controller
                 $targetFilter = !empty($filtered) ? implode(', ', $filtered) : null;
             } else {
                 $targetFilter = trim((string) $rawTargetFilter) ?: null;
+            }
+        } elseif ($targetKategori === 'kelas_pengajian') {
+            $rawKelas = $request->input('target_filter_kelas', $rawTargetFilter);
+            if (is_array($rawKelas)) {
+                $filteredKelas = array_filter(array_map('trim', $rawKelas));
+                $kelasStr = !empty($filteredKelas) ? implode(', ', $filteredKelas) : '';
+            } else {
+                $kelasStr = trim((string) $rawKelas);
+            }
+
+            $genderInput = strtolower(trim((string) $request->input('target_filter_gender', 'semua')));
+            if ($genderInput === 'putra') {
+                $targetFilter = $kelasStr ? "{$kelasStr} [Gender: Putra]" : '[Gender: Putra]';
+            } elseif ($genderInput === 'putri') {
+                $targetFilter = $kelasStr ? "{$kelasStr} [Gender: Putri]" : '[Gender: Putri]';
+            } else {
+                $targetFilter = $kelasStr ?: null;
             }
         } else {
             $targetFilter = null;
