@@ -211,8 +211,8 @@ class User extends Authenticatable
             return true;
         }
 
-        // Guru Pondok memiliki akses lihat ke Rekap Pondok
-        if ($this->role === 'guru' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, ['rekap_pondok', 'rekap_absensi']) && $action === 'view') {
+        // Guru & Musyrif memiliki akses lihat ke Rekap Pondok & Rekap Absensi
+        if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, ['rekap_pondok', 'rekap_absensi']) && $action === 'view') {
             return true;
         }
 

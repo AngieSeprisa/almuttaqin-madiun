@@ -1288,7 +1288,9 @@
             // Filter Kamar
             if (selKamar !== 'semua' && selKamar !== '') {
                 var k = (s.kamar || '').toLowerCase();
-                if (k.indexOf(selKamar.toLowerCase()) === -1) {
+                var cleanK = k.replace(/^kamar\s+/i, '').trim();
+                var cleanSel = selKamar.toLowerCase().replace(/^kamar\s+/i, '').trim();
+                if (cleanK !== cleanSel && k.indexOf(selKamar.toLowerCase()) === -1 && selKamar.toLowerCase().indexOf(k) === -1 && cleanK.indexOf(cleanSel) === -1 && cleanSel.indexOf(cleanK) === -1) {
                     return;
                 }
             }

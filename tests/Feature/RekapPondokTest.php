@@ -456,4 +456,95 @@ class RekapPondokTest extends TestCase
         $resPdf->assertStatus(200);
         $resPdf->assertSee('Zaid Santri');
     }
+
+    public function test_akses_rekap_pondok_dengan_akun_guru_dan_musyrif_tanpa_dibatasi_wali_kelas(): void
+    {
+        // Buat beberapa santri aktif
+        $this->createSantriWithPendaftaran(['nama_lengkap' => 'Santri Satu', 'kamar' => 'Kamar Abu Bakar']);
+        $this->createSantriWithPendaftaran(['nama_lengkap' => 'Santri Dua', 'kamar' => 'Kamar Umar']);
+
+        // Akun Guru biasa (bukan wali kelas dan bukan admin yayasan)
+        $userGuru = User::factory()->create([
+            'role'      => 'guru',
+            'is_active' => true,
+        ]);
+
+        $resGuru = $this->actingAs($userGuru)->get(route('rekap.pondok.index'));
+        $resGuru->assertStatus(200);
+        $rowsGuru = $resGuru->viewData('rows');
+        $this->assertGreaterThanOrEqual(2, count($rowsGuru));
+
+        // Akun Musyrif (role musyrif)
+        $userMusyrif = User::factory()->create([
+            'role'      => 'musyrif',
+            'is_active' => true,
+        ]);
+
+        $resMusyrif = $this->actingAs($userMusyrif)->get(route('rekap.pondok.index'));
+        $resMusyrif->assertStatus(200);
+        $rowsMusyrif = $resMusyrif->viewData('rows');
+        $this->assertGreaterThanOrEqual(2, count($rowsMusyrif));
+    }
+
+    public function test_filter_fleksibel_kamar_gender_dan_fallback_null(): void
+    {
+        // 1. Santri disimpan dengan kamar "Abu Bakar" (tanpa kata "Kamar "), tapi difilter dengan "Kamar Abu Bakar"
+        $s1 = $this->createSantriWithPendaftaran([
+            'nama_lengkap'  => 'Santri Abu Bakar',
+            'kamar'         => 'Abu Bakar',
+            'jenis_kelamin' => 'Laki-laki',
+            'kelas'         => 'Kelas 7A',
+        ]);
+
+        $resKamar = $this->actingAs($this->admin)->get(route('rekap.pondok.index', [
+            'kamar' => 'Kamar Abu Bakar',
+        ]));
+        $resKamar->assertStatus(200);
+        $rowsKamar = collect($resKamar->viewData('rows'))->pluck('nama_lengkap')->all();
+        $this->assertContains('Santri Abu Bakar', $rowsKamar);
+
+        // 2. Filter kelas fleksibel ("7A" vs "Kelas 7A")
+        $resKelas = $this->actingAs($this->admin)->get(route('rekap.pondok.index', [
+            'kelas' => '7A',
+        ]));
+        $resKelas->assertStatus(200);
+        $rowsKelas = collect($resKelas->viewData('rows'))->pluck('nama_lengkap')->all();
+        $this->assertContains('Santri Abu Bakar', $rowsKelas);
+
+        // 3. Filter gender fleksibel ('L' mencocokkan 'Laki-laki', 'P' mencocokkan 'Perempuan')
+        $s2 = $this->createSantriWithPendaftaran([
+            'nama_lengkap'  => 'Fathimah Banat',
+            'kamar'         => 'Kamar Banat 1',
+            'jenis_kelamin' => 'Perempuan',
+            'kelas'         => '8B',
+        ]);
+
+        $resGenderL = $this->actingAs($this->admin)->get(route('rekap.pondok.index', ['gender' => 'L']));
+        $rowsL = collect($resGenderL->viewData('rows'))->pluck('nama_lengkap')->all();
+        $this->assertContains('Santri Abu Bakar', $rowsL);
+        $this->assertNotContains('Fathimah Banat', $rowsL);
+
+        $resGenderP = $this->actingAs($this->admin)->get(route('rekap.pondok.index', ['gender' => 'P']));
+        $rowsP = collect($resGenderP->viewData('rows'))->pluck('nama_lengkap')->all();
+        $this->assertContains('Fathimah Banat', $rowsP);
+        $this->assertNotContains('Santri Abu Bakar', $rowsP);
+
+        // 4. Fallback toleran jika kombinasi filter menghasilkan 0 santri karena kolom santri NULL
+        // Misal santri santri baru kamar "Kamar Ali" belum punya kelas (kelas = null)
+        $s3 = $this->createSantriWithPendaftaran([
+            'nama_lengkap'  => 'Ali Santri Baru',
+            'kamar'         => 'Kamar Ali',
+            'kelas'         => null,
+            'jenis_kelamin' => 'Laki-laki',
+        ]);
+
+        // Filter kamar "Kamar Ali" dan kelas "9A" -> karena kelasnya null, fallback memastikan santri tetap muncul
+        $resCombo = $this->actingAs($this->admin)->get(route('rekap.pondok.index', [
+            'kamar' => 'Kamar Ali',
+            'kelas' => '9A',
+        ]));
+        $resCombo->assertStatus(200);
+        $rowsCombo = collect($resCombo->viewData('rows'))->pluck('nama_lengkap')->all();
+        $this->assertContains('Ali Santri Baru', $rowsCombo);
+    }
 }

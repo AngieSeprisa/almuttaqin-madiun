@@ -68,6 +68,107 @@ class RekapPondokController extends Controller
     }
 
     /**
+     * Helper fleksibel untuk mencocokkan kamar santri dengan filter dropdown.
+     */
+    public static function matchKamar(?string $siswaKamar, string $targetKamar): bool
+    {
+        $sk = trim((string) $siswaKamar);
+        $tk = trim($targetKamar);
+
+        if ($tk === '' || $tk === 'semua' || $tk === '-') {
+            return true;
+        }
+        if ($sk === '' || $sk === '-') {
+            return false;
+        }
+
+        if (strcasecmp($sk, $tk) === 0) {
+            return true;
+        }
+
+        if (class_exists(PlottingKamarController::class) && PlottingKamarController::isSameKamar($sk, $tk)) {
+            return true;
+        }
+
+        $cleanSk = mb_strtolower(trim((string) preg_replace('/^kamar\s+/iu', '', $sk)));
+        $cleanTk = mb_strtolower(trim((string) preg_replace('/^kamar\s+/iu', '', $tk)));
+
+        if ($cleanSk === $cleanTk) {
+            return true;
+        }
+
+        return (str_contains($cleanSk, $cleanTk) || str_contains($cleanTk, $cleanSk));
+    }
+
+    /**
+     * Helper fleksibel untuk mencocokkan kelas sekolah santri dengan filter dropdown.
+     */
+    public static function matchKelas(?string $siswaKelas, string $targetKelas): bool
+    {
+        $sk = trim((string) $siswaKelas);
+        $tk = trim($targetKelas);
+
+        if ($tk === '' || $tk === 'semua') {
+            return true;
+        }
+        if ($sk === '' || $sk === '-') {
+            return false;
+        }
+
+        if (strcasecmp($sk, $tk) === 0) {
+            return true;
+        }
+
+        if (class_exists(PlottingKelasController::class) && PlottingKelasController::isSameClass($sk, $tk)) {
+            return true;
+        }
+
+        $cleanSk = mb_strtolower(trim((string) preg_replace('/^kelas\s+/iu', '', $sk)));
+        $cleanTk = mb_strtolower(trim((string) preg_replace('/^kelas\s+/iu', '', $tk)));
+
+        if ($cleanSk === $cleanTk) {
+            return true;
+        }
+
+        return (str_contains($cleanSk, $cleanTk) || str_contains($cleanTk, $cleanSk));
+    }
+
+    /**
+     * Normalisasi gender santri menjadi 'L' atau 'P' dengan fallback menyeluruh.
+     */
+    public static function normalizeGender($siswa): ?string
+    {
+        if (!$siswa) return null;
+
+        $candidates = [];
+        if (is_object($siswa)) {
+            $candidates = [
+                $siswa->gender ?? null,
+                $siswa->jenis_kelamin ?? null,
+                (method_exists($siswa, 'getRawOriginal') ? $siswa->getRawOriginal('jenis_kelamin') : null),
+                $siswa->pendaftaran?->jenis_kelamin ?? null,
+                $siswa->kamar ?? null,
+            ];
+        } elseif (is_string($siswa)) {
+            $candidates = [$siswa];
+        }
+
+        foreach ($candidates as $cand) {
+            if (empty($cand)) continue;
+            $str = strtoupper(trim((string) $cand));
+
+            if (str_contains($str, 'PEREMPUAN') || str_contains($str, 'PUTRI') || str_contains($str, 'BANAT') || $str === 'P') {
+                return 'P';
+            }
+            if (str_contains($str, 'LAKI') || str_contains($str, 'PUTRA') || str_contains($str, 'BANIN') || $str === 'L') {
+                return 'L';
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Halaman utama Rekap Presensi Pondok (Sholat & Pengajian) dengan UI Filament 3.x.
      */
     public function index(Request $request)
@@ -283,8 +384,12 @@ class RekapPondokController extends Controller
         }
 
         // E. Daftar Kamar Asrama
-        $kamarModels = Kamar::active()->orderBy('urutan')->orderBy('nama_kamar')->get();
-        $kamarList = $kamarModels->pluck('nama_kamar')->filter()->unique()->values();
+        if (class_exists(Kamar::class) && method_exists(Kamar::class, 'daftarNamaKamarAktif')) {
+            $kamarList = Kamar::daftarNamaKamarAktif();
+        } else {
+            $kamarModels = Kamar::active()->orderBy('urutan')->orderBy('nama_kamar')->get();
+            $kamarList = $kamarModels->pluck('nama_kamar')->filter()->unique()->values();
+        }
         if ($kamarList->isEmpty()) {
             $kamarList = Siswa::whereNotNull('kamar')
                 ->where('kamar', '!=', '')
@@ -306,12 +411,21 @@ class RekapPondokController extends Controller
         ];
 
         // 4. Ambil Santri Aktif & Terapkan Filter Target
+        // Query siswa tidak dibatasi oleh auth()->user()->id, kelas_id, atau scope wali guru/musyrif.
         $allActiveSantri = Siswa::with(['pendaftaran', 'kelasPengajian'])
-            ->where('status', 'aktif')
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', '')
+                  ->orWhere(function ($sub) {
+                      $sub->whereNotIn('status', ['keluar', 'lulus', 'alumni', 'nonaktif', 'ditolak', 'Ditolak', 'Lulus']);
+                  });
+            })
             ->orderBy('nama_lengkap')
             ->get();
 
-        $filteredSantris = $allActiveSantri->filter(function (Siswa $siswa) use (
+        // Helper filter santri
+        $filterCallback = function (bool $allowNullFallback) use (
+            $allActiveSantri,
             $filterKelas,
             $filterKamar,
             $filterKelasPengajian,
@@ -319,77 +433,109 @@ class RekapPondokController extends Controller
             $filterJenjang,
             $search
         ) {
-            // Filter Kelas Sekolah
-            if ($filterKelas !== 'semua' && $filterKelas !== '') {
-                $kls = trim((string) $siswa->kelas);
-                if (strcasecmp($kls, $filterKelas) !== 0) {
-                    return false;
+            return $allActiveSantri->filter(function (Siswa $siswa) use (
+                $filterKelas,
+                $filterKamar,
+                $filterKelasPengajian,
+                $filterGender,
+                $filterJenjang,
+                $search,
+                $allowNullFallback
+            ) {
+                // Filter Kelas Sekolah
+                if ($filterKelas !== 'semua' && $filterKelas !== '') {
+                    $matchedKls = self::matchKelas($siswa->kelas, $filterKelas);
+                    if (!$matchedKls) {
+                        $isKlsEmpty = empty(trim((string) $siswa->kelas)) || $siswa->kelas === '-';
+                        if (!($allowNullFallback && $isKlsEmpty)) {
+                            return false;
+                        }
+                    }
                 }
-            }
 
-            // Filter Kamar
-            if ($filterKamar !== '') {
-                if (stripos((string) $siswa->kamar, $filterKamar) === false) {
-                    return false;
+                // Filter Kamar
+                if ($filterKamar !== '' && $filterKamar !== 'semua') {
+                    $matchedKmr = self::matchKamar($siswa->kamar, $filterKamar);
+                    if (!$matchedKmr) {
+                        $isKmrEmpty = empty(trim((string) $siswa->kamar)) || $siswa->kamar === '-';
+                        if (!($allowNullFallback && $isKmrEmpty)) {
+                            return false;
+                        }
+                    }
                 }
-            }
 
-            // Filter Kelas Pengajian
-            if ($filterKelasPengajian !== 'semua' && $filterKelasPengajian !== '') {
-                $kpId = (string) $siswa->kelas_pengajian_id;
-                $kpKode = $siswa->kelasPengajian?->kode_kelas ?? '';
-                if ($kpId !== $filterKelasPengajian && $kpKode !== $filterKelasPengajian) {
-                    return false;
+                // Filter Kelas Pengajian
+                if ($filterKelasPengajian !== 'semua' && $filterKelasPengajian !== '') {
+                    $kpId = (string) $siswa->kelas_pengajian_id;
+                    $kpKode = $siswa->kelasPengajian?->kode_kelas ?? '';
+                    if ($kpId !== $filterKelasPengajian && $kpKode !== $filterKelasPengajian) {
+                        if (!($allowNullFallback && empty($kpId))) {
+                            return false;
+                        }
+                    }
                 }
-            }
 
-            // Filter Gender
-            if ($filterGender !== 'SEMUA' && $filterGender !== '') {
-                $g = strtoupper((string) ($siswa->gender ?: $siswa->jenis_kelamin ?: ''));
-                $isMale = str_contains($g, 'LAKI') || $g === 'L';
-                $isFemale = str_contains($g, 'PEREMPUAN') || $g === 'P' || str_contains($g, 'PUTRI') || str_contains($g, 'BANAT');
+                // Filter Gender
+                if ($filterGender !== 'SEMUA' && $filterGender !== '') {
+                    $normG = self::normalizeGender($siswa);
+                    if ($normG !== $filterGender) {
+                        if (!($allowNullFallback && $normG === null)) {
+                            return false;
+                        }
+                    }
+                }
 
-                if ($filterGender === 'L' && !$isMale) {
-                    return false;
-                }
-                if ($filterGender === 'P' && !$isFemale) {
-                    return false;
-                }
-            }
+                // Filter Jenjang (SMP / SMA / Reguler)
+                if ($filterJenjang !== 'semua' && $filterJenjang !== '') {
+                    $jenjangSantri = strtolower(trim((string) ($siswa->jenjang ?: ($siswa->pendaftaran?->jenjang ?: ''))));
+                    $kamarSantri = strtolower(trim((string) $siswa->kamar));
 
-            // Filter Jenjang (SMP / SMA / Reguler)
-            if ($filterJenjang !== 'semua' && $filterJenjang !== '') {
-                $jenjangSantri = strtolower(trim((string) ($siswa->jenjang ?: ($siswa->pendaftaran?->jenjang ?: ''))));
-                $kamarSantri = strtolower(trim((string) $siswa->kamar));
+                    $isMatchJenjang = false;
+                    if ($filterJenjang === 'smp' && str_contains($jenjangSantri, 'smp')) {
+                        $isMatchJenjang = true;
+                    } elseif ($filterJenjang === 'sma' && str_contains($jenjangSantri, 'sma')) {
+                        $isMatchJenjang = true;
+                    } elseif ($filterJenjang === 'reguler' && (str_contains($jenjangSantri, 'reguler') || str_contains($kamarSantri, 'reguler') || (!str_contains($jenjangSantri, 'smp') && !str_contains($jenjangSantri, 'sma')))) {
+                        $isMatchJenjang = true;
+                    }
 
-                if ($filterJenjang === 'smp' && !str_contains($jenjangSantri, 'smp')) {
-                    return false;
+                    if (!$isMatchJenjang) {
+                        if (!($allowNullFallback && empty($jenjangSantri))) {
+                            return false;
+                        }
+                    }
                 }
-                if ($filterJenjang === 'sma' && !str_contains($jenjangSantri, 'sma')) {
-                    return false;
-                }
-                if ($filterJenjang === 'reguler') {
-                    $isReguler = str_contains($jenjangSantri, 'reguler')
-                        || str_contains($kamarSantri, 'reguler')
-                        || (!str_contains($jenjangSantri, 'smp') && !str_contains($jenjangSantri, 'sma'));
-                    if (!$isReguler) {
+
+                // Filter Pencarian Live (Nama / NISN)
+                if ($search !== '') {
+                    $needle = mb_strtolower($search);
+                    $nama = mb_strtolower((string) $siswa->nama_lengkap);
+                    $nisn = mb_strtolower((string) ($siswa->pendaftaran?->nisn ?? $siswa->nisn ?? ''));
+                    if (!str_contains($nama, $needle) && !str_contains($nisn, $needle)) {
                         return false;
                     }
                 }
-            }
 
-            // Filter Pencarian Live (Nama / NISN)
-            if ($search !== '') {
-                $needle = mb_strtolower($search);
-                $nama = mb_strtolower((string) $siswa->nama_lengkap);
-                $nisn = mb_strtolower((string) ($siswa->pendaftaran?->nisn ?? $siswa->nisn ?? ''));
-                if (!str_contains($nama, $needle) && !str_contains($nisn, $needle)) {
-                    return false;
-                }
-            }
+                return true;
+            })->values();
+        };
 
-            return true;
-        })->values();
+        // 1. Filter Ketat (Default Strict AND)
+        $filteredSantris = $filterCallback(false);
+
+        // 2. Fallback Toleran jika Kombinasi Filter Menghasilkan 0 Santri Karena Ada Kolom NULL
+        $hasSpecificFilter = ($filterKelas !== 'semua' && $filterKelas !== '')
+            || ($filterKamar !== '' && $filterKamar !== 'semua')
+            || ($filterGender !== 'SEMUA' && $filterGender !== '')
+            || ($filterKelasPengajian !== 'semua' && $filterKelasPengajian !== '')
+            || ($filterJenjang !== 'semua' && $filterJenjang !== '');
+
+        if ($filteredSantris->isEmpty() && $hasSpecificFilter && $search === '') {
+            $fallbackFiltered = $filterCallback(true);
+            if ($fallbackFiltered->isNotEmpty()) {
+                $filteredSantris = $fallbackFiltered;
+            }
+        }
 
         $filteredSantriIds = $filteredSantris->pluck('id')->all();
 
