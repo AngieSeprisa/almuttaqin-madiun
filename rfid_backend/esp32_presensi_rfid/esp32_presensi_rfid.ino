@@ -170,7 +170,7 @@ void publishHeartbeat(const char* eventName) {
 
 // ================= CALLBACK MQTT DARI DAEMON VPS ================
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-    StaticJsonDocument<384> doc;
+    StaticJsonDocument<512> doc;
     DeserializationError err = deserializeJson(doc, payload, length);
     if (err) return;
 
@@ -193,23 +193,28 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             adaSesi = true;
         }
 
+        String nextKategori = "";
+        String nextSesiName = "";
         if (adaSesi) {
-            hasActiveSesi   = true;
-            currentKategori = doc["kategori"]  | "Presensi";
+            nextKategori = doc["kategori"] | "Presensi";
             const char* nSesi = doc["nama_sesi"] | doc["sesi"] | "";
             if (strlen(nSesi) > 0) {
-                currentSesiName = String(nSesi);
+                nextSesiName = String(nSesi);
             } else {
-                currentSesiName = currentKategori;
+                nextSesiName = nextKategori;
             }
-        } else {
-            hasActiveSesi   = false;
-            currentKategori = "";
-            currentSesiName = "";
         }
 
-        // Jika tidak sedang menampilkan hasil tap atau menunggu respon, segera perbarui layar
-        if (!showingResult && !waitingResponse) {
+        bool changed = (hasActiveSesi != adaSesi) ||
+                       (currentKategori != nextKategori) ||
+                       (currentSesiName != nextSesiName);
+
+        hasActiveSesi   = adaSesi;
+        currentKategori = nextKategori;
+        currentSesiName = nextSesiName;
+
+        // Perbarui layar hanya jika status/nama sesi berubah dan tidak sedang menampilkan hasil tap
+        if (changed && !showingResult && !waitingResponse) {
             showStandbyScreen();
         }
         return;
@@ -323,6 +328,7 @@ void setup() {
 
     connectWiFi();
 
+    mqttClient.setBufferSize(512);
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     mqttClient.setCallback(mqttCallback);
     reconnectMQTT();
