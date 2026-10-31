@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Kamar;
 use App\Models\MasterDevice;
-use App\Models\MasterKelasPengajian;
 use App\Models\MasterSesi;
 use App\Models\PerizinanSakit;
 use App\Models\PerizinanSambang;
@@ -17,39 +16,66 @@ use Illuminate\Support\Collection;
 class RekapPondokController extends Controller
 {
     /**
-     * Halaman utama Rekapitulasi Presensi Pondok (Sholat & Pengajian).
+     * Konfigurasi standar 5 waktu sholat.
+     */
+    public const SHOLAT_SLOTS = [
+        'subuh' => [
+            'key'       => 'subuh',
+            'label'     => 'Subuh',
+            'jam_mulai' => '04:00',
+            'jam_akhir' => '06:30',
+        ],
+        'dzuhur' => [
+            'key'       => 'dzuhur',
+            'label'     => 'Dzuhur',
+            'jam_mulai' => '11:30',
+            'jam_akhir' => '13:30',
+        ],
+        'ashar' => [
+            'key'       => 'ashar',
+            'label'     => 'Ashar',
+            'jam_mulai' => '14:45',
+            'jam_akhir' => '17:00',
+        ],
+        'maghrib' => [
+            'key'       => 'maghrib',
+            'label'     => 'Maghrib',
+            'jam_mulai' => '17:30',
+            'jam_akhir' => '18:45',
+        ],
+        'isya' => [
+            'key'       => 'isya',
+            'label'     => 'Isya',
+            'jam_mulai' => '18:45',
+            'jam_akhir' => '21:30',
+        ],
+    ];
+
+    /**
+     * Halaman utama Rekap Presensi Sholat.
      */
     public function index(Request $request)
     {
-        $data = $this->buildRekapData($request);
+        $data = $this->buildRekapSholatData($request);
 
         return view('rekap-absensi.pondok', $data);
     }
 
     /**
-     * Ekspor Rekap Presensi Pondok ke CSV/Excel atau Cetak PDF/Print View.
+     * Ekspor Rekap Presensi Sholat ke CSV/Excel atau Cetak PDF/Print View.
      */
     public function export(Request $request)
     {
-        $data = $this->buildRekapData($request);
+        $data = $this->buildRekapSholatData($request);
         $format = strtolower((string) $request->get('format', 'excel'));
 
         if (in_array($format, ['pdf', 'print', 'cetak'], true)) {
             return view('rekap-absensi.pondok-cetak', $data);
         }
 
-        $mode = $data['mode'];
+        $rentang = $data['rentang'];
         $tanggal = $data['tanggal'];
-        $bulan = $data['bulan'];
-        $tahun = $data['tahun'];
-        $selectedSesi = $data['selectedSesi'];
-        $sesiSlug = $selectedSesi ? strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $selectedSesi->nama_sesi)) : $data['kategori'];
-
-        if ($mode === 'bulanan') {
-            $fileName = sprintf('rekap_pondok_bulanan_%s_%04d_%02d.csv', $sesiSlug, $tahun, $bulan);
-        } else {
-            $fileName = sprintf('rekap_pondok_harian_%s_%s.csv', $sesiSlug, str_replace('-', '', $tanggal));
-        }
+        $fileName = sprintf('rekap_presensi_sholat_%s_%s.csv', $rentang, str_replace('-', '', $tanggal));
 
         $headers = [
             'Content-Type'        => 'text/csv; charset=UTF-8',
@@ -59,70 +85,44 @@ class RekapPondokController extends Controller
             'Expires'             => '0',
         ];
 
-        $callback = function () use ($data, $mode) {
+        $callback = function () use ($data) {
             $handle = fopen('php://output', 'w');
-            // UTF-8 BOM untuk kompatibilitas Microsoft Excel
-            fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM
 
-            if ($mode === 'bulanan') {
-                $headerRow = ['No', 'NISN', 'Nama Santri', 'Gender', 'Kamar', 'Kelas Pengajian'];
-                for ($d = 1; $d <= $data['daysInMonth']; $d++) {
-                    $headerRow[] = (string) $d;
-                }
-                $headerRow = array_merge($headerRow, ['Total H', 'Total T', 'Total I/S', 'Total A', 'Persentase (%)']);
-                fputcsv($handle, $headerRow);
+            fputcsv($handle, [
+                'No',
+                'NISN',
+                'Nama Santri',
+                'Kamar',
+                'Jenjang',
+                'Subuh',
+                'Dzuhur',
+                'Ashar',
+                'Maghrib',
+                'Isya',
+                'Total H',
+                'Total T',
+                'Total I',
+                'Total A',
+            ]);
 
-                foreach ($data['matriksRows'] as $idx => $row) {
-                    $line = [
-                        $idx + 1,
-                        $row['nisn'],
-                        $row['nama_lengkap'],
-                        $row['gender_code'],
-                        $row['kamar'],
-                        $row['kelas_pengajian'],
-                    ];
-                    for ($d = 1; $d <= $data['daysInMonth']; $d++) {
-                        $line[] = $row['days'][$d]['code'] ?? '-';
-                    }
-                    $line[] = $row['total_h'];
-                    $line[] = $row['total_t'];
-                    $line[] = $row['total_is'];
-                    $line[] = $row['total_a'];
-                    $line[] = $row['persentase'] . '%';
-                    fputcsv($handle, $line);
-                }
-            } else {
+            foreach ($data['rows'] as $idx => $r) {
                 fputcsv($handle, [
-                    'No',
-                    'Tanggal',
-                    'NISN',
-                    'Nama Santri',
-                    'Gender',
-                    'Kamar',
-                    'Kelas Pengajian',
-                    'Sesi',
-                    'Jam Tap',
-                    'Titik Mesin ESP32',
-                    'Status',
-                    'Keterangan',
+                    $idx + 1,
+                    $r['nisn'],
+                    $r['nama_lengkap'],
+                    $r['kamar'],
+                    $r['jenjang'],
+                    $r['sholat']['subuh']['display'] ?? '-',
+                    $r['sholat']['dzuhur']['display'] ?? '-',
+                    $r['sholat']['ashar']['display'] ?? '-',
+                    $r['sholat']['maghrib']['display'] ?? '-',
+                    $r['sholat']['isya']['display'] ?? '-',
+                    $r['total_h'],
+                    $r['total_t'],
+                    $r['total_i'],
+                    $r['total_a'],
                 ]);
-
-                foreach ($data['dailyRows'] as $idx => $row) {
-                    fputcsv($handle, [
-                        $idx + 1,
-                        $data['tanggal'],
-                        $row['nisn'],
-                        $row['nama_lengkap'],
-                        $row['gender_label'],
-                        $row['kamar'],
-                        $row['kelas_pengajian'],
-                        $row['sesi_nama'],
-                        $row['jam_tap'] ?: '-',
-                        $row['device_label'] ?: '-',
-                        $row['status_label'],
-                        $row['keterangan'] ?: '-',
-                    ]);
-                }
             }
 
             fclose($handle);
@@ -132,30 +132,14 @@ class RekapPondokController extends Controller
     }
 
     /**
-     * Membangun seluruh data rekapitulasi harian & matriks bulanan.
+     * Membangun data presensi sholat sesuai filter.
      */
-    private function buildRekapData(Request $request): array
+    private function buildRekapSholatData(Request $request): array
     {
         // 1. Parameter Filter
-        $kategori = strtolower(trim((string) $request->get('kategori', 'semua')));
-        if (!in_array($kategori, ['semua', 'sholat', 'pengajian'], true)) {
-            $kategori = 'semua';
-        }
-
-        $sesiId = $request->get('sesi_id');
-        $filterKamar = trim((string) $request->get('kamar', ''));
-        $filterKelasPengajianId = trim((string) $request->get('kelas_pengajian_id', ''));
-        $filterGender = strtoupper(trim((string) $request->get('gender', '')));
-        if (!in_array($filterGender, ['L', 'P'], true)) {
-            $filterGender = '';
-        }
-
-        $filterStatus = strtolower(trim((string) $request->get('status', '')));
-        $search = trim((string) $request->get('search', ''));
-
-        $mode = strtolower(trim((string) $request->get('mode', $request->get('tab', 'harian'))));
-        if (!in_array($mode, ['harian', 'bulanan'], true)) {
-            $mode = 'harian';
+        $rentang = strtolower(trim((string) $request->get('rentang', $request->get('mode', 'harian'))));
+        if (!in_array($rentang, ['harian', 'mingguan', 'bulanan'], true)) {
+            $rentang = 'harian';
         }
 
         $tanggalInput = $request->get('tanggal');
@@ -176,34 +160,64 @@ class RekapPondokController extends Controller
             $tahun = (int) $tanggalCarbon->year;
         }
 
-        // 2. Data Master Sesi Pondok (Sholat & Pengajian)
-        $allSesiPondok = MasterSesi::with('allocations')
-            ->whereIn('kategori', ['sholat', 'pengajian'])
-            ->orderBy('jam_mulai')
-            ->orderBy('id')
-            ->get();
-
-        $sesiList = $allSesiPondok->filter(function (MasterSesi $s) use ($kategori) {
-            if ($kategori === 'semua') {
-                return true;
-            }
-            return strtolower((string) $s->kategori) === $kategori;
-        })->values();
-
-        $selectedSesi = null;
-        if (!empty($sesiId)) {
-            $selectedSesi = $allSesiPondok->firstWhere('id', (int) $sesiId)
-                ?? MasterSesi::with('allocations')->find((int) $sesiId);
+        $filterSesiSholat = strtolower(trim((string) $request->get('sesi_sholat', $request->get('sesi_id', 'semua'))));
+        if (!array_key_exists($filterSesiSholat, self::SHOLAT_SLOTS)) {
+            $filterSesiSholat = 'semua';
         }
 
-        // Jika sesi spesifik dipilih, sinkronkan daftar sesi aktif yang dievaluasi
-        $evaluatedSesis = $selectedSesi
-            ? collect([$selectedSesi])
-            : ($sesiList->isNotEmpty() ? $sesiList : $allSesiPondok);
+        $filterKamar = trim((string) $request->get('kamar', ''));
+        $filterJenjang = strtolower(trim((string) $request->get('jenjang', 'semua')));
+        $search = trim((string) $request->get('search', ''));
 
-        $evaluatedSesiIds = $evaluatedSesis->pluck('id')->all();
+        // 2. Tentukan Rentang Tanggal Evaluasi
+        if ($rentang === 'bulanan') {
+            $startDate = Carbon::createFromDate($tahun, $bulan, 1)->startOfMonth();
+            $endDate = (clone $startDate)->endOfMonth();
+        } elseif ($rentang === 'mingguan') {
+            $startDate = (clone $tanggalCarbon)->startOfWeek(Carbon::MONDAY);
+            $endDate = (clone $startDate)->addDays(6);
+        } else {
+            // Harian
+            $startDate = clone $tanggalCarbon;
+            $endDate = clone $tanggalCarbon;
+        }
 
-        // 3. Data Master Kamar, Kelas Pengajian, & Perangkat ESP32
+        $startDateStr = $startDate->toDateString();
+        $endDateStr = $endDate->toDateString();
+        $todayStr = Carbon::today()->toDateString();
+        $nowTimeStr = Carbon::now()->format('H:i');
+
+        // Buat daftar tanggal yang dievaluasi
+        $evalDates = [];
+        $currDate = clone $startDate;
+        while ($currDate->lte($endDate)) {
+            $evalDates[] = $currDate->toDateString();
+            $currDate->addDay();
+        }
+
+        // 3. Ambil Master Sesi Sholat & Map Slot
+        $sesiSholatList = MasterSesi::where(function ($q) {
+                $q->where('kategori', 'sholat')
+                  ->orWhere('kode_sesi', 'LIKE', '%SUBUH%')
+                  ->orWhere('kode_sesi', 'LIKE', '%DZUHUR%')
+                  ->orWhere('kode_sesi', 'LIKE', '%ASHAR%')
+                  ->orWhere('kode_sesi', 'LIKE', '%MAGHRIB%')
+                  ->orWhere('kode_sesi', 'LIKE', '%ISYA%')
+                  ->orWhere('nama_sesi', 'LIKE', '%sholat%')
+                  ->orWhere('nama_sesi', 'LIKE', '%subuh%')
+                  ->orWhere('nama_sesi', 'LIKE', '%dzuhur%')
+                  ->orWhere('nama_sesi', 'LIKE', '%ashar%')
+                  ->orWhere('nama_sesi', 'LIKE', '%maghrib%')
+                  ->orWhere('nama_sesi', 'LIKE', '%isya%');
+            })
+            ->get();
+
+        $sesiSlotMap = [];
+        foreach ($sesiSholatList as $s) {
+            $sesiSlotMap[$s->id] = self::detectSlotSholat($s);
+        }
+
+        // Master Kamar List untuk Filter
         $kamarModels = Kamar::active()->orderBy('urutan')->orderBy('nama_kamar')->get();
         $kamarList = $kamarModels->pluck('nama_kamar')->filter()->unique()->values();
         if ($kamarList->isEmpty()) {
@@ -217,80 +231,49 @@ class RekapPondokController extends Controller
                 ->values();
         }
 
-        $kelasPengajianList = MasterKelasPengajian::orderBy('id')->get();
-        $deviceMap = MasterDevice::pluck('nama_lokasi', 'device_id')->toArray();
-
-        // 4. Ambil Santri Aktif & Filter Target Sasaran
-        $allActiveSantri = Siswa::with(['pendaftaran', 'kelasPengajian'])
+        // 4. Ambil Santri Aktif & Terapkan Filter (Kamar, Jenjang, Search)
+        $allActiveSantri = Siswa::with(['pendaftaran'])
             ->where('status', 'aktif')
             ->orderBy('nama_lengkap')
             ->get();
 
-        $targetSantris = $allActiveSantri->filter(function (Siswa $siswa) use (
-            $selectedSesi,
-            $evaluatedSesis,
-            $kategori,
-            $filterKamar,
-            $filterKelasPengajianId,
-            $filterGender,
-            $search
-        ) {
-            // A. Jika sesi spesifik dipilih, santri harus masuk dalam target sesi tersebut
-            if ($selectedSesi) {
-                if (!self::matchesSesiTarget($siswa, $selectedSesi)) {
-                    return false;
-                }
-            } elseif ($kategori !== 'semua' && $evaluatedSesis->isNotEmpty()) {
-                // Jika kategori dipilih (misal: Pengajian) tanpa sesi spesifik, santri harus cocok dengan minimal 1 sesi di kategori tsb
-                $matchesAnyInCat = $evaluatedSesis->contains(function (MasterSesi $s) use ($siswa) {
-                    return self::matchesSesiTarget($siswa, $s);
-                });
-                if (!$matchesAnyInCat) {
-                    return false;
-                }
-            }
-
-            // B. Filter Kamar dari dropdown UI
+        $filteredSantris = $allActiveSantri->filter(function (Siswa $siswa) use ($filterKamar, $filterJenjang, $search) {
+            // Filter Kamar
             if ($filterKamar !== '') {
-                if (!self::matchesKamarFilter((string) $siswa->kamar, $filterKamar)) {
+                if (stripos((string) $siswa->kamar, $filterKamar) === false) {
                     return false;
                 }
             }
 
-            // C. Filter Kelas Pengajian dari dropdown UI
-            if ($filterKelasPengajianId !== '') {
-                if (is_numeric($filterKelasPengajianId)) {
-                    if ((int) $siswa->kelas_pengajian_id !== (int) $filterKelasPengajianId) {
+            // Filter Jenjang (SMP / SMA / Reguler)
+            if ($filterJenjang !== 'semua' && $filterJenjang !== '') {
+                $jenjangSantri = strtolower(trim((string) ($siswa->jenjang ?: ($siswa->pendaftaran?->jenjang ?: ''))));
+                $kamarSantri = strtolower(trim((string) $siswa->kamar));
+
+                if ($filterJenjang === 'smp') {
+                    if (!str_contains($jenjangSantri, 'smp')) {
                         return false;
                     }
-                } else {
-                    if (!self::matchesKelasPengajianFilter($siswa, $filterKelasPengajianId)) {
+                } elseif ($filterJenjang === 'sma') {
+                    if (!str_contains($jenjangSantri, 'sma')) {
+                        return false;
+                    }
+                } elseif ($filterJenjang === 'reguler') {
+                    $isReguler = str_contains($jenjangSantri, 'reguler')
+                        || str_contains($kamarSantri, 'reguler')
+                        || (!str_contains($jenjangSantri, 'smp') && !str_contains($jenjangSantri, 'sma'));
+                    if (!$isReguler) {
                         return false;
                     }
                 }
             }
 
-            // D. Filter Gender dari dropdown UI
-            if ($filterGender !== '') {
-                if (self::normalizeGender($siswa) !== $filterGender) {
-                    return false;
-                }
-            }
-
-            // E. Filter Search (Nama Santri / NISN / NIK / UID)
+            // Filter Pencarian Nama / NISN
             if ($search !== '') {
                 $needle = mb_strtolower($search);
                 $nama = mb_strtolower((string) $siswa->nama_lengkap);
                 $nisn = mb_strtolower((string) ($siswa->pendaftaran?->nisn ?? $siswa->nisn ?? ''));
-                $nik = mb_strtolower((string) ($siswa->pendaftaran?->nik ?? ''));
-                $uid = mb_strtolower((string) ($siswa->rfid_uid ?? ''));
-
-                if (
-                    !str_contains($nama, $needle) &&
-                    !str_contains($nisn, $needle) &&
-                    !str_contains($nik, $needle) &&
-                    !str_contains($uid, $needle)
-                ) {
+                if (!str_contains($nama, $needle) && !str_contains($nisn, $needle)) {
                     return false;
                 }
             }
@@ -298,393 +281,301 @@ class RekapPondokController extends Controller
             return true;
         })->values();
 
-        $targetSantriIds = $targetSantris->pluck('id')->all();
+        $filteredSantriIds = $filteredSantris->pluck('id')->all();
 
-        // 5. Evaluasi Rekap Harian (pada $tanggal)
-        $dailyPresensis = collect();
-        if (!empty($targetSantriIds)) {
-            $presensiQuery = Presensi::with(['sesi', 'device'])
+        // 5. Query Presensi & Perizinan pada Rentang Tanggal
+        $presensisBySantriDateSlot = [];
+        if (!empty($filteredSantriIds)) {
+            $presensiList = Presensi::with('sesi')
                 ->where('tipe_entitas', 'santri')
-                ->whereIn('entitas_id', $targetSantriIds)
-                ->whereDate('waktu_tap', $tanggal);
-
-            if (!empty($evaluatedSesiIds)) {
-                $presensiQuery->whereIn('sesi_id', $evaluatedSesiIds);
-            }
-
-            $dailyPresensis = $presensiQuery
-                ->orderBy('waktu_tap', 'asc')
-                ->get()
-                ->groupBy('entitas_id');
-        }
-
-        // Ambil data Perizinan pada $tanggal
-        $dailySakits = PerizinanSakit::where(function ($q) use ($tanggal) {
-                $q->whereDate('tanggal_sakit', $tanggal)
-                  ->orWhere(function ($q2) use ($tanggal) {
-                      $q2->whereDate('tanggal_sakit', '<=', $tanggal)
-                         ->where('status', 'sakit');
-                  });
-            })
-            ->get();
-
-        $dailySambangs = PerizinanSambang::whereDate('tanggal_mulai', '<=', $tanggal)
-            ->whereDate('tanggal_kembali', '>=', $tanggal)
-            ->get();
-
-        $stats = [
-            'total_target' => $targetSantris->count(),
-            'hadir'        => 0,
-            'terlambat'    => 0,
-            'izin_sakit'   => 0,
-            'izin'         => 0,
-            'sakit'        => 0,
-            'alfa'         => 0,
-        ];
-
-        $dailyRows = [];
-        foreach ($targetSantris as $siswa) {
-            $taps = $dailyPresensis->get($siswa->id, collect());
-            $tap = $taps->first();
-
-            $eval = $this->evaluateSantriStatusOnDate(
-                $siswa,
-                $tanggal,
-                $tap,
-                $selectedSesi,
-                $dailySakits,
-                $dailySambangs,
-                $deviceMap
-            );
-
-            // Akumulasi kartu statistik ringkasan (sebelum disaring dropdown status tabel)
-            if ($eval['status'] === 'hadir') {
-                $stats['hadir']++;
-            } elseif ($eval['status'] === 'terlambat') {
-                $stats['terlambat']++;
-            } elseif ($eval['status'] === 'izin') {
-                $stats['izin']++;
-                $stats['izin_sakit']++;
-            } elseif ($eval['status'] === 'sakit') {
-                $stats['sakit']++;
-                $stats['izin_sakit']++;
-            } else {
-                $stats['alfa']++;
-            }
-
-            // Filter baris tabel jika pengguna memilih filter status tertentu
-            if ($filterStatus !== '') {
-                if ($filterStatus === 'izin_sakit' && !in_array($eval['status'], ['izin', 'sakit'], true)) {
-                    continue;
-                } elseif ($filterStatus !== 'izin_sakit' && $eval['status'] !== $filterStatus) {
-                    continue;
-                }
-            }
-
-            $dailyRows[] = $eval;
-        }
-
-        // 6. Evaluasi Matriks Bulanan (Tanggal 1 s/d akhir bulan $bulan-$tahun)
-        $startOfMonth = Carbon::createFromDate($tahun, $bulan, 1)->startOfMonth();
-        $endOfMonth = (clone $startOfMonth)->endOfMonth();
-        $daysInMonth = $startOfMonth->daysInMonth;
-        $todayStr = Carbon::today()->toDateString();
-
-        $monthlyPresensisBySantriDate = [];
-        $activeDatesInMonth = [];
-
-        if (!empty($targetSantriIds)) {
-            $mPresensiQuery = Presensi::with(['sesi', 'device'])
-                ->where('tipe_entitas', 'santri')
-                ->whereIn('entitas_id', $targetSantriIds)
+                ->whereIn('entitas_id', $filteredSantriIds)
                 ->whereBetween('waktu_tap', [
-                    $startOfMonth->toDateTimeString(),
-                    $endOfMonth->toDateTimeString(),
-                ]);
+                    $startDate->copy()->startOfDay()->toDateTimeString(),
+                    $endDate->copy()->endOfDay()->toDateTimeString(),
+                ])
+                ->orderBy('waktu_tap', 'asc')
+                ->get();
 
-            if (!empty($evaluatedSesiIds)) {
-                $mPresensiQuery->whereIn('sesi_id', $evaluatedSesiIds);
-            }
+            foreach ($presensiList as $p) {
+                $dStr = $p->waktu_tap ? $p->waktu_tap->toDateString() : null;
+                if (!$dStr) continue;
 
-            $mPresensis = $mPresensiQuery->orderBy('waktu_tap', 'asc')->get();
-            foreach ($mPresensis as $mp) {
-                $dStr = $mp->waktu_tap->toDateString();
-                $activeDatesInMonth[$dStr] = true;
-                if (!isset($monthlyPresensisBySantriDate[$mp->entitas_id][$dStr])) {
-                    $monthlyPresensisBySantriDate[$mp->entitas_id][$dStr] = $mp;
+                // Tentukan slot sholat
+                $slotKey = $sesiSlotMap[$p->sesi_id] ?? self::detectSlotSholat($p->sesi, $p->waktu_tap);
+                if (!$slotKey) continue;
+
+                if (!isset($presensisBySantriDateSlot[$p->entitas_id][$dStr][$slotKey])) {
+                    $presensisBySantriDateSlot[$p->entitas_id][$dStr][$slotKey] = $p;
                 }
             }
         }
 
-        $monthlySakits = PerizinanSakit::whereDate('tanggal_sakit', '<=', $endOfMonth->toDateString())
-            ->where(function ($q) use ($startOfMonth) {
-                $q->whereDate('tanggal_sakit', '>=', $startOfMonth->toDateString())
+        // Ambil Data Perizinan pada Rentang Tanggal
+        $sakits = PerizinanSakit::whereDate('tanggal_sakit', '<=', $endDateStr)
+            ->where(function ($q) use ($startDateStr) {
+                $q->whereDate('tanggal_sakit', '>=', $startDateStr)
                   ->orWhere('status', 'sakit');
             })
             ->get();
 
-        $monthlySambangs = PerizinanSambang::whereDate('tanggal_mulai', '<=', $endOfMonth->toDateString())
-            ->whereDate('tanggal_kembali', '>=', $startOfMonth->toDateString())
+        $sambangs = PerizinanSambang::whereDate('tanggal_mulai', '<=', $endDateStr)
+            ->whereDate('tanggal_kembali', '>=', $startDateStr)
             ->get();
 
-        $matriksRows = [];
-        foreach ($targetSantris as $siswa) {
-            $daysData = [];
-            $totalH = 0;
-            $totalT = 0;
-            $totalIS = 0;
-            $totalA = 0;
-            $totalEfektif = 0;
+        // 6. Evaluasi Setiap Santri & Setiap Slot Sholat
+        $rows = [];
+        $grandTotalH = 0;
+        $grandTotalT = 0;
+        $grandTotalI = 0;
+        $grandTotalA = 0;
 
-            for ($d = 1; $d <= $daysInMonth; $d++) {
-                $curDateStr = sprintf('%04d-%02d-%02d', $tahun, $bulan, $d);
-                $tapOnDay = $monthlyPresensisBySantriDate[$siswa->id][$curDateStr] ?? null;
+        foreach ($filteredSantris as $siswa) {
+            $siswaRow = [
+                'siswa_id'     => $siswa->id,
+                'nisn'         => $siswa->pendaftaran?->nisn ?: ($siswa->nisn ?: '-'),
+                'nama_lengkap' => $siswa->nama_lengkap,
+                'kamar'        => $siswa->kamar ?: '-',
+                'jenjang'      => $siswa->jenjang ?: ($siswa->pendaftaran?->jenjang ?: 'Reguler'),
+                'sholat'       => [],
+                'total_h'      => 0,
+                'total_t'      => 0,
+                'total_i'      => 0,
+                'total_a'      => 0,
+            ];
 
-                $hasIzinOnDay = $this->findSantriIzinOnDate($siswa, $curDateStr, $monthlySakits, $monthlySambangs) !== null;
-                $shouldEvaluateDay = ($curDateStr <= $todayStr) || ($tapOnDay !== null) || $hasIzinOnDay || isset($activeDatesInMonth[$curDateStr]);
-
-                if (!$shouldEvaluateDay) {
-                    $daysData[$d] = [
-                        'date'   => $curDateStr,
-                        'status' => 'belum',
-                        'code'   => '-',
-                        'label'  => 'Belum Berlangsung',
-                        'jam'    => null,
-                    ];
-                    continue;
-                }
-
-                $dayEval = $this->evaluateSantriStatusOnDate(
-                    $siswa,
-                    $curDateStr,
-                    $tapOnDay,
-                    $selectedSesi,
-                    $monthlySakits,
-                    $monthlySambangs,
-                    $deviceMap
-                );
-
-                $totalEfektif++;
-                if ($dayEval['status'] === 'hadir') {
-                    $totalH++;
-                } elseif ($dayEval['status'] === 'terlambat') {
-                    $totalT++;
-                } elseif (in_array($dayEval['status'], ['izin', 'sakit'], true)) {
-                    $totalIS++;
-                } else {
-                    $totalA++;
-                }
-
-                $daysData[$d] = [
-                    'date'   => $curDateStr,
-                    'status' => $dayEval['status'],
-                    'code'   => $dayEval['matrix_code'],
-                    'label'  => $dayEval['status_label'],
-                    'jam'    => $dayEval['jam_tap'],
+            // Inisialisasi slot sholat untuk santri ini
+            foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
+                $siswaRow['sholat'][$slotKey] = [
+                    'key'     => $slotKey,
+                    'label'   => $slotMeta['label'],
+                    'code'    => '-',
+                    'display' => '-',
+                    'jam'     => null,
+                    'status'  => 'belum',
+                    'count_h' => 0,
+                    'count_t' => 0,
+                    'count_i' => 0,
+                    'count_a' => 0,
                 ];
             }
 
-            $hadirCount = $totalH + $totalT;
-            $persentase = $totalEfektif > 0
-                ? round(($hadirCount / $totalEfektif) * 100, 1)
-                : 0.0;
+            // Iterasi seluruh tanggal dalam rentang
+            foreach ($evalDates as $dStr) {
+                // Cek izin santri pada tanggal ini
+                $izinInfo = $this->findSantriIzin($siswa, $dStr, $sakits, $sambangs);
 
-            $genderNorm = self::normalizeGender($siswa);
-            $nisn = $siswa->pendaftaran?->nisn ?: ($siswa->nisn ?: '-');
+                foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
+                    $tap = $presensisBySantriDateSlot[$siswa->id][$dStr][$slotKey] ?? null;
 
-            $matriksRows[] = [
-                'siswa_id'        => $siswa->id,
-                'nisn'            => $nisn,
-                'nama_lengkap'    => $siswa->nama_lengkap,
-                'gender_code'     => $genderNorm ?: '-',
-                'gender_label'    => $genderNorm === 'P' ? 'Putri (P)' : ($genderNorm === 'L' ? 'Putra (L)' : '-'),
-                'kamar'           => $siswa->kamar ?: '-',
-                'kelas_pengajian' => $siswa->kelasPengajian?->nama_kelas ?: 'Belum Diplot',
-                'days'            => $daysData,
-                'total_h'         => $totalH,
-                'total_t'         => $totalT,
-                'total_is'        => $totalIS,
-                'total_a'         => $totalA,
-                'total_efektif'   => $totalEfektif,
-                'persentase'      => $persentase,
-            ];
+                    if ($tap) {
+                        // Santri tap RFID pada sesi sholat ini
+                        $isLate = ($tap->status_kehadiran === 'terlambat');
+                        if (!$isLate && $tap->sesi && !empty($tap->sesi->jam_mulai)) {
+                            try {
+                                $jamMulaiDt = Carbon::parse($dStr . ' ' . $tap->sesi->jam_mulai);
+                                $toleransi = (int) ($tap->sesi->toleransi_menit ?? 15);
+                                $batasDt = (clone $jamMulaiDt)->addMinutes($toleransi);
+                                if ($tap->waktu_tap && $tap->waktu_tap->gt($batasDt)) {
+                                    $isLate = true;
+                                }
+                            } catch (\Throwable $e) {}
+                        }
+
+                        if ($isLate) {
+                            $siswaRow['sholat'][$slotKey]['count_t']++;
+                            $siswaRow['total_t']++;
+                            $status = 'terlambat';
+                            $code = 'T';
+                        } else {
+                            $siswaRow['sholat'][$slotKey]['count_h']++;
+                            $siswaRow['total_h']++;
+                            $status = 'hadir';
+                            $code = 'H';
+                        }
+
+                        $jamTap = $tap->waktu_tap ? $tap->waktu_tap->format('H:i') : null;
+                        if ($rentang === 'harian') {
+                            $siswaRow['sholat'][$slotKey]['status'] = $status;
+                            $siswaRow['sholat'][$slotKey]['code'] = $code;
+                            $siswaRow['sholat'][$slotKey]['jam'] = $jamTap;
+                            $siswaRow['sholat'][$slotKey]['display'] = $jamTap ?: $code;
+                        }
+                    } elseif ($izinInfo) {
+                        // Tidak tap, tapi ada surat izin / sakit
+                        $siswaRow['sholat'][$slotKey]['count_i']++;
+                        $siswaRow['total_i']++;
+
+                        if ($rentang === 'harian') {
+                            $siswaRow['sholat'][$slotKey]['status'] = 'izin';
+                            $siswaRow['sholat'][$slotKey]['code'] = 'I';
+                            $siswaRow['sholat'][$slotKey]['display'] = 'I';
+                        }
+                    } else {
+                        // Tidak tap dan tidak ada izin -> Cek apakah waktu sholat sudah lewat
+                        $sudahLewat = false;
+                        if ($dStr < $todayStr) {
+                            $sudahLewat = true;
+                        } elseif ($dStr === $todayStr) {
+                            $jamAkhir = $slotMeta['jam_akhir'];
+                            if ($nowTimeStr >= $jamAkhir) {
+                                $sudahLewat = true;
+                            }
+                        }
+
+                        if ($sudahLewat) {
+                            $siswaRow['sholat'][$slotKey]['count_a']++;
+                            $siswaRow['total_a']++;
+
+                            if ($rentang === 'harian') {
+                                $siswaRow['sholat'][$slotKey]['status'] = 'alfa';
+                                $siswaRow['sholat'][$slotKey]['code'] = 'A';
+                                $siswaRow['sholat'][$slotKey]['display'] = 'A';
+                            }
+                        } else {
+                            // Belum berlangsung
+                            if ($rentang === 'harian') {
+                                $siswaRow['sholat'][$slotKey]['status'] = 'belum';
+                                $siswaRow['sholat'][$slotKey]['code'] = '-';
+                                $siswaRow['sholat'][$slotKey]['display'] = '-';
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Jika mode mingguan atau bulanan, susun tampilan ringkasan per slot sholat
+            if ($rentang !== 'harian') {
+                foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
+                    $cH = $siswaRow['sholat'][$slotKey]['count_h'];
+                    $cT = $siswaRow['sholat'][$slotKey]['count_t'];
+                    $cI = $siswaRow['sholat'][$slotKey]['count_i'];
+                    $cA = $siswaRow['sholat'][$slotKey]['count_a'];
+
+                    $totHadir = $cH + $cT;
+                    $parts = [];
+                    if ($cH > 0) $parts[] = "{$cH}H";
+                    if ($cT > 0) $parts[] = "{$cT}T";
+                    if ($cI > 0) $parts[] = "{$cI}I";
+                    if ($cA > 0) $parts[] = "{$cA}A";
+
+                    $siswaRow['sholat'][$slotKey]['display'] = !empty($parts) ? implode(' ', $parts) : '-';
+                    $siswaRow['sholat'][$slotKey]['code'] = $totHadir > 0 ? 'H' : ($cA > 0 ? 'A' : ($cI > 0 ? 'I' : '-'));
+                }
+            }
+
+            $grandTotalH += $siswaRow['total_h'];
+            $grandTotalT += $siswaRow['total_t'];
+            $grandTotalI += $siswaRow['total_i'];
+            $grandTotalA += $siswaRow['total_a'];
+
+            $rows[] = $siswaRow;
         }
+
+        $stats = [
+            'total_target' => $filteredSantris->count(),
+            'hadir'        => $grandTotalH,
+            'terlambat'    => $grandTotalT,
+            'izin_sakit'   => $grandTotalI,
+            'alfa'         => $grandTotalA,
+        ];
 
         $namaBulanList = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
             5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
             9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
         ];
-        $namaBulan = $namaBulanList[$bulan] ?? '';
 
         return [
-            'kategori'              => $kategori,
-            'sesiId'                => $sesiId,
-            'selectedSesi'          => $selectedSesi,
-            'allSesiPondok'         => $allSesiPondok,
-            'sesiList'              => $sesiList,
-            'kamarList'             => $kamarList,
-            'kelasPengajianList'    => $kelasPengajianList,
-            'filterKamar'           => $filterKamar,
-            'filterKelasPengajianId'=> $filterKelasPengajianId,
-            'filterGender'          => $filterGender,
-            'filterStatus'          => $filterStatus,
-            'search'                => $search,
-            'mode'                  => $mode,
-            'tanggal'               => $tanggal,
-            'tanggalCarbon'         => $tanggalCarbon,
-            'bulan'                 => $bulan,
-            'tahun'                 => $tahun,
-            'namaBulan'             => $namaBulan,
-            'namaBulanList'         => $namaBulanList,
-            'daysInMonth'           => $daysInMonth,
-            'stats'                 => $stats,
-            'dailyRows'             => $dailyRows,
-            'matriksRows'           => $matriksRows,
+            'rentang'          => $rentang,
+            'mode'             => $rentang, // alias kompatibilitas
+            'tanggal'          => $tanggal,
+            'tanggalCarbon'    => $tanggalCarbon,
+            'startDate'        => $startDate,
+            'endDate'          => $endDate,
+            'bulan'            => $bulan,
+            'tahun'            => $tahun,
+            'namaBulan'        => $namaBulanList[$bulan] ?? '',
+            'namaBulanList'    => $namaBulanList,
+            'filterSesiSholat' => $filterSesiSholat,
+            'filterKamar'      => $filterKamar,
+            'filterJenjang'    => $filterJenjang,
+            'search'           => $search,
+            'kamarList'        => $kamarList,
+            'sholatSlots'      => self::SHOLAT_SLOTS,
+            'stats'            => $stats,
+            'rows'             => $rows,
+            // Kompatibilitas untuk view lama jika masih ada referensi
+            'dailyRows'        => $rows,
+            'matriksRows'      => $rows,
+            'daysInMonth'      => $startDate->daysInMonth,
+            'selectedSesi'     => null,
+            'kategori'         => 'sholat',
         ];
     }
 
     /**
-     * Evaluasi status kehadiran 1 santri pada 1 tanggal.
+     * Deteksi slot sholat (subuh, dzuhur, ashar, maghrib, isya) dari MasterSesi atau waktu tap.
      */
-    private function evaluateSantriStatusOnDate(
-        Siswa $siswa,
-        string $dateStr,
-        ?Presensi $tap,
-        ?MasterSesi $selectedSesi,
-        Collection $sakits,
-        Collection $sambangs,
-        array $deviceMap
-    ): array {
-        $genderNorm = self::normalizeGender($siswa);
-        $nisn = $siswa->pendaftaran?->nisn ?: ($siswa->nisn ?: '-');
-        $kamar = $siswa->kamar ?: '-';
-        $kelasPengajian = $siswa->kelasPengajian?->nama_kelas ?: 'Belum Diplot';
+    public static function detectSlotSholat(?MasterSesi $sesi, ?Carbon $waktuTap = null): ?string
+    {
+        if ($sesi) {
+            $kode = strtolower((string) $sesi->kode_sesi);
+            $nama = strtolower((string) $sesi->nama_sesi);
 
-        if ($tap) {
-            $sesiObj = $tap->sesi ?? $selectedSesi;
-            $isLate = ($tap->status_kehadiran === 'terlambat');
+            if (str_contains($kode, 'subuh') || str_contains($nama, 'subuh')) return 'subuh';
+            if (str_contains($kode, 'dzuhur') || str_contains($nama, 'dzuhur') || str_contains($kode, 'zuhur') || str_contains($nama, 'zuhur')) return 'dzuhur';
+            if (str_contains($kode, 'ashar') || str_contains($nama, 'ashar') || str_contains($kode, 'asar') || str_contains($nama, 'asar')) return 'ashar';
+            if (str_contains($kode, 'maghrib') || str_contains($nama, 'maghrib')) return 'maghrib';
+            if (str_contains($kode, 'isya') || str_contains($nama, 'isya')) return 'isya';
 
-            if (!$isLate && $sesiObj && !empty($sesiObj->jam_mulai)) {
-                try {
-                    $jamMulaiDt = Carbon::parse($dateStr . ' ' . $sesiObj->jam_mulai);
-                    $batasToleransiDt = (clone $jamMulaiDt)->addMinutes((int) ($sesiObj->toleransi_menit ?? 0));
-                    if ($tap->waktu_tap && $tap->waktu_tap->gt($batasToleransiDt)) {
-                        $isLate = true;
-                    }
-                } catch (\Throwable $e) {
-                    // Abaikan jika format jam tidak standar
-                }
+            if (!empty($sesi->jam_mulai)) {
+                $jam = substr((string) $sesi->jam_mulai, 0, 5);
+                if ($jam >= '03:00' && $jam <= '06:30') return 'subuh';
+                if ($jam >= '11:00' && $jam <= '13:30') return 'dzuhur';
+                if ($jam >= '14:30' && $jam <= '16:59') return 'ashar';
+                if ($jam >= '17:00' && $jam <= '18:44') return 'maghrib';
+                if ($jam >= '18:45' && $jam <= '22:00') return 'isya';
             }
-
-            $status = $isLate ? 'terlambat' : 'hadir';
-            $statusLabel = $isLate ? 'Terlambat' : 'Hadir';
-            $matrixCode = $isLate ? 'T' : 'H';
-
-            $devId = (string) ($tap->device_id ?? '');
-            $lokasi = $deviceMap[$devId] ?? ($tap->device?->nama_lokasi ?? '');
-            $deviceLabel = $devId ? ($lokasi ? "{$devId} ({$lokasi})" : $devId) : '-';
-
-            return [
-                'siswa_id'        => $siswa->id,
-                'nisn'            => $nisn,
-                'nama_lengkap'    => $siswa->nama_lengkap,
-                'gender_code'     => $genderNorm ?: '-',
-                'gender_label'    => $genderNorm === 'P' ? 'Putri (P)' : ($genderNorm === 'L' ? 'Putra (L)' : '-'),
-                'kamar'           => $kamar,
-                'kelas_pengajian' => $kelasPengajian,
-                'sesi_nama'       => $sesiObj?->nama_sesi ?? '-',
-                'jam_tap'         => $tap->waktu_tap ? $tap->waktu_tap->format('H:i:s') : null,
-                'device_id'       => $devId ?: null,
-                'device_label'    => $deviceLabel,
-                'status'          => $status,
-                'status_label'    => $statusLabel,
-                'matrix_code'     => $matrixCode,
-                'keterangan'      => $isLate ? 'Melewati batas toleransi' : 'Tepat waktu',
-            ];
         }
 
-        // Cek apakah santri memiliki izin / sakit yang valid pada tanggal tersebut
-        $izinInfo = $this->findSantriIzinOnDate($siswa, $dateStr, $sakits, $sambangs);
-        if ($izinInfo !== null) {
-            return [
-                'siswa_id'        => $siswa->id,
-                'nisn'            => $nisn,
-                'nama_lengkap'    => $siswa->nama_lengkap,
-                'gender_code'     => $genderNorm ?: '-',
-                'gender_label'    => $genderNorm === 'P' ? 'Putri (P)' : ($genderNorm === 'L' ? 'Putra (L)' : '-'),
-                'kamar'           => $kamar,
-                'kelas_pengajian' => $kelasPengajian,
-                'sesi_nama'       => $selectedSesi?->nama_sesi ?? 'Semua Sesi',
-                'jam_tap'         => null,
-                'device_id'       => null,
-                'device_label'    => '-',
-                'status'          => $izinInfo['status'],      // 'izin' atau 'sakit'
-                'status_label'    => $izinInfo['status_label'],// 'Izin' atau 'Sakit'
-                'matrix_code'     => $izinInfo['matrix_code'], // 'I' atau 'S'
-                'keterangan'      => $izinInfo['keterangan'],
-            ];
+        if ($waktuTap) {
+            $jam = $waktuTap->format('H:i');
+            if ($jam >= '03:30' && $jam <= '06:30') return 'subuh';
+            if ($jam >= '11:00' && $jam <= '13:30') return 'dzuhur';
+            if ($jam >= '14:30' && $jam <= '16:59') return 'ashar';
+            if ($jam >= '17:00' && $jam <= '18:44') return 'maghrib';
+            if ($jam >= '18:45' && $jam <= '21:30') return 'isya';
         }
 
-        // Tidak tap dan tidak memiliki surat izin/sakit -> Alfa
-        return [
-            'siswa_id'        => $siswa->id,
-            'nisn'            => $nisn,
-            'nama_lengkap'    => $siswa->nama_lengkap,
-            'gender_code'     => $genderNorm ?: '-',
-            'gender_label'    => $genderNorm === 'P' ? 'Putri (P)' : ($genderNorm === 'L' ? 'Putra (L)' : '-'),
-            'kamar'           => $kamar,
-            'kelas_pengajian' => $kelasPengajian,
-            'sesi_nama'       => $selectedSesi?->nama_sesi ?? 'Semua Sesi',
-            'jam_tap'         => null,
-            'device_id'       => null,
-            'device_label'    => '-',
-            'status'          => 'alfa',
-            'status_label'    => 'Alfa',
-            'matrix_code'     => 'A',
-            'keterangan'      => 'Tidak hadir / belum tap kartu',
-        ];
+        return null;
     }
 
     /**
-     * Cek data PerizinanSakit & PerizinanSambang santri pada tanggal tertentu.
+     * Cek data perizinan santri pada tanggal tertentu.
      */
-    private function findSantriIzinOnDate(
-        Siswa $siswa,
-        string $dateStr,
-        Collection $sakits,
-        Collection $sambangs
-    ): ?array {
+    private function findSantriIzin(Siswa $siswa, string $dateStr, Collection $sakits, Collection $sambangs): ?array
+    {
         // 1. Cek Perizinan Sakit
         $sakitMatch = $sakits->first(function (PerizinanSakit $sk) use ($siswa, $dateStr) {
-            $sameSiswa = ($sk->siswa_id && (int) $sk->siswa_id === (int) $siswa->id)
+            $same = ($sk->siswa_id && (int) $sk->siswa_id === (int) $siswa->id)
                 || (!$sk->siswa_id && mb_strtolower(trim((string) $sk->nama)) === mb_strtolower(trim((string) $siswa->nama_lengkap)));
-            if (!$sameSiswa || !$sk->tanggal_sakit) {
-                return false;
-            }
-            $tglSakit = $sk->tanggal_sakit->toDateString();
-            if ($tglSakit === $dateStr) {
-                return true;
-            }
-            return $tglSakit <= $dateStr && $sk->status === 'sakit';
+            if (!$same || !$sk->tanggal_sakit) return false;
+            $tgl = $sk->tanggal_sakit->toDateString();
+            return $tgl === $dateStr || ($tgl <= $dateStr && $sk->status === 'sakit');
         });
 
         if ($sakitMatch) {
             return [
-                'status'       => 'sakit',
-                'status_label' => 'Sakit',
-                'matrix_code'  => 'S',
-                'keterangan'   => 'Sakit: ' . ($sakitMatch->sakit ?: ($sakitMatch->keterangan ?: 'Rawat/Istirahat')),
+                'status' => 'sakit',
+                'label'  => 'Sakit: ' . ($sakitMatch->sakit ?: 'Rawat/Istirahat'),
             ];
         }
 
         // 2. Cek Perizinan Sambang / Pulang
         $sambangMatch = $sambangs->first(function (PerizinanSambang $sb) use ($siswa, $dateStr) {
-            $sameSiswa = ($sb->siswa_id && (int) $sb->siswa_id === (int) $siswa->id)
+            $same = ($sb->siswa_id && (int) $sb->siswa_id === (int) $siswa->id)
                 || (!$sb->siswa_id && mb_strtolower(trim((string) $sb->nama)) === mb_strtolower(trim((string) $siswa->nama_lengkap)));
-            if (!$sameSiswa || !$sb->tanggal_mulai || !$sb->tanggal_kembali) {
-                return false;
-            }
+            if (!$same || !$sb->tanggal_mulai || !$sb->tanggal_kembali) return false;
             $mulai = $sb->tanggal_mulai->toDateString();
             $kembali = $sb->tanggal_kembali->toDateString();
             return $dateStr >= $mulai && $dateStr <= $kembali;
@@ -692,210 +583,11 @@ class RekapPondokController extends Controller
 
         if ($sambangMatch) {
             return [
-                'status'       => 'izin',
-                'status_label' => 'Izin',
-                'matrix_code'  => 'I',
-                'keterangan'   => 'Izin: ' . ($sambangMatch->keterangan ?: 'Sambang / Pulang'),
+                'status' => 'izin',
+                'label'  => 'Izin: ' . ($sambangMatch->keterangan ?: 'Sambang / Pulang'),
             ];
         }
 
         return null;
     }
-
-    /**
-     * Memeriksa apakah seorang santri termasuk sasaran wajib hadir pada sebuah MasterSesi.
-     */
-    public static function matchesSesiTarget(Siswa $siswa, MasterSesi $sesi): bool
-    {
-        $allocations = $sesi->relationLoaded('allocations') ? $sesi->allocations : $sesi->allocations()->get();
-
-        if ($allocations->isNotEmpty()) {
-            foreach ($allocations as $alloc) {
-                if (self::matchesSingleAllocation(
-                    $siswa,
-                    (string) ($alloc->target_kategori ?? 'semua'),
-                    (string) ($alloc->target_filter ?? ''),
-                    (string) ($alloc->target_gender ?? 'ALL')
-                )) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        // Fallback ke kolom legacy pada master_sesis
-        return self::matchesSingleAllocation(
-            $siswa,
-            (string) ($sesi->target_kategori ?? 'semua_santri'),
-            (string) ($sesi->target_filter ?? ''),
-            'ALL'
-        );
-    }
-
-    /**
-     * Pencocokan santri terhadap 1 baris aturan alokasi target.
-     */
-    private static function matchesSingleAllocation(
-        Siswa $siswa,
-        string $targetKategori,
-        string $targetFilter,
-        string $targetGender = 'ALL'
-    ): bool {
-        $kat = strtolower(trim($targetKategori));
-        $filter = trim($targetFilter);
-        $genderReq = strtoupper(trim($targetGender));
-
-        // 1. Cek Gender Alokasi
-        if (in_array($genderReq, ['L', 'P'], true)) {
-            if (self::normalizeGender($siswa) !== $genderReq) {
-                return false;
-            }
-        }
-
-        // Cek juga apabila ada tag [Gender: Putra] / [Gender: Putri] di dalam string filter
-        if (stripos($filter, '[gender: putra]') !== false && self::normalizeGender($siswa) !== 'L') {
-            return false;
-        }
-        if (stripos($filter, '[gender: putri]') !== false && self::normalizeGender($siswa) !== 'P') {
-            return false;
-        }
-
-        $cleanFilter = trim((string) preg_replace('/\[gender:\s*(putra|putri)\]/i', '', $filter));
-
-        // 2. Cek Kategori Target
-        if (in_array($kat, ['', 'semua', 'semua_santri', 'gender', 'all'], true)) {
-            return true;
-        }
-
-        if (in_array($kat, ['kamar', 'kamar_khusus'], true)) {
-            if ($cleanFilter === '' || in_array(strtolower($cleanFilter), ['semua', 'all', 'semua_santri'], true)) {
-                return true;
-            }
-            return self::matchesKamarFilter((string) $siswa->kamar, $cleanFilter);
-        }
-
-        if (in_array($kat, ['kelas_pengajian', 'pengajian'], true)) {
-            if ($cleanFilter === '' || in_array(strtolower($cleanFilter), ['semua', 'all'], true)) {
-                return true;
-            }
-            return self::matchesKelasPengajianFilter($siswa, $cleanFilter);
-        }
-
-        if (in_array($kat, ['kelas_sekolah', 'sekolah', 'jenjang'], true)) {
-            if ($cleanFilter === '' || in_array(strtolower($cleanFilter), ['semua', 'all'], true)) {
-                return true;
-            }
-            return self::matchesSekolahFilter($siswa, $cleanFilter);
-        }
-
-        return true;
-    }
-
-    /**
-     * Pencocokan kamar santri terhadap filter kamar (bisa multi-kamar dipisah koma).
-     */
-    public static function matchesKamarFilter(string $santriKamar, string $filterKamar): bool
-    {
-        $normSantri = self::normalizeRoomName($santriKamar);
-        if ($normSantri === '') {
-            return false;
-        }
-
-        $targets = array_filter(array_map('trim', explode(',', $filterKamar)));
-        foreach ($targets as $t) {
-            $normTarget = self::normalizeRoomName($t);
-            if ($normTarget === '') {
-                continue;
-            }
-            if ($normSantri === $normTarget || str_contains($normSantri, $normTarget) || str_contains($normTarget, $normSantri)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static function normalizeRoomName(string $name): string
-    {
-        $clean = mb_strtolower(trim($name));
-        if (str_starts_with($clean, 'kamar ')) {
-            $clean = trim(mb_substr($clean, 6));
-        }
-        return preg_replace('/\s+/', ' ', $clean);
-    }
-
-    /**
-     * Pencocokan kelas pengajian santri terhadap filter (nama_kelas, kode_kelas, atau ID).
-     */
-    public static function matchesKelasPengajianFilter(Siswa $siswa, string $filterKelas): bool
-    {
-        $namaKelas = mb_strtolower(trim((string) ($siswa->kelasPengajian?->nama_kelas ?? '')));
-        $kodeKelas = mb_strtolower(trim((string) ($siswa->kelasPengajian?->kode_kelas ?? '')));
-        $idKelas = (string) ($siswa->kelas_pengajian_id ?? '');
-
-        if ($namaKelas === '' && $kodeKelas === '' && $idKelas === '') {
-            return false;
-        }
-
-        $targets = array_filter(array_map('trim', explode(',', $filterKelas)));
-        foreach ($targets as $t) {
-            $tLower = mb_strtolower($t);
-            if ($tLower === '') {
-                continue;
-            }
-            if (
-                $tLower === $idKelas ||
-                ($namaKelas !== '' && ($namaKelas === $tLower || str_contains($namaKelas, $tLower) || str_contains($tLower, $namaKelas))) ||
-                ($kodeKelas !== '' && ($kodeKelas === $tLower || str_contains($kodeKelas, $tLower)))
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Pencocokan jenjang/kelas sekolah santri terhadap filter (misal SMP, SMA).
-     */
-    public static function matchesSekolahFilter(Siswa $siswa, string $filterSekolah): bool
-    {
-        $jenjang = mb_strtolower(trim((string) ($siswa->jenjang ?: ($siswa->pendaftaran?->jenjang ?? ''))));
-        $kelas = mb_strtolower(trim((string) ($siswa->kelas ?? '')));
-
-        $targets = array_filter(array_map('trim', explode(',', $filterSekolah)));
-        foreach ($targets as $t) {
-            $tLower = mb_strtolower($t);
-            if ($tLower === '') {
-                continue;
-            }
-            if (
-                ($jenjang !== '' && ($jenjang === $tLower || str_contains($jenjang, $tLower) || str_contains($tLower, $jenjang))) ||
-                ($kelas !== '' && ($kelas === $tLower || str_contains($kelas, $tLower)))
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Normalisasi jenis kelamin santri menjadi 'L' atau 'P'.
-     */
-    public static function normalizeGender(Siswa $siswa): string
-    {
-        $raw = trim((string) ($siswa->jenis_kelamin ?? ''));
-        $upper = mb_strtoupper($raw);
-
-        if (in_array($upper, ['L', 'LAKI-LAKI', 'LAKI - LAKI', 'PUTRA', 'IKHWAN', 'MALE', 'BANIN'], true)) {
-            return 'L';
-        }
-        if (in_array($upper, ['P', 'PEREMPUAN', 'PUTRI', 'AKHWAT', 'FEMALE', 'BANAT'], true)) {
-            return 'P';
-        }
-
-        return '';
-    }
 }
-

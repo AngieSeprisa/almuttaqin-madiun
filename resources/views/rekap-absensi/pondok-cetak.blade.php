@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cetak Rekap Presensi Pondok — Yayasan Pondok Pesantren Al-Muttaqin</title>
+    <title>Cetak Rekap Presensi Sholat — Yayasan Pondok Pesantren Al-Muttaqin</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -78,9 +78,15 @@
 <body>
     <div class="print-toolbar">
         <div>
-            <strong>Pratinjau Cetak / PDF Rekap Presensi Pondok</strong>
+            <strong>Pratinjau Cetak / PDF Rekap Presensi Sholat</strong>
             <span style="color:#64748b;margin-left:8px;">
-                ({{ $mode === 'bulanan' ? 'Matriks Bulanan ' . $namaBulan . ' ' . $tahun : 'Rekap Harian ' . $tanggal }})
+                @if($rentang === 'harian')
+                    (Harian &mdash; {{ $tanggalCarbon->translatedFormat('d F Y') }})
+                @elseif($rentang === 'mingguan')
+                    (Mingguan &mdash; {{ $startDate->translatedFormat('d M') }} s/d {{ $endDate->translatedFormat('d M Y') }})
+                @else
+                    (Bulanan &mdash; {{ $namaBulan }} {{ $tahun }})
+                @endif
             </span>
         </div>
         <button type="button" class="btn-print" onclick="window.print()">Cetak / Simpan PDF</button>
@@ -89,101 +95,70 @@
     <div class="kop">
         <h2>Yayasan Pondok Pesantren Al-Muttaqin</h2>
         <p>
-            Laporan Rekapitulasi Presensi Pondok (Sholat &amp; Pengajian) &mdash;
-            @if($mode === 'bulanan')
-                Periode Bulan {{ $namaBulan }} {{ $tahun }}
-            @else
+            Laporan Rekapitulasi Presensi Sholat Santri &mdash;
+            @if($rentang === 'harian')
                 Tanggal {{ $tanggalCarbon->translatedFormat('d F Y') }}
+            @elseif($rentang === 'mingguan')
+                Periode {{ $startDate->translatedFormat('d M Y') }} s/d {{ $endDate->translatedFormat('d M Y') }}
+            @else
+                Periode Bulan {{ $namaBulan }} {{ $tahun }}
             @endif
         </p>
     </div>
 
     <div class="summary-row">
-        <div class="summary-box"><strong>Sesi:</strong> {{ $selectedSesi ? $selectedSesi->nama_sesi : ucfirst($kategori) }}</div>
-        <div class="summary-box"><strong>Total Target Santri:</strong> {{ $stats['total_target'] }}</div>
-        <div class="summary-box"><strong>Hadir Tepat Waktu:</strong> {{ $stats['hadir'] }}</div>
-        <div class="summary-box"><strong>Terlambat:</strong> {{ $stats['terlambat'] }}</div>
-        <div class="summary-box"><strong>Izin / Sakit:</strong> {{ $stats['izin_sakit'] }}</div>
-        <div class="summary-box"><strong>Tidak Hadir / Alfa:</strong> {{ $stats['alfa'] }}</div>
+        <div class="summary-box"><strong>Total Santri:</strong> {{ $stats['total_target'] }}</div>
+        <div class="summary-box"><strong>Hadir Tepat (H):</strong> {{ $stats['hadir'] }}</div>
+        <div class="summary-box"><strong>Terlambat (T):</strong> {{ $stats['terlambat'] }}</div>
+        <div class="summary-box"><strong>Izin / Sakit (I):</strong> {{ $stats['izin_sakit'] }}</div>
+        <div class="summary-box"><strong>Alpha (A):</strong> {{ $stats['alfa'] }}</div>
     </div>
 
-    @if($mode === 'bulanan')
-        <table>
-            <thead>
+    <table>
+        <thead>
+            <tr>
+                <th rowspan="2" style="width:32px; text-align:center;">No</th>
+                <th rowspan="2">NISN</th>
+                <th rowspan="2">Nama Santri</th>
+                <th rowspan="2">Kamar / Jenjang</th>
+                <th colspan="5" style="text-align:center;">Waktu Sholat</th>
+                <th colspan="4" style="text-align:center;">Rekapan</th>
+            </tr>
+            <tr>
+                <th style="text-align:center;width:60px;">Subuh</th>
+                <th style="text-align:center;width:60px;">Dzuhur</th>
+                <th style="text-align:center;width:60px;">Ashar</th>
+                <th style="text-align:center;width:60px;">Maghrib</th>
+                <th style="text-align:center;width:60px;">Isya</th>
+                <th style="text-align:center;width:35px;">H</th>
+                <th style="text-align:center;width:35px;">T</th>
+                <th style="text-align:center;width:35px;">I</th>
+                <th style="text-align:center;width:35px;">A</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse($rows as $idx => $r)
                 <tr>
-                    <th style="text-align:center;width:28px;">No</th>
-                    <th>NISN</th>
-                    <th>Nama Santri</th>
-                    <th style="text-align:center;">L/P</th>
-                    <th>Kamar / Kelas</th>
-                    @for($d = 1; $d <= $daysInMonth; $d++)
-                        <th style="text-align:center;padding:3px 2px;">{{ $d }}</th>
-                    @endfor
-                    <th style="text-align:center;">H</th>
-                    <th style="text-align:center;">T</th>
-                    <th style="text-align:center;">I/S</th>
-                    <th style="text-align:center;">A</th>
-                    <th style="text-align:center;">%</th>
+                    <td style="text-align:center;">{{ $idx + 1 }}</td>
+                    <td>{{ $r['nisn'] }}</td>
+                    <td><strong>{{ $r['nama_lengkap'] }}</strong></td>
+                    <td>{{ $r['kamar'] }} / {{ $r['jenjang'] }}</td>
+                    <td style="text-align:center;">{{ $r['sholat']['subuh']['display'] ?? '-' }}</td>
+                    <td style="text-align:center;">{{ $r['sholat']['dzuhur']['display'] ?? '-' }}</td>
+                    <td style="text-align:center;">{{ $r['sholat']['ashar']['display'] ?? '-' }}</td>
+                    <td style="text-align:center;">{{ $r['sholat']['maghrib']['display'] ?? '-' }}</td>
+                    <td style="text-align:center;">{{ $r['sholat']['isya']['display'] ?? '-' }}</td>
+                    <td style="text-align:center;font-weight:700;">{{ $r['total_h'] }}</td>
+                    <td style="text-align:center;font-weight:700;">{{ $r['total_t'] }}</td>
+                    <td style="text-align:center;font-weight:700;">{{ $r['total_i'] }}</td>
+                    <td style="text-align:center;font-weight:700;">{{ $r['total_a'] }}</td>
                 </tr>
-            </thead>
-            <tbody>
-                @forelse($matriksRows as $idx => $mRow)
-                    <tr>
-                        <td style="text-align:center;">{{ $idx + 1 }}</td>
-                        <td>{{ $mRow['nisn'] }}</td>
-                        <td>{{ $mRow['nama_lengkap'] }}</td>
-                        <td style="text-align:center;">{{ $mRow['gender_code'] }}</td>
-                        <td>{{ $mRow['kamar'] }} / {{ $mRow['kelas_pengajian'] }}</td>
-                        @for($d = 1; $d <= $daysInMonth; $d++)
-                            <td style="text-align:center;padding:3px 2px;">{{ $mRow['days'][$d]['code'] ?? '-' }}</td>
-                        @endfor
-                        <td style="text-align:center;font-weight:700;">{{ $mRow['total_h'] }}</td>
-                        <td style="text-align:center;font-weight:700;">{{ $mRow['total_t'] }}</td>
-                        <td style="text-align:center;font-weight:700;">{{ $mRow['total_is'] }}</td>
-                        <td style="text-align:center;font-weight:700;">{{ $mRow['total_a'] }}</td>
-                        <td style="text-align:center;font-weight:700;">{{ $mRow['persentase'] }}%</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="{{ $daysInMonth + 10 }}" style="text-align:center;padding:18px;">Tidak ada data santri.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    @else
-        <table>
-            <thead>
+            @empty
                 <tr>
-                    <th style="width:32px;text-align:center;">No</th>
-                    <th>NISN</th>
-                    <th>Nama Santri</th>
-                    <th style="text-align:center;">Gender</th>
-                    <th>Kamar / Kelas Pengajian</th>
-                    <th style="text-align:center;">Jam Tap</th>
-                    <th>Titik Mesin ESP32</th>
-                    <th style="text-align:center;">Status</th>
+                    <td colspan="13" style="text-align:center;padding:18px;">Tidak ada data santri.</td>
                 </tr>
-            </thead>
-            <tbody>
-                @forelse($dailyRows as $idx => $row)
-                    <tr>
-                        <td style="text-align:center;">{{ $idx + 1 }}</td>
-                        <td>{{ $row['nisn'] }}</td>
-                        <td>{{ $row['nama_lengkap'] }}</td>
-                        <td style="text-align:center;">{{ $row['gender_label'] }}</td>
-                        <td>{{ $row['kamar'] }} / {{ $row['kelas_pengajian'] }}</td>
-                        <td style="text-align:center;">{{ $row['jam_tap'] ?: '-' }}</td>
-                        <td>{{ $row['device_label'] }}</td>
-                        <td style="text-align:center;font-weight:700;">{{ $row['status_label'] }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="8" style="text-align:center;padding:18px;">Tidak ada data santri.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    @endif
+            @endforelse
+        </tbody>
+    </table>
 </body>
 </html>
-

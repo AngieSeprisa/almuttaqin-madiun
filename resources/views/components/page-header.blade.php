@@ -33,10 +33,10 @@
                 $bcParent = 'Sekolah';
                 $bcParentRoute = route('sekolah.rekap-jurnal');
                 $bcChild = 'Rekap Jurnal';
-            } elseif (request()->routeIs('rekap.pondok.*')) {
+            } elseif (request()->routeIs('rekap.sholat.*') || request()->routeIs('rekap.pondok.*')) {
                 $bcParent = 'Rekap';
-                $bcParentRoute = route('rekap.pondok.index');
-                $bcChild = 'Pondok';
+                $bcParentRoute = route('rekap.sholat.index');
+                $bcChild = 'Sholat';
             } elseif (request()->routeIs('sekolah.rekap-absensi*') || request()->routeIs('rekap-absensi.sekolah*')) {
                 $bcParent = 'Rekap';
                 $bcParentRoute = route('rekap-absensi.sekolah');

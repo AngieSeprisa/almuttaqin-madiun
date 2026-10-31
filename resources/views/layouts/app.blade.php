@@ -230,10 +230,10 @@
                 </a>
                 @endif
 
-                {{-- Menu Rekap dengan Submenu Pondok, Sekolah & Guru --}}
+                {{-- Menu Rekap dengan Submenu Sholat, Sekolah & Guru --}}
                 @if(!$authUser || $authUser->canDo('rekap_absensi', 'view') || $authUser->canDo('rekap_pondok', 'view') || $authUser->canDo('sekolah', 'view'))
-                <div class="nav-group {{ request()->routeIs('rekap-absensi.*') || request()->routeIs('rekap.pondok.*') || request()->routeIs('sekolah.rekap-absensi*') ? 'open' : '' }}" id="navGroupRekapAbsensi">
-                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('rekap-absensi.*') || request()->routeIs('rekap.pondok.*') || request()->routeIs('sekolah.rekap-absensi*') ? 'active' : '' }}" id="toggleRekapAbsensi" title="Rekap">
+                <div class="nav-group {{ request()->routeIs('rekap-absensi.*') || request()->routeIs('rekap.sholat.*') || request()->routeIs('rekap.pondok.*') || request()->routeIs('sekolah.rekap-absensi*') ? 'open' : '' }}" id="navGroupRekapAbsensi">
+                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('rekap-absensi.*') || request()->routeIs('rekap.sholat.*') || request()->routeIs('rekap.pondok.*') || request()->routeIs('sekolah.rekap-absensi*') ? 'active' : '' }}" id="toggleRekapAbsensi" title="Rekap">
                         <span class="nav-item-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -252,9 +252,9 @@
                     </button>
                     <div class="sidebar-subnav">
                         @if(!$authUser || $authUser->canDo('rekap_absensi', 'view') || $authUser->canDo('rekap_pondok', 'view') || $authUser->canDo('pengaturan_pondok', 'view'))
-                        <a href="{{ route('rekap.pondok.index') }}" class="subnav-item {{ request()->routeIs('rekap.pondok.*') ? 'active' : '' }}" title="Rekap Presensi Pondok">
+                        <a href="{{ route('rekap.sholat.index') }}" class="subnav-item {{ request()->routeIs('rekap.sholat.*') || request()->routeIs('rekap.pondok.*') ? 'active' : '' }}" title="Rekap Presensi Sholat">
                             <span class="subnav-dot"></span>
-                            <span class="subnav-text">Pondok</span>
+                            <span class="subnav-text">Sholat</span>
                         </a>
                         @endif
 
