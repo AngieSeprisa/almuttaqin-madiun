@@ -49,6 +49,10 @@ class PengaturanSesiTest extends TestCase
         $createResponse->assertStatus(200);
         $createResponse->assertSee('Semua Perangkat / Global (Belum ada alat terdaftar)');
         $createResponse->assertSee('Tambah Sesi Presensi Baru');
+        $createResponse->assertSee('Pengaturan Sesi');
+        $createResponse->assertSee('Tambah Sesi');
+        $createResponse->assertSee('Kembali ke Daftar Sesi');
+        $createResponse->assertSee('btn btn-secondary');
         $createResponse->assertSee('Informasi Dasar &amp; Rentang Waktu', false);
         $createResponse->assertSee('Alokasi Perangkat Mesin ESP32', false);
         $createResponse->assertSee('Target Peserta &amp; Hak Akses Presensi', false);

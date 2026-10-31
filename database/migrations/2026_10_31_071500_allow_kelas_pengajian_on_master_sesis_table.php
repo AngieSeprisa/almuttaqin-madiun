@@ -26,3 +26,4 @@ return new class extends Migration
         // Tetap string atau tidak perlu revert
     }
 };
+

@@ -36,8 +36,8 @@
 @section('title', $title)
 
 @section('header-actions')
-<a href="{{ route('pengaturan.sesi') }}" class="pk-btn-secondary" title="Kembali ke Daftar Sesi & Perangkat">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="pk-btn-icon">
+<a href="{{ route('pengaturan.sesi') }}" class="btn btn-secondary" title="Kembali ke Daftar Sesi & Perangkat">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;">
         <line x1="19" y1="12" x2="5" y2="12"></line>
         <polyline points="12 19 5 12 12 5"></polyline>
     </svg>
@@ -501,6 +501,47 @@
 /* ================================================================
    PAGE STYLES: DEDICATED FULL-PAGE FORM PENGATURAN SESI (FILAMENT 3.x)
    ================================================================ */
+/* Header Action Button: Kembali ke Daftar Sesi */
+.page-header-actions .btn-secondary,
+a.btn.btn-secondary {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
+    background: #FFFFFF !important;
+    color: var(--text-primary, #1E293B) !important;
+    border: 1px solid var(--border-light, #E2E8F0) !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+
+.page-header-actions .btn-secondary:hover,
+a.btn.btn-secondary:hover {
+    background: var(--bg-page, #F8FAFC) !important;
+    border-color: var(--border-medium, #CBD5E1) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.08) !important;
+    color: var(--text-primary, #0F172A) !important;
+}
+
+.dark-mode .page-header-actions .btn-secondary,
+.dark-mode a.btn.btn-secondary {
+    background: #1E293B !important;
+    color: #F8FAFC !important;
+    border-color: #334155 !important;
+}
+
+.dark-mode .page-header-actions .btn-secondary:hover,
+.dark-mode a.btn.btn-secondary:hover {
+    background: #334155 !important;
+    border-color: #475569 !important;
+}
+
 .sesi-form-page-container {
     width: 100%;
     max-width: 1080px;
@@ -1002,3 +1043,4 @@ function sesiFormManager(config) {
 }
 </script>
 @endsection
+

@@ -98,10 +98,12 @@
                 $bcChild = $displayTitle ?: 'Halaman';
             }
 
-            $breadcrumbsList = [
-                ['label' => $bcParent, 'url' => $bcParentRoute],
-                ['label' => $bcChild, 'url' => null],
-            ];
+            if (empty($breadcrumbsList)) {
+                $breadcrumbsList = [
+                    ['label' => $bcParent, 'url' => $bcParentRoute],
+                    ['label' => $bcChild, 'url' => null],
+                ];
+            }
         }
     } else {
         $customBreadcrumbHtml = null;
