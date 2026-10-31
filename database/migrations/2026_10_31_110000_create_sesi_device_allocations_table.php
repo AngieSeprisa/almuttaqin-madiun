@@ -82,3 +82,4 @@ return new class extends Migration
         Schema::dropIfExists('sesi_device_allocations');
     }
 };
+

@@ -26,3 +26,4 @@ class SesiDeviceAllocation extends Model
         return $this->belongsTo(MasterDevice::class, 'device_id', 'device_id');
     }
 }
+

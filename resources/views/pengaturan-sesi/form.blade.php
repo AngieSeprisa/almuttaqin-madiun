@@ -77,7 +77,173 @@
 </a>
 @endsection
 
+@push('styles')
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+@endpush
+
 @section('content')
+<script>
+window.sesiMultiDeviceManager = function(config) {
+    return {
+        allocations: Array.isArray(config.initialAllocations) && config.initialAllocations.length > 0
+            ? config.initialAllocations
+            : [{
+                device_id: '',
+                target_kategori: 'semua',
+                target_gender: 'ALL',
+                target_filter: '',
+                selected_kamars: [],
+                selected_kelas: [],
+                selected_sekolah: []
+            }],
+        allKamars: config.allKamars || [],
+        allKelasPengajian: config.allKelasPengajian || [],
+
+        addAllocation() {
+            this.allocations.push({
+                device_id: '',
+                target_kategori: 'semua',
+                target_gender: 'ALL',
+                target_filter: '',
+                selected_kamars: [],
+                selected_kelas: [],
+                selected_sekolah: []
+            });
+        },
+
+        removeAllocation(index) {
+            if (this.allocations.length > 1) {
+                this.allocations.splice(index, 1);
+            }
+        },
+
+        // Helpers Kamar
+        isKamarSelectedInAlloc(alloc, kamar) {
+            return alloc.selected_kamars && alloc.selected_kamars.includes(kamar);
+        },
+        toggleKamarInAlloc(alloc, kamar) {
+            if (!alloc.selected_kamars) alloc.selected_kamars = [];
+            const idx = alloc.selected_kamars.indexOf(kamar);
+            if (idx >= 0) {
+                alloc.selected_kamars.splice(idx, 1);
+            } else {
+                alloc.selected_kamars.push(kamar);
+            }
+        },
+        selectAllKamarsForAlloc(alloc) {
+            alloc.selected_kamars = [...this.allKamars];
+        },
+        clearKamarsForAlloc(alloc) {
+            alloc.selected_kamars = [];
+        },
+
+        // Helpers Kelas Pengajian
+        isKelasSelectedInAlloc(alloc, kls) {
+            return alloc.selected_kelas && alloc.selected_kelas.includes(kls);
+        },
+        toggleKelasInAlloc(alloc, kls) {
+            if (!alloc.selected_kelas) alloc.selected_kelas = [];
+            const idx = alloc.selected_kelas.indexOf(kls);
+            if (idx >= 0) {
+                alloc.selected_kelas.splice(idx, 1);
+            } else {
+                alloc.selected_kelas.push(kls);
+            }
+        },
+        selectAllKelasForAlloc(alloc) {
+            alloc.selected_kelas = [...this.allKelasPengajian];
+        },
+        clearKelasForAlloc(alloc) {
+            alloc.selected_kelas = [];
+        },
+
+        // Helpers Sekolah
+        toggleSekolahInAlloc(alloc, jenjang) {
+            if (!alloc.selected_sekolah) alloc.selected_sekolah = [];
+            const idx = alloc.selected_sekolah.indexOf(jenjang);
+            if (idx >= 0) {
+                alloc.selected_sekolah.splice(idx, 1);
+            } else {
+                alloc.selected_sekolah.push(jenjang);
+            }
+        },
+
+        // Serialisasi data alokasi sebelum kirim form
+        serializeAllocations() {
+            return this.allocations.map(a => {
+                let filterStr = '';
+                if (a.target_kategori === 'kamar') {
+                    filterStr = (a.selected_kamars || []).join(', ');
+                } else if (a.target_kategori === 'kelas_pengajian') {
+                    filterStr = (a.selected_kelas || []).join(', ');
+                } else if (a.target_kategori === 'kelas_sekolah') {
+                    filterStr = (a.selected_sekolah || []).join(', ');
+                } else if (a.target_kategori === 'gender') {
+                    filterStr = a.target_gender === 'L' ? 'Putra' : (a.target_gender === 'P' ? 'Putri' : 'Semua');
+                }
+
+                return {
+                    device_id: a.device_id || null,
+                    target_kategori: a.target_kategori || 'semua',
+                    target_gender: a.target_gender || 'ALL',
+                    target_filter: filterStr
+                };
+            });
+        },
+
+        getLegacyTargetKategori() {
+            const first = this.allocations[0];
+            if (!first) return 'semua_santri';
+            if (first.target_kategori === 'kamar') return 'kamar_khusus';
+            if (first.target_kategori === 'kelas_sekolah') return 'sekolah';
+            if (first.target_kategori === 'kelas_pengajian') return 'kelas_pengajian';
+            if (first.target_kategori === 'pegawai') return 'pegawai';
+            return 'semua_santri';
+        },
+
+        getLegacyTargetFilter() {
+            const first = this.allocations[0];
+            if (!first) return '';
+            if (first.target_kategori === 'kamar') return (first.selected_kamars || []).join(', ');
+            if (first.target_kategori === 'kelas_sekolah') return (first.selected_sekolah || []).join(', ');
+            if (first.target_kategori === 'kelas_pengajian') {
+                const kls = (first.selected_kelas || []).join(', ');
+                if (first.target_gender === 'L') return kls ? `${kls} [Gender: Putra]` : '[Gender: Putra]';
+                if (first.target_gender === 'P') return kls ? `${kls} [Gender: Putri]` : '[Gender: Putri]';
+                return kls;
+            }
+            if (first.target_kategori === 'gender') {
+                return first.target_gender === 'L' ? '[Gender: Putra]' : (first.target_gender === 'P' ? '[Gender: Putri]' : '');
+            }
+            return '';
+        },
+
+        beforeSubmitForm(event) {
+            const jsonVal = JSON.stringify(this.serializeAllocations());
+            const jsonInput = document.getElementById('allocationsJsonInput');
+            if (jsonInput) {
+                jsonInput.value = jsonVal;
+            }
+            const computedVal = this.getLegacyTargetFilter();
+            const filterInput = document.getElementById('computedTargetFilter');
+            if (filterInput) {
+                filterInput.value = computedVal;
+            }
+        }
+    };
+};
+function sesiMultiDeviceManager(config) {
+    return window.sesiMultiDeviceManager(config);
+}
+document.addEventListener('alpine:init', function() {
+    if (window.Alpine) {
+        Alpine.data('sesiMultiDeviceManager', window.sesiMultiDeviceManager);
+    }
+});
+</script>
+
 <div class="sesi-form-page-container" x-data="sesiMultiDeviceManager({
     initialAllocations: @js($initialAllocations),
     allKamars: @js($kamars->values()),
@@ -481,7 +647,7 @@
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                             </svg>
-                            <span style="color: #0052FF;">+ Tambah Titik Mesin ESP32 Lainnya</span>
+                            <span style="color: #0052FF;">Tambah Titik Mesin ESP32 Lainnya</span>
                         </button>
                     </div>
 
@@ -957,155 +1123,19 @@ a.btn.btn-secondary:hover {
 .sesi-btn-submit-icon { width: 17px; height: 17px; }
 </style>
 
+@push('scripts')
 <script>
-function sesiMultiDeviceManager(config) {
-    return {
-        allocations: Array.isArray(config.initialAllocations) && config.initialAllocations.length > 0
-            ? config.initialAllocations
-            : [{
-                device_id: '',
-                target_kategori: 'semua',
-                target_gender: 'ALL',
-                target_filter: '',
-                selected_kamars: [],
-                selected_kelas: [],
-                selected_sekolah: []
-            }],
-        allKamars: config.allKamars || [],
-        allKelasPengajian: config.allKelasPengajian || [],
-
-        addAllocation() {
-            this.allocations.push({
-                device_id: '',
-                target_kategori: 'semua',
-                target_gender: 'ALL',
-                target_filter: '',
-                selected_kamars: [],
-                selected_kelas: [],
-                selected_sekolah: []
-            });
-        },
-
-        removeAllocation(index) {
-            if (this.allocations.length > 1) {
-                this.allocations.splice(index, 1);
-            }
-        },
-
-        // Helpers Kamar
-        isKamarSelectedInAlloc(alloc, kamar) {
-            return alloc.selected_kamars && alloc.selected_kamars.includes(kamar);
-        },
-        toggleKamarInAlloc(alloc, kamar) {
-            if (!alloc.selected_kamars) alloc.selected_kamars = [];
-            const idx = alloc.selected_kamars.indexOf(kamar);
-            if (idx >= 0) {
-                alloc.selected_kamars.splice(idx, 1);
-            } else {
-                alloc.selected_kamars.push(kamar);
-            }
-        },
-        selectAllKamarsForAlloc(alloc) {
-            alloc.selected_kamars = [...this.allKamars];
-        },
-        clearKamarsForAlloc(alloc) {
-            alloc.selected_kamars = [];
-        },
-
-        // Helpers Kelas Pengajian
-        isKelasSelectedInAlloc(alloc, kls) {
-            return alloc.selected_kelas && alloc.selected_kelas.includes(kls);
-        },
-        toggleKelasInAlloc(alloc, kls) {
-            if (!alloc.selected_kelas) alloc.selected_kelas = [];
-            const idx = alloc.selected_kelas.indexOf(kls);
-            if (idx >= 0) {
-                alloc.selected_kelas.splice(idx, 1);
-            } else {
-                alloc.selected_kelas.push(kls);
-            }
-        },
-        selectAllKelasForAlloc(alloc) {
-            alloc.selected_kelas = [...this.allKelasPengajian];
-        },
-        clearKelasForAlloc(alloc) {
-            alloc.selected_kelas = [];
-        },
-
-        // Helpers Sekolah
-        toggleSekolahInAlloc(alloc, jenjang) {
-            if (!alloc.selected_sekolah) alloc.selected_sekolah = [];
-            const idx = alloc.selected_sekolah.indexOf(jenjang);
-            if (idx >= 0) {
-                alloc.selected_sekolah.splice(idx, 1);
-            } else {
-                alloc.selected_sekolah.push(jenjang);
-            }
-        },
-
-        // Serialisasi data alokasi sebelum kirim form
-        serializeAllocations() {
-            return this.allocations.map(a => {
-                let filterStr = '';
-                if (a.target_kategori === 'kamar') {
-                    filterStr = (a.selected_kamars || []).join(', ');
-                } else if (a.target_kategori === 'kelas_pengajian') {
-                    filterStr = (a.selected_kelas || []).join(', ');
-                } else if (a.target_kategori === 'kelas_sekolah') {
-                    filterStr = (a.selected_sekolah || []).join(', ');
-                } else if (a.target_kategori === 'gender') {
-                    filterStr = a.target_gender === 'L' ? 'Putra' : (a.target_gender === 'P' ? 'Putri' : 'Semua');
-                }
-
-                return {
-                    device_id: a.device_id || null,
-                    target_kategori: a.target_kategori || 'semua',
-                    target_gender: a.target_gender || 'ALL',
-                    target_filter: filterStr
-                };
-            });
-        },
-
-        getLegacyTargetKategori() {
-            const first = this.allocations[0];
-            if (!first) return 'semua_santri';
-            if (first.target_kategori === 'kamar') return 'kamar_khusus';
-            if (first.target_kategori === 'kelas_sekolah') return 'sekolah';
-            if (first.target_kategori === 'kelas_pengajian') return 'kelas_pengajian';
-            if (first.target_kategori === 'pegawai') return 'pegawai';
-            return 'semua_santri';
-        },
-
-        getLegacyTargetFilter() {
-            const first = this.allocations[0];
-            if (!first) return '';
-            if (first.target_kategori === 'kamar') return (first.selected_kamars || []).join(', ');
-            if (first.target_kategori === 'kelas_sekolah') return (first.selected_sekolah || []).join(', ');
-            if (first.target_kategori === 'kelas_pengajian') {
-                const kls = (first.selected_kelas || []).join(', ');
-                if (first.target_gender === 'L') return kls ? `${kls} [Gender: Putra]` : '[Gender: Putra]';
-                if (first.target_gender === 'P') return kls ? `${kls} [Gender: Putri]` : '[Gender: Putri]';
-                return kls;
-            }
-            if (first.target_kategori === 'gender') {
-                return first.target_gender === 'L' ? '[Gender: Putra]' : (first.target_gender === 'P' ? '[Gender: Putri]' : '');
-            }
-            return '';
-        },
-
-        beforeSubmitForm(event) {
-            const jsonVal = JSON.stringify(this.serializeAllocations());
-            const jsonInput = document.getElementById('allocationsJsonInput');
-            if (jsonInput) {
-                jsonInput.value = jsonVal;
-            }
-            const computedVal = this.getLegacyTargetFilter();
-            const filterInput = document.getElementById('computedTargetFilter');
-            if (filterInput) {
-                filterInput.value = computedVal;
-            }
-        }
-    };
-}
+    // Fallback in case Alpine is not loaded via layout
+    if (typeof window.Alpine === 'undefined') {
+        var alpineScript = document.createElement('script');
+        alpineScript.src = "{{ asset('js/vendor/alpine.min.js') }}";
+        alpineScript.onerror = function() {
+            var cdn = document.createElement('script');
+            cdn.src = 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js';
+            document.head.appendChild(cdn);
+        };
+        document.head.appendChild(alpineScript);
+    }
 </script>
+@endpush
 @endsection
