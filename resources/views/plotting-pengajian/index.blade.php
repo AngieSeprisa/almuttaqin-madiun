@@ -1084,15 +1084,18 @@
     z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px;
 }
 .pk-modal-dialog { width: 100%; max-width: 720px; max-height: 88vh; display: flex; flex-direction: column; }
-.pk-modal-dialog-sm { max-width: 460px; }
+.pk-modal-dialog-sm { max-width: 480px; }
 .pk-modal-content {
     background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 14px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.18); display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.18); display: flex; flex-direction: column;
 }
+#modalAnggota .pk-modal-content { overflow: hidden; }
+.pk-modal-dialog-sm .pk-modal-content { overflow: visible; }
+.pk-modal-dialog-sm .pk-modal-body { overflow: visible; min-height: 140px; }
 .dark-mode .pk-modal-content { background: #141C28; border-color: #263346; }
 .pk-modal-header {
     display: flex; align-items: center; justify-content: space-between; padding: 16px 20px;
-    border-bottom: 1px solid #F3F4F6;
+    border-bottom: 1px solid #F3F4F6; border-top-left-radius: 14px; border-top-right-radius: 14px;
 }
 .dark-mode .pk-modal-header { border-bottom-color: #1F2937; }
 .pk-modal-title { font-size: 15px; font-weight: 700; color: #111827; margin: 0; }
@@ -1105,7 +1108,7 @@
 .pk-modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
 .pk-modal-footer {
     display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 20px;
-    background: #F9FAFB; border-top: 1px solid #F3F4F6;
+    background: #F9FAFB; border-top: 1px solid #F3F4F6; border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
 }
 .dark-mode .pk-modal-footer { background: #101622; border-top-color: #1F2937; }
 .pk-btn-clean {
@@ -1609,17 +1612,34 @@ function openMutasiBulkBelum() {
 
     document.getElementById('mutasiSiswaId').value = ids;
     document.getElementById('mutasiSiswaNama').textContent = label;
+
+    const sel = document.getElementById('selectKelasTujuan');
+    if (sel) {
+        sel.value = '';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (window.closeAllFiSelects) window.closeAllFiSelects();
+
     document.getElementById('modalMutasi').style.display = 'flex';
 }
 
 function openMutasiSingleModal(siswaId, namaSantri) {
     document.getElementById('mutasiSiswaId').value = siswaId;
     document.getElementById('mutasiSiswaNama').textContent = namaSantri;
+
+    const sel = document.getElementById('selectKelasTujuan');
+    if (sel) {
+        sel.value = '';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (window.closeAllFiSelects) window.closeAllFiSelects();
+
     document.getElementById('modalMutasi').style.display = 'flex';
 }
 
 function closeMutasiModal() {
     document.getElementById('modalMutasi').style.display = 'none';
+    if (window.closeAllFiSelects) window.closeAllFiSelects();
 }
 
 function openTambahKelasModal() {
@@ -1628,6 +1648,7 @@ function openTambahKelasModal() {
 
 function closeTambahKelasModal() {
     document.getElementById('modalTambahKelas').style.display = 'none';
+    if (window.closeAllFiSelects) window.closeAllFiSelects();
 }
 
 function openEditKelasModal(id, nama, kode, jenjang) {
@@ -1636,11 +1657,14 @@ function openEditKelasModal(id, nama, kode, jenjang) {
     document.getElementById('editNamaKelas').value = nama;
     document.getElementById('editKodeKelas').value = kode;
     document.getElementById('editJenjang').value = jenjang;
+    document.getElementById('editJenjang').dispatchEvent(new Event('change', { bubbles: true }));
+    if (window.closeAllFiSelects) window.closeAllFiSelects();
     document.getElementById('modalEditKelas').style.display = 'flex';
 }
 
 function closeEditKelasModal() {
     document.getElementById('modalEditKelas').style.display = 'none';
+    if (window.closeAllFiSelects) window.closeAllFiSelects();
 }
 
 // ==========================================

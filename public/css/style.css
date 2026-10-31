@@ -8038,6 +8038,7 @@ html.dark-mode .fi-select-pill {
 
 /* Popover Dropdown */
 .fi-select-popover {
+  display: none;
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
@@ -8047,10 +8048,20 @@ html.dark-mode .fi-select-pill {
   border: 1px solid var(--border-light, #E2E8F0);
   border-radius: 8px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-  display: flex;
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
+}
+
+.fi-select-wrap.is-open .fi-select-popover {
+  display: flex;
+  animation: fiPopoverIn 0.14s ease-out;
+}
+
+.fi-select-popover.is-dropup {
+  top: auto;
+  bottom: calc(100% + 4px);
+  box-shadow: 0 -10px 25px -5px rgba(0, 0, 0, 0.1), 0 -8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
 html.dark-mode .fi-select-popover {

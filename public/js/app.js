@@ -1695,8 +1695,31 @@ document.addEventListener('DOMContentLoaded', function () {
       wrap.appendChild(trigger);
       wrap.appendChild(popover);
 
-      // Hide native select visually while keeping in form
-      selectEl.style.display = 'none';
+      // Hide native select visually while keeping in form accessible for HTML5 validation
+      selectEl.style.position = 'absolute';
+      selectEl.style.opacity = '0';
+      selectEl.style.width = '1px';
+      selectEl.style.height = '1px';
+      selectEl.style.padding = '0';
+      selectEl.style.margin = '-1px';
+      selectEl.style.overflow = 'hidden';
+      selectEl.style.clip = 'rect(0, 0, 0, 0)';
+      selectEl.style.border = '0';
+      selectEl.style.pointerEvents = 'none';
+      selectEl.tabIndex = -1;
+
+      selectEl.addEventListener('invalid', function (e) {
+        e.preventDefault();
+        openPopover();
+        trigger.focus();
+        trigger.style.borderColor = '#EF4444';
+        trigger.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.18)';
+      });
+      selectEl.addEventListener('change', function () {
+        trigger.style.borderColor = '';
+        trigger.style.boxShadow = '';
+      });
+
       selectEl.parentNode.insertBefore(wrap, selectEl.nextSibling);
 
       // Helper function to render options list
@@ -1810,6 +1833,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
 
+      popover.addEventListener('click', function (e) {
+        e.stopPropagation();
+      });
+
       function openPopover() {
         if (selectEl.disabled) return;
         // Close all other open fi-selects
@@ -1821,6 +1848,16 @@ document.addEventListener('DOMContentLoaded', function () {
         syncFromNative();
         searchInput.value = '';
         filterOptions('');
+
+        // Auto position: check if space below is limited
+        var rect = wrap.getBoundingClientRect();
+        var spaceBelow = window.innerHeight - rect.bottom;
+        if (spaceBelow < 250 && rect.top > 250) {
+          popover.classList.add('is-dropup');
+        } else {
+          popover.classList.remove('is-dropup');
+        }
+
         if (isSearchable) {
           setTimeout(function () { searchInput.focus(); }, 50);
         }
@@ -1920,6 +1957,12 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
   }
+
+  window.closeAllFiSelects = function () {
+    document.querySelectorAll('.fi-select-wrap.is-open').forEach(function (w) {
+      w.classList.remove('is-open');
+    });
+  };
 
   window.initFilamentSelects = initFilamentSelects;
   initFilamentSelects();
