@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Rekap Presensi Pondok (Sholat & Pengajian)')
+@section('title', $pageTitle ?? 'Rekap Presensi Pondok')
 
 @section('content')
 <style>
@@ -702,18 +702,22 @@
     <div class="fi-ta-ctn">
 
         {{-- FILAMENT TABLE FILTERS (ABOVE CONTENT) --}}
-        <form action="{{ route('rekap.pondok.index') }}" method="GET" id="formFilamentFilters">
+        <form action="{{ route(($routeBase ?? 'rekap.pondok') . '.index') }}" method="GET" id="formFilamentFilters">
             <input type="hidden" name="search" id="filterHiddenSearch" value="{{ $search }}">
             <input type="hidden" name="per_page" value="{{ $perPage }}">
+            @if(!empty($forcedKategori))
+                <input type="hidden" name="kategori" value="{{ $forcedKategori }}">
+            @endif
 
             <div class="fi-ta-filters">
                 <div class="fi-ta-filters-header">
                     <h4 class="fi-ta-filters-heading">Filters</h4>
-                    <a href="{{ route('rekap.pondok.index') }}" class="fi-ta-filters-reset-btn">Reset</a>
+                    <a href="{{ route(($routeBase ?? 'rekap.pondok') . '.index') }}" class="fi-ta-filters-reset-btn">Reset</a>
                 </div>
 
                 <div class="fi-ta-filters-grid">
-                    {{-- Filter 1: Kategori Kegiatan --}}
+                    {{-- Filter Kategori Kegiatan (hanya tampil jika tidak di-forced khusus Sholat/Pengajian) --}}
+                    @if(empty($forcedKategori))
                     <div class="fi-filter-item">
                         <label class="fi-filter-label">Kategori Kegiatan</label>
                         <select name="kategori" class="fi-select" onchange="this.form.submit()">
@@ -722,10 +726,11 @@
                             @endforeach
                         </select>
                     </div>
+                    @endif
 
-                    {{-- Filter 2: Sesi Spesifik --}}
+                    {{-- Filter Sesi Spesifik --}}
                     <div class="fi-filter-item">
-                        <label class="fi-filter-label">Sesi Presensi Spesifik</label>
+                        <label class="fi-filter-label">{{ $kategori === 'sholat' ? 'Sesi Sholat' : ($kategori === 'pengajian' ? 'Sesi Pengajian' : 'Sesi Presensi') }}</label>
                         <select name="sesi_id" class="fi-select" onchange="this.form.submit()">
                             @foreach($sesiOptions as $sId => $sLabel)
                                 <option value="{{ $sId }}" {{ (string) $sesi_id === (string) $sId ? 'selected' : '' }}>{{ $sLabel }}</option>
@@ -733,7 +738,28 @@
                         </select>
                     </div>
 
-                    {{-- Filter 3: Rentang Waktu --}}
+                    {{-- Filter Kamar Asrama --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Kamar Santri</label>
+                        <select name="kamar" class="fi-select" onchange="this.form.submit()">
+                            <option value="">Semua Kamar</option>
+                            @foreach($kamarList as $kmr)
+                                <option value="{{ $kmr }}" {{ $kamar === $kmr ? 'selected' : '' }}>{{ $kmr }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Filter Jenjang --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Jenjang</label>
+                        <select name="jenjang" class="fi-select" onchange="this.form.submit()">
+                            @foreach(($jenjangList ?? ['semua' => 'Semua Jenjang', 'smp' => 'SMP AL MUTTAQIN', 'sma' => 'SMA AL MUTTAQIN', 'reguler' => 'Reguler']) as $jKey => $jLabel)
+                                <option value="{{ $jKey }}" {{ strtolower($jenjang ?? 'semua') === strtolower($jKey) ? 'selected' : '' }}>{{ $jLabel }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Filter Rentang Waktu --}}
                     <div class="fi-filter-item">
                         <label class="fi-filter-label">Rentang Waktu</label>
                         <select name="rentang" class="fi-select" onchange="this.form.submit()">
@@ -743,7 +769,7 @@
                         </select>
                     </div>
 
-                    {{-- Filter 4: Tanggal / Bulan --}}
+                    {{-- Filter Tanggal / Bulan --}}
                     <div class="fi-filter-item">
                         @if($rentang !== 'bulanan')
                             <label class="fi-filter-label">Tanggal</label>
@@ -765,7 +791,20 @@
                         @endif
                     </div>
 
-                    {{-- Filter 5: Kelas Sekolah --}}
+                    {{-- Filter Kelas Pengajian (tampil jika bukan sholat khusus) --}}
+                    @if($kategori !== 'sholat')
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Kelas Pengajian</label>
+                        <select name="kelas_pengajian_id" class="fi-select" onchange="this.form.submit()">
+                            <option value="semua">Semua Kelas Pengajian</option>
+                            @foreach($kelasPengajianList as $kp)
+                                <option value="{{ $kp->id }}" {{ (string) $kelas_pengajian_id === (string) $kp->id ? 'selected' : '' }}>{{ $kp->nama_kelas }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+
+                    {{-- Filter Kelas Sekolah --}}
                     <div class="fi-filter-item">
                         <label class="fi-filter-label">Kelas Sekolah</label>
                         <select name="kelas" class="fi-select" onchange="this.form.submit()">
@@ -776,29 +815,7 @@
                         </select>
                     </div>
 
-                    {{-- Filter 6: Kamar Asrama --}}
-                    <div class="fi-filter-item">
-                        <label class="fi-filter-label">Kamar Santri</label>
-                        <select name="kamar" class="fi-select" onchange="this.form.submit()">
-                            <option value="">Semua Kamar</option>
-                            @foreach($kamarList as $kmr)
-                                <option value="{{ $kmr }}" {{ $kamar === $kmr ? 'selected' : '' }}>{{ $kmr }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    {{-- Filter 7: Kelas Pengajian --}}
-                    <div class="fi-filter-item">
-                        <label class="fi-filter-label">Kelas Pengajian</label>
-                        <select name="kelas_pengajian_id" class="fi-select" onchange="this.form.submit()">
-                            <option value="semua">Semua Kelas Pengajian</option>
-                            @foreach($kelasPengajianList as $kp)
-                                <option value="{{ $kp->id }}" {{ (string) $kelas_pengajian_id === (string) $kp->id ? 'selected' : '' }}>{{ $kp->nama_kelas }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    {{-- Filter 8: Gender --}}
+                    {{-- Filter Gender --}}
                     <div class="fi-filter-item">
                         <label class="fi-filter-label">Gender (Jenis Kelamin)</label>
                         <select name="gender" class="fi-select" onchange="this.form.submit()">
@@ -816,7 +833,7 @@
         {{-- TOOLBAR SEARCH & ACTIONS --}}
         <div class="fi-ta-toolbar">
             <div class="fi-ta-title-wrap">
-                <h3 class="fi-ta-title">Data Presensi Pondok</h3>
+                <h3 class="fi-ta-title">{{ $tableTitle ?? 'Data Presensi Pondok' }}</h3>
                 <span class="fi-ta-badge">{{ $stats['total_target'] }} Santri</span>
             </div>
 
@@ -835,7 +852,7 @@
                 </div>
 
                 {{-- Refresh Button --}}
-                <a href="{{ route('rekap.pondok.index') }}" class="fi-btn-icon" title="Reset / Reload">
+                <a href="{{ route(($routeBase ?? 'rekap.pondok') . '.index') }}" class="fi-btn-icon" title="Reset / Reload">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
                         <polyline points="23 4 23 10 17 10"></polyline>
                         <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
@@ -851,7 +868,7 @@
                 </button>
 
                 {{-- Unduh Rekap Excel / CSV --}}
-                <a href="{{ route('rekap.pondok.export', array_merge(request()->query(), ['format' => 'excel'])) }}"
+                <a href="{{ route(($routeBase ?? 'rekap.pondok') . '.export', array_merge(request()->query(), ['format' => 'excel'])) }}"
                    class="fi-btn-secondary"
                    title="Unduh Rekap Excel / CSV">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
@@ -863,7 +880,7 @@
                 </a>
 
                 {{-- Cetak / PDF --}}
-                <a href="{{ route('rekap.pondok.export', array_merge(request()->query(), ['format' => 'pdf'])) }}"
+                <a href="{{ route(($routeBase ?? 'rekap.pondok') . '.export', array_merge(request()->query(), ['format' => 'pdf'])) }}"
                    target="_blank"
                    class="fi-btn-secondary"
                    title="Cetak Laporan / Simpan PDF">

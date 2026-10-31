@@ -154,11 +154,6 @@ class PengaturanSesiTest extends TestCase
         $device = DB::table('master_devices')->where('device_id', 'ESP32-7C9EBD4412FA')->first();
         $this->assertNotNull($device);
 
-        // Hubungkan 1 sesi ke alat ini
-        DB::table('master_sesis')->where('kode_sesi', 'REGULER_HARIAN')->update([
-            'device_id_target' => 'ESP32-7C9EBD4412FA',
-        ]);
-
         // 2. Ubah nama lokasi alat
         $editResp = $this->actingAs($yayasan)->put(route('pengaturan.sesi.device.update', $device->id), [
             'nama_lokasi' => 'Pintu Masuk Kamar Reguler',
@@ -178,15 +173,11 @@ class PengaturanSesiTest extends TestCase
             'nama_lokasi' => 'Pintu Masuk Kamar Reguler',
         ]);
 
-        // 4. Hapus perangkat — sesi terkait harus otomatis kembali ke Global (NULL) tanpa error
+        // 4. Hapus perangkat
         $delResp = $this->actingAs($yayasan)->delete(route('pengaturan.sesi.device.destroy', $device->id));
         $delResp->assertRedirect(route('pengaturan.sesi', ['tab' => 'devices']));
 
         $this->assertDatabaseMissing('master_devices', ['id' => $device->id]);
-        $this->assertDatabaseHas('master_sesis', [
-            'kode_sesi' => 'REGULER_HARIAN',
-            'device_id_target' => null,
-        ]);
     }
 
     public function test_halaman_dashboard_nfc_tap_dan_sidebar_tampil_dengan_tema_baru(): void

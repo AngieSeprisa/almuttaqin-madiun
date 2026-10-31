@@ -72,18 +72,29 @@ class RekapPondokTest extends TestCase
         $response->assertSee('Laporan WhatsApp');
         $response->assertSee('Unduh Rekap');
         $response->assertSee('Cetak PDF');
-        $response->assertSee('Pondok'); // Submenu di sidebar Rekap
+        $response->assertSee('Sholat'); // Submenu terpisah di sidebar Rekap
+        $response->assertSee('Pengajian'); // Submenu terpisah di sidebar Rekap
 
-        // 2. Akses alias route rekap.sholat.index juga harus tetap berfungsi
-        $resAlias = $this->actingAs($this->admin)->get(route('rekap.sholat.index'));
-        $resAlias->assertStatus(200);
+        // 2. Akses menu terpisah rekap.sholat.index
+        $resSholat = $this->actingAs($this->admin)->get(route('rekap.sholat.index'));
+        $resSholat->assertStatus(200);
+        $resSholat->assertSee('Rekap Presensi Sholat');
+        $resSholat->assertSee('Data Presensi Sholat');
+        $resSholat->assertSee('Sesi Sholat');
 
-        // 3. Verifikasi dropdown Jenjang, Kamar, dan Sesi di Modal WhatsApp
+        // 3. Akses menu terpisah rekap.pengajian.index
+        $resPengajian = $this->actingAs($this->admin)->get(route('rekap.pengajian.index'));
+        $resPengajian->assertStatus(200);
+        $resPengajian->assertSee('Rekap Presensi Pengajian');
+        $resPengajian->assertSee('Data Presensi Pengajian');
+        $resPengajian->assertSee('Sesi Pengajian');
+
+        // 4. Verifikasi dropdown Jenjang, Kamar, dan Sesi di Modal WhatsApp
         $response->assertSee('id="waJenjangSelect"', false);
         $response->assertSee('id="waKamarSelect"', false);
         $response->assertSee('id="waSessionSelect"', false);
 
-        // 4. Verifikasi teks deskripsi berlebih sudah dihilangkan agar tampilan elegan & bersih
+        // 5. Verifikasi teks deskripsi berlebih sudah dihilangkan agar tampilan elegan & bersih
         $response->assertDontSee('Santri aktif dalam sasaran sesi');
         $response->assertDontSee('Tap sebelum batas toleransi');
         $response->assertDontSee('Melewati toleransi batas sesi');

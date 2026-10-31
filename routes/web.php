@@ -176,21 +176,28 @@ Route::middleware('auth')->group(function () {
     Route::patch('/pengaturan-sesi/device/{id}/toggle', [PengaturanSesiController::class, 'toggleDevice'])->whereNumber('id')->name('pengaturan.sesi.device.toggle');
     Route::delete('/pengaturan-sesi/device/{id}', [PengaturanSesiController::class, 'destroyDevice'])->whereNumber('id')->name('pengaturan.sesi.device.destroy');
 
-    // Menu Rekap (Pondok, Sekolah & Guru)
+    // Menu Rekap Pondok (Sholat & Pengajian)
+    Route::get('/rekap-absensi/sholat', [RekapPondokController::class, 'sholat'])
+        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_sholat|pengaturan_pondok|siswa,view')
+        ->name('rekap.sholat.index');
+    Route::get('/rekap-absensi/sholat/export', [RekapPondokController::class, 'exportSholat'])
+        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_sholat|pengaturan_pondok|siswa,view')
+        ->name('rekap.sholat.export');
+
+    Route::get('/rekap-absensi/pengajian', [RekapPondokController::class, 'pengajian'])
+        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_pengajian|pengaturan_pondok|siswa,view')
+        ->name('rekap.pengajian.index');
+    Route::get('/rekap-absensi/pengajian/export', [RekapPondokController::class, 'exportPengajian'])
+        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_pengajian|pengaturan_pondok|siswa,view')
+        ->name('rekap.pengajian.export');
+
+    // Rute kompatibilitas rekap.pondok
     Route::get('/rekap-absensi/pondok', [RekapPondokController::class, 'index'])
         ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
         ->name('rekap.pondok.index');
     Route::get('/rekap-absensi/pondok/export', [RekapPondokController::class, 'export'])
         ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
         ->name('rekap.pondok.export');
-
-    // Alias kompatibilitas rute /rekap-absensi/sholat
-    Route::get('/rekap-absensi/sholat', [RekapPondokController::class, 'index'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
-        ->name('rekap.sholat.index');
-    Route::get('/rekap-absensi/sholat/export', [RekapPondokController::class, 'export'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
-        ->name('rekap.sholat.export');
 
     Route::prefix('rekap-absensi')->name('rekap-absensi.')->group(function () {
         Route::get('/sekolah', [SekolahController::class, 'rekapAbsensi'])

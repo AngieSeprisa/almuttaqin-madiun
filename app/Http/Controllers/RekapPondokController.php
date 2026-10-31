@@ -169,11 +169,64 @@ class RekapPondokController extends Controller
     }
 
     /**
+     * Halaman Rekap Presensi Sholat.
+     */
+    public function sholat(Request $request)
+    {
+        $data = $this->buildRekapData($request, 'sholat');
+        $data['pageTitle'] = 'Rekap Presensi Sholat';
+        $data['tableTitle'] = 'Data Presensi Sholat';
+        $data['routeBase'] = 'rekap.sholat';
+
+        return view('rekap-absensi.pondok', $data);
+    }
+
+    /**
+     * Ekspor Rekap Presensi Sholat.
+     */
+    public function exportSholat(Request $request)
+    {
+        return $this->exportWithKategori($request, 'sholat');
+    }
+
+    /**
+     * Halaman Rekap Presensi Pengajian.
+     */
+    public function pengajian(Request $request)
+    {
+        $data = $this->buildRekapData($request, 'pengajian');
+        $data['pageTitle'] = 'Rekap Presensi Pengajian';
+        $data['tableTitle'] = 'Data Presensi Pengajian';
+        $data['routeBase'] = 'rekap.pengajian';
+
+        return view('rekap-absensi.pondok', $data);
+    }
+
+    /**
+     * Ekspor Rekap Presensi Pengajian.
+     */
+    public function exportPengajian(Request $request)
+    {
+        return $this->exportWithKategori($request, 'pengajian');
+    }
+
+    /**
      * Halaman utama Rekap Presensi Pondok (Sholat & Pengajian) dengan UI Filament 3.x.
      */
     public function index(Request $request)
     {
+        $kategoriReq = strtolower(trim((string) $request->get('kategori', '')));
+        if ($kategoriReq === 'sholat') {
+            return $this->sholat($request);
+        }
+        if ($kategoriReq === 'pengajian') {
+            return $this->pengajian($request);
+        }
+
         $data = $this->buildRekapData($request);
+        $data['pageTitle'] = 'Rekap Presensi Pondok (Sholat & Pengajian)';
+        $data['tableTitle'] = 'Data Presensi Pondok';
+        $data['routeBase'] = 'rekap.pondok';
 
         return view('rekap-absensi.pondok', $data);
     }
@@ -183,7 +236,16 @@ class RekapPondokController extends Controller
      */
     public function export(Request $request)
     {
-        $data = $this->buildRekapData($request);
+        $kategoriReq = strtolower(trim((string) $request->get('kategori', '')));
+        return $this->exportWithKategori($request, in_array($kategoriReq, ['sholat', 'pengajian'], true) ? $kategoriReq : null);
+    }
+
+    /**
+     * Helper ekspor rekap berdasarkan kategori terpilih.
+     */
+    public function exportWithKategori(Request $request, ?string $forcedKategori = null)
+    {
+        $data = $this->buildRekapData($request, $forcedKategori);
         $format = strtolower((string) $request->get('format', 'excel'));
 
         if (in_array($format, ['pdf', 'print', 'cetak'], true)) {
@@ -192,7 +254,8 @@ class RekapPondokController extends Controller
 
         $rentang = $data['rentang'];
         $tanggal = $data['tanggal'];
-        $fileName = sprintf('rekap_presensi_pondok_%s_%s.csv', $rentang, str_replace('-', '', $tanggal));
+        $katPrefix = $forcedKategori ? "rekap_presensi_{$forcedKategori}" : 'rekap_presensi_pondok';
+        $fileName = sprintf('%s_%s_%s.csv', $katPrefix, $rentang, str_replace('-', '', $tanggal));
 
         $headers = [
             'Content-Type'        => 'text/csv; charset=UTF-8',
@@ -243,12 +306,16 @@ class RekapPondokController extends Controller
     /**
      * Membangun data presensi pondok (sholat & pengajian) sesuai filter lengkap.
      */
-    public function buildRekapData(Request $request): array
+    public function buildRekapData(Request $request, ?string $forcedKategori = null): array
     {
         // 1. Parameter Filter
-        $kategori = strtolower(trim((string) $request->get('kategori', 'semua')));
-        if (!in_array($kategori, ['semua', 'sholat', 'pengajian'], true)) {
-            $kategori = 'semua';
+        if ($forcedKategori !== null) {
+            $kategori = $forcedKategori;
+        } else {
+            $kategori = strtolower(trim((string) $request->get('kategori', 'semua')));
+            if (!in_array($kategori, ['semua', 'sholat', 'pengajian'], true)) {
+                $kategori = 'semua';
+            }
         }
 
         $filterSesiId = trim((string) $request->get('sesi_id', $request->get('sesi_sholat', 'semua')));
@@ -345,17 +412,28 @@ class RekapPondokController extends Controller
 
         // C. Sesi Spesifik Dropdown Options
         $sesiOptions = [];
-        $sesiOptions['semua'] = 'Semua Sesi';
-
-        if ($kategori === 'semua' || $kategori === 'sholat') {
+        if ($kategori === 'sholat') {
+            $sesiOptions['semua'] = 'Semua Sholat';
             foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
                 $sesiOptions[$slotKey] = 'Sholat: ' . $slotMeta['label'];
             }
-        }
-
-        foreach ($dbSesiList as $s) {
-            $katLabel = ucfirst($s->kategori ?? 'sesi');
-            $sesiOptions[(string) $s->id] = "{$katLabel}: {$s->nama_sesi}";
+            foreach ($dbSesiList as $s) {
+                $sesiOptions[(string) $s->id] = "Sesi: {$s->nama_sesi}";
+            }
+        } elseif ($kategori === 'pengajian') {
+            $sesiOptions['semua'] = 'Semua Pengajian';
+            foreach ($dbSesiList as $s) {
+                $sesiOptions[(string) $s->id] = "Pengajian: {$s->nama_sesi}";
+            }
+        } else {
+            $sesiOptions['semua'] = 'Semua Sesi';
+            foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
+                $sesiOptions[$slotKey] = 'Sholat: ' . $slotMeta['label'];
+            }
+            foreach ($dbSesiList as $s) {
+                $katLabel = ucfirst($s->kategori ?? 'sesi');
+                $sesiOptions[(string) $s->id] = "{$katLabel}: {$s->nama_sesi}";
+            }
         }
 
         // Cek jika filterSesiId merujuk ke MasterSesi spesifik
@@ -828,12 +906,13 @@ class RekapPondokController extends Controller
 
         // Active filters count untuk badge icon
         $activeFiltersCount = 0;
-        if ($kategori !== 'semua') $activeFiltersCount++;
+        if ($forcedKategori === null && $kategori !== 'semua') $activeFiltersCount++;
         if ($filterSesiId !== 'semua') $activeFiltersCount++;
         if ($filterKelas !== 'semua') $activeFiltersCount++;
         if ($filterKamar !== '') $activeFiltersCount++;
         if ($filterKelasPengajian !== 'semua') $activeFiltersCount++;
         if ($filterGender !== 'SEMUA') $activeFiltersCount++;
+        if ($filterJenjang !== 'semua') $activeFiltersCount++;
         if ($rentang !== 'harian') $activeFiltersCount++;
 
         $namaBulanList = [
@@ -842,8 +921,16 @@ class RekapPondokController extends Controller
             9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
         ];
 
+        $jenjangList = [
+            'semua'   => 'Semua Jenjang',
+            'smp'     => 'SMP AL MUTTAQIN',
+            'sma'     => 'SMA AL MUTTAQIN',
+            'reguler' => 'Reguler',
+        ];
+
         return [
             'kategori'             => $kategori,
+            'forcedKategori'       => $forcedKategori,
             'kategoriList'         => $kategoriList,
             'sesi_id'              => $filterSesiId,
             'filterSesiSholat'     => $filterSesiId,
@@ -860,6 +947,7 @@ class RekapPondokController extends Controller
             'genderList'           => $genderList,
             'jenjang'              => $filterJenjang,
             'filterJenjang'        => $filterJenjang,
+            'jenjangList'          => $jenjangList,
             'rentang'              => $rentang,
             'mode'                 => $rentang,
             'tanggal'              => $tanggal,
@@ -880,6 +968,9 @@ class RekapPondokController extends Controller
             'matriksRows'          => $rows,
             'daysInMonth'          => $startDate->daysInMonth,
             'sholatSlots'          => self::SHOLAT_SLOTS,
+            'pageTitle'            => $forcedKategori === 'sholat' ? 'Rekap Presensi Sholat' : ($forcedKategori === 'pengajian' ? 'Rekap Presensi Pengajian' : 'Rekap Presensi Pondok (Sholat & Pengajian)'),
+            'tableTitle'           => $forcedKategori === 'sholat' ? 'Data Presensi Sholat' : ($forcedKategori === 'pengajian' ? 'Data Presensi Pengajian' : 'Data Presensi Pondok'),
+            'routeBase'            => $forcedKategori === 'sholat' ? 'rekap.sholat' : ($forcedKategori === 'pengajian' ? 'rekap.pengajian' : 'rekap.pondok'),
             // Data Laporan WhatsApp
             'waText'               => $waReports['primary']['text'] ?? '',
             'waEncoded'            => urlencode($waReports['primary']['text'] ?? ''),
