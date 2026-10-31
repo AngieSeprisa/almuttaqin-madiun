@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Kamar;
-use App\Models\MasterDevice;
 use App\Models\MasterSesi;
 use App\Models\PerizinanSakit;
 use App\Models\PerizinanSambang;
@@ -11,6 +10,7 @@ use App\Models\Presensi;
 use App\Models\Siswa;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 class RekapPondokController extends Controller
@@ -21,38 +21,38 @@ class RekapPondokController extends Controller
     public const SHOLAT_SLOTS = [
         'subuh' => [
             'key'       => 'subuh',
-            'label'     => 'Subuh',
+            'label'     => 'SUBUH',
             'jam_mulai' => '04:00',
             'jam_akhir' => '06:30',
         ],
         'dzuhur' => [
             'key'       => 'dzuhur',
-            'label'     => 'Dzuhur',
+            'label'     => 'DZUHUR',
             'jam_mulai' => '11:30',
             'jam_akhir' => '13:30',
         ],
         'ashar' => [
             'key'       => 'ashar',
-            'label'     => 'Ashar',
+            'label'     => 'ASAR',
             'jam_mulai' => '14:45',
             'jam_akhir' => '17:00',
         ],
         'maghrib' => [
             'key'       => 'maghrib',
-            'label'     => 'Maghrib',
+            'label'     => 'MAGHRIB',
             'jam_mulai' => '17:30',
             'jam_akhir' => '18:45',
         ],
         'isya' => [
             'key'       => 'isya',
-            'label'     => 'Isya',
+            'label'     => 'ISYA',
             'jam_mulai' => '18:45',
             'jam_akhir' => '21:30',
         ],
     ];
 
     /**
-     * Halaman utama Rekap Presensi Sholat.
+     * Halaman utama Rekap Presensi Sholat (Filament 3.x Clean Table & Modal Pop-up).
      */
     public function index(Request $request)
     {
@@ -92,18 +92,13 @@ class RekapPondokController extends Controller
             fputcsv($handle, [
                 'No',
                 'NISN',
-                'Nama Santri',
+                'Nama',
                 'Kamar',
                 'Jenjang',
-                'Subuh',
-                'Dzuhur',
-                'Ashar',
-                'Maghrib',
-                'Isya',
-                'Total H',
-                'Total T',
-                'Total I',
-                'Total A',
+                'Hadir',
+                'Telat',
+                'Izin',
+                'Alfa',
             ]);
 
             foreach ($data['rows'] as $idx => $r) {
@@ -113,14 +108,9 @@ class RekapPondokController extends Controller
                     $r['nama_lengkap'],
                     $r['kamar'],
                     $r['jenjang'],
-                    $r['sholat']['subuh']['display'] ?? '-',
-                    $r['sholat']['dzuhur']['display'] ?? '-',
-                    $r['sholat']['ashar']['display'] ?? '-',
-                    $r['sholat']['maghrib']['display'] ?? '-',
-                    $r['sholat']['isya']['display'] ?? '-',
                     $r['total_h'],
                     $r['total_t'],
-                    $r['total_i'],
+                    $r['total_i'] + $r['total_s'],
                     $r['total_a'],
                 ]);
             }
@@ -168,6 +158,11 @@ class RekapPondokController extends Controller
         $filterKamar = trim((string) $request->get('kamar', ''));
         $filterJenjang = strtolower(trim((string) $request->get('jenjang', 'semua')));
         $search = trim((string) $request->get('search', ''));
+        $perPage = (int) $request->get('per_page', 10);
+        if (!in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 10;
+        }
+        $currentPage = max(1, (int) $request->get('page', 1));
 
         // 2. Tentukan Rentang Tanggal Evaluasi
         if ($rentang === 'bulanan') {
@@ -187,13 +182,18 @@ class RekapPondokController extends Controller
         $todayStr = Carbon::today()->toDateString();
         $nowTimeStr = Carbon::now()->format('H:i');
 
-        // Buat daftar tanggal yang dievaluasi
+        // Daftar tanggal yang dievaluasi
         $evalDates = [];
         $currDate = clone $startDate;
         while ($currDate->lte($endDate)) {
             $evalDates[] = $currDate->toDateString();
             $currDate->addDay();
         }
+
+        // Slot sholat yang dievaluasi
+        $slotsToEvaluate = ($filterSesiSholat !== 'semua' && isset(self::SHOLAT_SLOTS[$filterSesiSholat]))
+            ? [$filterSesiSholat => self::SHOLAT_SLOTS[$filterSesiSholat]]
+            : self::SHOLAT_SLOTS;
 
         // 3. Ambil Master Sesi Sholat & Map Slot
         $sesiSholatList = MasterSesi::where(function ($q) {
@@ -231,7 +231,7 @@ class RekapPondokController extends Controller
                 ->values();
         }
 
-        // 4. Ambil Santri Aktif & Terapkan Filter (Kamar, Jenjang, Search)
+        // 4. Ambil Santri Aktif & Terapkan Filter
         $allActiveSantri = Siswa::with(['pendaftaran'])
             ->where('status', 'aktif')
             ->orderBy('nama_lengkap')
@@ -300,7 +300,6 @@ class RekapPondokController extends Controller
                 $dStr = $p->waktu_tap ? $p->waktu_tap->toDateString() : null;
                 if (!$dStr) continue;
 
-                // Tentukan slot sholat
                 $slotKey = $sesiSlotMap[$p->sesi_id] ?? self::detectSlotSholat($p->sesi, $p->waktu_tap);
                 if (!$slotKey) continue;
 
@@ -322,11 +321,12 @@ class RekapPondokController extends Controller
             ->whereDate('tanggal_kembali', '>=', $startDateStr)
             ->get();
 
-        // 6. Evaluasi Setiap Santri & Setiap Slot Sholat
+        // 6. Evaluasi Setiap Santri & Bangun Riwayat Modal
         $rows = [];
         $grandTotalH = 0;
         $grandTotalT = 0;
         $grandTotalI = 0;
+        $grandTotalS = 0;
         $grandTotalA = 0;
 
         foreach ($filteredSantris as $siswa) {
@@ -336,14 +336,15 @@ class RekapPondokController extends Controller
                 'nama_lengkap' => $siswa->nama_lengkap,
                 'kamar'        => $siswa->kamar ?: '-',
                 'jenjang'      => $siswa->jenjang ?: ($siswa->pendaftaran?->jenjang ?: 'Reguler'),
-                'sholat'       => [],
                 'total_h'      => 0,
                 'total_t'      => 0,
                 'total_i'      => 0,
+                'total_s'      => 0,
                 'total_a'      => 0,
+                'sholat'       => [],
+                'riwayat'      => [],
             ];
 
-            // Inisialisasi slot sholat untuk santri ini
             foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
                 $siswaRow['sholat'][$slotKey] = [
                     'key'     => $slotKey,
@@ -351,24 +352,16 @@ class RekapPondokController extends Controller
                     'code'    => '-',
                     'display' => '-',
                     'jam'     => null,
-                    'status'  => 'belum',
-                    'count_h' => 0,
-                    'count_t' => 0,
-                    'count_i' => 0,
-                    'count_a' => 0,
                 ];
             }
 
-            // Iterasi seluruh tanggal dalam rentang
             foreach ($evalDates as $dStr) {
-                // Cek izin santri pada tanggal ini
                 $izinInfo = $this->findSantriIzin($siswa, $dStr, $sakits, $sambangs);
 
-                foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
+                foreach ($slotsToEvaluate as $slotKey => $slotMeta) {
                     $tap = $presensisBySantriDateSlot[$siswa->id][$dStr][$slotKey] ?? null;
 
                     if ($tap) {
-                        // Santri tap RFID pada sesi sholat ini
                         $isLate = ($tap->status_kehadiran === 'terlambat');
                         if (!$isLate && $tap->sesi && !empty($tap->sesi->jam_mulai)) {
                             try {
@@ -381,37 +374,56 @@ class RekapPondokController extends Controller
                             } catch (\Throwable $e) {}
                         }
 
+                        $jamTapStr = $tap->waktu_tap ? $tap->waktu_tap->format('H:i:s') : '-';
                         if ($isLate) {
-                            $siswaRow['sholat'][$slotKey]['count_t']++;
                             $siswaRow['total_t']++;
-                            $status = 'terlambat';
+                            $statusLabel = 'TERLAMBAT';
+                            $statusBadge = 'status-badge-terlambat';
+                            $keterangan = "Tap pukul {$jamTapStr} WIB (Melewati Batas Toleransi)";
                             $code = 'T';
                         } else {
-                            $siswaRow['sholat'][$slotKey]['count_h']++;
                             $siswaRow['total_h']++;
-                            $status = 'hadir';
+                            $statusLabel = 'HADIR';
+                            $statusBadge = 'status-badge-hadir';
+                            $keterangan = "Tap pukul {$jamTapStr} WIB (Tepat Waktu)";
                             $code = 'H';
                         }
 
-                        $jamTap = $tap->waktu_tap ? $tap->waktu_tap->format('H:i') : null;
-                        if ($rentang === 'harian') {
-                            $siswaRow['sholat'][$slotKey]['status'] = $status;
-                            $siswaRow['sholat'][$slotKey]['code'] = $code;
-                            $siswaRow['sholat'][$slotKey]['jam'] = $jamTap;
-                            $siswaRow['sholat'][$slotKey]['display'] = $jamTap ?: $code;
-                        }
-                    } elseif ($izinInfo) {
-                        // Tidak tap, tapi ada surat izin / sakit
-                        $siswaRow['sholat'][$slotKey]['count_i']++;
-                        $siswaRow['total_i']++;
+                        $siswaRow['sholat'][$slotKey]['code'] = $code;
+                        $siswaRow['sholat'][$slotKey]['display'] = $code;
+                        $siswaRow['sholat'][$slotKey]['jam'] = $jamTapStr;
 
-                        if ($rentang === 'harian') {
-                            $siswaRow['sholat'][$slotKey]['status'] = 'izin';
-                            $siswaRow['sholat'][$slotKey]['code'] = 'I';
-                            $siswaRow['sholat'][$slotKey]['display'] = 'I';
+                        $siswaRow['riwayat'][] = [
+                            'tanggal'    => $dStr,
+                            'sesi'       => $slotMeta['label'],
+                            'status'     => $statusLabel,
+                            'badge'      => $statusBadge,
+                            'keterangan' => $keterangan,
+                        ];
+                    } elseif ($izinInfo) {
+                        if ($izinInfo['status'] === 'sakit') {
+                            $siswaRow['total_s']++;
+                            $statusLabel = 'SAKIT';
+                            $statusBadge = 'status-badge-sakit';
+                        } else {
+                            $siswaRow['total_i']++;
+                            $statusLabel = 'IZIN';
+                            $statusBadge = 'status-badge-izin';
                         }
+
+                        $code = ($izinInfo['status'] === 'sakit') ? 'S' : 'I';
+                        $siswaRow['sholat'][$slotKey]['code'] = $code;
+                        $siswaRow['sholat'][$slotKey]['display'] = $code;
+
+                        $siswaRow['riwayat'][] = [
+                            'tanggal'    => $dStr,
+                            'sesi'       => $slotMeta['label'],
+                            'status'     => $statusLabel,
+                            'badge'      => $statusBadge,
+                            'keterangan' => $izinInfo['label'],
+                        ];
                     } else {
-                        // Tidak tap dan tidak ada izin -> Cek apakah waktu sholat sudah lewat
+                        // Tidak tap dan tidak ada izin
                         $sudahLewat = false;
                         if ($dStr < $todayStr) {
                             $sudahLewat = true;
@@ -423,61 +435,70 @@ class RekapPondokController extends Controller
                         }
 
                         if ($sudahLewat) {
-                            $siswaRow['sholat'][$slotKey]['count_a']++;
                             $siswaRow['total_a']++;
+                            $siswaRow['sholat'][$slotKey]['code'] = 'A';
+                            $siswaRow['sholat'][$slotKey]['display'] = 'A';
 
-                            if ($rentang === 'harian') {
-                                $siswaRow['sholat'][$slotKey]['status'] = 'alfa';
-                                $siswaRow['sholat'][$slotKey]['code'] = 'A';
-                                $siswaRow['sholat'][$slotKey]['display'] = 'A';
-                            }
+                            $siswaRow['riwayat'][] = [
+                                'tanggal'    => $dStr,
+                                'sesi'       => $slotMeta['label'],
+                                'status'     => 'ALPA',
+                                'badge'      => 'status-badge-alpa',
+                                'keterangan' => 'Tidak Hadir / Belum Absen',
+                            ];
                         } else {
                             // Belum berlangsung
-                            if ($rentang === 'harian') {
-                                $siswaRow['sholat'][$slotKey]['status'] = 'belum';
-                                $siswaRow['sholat'][$slotKey]['code'] = '-';
-                                $siswaRow['sholat'][$slotKey]['display'] = '-';
-                            }
+                            $siswaRow['sholat'][$slotKey]['code'] = '-';
+                            $siswaRow['sholat'][$slotKey]['display'] = '-';
+
+                            $siswaRow['riwayat'][] = [
+                                'tanggal'    => $dStr,
+                                'sesi'       => $slotMeta['label'],
+                                'status'     => 'BELUM',
+                                'badge'      => 'status-badge-belum',
+                                'keterangan' => 'Belum Berlangsung',
+                            ];
                         }
                     }
-                }
-            }
-
-            // Jika mode mingguan atau bulanan, susun tampilan ringkasan per slot sholat
-            if ($rentang !== 'harian') {
-                foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
-                    $cH = $siswaRow['sholat'][$slotKey]['count_h'];
-                    $cT = $siswaRow['sholat'][$slotKey]['count_t'];
-                    $cI = $siswaRow['sholat'][$slotKey]['count_i'];
-                    $cA = $siswaRow['sholat'][$slotKey]['count_a'];
-
-                    $totHadir = $cH + $cT;
-                    $parts = [];
-                    if ($cH > 0) $parts[] = "{$cH}H";
-                    if ($cT > 0) $parts[] = "{$cT}T";
-                    if ($cI > 0) $parts[] = "{$cI}I";
-                    if ($cA > 0) $parts[] = "{$cA}A";
-
-                    $siswaRow['sholat'][$slotKey]['display'] = !empty($parts) ? implode(' ', $parts) : '-';
-                    $siswaRow['sholat'][$slotKey]['code'] = $totHadir > 0 ? 'H' : ($cA > 0 ? 'A' : ($cI > 0 ? 'I' : '-'));
                 }
             }
 
             $grandTotalH += $siswaRow['total_h'];
             $grandTotalT += $siswaRow['total_t'];
             $grandTotalI += $siswaRow['total_i'];
+            $grandTotalS += $siswaRow['total_s'];
             $grandTotalA += $siswaRow['total_a'];
 
             $rows[] = $siswaRow;
         }
 
+        $totalFiltered = count($rows);
+
+        // Buat Pagination Paginator
+        $paginatedRows = new LengthAwarePaginator(
+            array_slice($rows, ($currentPage - 1) * $perPage, $perPage),
+            $totalFiltered,
+            $perPage,
+            $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         $stats = [
-            'total_target' => $filteredSantris->count(),
+            'total_target' => $totalFiltered,
             'hadir'        => $grandTotalH,
             'terlambat'    => $grandTotalT,
-            'izin_sakit'   => $grandTotalI,
+            'izin'         => $grandTotalI,
+            'sakit'        => $grandTotalS,
+            'izin_sakit'   => $grandTotalI + $grandTotalS,
             'alfa'         => $grandTotalA,
         ];
+
+        // Hitung jumlah filter aktif untuk badge filter icon (seperti "0" di gambar)
+        $activeFiltersCount = 0;
+        if ($filterSesiSholat !== 'semua') $activeFiltersCount++;
+        if ($filterKamar !== '') $activeFiltersCount++;
+        if ($filterJenjang !== 'semua') $activeFiltersCount++;
+        if ($rentang !== 'harian') $activeFiltersCount++;
 
         $namaBulanList = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
@@ -486,35 +507,38 @@ class RekapPondokController extends Controller
         ];
 
         return [
-            'rentang'          => $rentang,
-            'mode'             => $rentang, // alias kompatibilitas
-            'tanggal'          => $tanggal,
-            'tanggalCarbon'    => $tanggalCarbon,
-            'startDate'        => $startDate,
-            'endDate'          => $endDate,
-            'bulan'            => $bulan,
-            'tahun'            => $tahun,
-            'namaBulan'        => $namaBulanList[$bulan] ?? '',
-            'namaBulanList'    => $namaBulanList,
-            'filterSesiSholat' => $filterSesiSholat,
-            'filterKamar'      => $filterKamar,
-            'filterJenjang'    => $filterJenjang,
-            'search'           => $search,
-            'kamarList'        => $kamarList,
-            'sholatSlots'      => self::SHOLAT_SLOTS,
-            'stats'            => $stats,
-            'rows'             => $rows,
-            // Kompatibilitas untuk view lama jika masih ada referensi
-            'dailyRows'        => $rows,
-            'matriksRows'      => $rows,
-            'daysInMonth'      => $startDate->daysInMonth,
-            'selectedSesi'     => null,
-            'kategori'         => 'sholat',
+            'rentang'            => $rentang,
+            'mode'               => $rentang,
+            'tanggal'            => $tanggal,
+            'tanggalCarbon'      => $tanggalCarbon,
+            'startDate'          => $startDate,
+            'endDate'            => $endDate,
+            'bulan'              => $bulan,
+            'tahun'              => $tahun,
+            'namaBulan'          => $namaBulanList[$bulan] ?? '',
+            'namaBulanList'      => $namaBulanList,
+            'filterSesiSholat'   => $filterSesiSholat,
+            'filterKamar'        => $filterKamar,
+            'filterJenjang'      => $filterJenjang,
+            'search'             => $search,
+            'perPage'            => $perPage,
+            'activeFiltersCount' => $activeFiltersCount,
+            'kamarList'          => $kamarList,
+            'sholatSlots'        => self::SHOLAT_SLOTS,
+            'stats'              => $stats,
+            'rows'               => $rows,
+            'paginatedRows'      => $paginatedRows,
+            // Kompatibilitas alias
+            'dailyRows'          => $rows,
+            'matriksRows'        => $rows,
+            'daysInMonth'        => $startDate->daysInMonth,
+            'selectedSesi'       => null,
+            'kategori'           => 'sholat',
         ];
     }
 
     /**
-     * Deteksi slot sholat (subuh, dzuhur, ashar, maghrib, isya) dari MasterSesi atau waktu tap.
+     * Deteksi slot sholat dari MasterSesi atau waktu tap.
      */
     public static function detectSlotSholat(?MasterSesi $sesi, ?Carbon $waktuTap = null): ?string
     {
@@ -567,7 +591,7 @@ class RekapPondokController extends Controller
         if ($sakitMatch) {
             return [
                 'status' => 'sakit',
-                'label'  => 'Sakit: ' . ($sakitMatch->sakit ?: 'Rawat/Istirahat'),
+                'label'  => 'Sakit: ' . ($sakitMatch->sakit ?: ($sakitMatch->keterangan ?: 'Rawat/Istirahat')),
             ];
         }
 

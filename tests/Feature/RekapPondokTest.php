@@ -60,18 +60,14 @@ class RekapPondokTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('Rekap Presensi Sholat');
-        $response->assertSee('TOTAL SANTRI');
-        $response->assertSee('HADIR TEPAT (H)');
-        $response->assertSee('TERLAMBAT (T)');
-        $response->assertSee('IZIN / SAKIT (I)');
-        $response->assertSee('ALPHA (A)');
-        $response->assertSee('WAKTU SHOLAT');
-        $response->assertSee('SUBUH');
-        $response->assertSee('DZUHUR');
-        $response->assertSee('ASHAR');
-        $response->assertSee('MAGHRIB');
-        $response->assertSee('ISYA');
-        $response->assertSee('REKAPAN');
+        $response->assertSee('Data Presensi Sholat');
+        $response->assertSee('Nama');
+        $response->assertSee('Hadir');
+        $response->assertSee('Telat');
+        $response->assertSee('Izin');
+        $response->assertSee('Alfa');
+        $response->assertSee('Unduh Rekap');
+        $response->assertSee('Rincian Kehadiran Siswa');
         $response->assertSee('Sholat'); // Submenu di sidebar
     }
 
@@ -161,11 +157,11 @@ class RekapPondokTest extends TestCase
         $rows = collect($response->viewData('rows'))->keyBy('nama_lengkap');
 
         $this->assertEquals('H', $rows['Ahmad Dzuhur']['sholat']['dzuhur']['code']);
-        $this->assertEquals('11:40', $rows['Ahmad Dzuhur']['sholat']['dzuhur']['jam']);
+        $this->assertStringContainsString('11:40', $rows['Ahmad Dzuhur']['sholat']['dzuhur']['jam']);
         $this->assertGreaterThanOrEqual(1, $rows['Ahmad Dzuhur']['total_h']);
 
         $this->assertEquals('T', $rows['Budi Telat']['sholat']['dzuhur']['code']);
-        $this->assertEquals('12:05', $rows['Budi Telat']['sholat']['dzuhur']['jam']);
+        $this->assertStringContainsString('12:05', $rows['Budi Telat']['sholat']['dzuhur']['jam']);
         $this->assertGreaterThanOrEqual(1, $rows['Budi Telat']['total_t']);
 
         $this->assertEquals('I', $rows['Chandra Izin']['sholat']['dzuhur']['code']);

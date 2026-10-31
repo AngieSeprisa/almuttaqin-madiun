@@ -2,349 +2,901 @@
 
 @section('title', 'Rekap Presensi Sholat')
 
-@section('header-actions')
-<div style="display:flex; align-items:center; gap:8px;">
-    <a href="{{ route('rekap.sholat.export', array_merge(request()->query(), ['format' => 'excel'])) }}"
-       class="btn btn-secondary"
-       style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:8px 14px; font-size:13px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-        </svg>
-        <span>Ekspor Excel</span>
-    </a>
-
-    <a href="{{ route('rekap.sholat.export', array_merge(request()->query(), ['format' => 'pdf'])) }}"
-       target="_blank"
-       class="btn btn-primary"
-       style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:8px 14px; font-size:13px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-            <rect x="6" y="14" width="12" height="8"></rect>
-        </svg>
-        <span>Cetak Laporan</span>
-    </a>
-</div>
-@endsection
-
 @section('content')
-<div class="rekap-sekolah-container">
+<style>
+    /* Filament 3.x Clean Card & Table */
+    .filament-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+        overflow: hidden;
+    }
+    .filament-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .filament-card-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .filament-card-title {
+        font-size: 0.98rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+    }
+    .filament-badge-count {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 9px;
+        border-radius: 9999px;
+        font-size: 0.73rem;
+        font-weight: 600;
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+    .filament-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .filament-search-wrap {
+        position: relative;
+        min-width: 220px;
+    }
+    .filament-search-input {
+        width: 100%;
+        padding: 7px 12px 7px 34px;
+        font-size: 0.83rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        outline: none;
+        background: #ffffff;
+        color: #1e293b;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .filament-search-input:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    .filament-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 15px;
+        height: 15px;
+        color: #94a3b8;
+        pointer-events: none;
+    }
+    .filament-btn-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 35px;
+        padding: 0 11px;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #475569;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .filament-btn-icon:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #0f172a;
+    }
+    .filament-btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 35px;
+        padding: 0 14px;
+        border-radius: 9px;
+        background: #4f46e5;
+        color: #ffffff;
+        font-size: 0.82rem;
+        font-weight: 600;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background-color 0.15s ease, transform 0.05s ease;
+    }
+    .filament-btn-primary:hover {
+        background: #4338ca;
+        color: #ffffff;
+    }
+    .filament-filter-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #e0e7ff;
+        color: #4338ca;
+        font-size: 0.69rem;
+        font-weight: 700;
+        border-radius: 9999px;
+        width: 17px;
+        height: 17px;
+        margin-left: 2px;
+    }
 
-    {{-- 1. Kartu Ringkasan Statistik (5 Stat Cards Bersih Tanpa Deskripsi Panjang) --}}
-    <div class="stat-summary-grid">
-        <div class="form-section-card stat-summary-card">
-            <span class="stat-summary-label">TOTAL SANTRI</span>
-            <div class="stat-summary-val-wrap">
-                <span class="stat-summary-num text-electric-blue">{{ $stats['total_target'] }}</span>
-                <span class="stat-summary-sub">Santri</span>
+    /* Panel Filter Dropdown / Collapsible */
+    .filament-filter-panel {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 14px 20px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) auto;
+        gap: 12px;
+        align-items: end;
+    }
+    .filament-filter-field label {
+        display: block;
+        font-size: 0.74rem;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 5px;
+    }
+    .filament-filter-select, .filament-filter-input {
+        width: 100%;
+        padding: 6px 10px;
+        font-size: 0.81rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #1e293b;
+        outline: none;
+    }
+
+    /* Clean Filament Table */
+    .filament-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 0.84rem;
+    }
+    .filament-table thead th {
+        background: #fafafa;
+        color: #64748b;
+        font-size: 0.77rem;
+        font-weight: 600;
+        text-transform: none;
+        padding: 12px 18px;
+        border-bottom: 1px solid #f1f5f9;
+        letter-spacing: 0.2px;
+    }
+    .filament-table tbody tr {
+        transition: background-color 0.12s ease;
+    }
+    .filament-table tbody tr:hover {
+        background-color: #f8fafc;
+    }
+    .filament-table tbody td {
+        padding: 13px 18px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+        vertical-align: middle;
+    }
+    .filament-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    .col-nama-link {
+        font-weight: 600;
+        color: #0f172a;
+        cursor: pointer;
+        display: inline-block;
+        transition: color 0.15s ease;
+        text-decoration: none;
+    }
+    .col-nama-link:hover {
+        color: #4f46e5;
+        text-decoration: underline;
+    }
+
+    /* Filament Card Footer & Pagination */
+    .filament-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        border-top: 1px solid #f1f5f9;
+        background: #ffffff;
+        gap: 12px;
+        flex-wrap: wrap;
+        font-size: 0.79rem;
+        color: #64748b;
+    }
+    .filament-pagination {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .filament-page-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 28px;
+        padding: 0 7px;
+        border-radius: 7px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #475569;
+        text-decoration: none;
+        border: 1px solid transparent;
+        transition: all 0.15s ease;
+    }
+    .filament-page-btn:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+    .filament-page-btn.active {
+        background: #4f46e5;
+        color: #ffffff;
+        border-color: #4f46e5;
+    }
+    .filament-page-ellipsis {
+        padding: 0 4px;
+        color: #94a3b8;
+    }
+
+    /* Modal Rincian Kehadiran Siswa (Gambar 2) */
+    .rp-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(3px);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        animation: rpFadeIn 0.18s ease-out;
+    }
+    @keyframes rpFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .rp-modal-dialog {
+        width: 100%;
+        max-width: 640px;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+    }
+    .rp-modal-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        padding: 18px 24px 14px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .rp-modal-title {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+    }
+    .rp-modal-sub {
+        font-size: 0.77rem;
+        color: #64748b;
+        margin-top: 3px;
+    }
+    .rp-modal-close-btn {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 6px;
+        transition: color 0.15s ease;
+    }
+    .rp-modal-close-btn:hover {
+        color: #0f172a;
+    }
+    .rp-modal-body {
+        padding: 18px 24px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    /* Metrik Box Bulat Rounded 5 Kolom */
+    .rp-metrics-box {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        padding: 12px 6px;
+        background: #ffffff;
+    }
+    .rp-metric-item {
+        text-align: center;
+        border-right: 1px solid #f1f5f9;
+        padding: 0 4px;
+    }
+    .rp-metric-item:last-child {
+        border-right: none;
+    }
+    .rp-metric-label {
+        display: block;
+        font-size: 0.69rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 4px;
+    }
+    .rp-metric-value {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.1;
+    }
+    /* Tabel Rincian Modal */
+    .rp-modal-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.79rem;
+    }
+    .rp-modal-table thead th {
+        text-align: left;
+        padding: 8px 10px;
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.73rem;
+        font-weight: 700;
+        border-bottom: 1px solid #e2e8f0;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .rp-modal-table tbody td {
+        padding: 10px 10px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+        vertical-align: middle;
+    }
+    .rp-modal-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    /* Status Badge Rincian */
+    .rp-badge-status {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+    }
+    .status-badge-alpa {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+    .status-badge-hadir {
+        background: #dcfce7;
+        color: #15803d;
+    }
+    .status-badge-terlambat {
+        background: #fef3c7;
+        color: #b45309;
+    }
+    .status-badge-izin {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+    .status-badge-sakit {
+        background: #f3e8ff;
+        color: #7e22ce;
+    }
+    .status-badge-belum {
+        background: #f1f5f9;
+        color: #94a3b8;
+    }
+    .rp-modal-footer {
+        padding: 12px 24px 16px;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: flex-end;
+    }
+    .rp-btn-tutup {
+        padding: 6px 18px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #334155;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .rp-btn-tutup:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+</style>
+
+<div style="display:flex; flex-direction:column; gap:16px;">
+
+    {{-- CARD TABEL UTAMA (FILAMENT 3.X CLEAN TABLE) --}}
+    <div class="filament-card">
+
+        {{-- Header Card: Data Presensi Sholat, Pencarian, Filter Icon, Refresh & Unduh Rekap --}}
+        <div class="filament-card-header">
+            <div class="filament-card-title-wrap">
+                <h3 class="filament-card-title">Data Presensi Sholat</h3>
+                <span class="filament-badge-count">{{ $stats['total_target'] }} Santri</span>
+            </div>
+
+            <div class="filament-header-actions">
+                {{-- Search Bar Client-Side Live + Server Fallback --}}
+                <div class="filament-search-wrap">
+                    <svg class="filament-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text"
+                           id="filamentLiveSearch"
+                           value="{{ $search }}"
+                           placeholder="Cari..."
+                           class="filament-search-input">
+                </div>
+
+                {{-- Tombol Filter Icon dengan Badge Angka --}}
+                <button type="button"
+                        id="btnToggleFilterPanel"
+                        class="filament-btn-icon"
+                        title="Filter Data Presensi"
+                        onclick="toggleFilterPanel()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                    </svg>
+                    <span class="filament-filter-badge" id="badgeActiveFilterCount">{{ $activeFiltersCount }}</span>
+                </button>
+
+                {{-- Tombol Refresh --}}
+                <a href="{{ route('rekap.sholat.index') }}" class="filament-btn-icon" title="Muat Ulang / Reset Data">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                </a>
+
+                {{-- Tombol Unduh Rekap (Ungu Filament) --}}
+                <a href="{{ route('rekap.sholat.export', array_merge(request()->query(), ['format' => 'excel'])) }}"
+                   class="filament-btn-primary"
+                   title="Unduh Rekap Excel / CSV">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Unduh Rekap</span>
+                </a>
             </div>
         </div>
 
-        <div class="form-section-card stat-summary-card">
-            <span class="stat-summary-label">HADIR TEPAT (H)</span>
-            <div class="stat-summary-val-wrap">
-                <span class="stat-summary-num" style="color:#059669;">{{ $stats['hadir'] }}</span>
-                <span class="stat-summary-sub">Sesi</span>
-            </div>
-        </div>
+        {{-- Panel Filter Dropdown (Toggled by Filter Icon) --}}
+        <div id="filamentFilterPanel" class="filament-filter-panel" style="{{ $activeFiltersCount > 0 ? '' : 'display:none;' }}">
+            <form action="{{ route('rekap.sholat.index') }}" method="GET" id="formFilterSholat" style="display:contents;">
+                <input type="hidden" name="search" id="formHiddenSearch" value="{{ $search }}">
+                <input type="hidden" name="per_page" value="{{ $perPage }}">
 
-        <div class="form-section-card stat-summary-card">
-            <span class="stat-summary-label">TERLAMBAT (T)</span>
-            <div class="stat-summary-val-wrap">
-                <span class="stat-summary-num" style="color:#D97706;">{{ $stats['terlambat'] }}</span>
-                <span class="stat-summary-sub">Sesi</span>
-            </div>
-        </div>
-
-        <div class="form-section-card stat-summary-card">
-            <span class="stat-summary-label">IZIN / SAKIT (I)</span>
-            <div class="stat-summary-val-wrap">
-                <span class="stat-summary-num" style="color:#2563EB;">{{ $stats['izin_sakit'] }}</span>
-                <span class="stat-summary-sub">Sesi</span>
-            </div>
-        </div>
-
-        <div class="form-section-card stat-summary-card">
-            <span class="stat-summary-label">ALPHA (A)</span>
-            <div class="stat-summary-val-wrap">
-                <span class="stat-summary-num" style="color:#DC2626;">{{ $stats['alfa'] }}</span>
-                <span class="stat-summary-sub">Sesi</span>
-            </div>
-        </div>
-    </div>
-
-    {{-- 2. Filter Bar Terpadu (Gaya Tabel Menu Lainnya) --}}
-    <div class="form-section-card filter-card">
-        <form action="{{ route('rekap.sholat.index') }}" method="GET" class="filter-form" id="filterFormSholat">
-            <div class="filter-group-left">
-
-                {{-- Rentang Waktu (Harian / Mingguan / Bulanan) --}}
-                <div class="filter-select-wrap">
-                    <div class="filter-select-icon-left">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                    </div>
-                    <select name="rentang" id="selectRentang" class="form-select filter-select" onchange="this.form.submit()">
+                {{-- Rentang Waktu --}}
+                <div class="filament-filter-field">
+                    <label>Rentang Waktu</label>
+                    <select name="rentang" class="filament-filter-select" onchange="this.form.submit()">
                         <option value="harian" {{ $rentang === 'harian' ? 'selected' : '' }}>Harian</option>
                         <option value="mingguan" {{ $rentang === 'mingguan' ? 'selected' : '' }}>Mingguan</option>
                         <option value="bulanan" {{ $rentang === 'bulanan' ? 'selected' : '' }}>Bulanan</option>
                     </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </div>
                 </div>
 
-                {{-- Input Tanggal (Mode Harian & Mingguan) --}}
+                {{-- Tanggal / Bulan --}}
                 @if($rentang !== 'bulanan')
-                <div class="filter-select-wrap">
-                    <div class="filter-select-icon-left">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                    </div>
-                    <input type="date" name="tanggal" value="{{ $tanggal }}"
-                           class="form-control"
-                           style="border:none; background:transparent; font-size:13px; font-weight:600; padding-left:36px; padding-right:12px; height:38px; outline:none;"
-                           onchange="this.form.submit()">
+                <div class="filament-filter-field">
+                    <label>Tanggal</label>
+                    <input type="date" name="tanggal" value="{{ $tanggal }}" class="filament-filter-input" onchange="this.form.submit()">
                 </div>
                 @else
-                {{-- Pilihan Bulan & Tahun (Mode Bulanan) --}}
-                <div class="filter-select-wrap">
-                    <select name="bulan" class="form-select filter-select" onchange="this.form.submit()">
-                        @foreach($namaBulanList as $num => $lbl)
-                            <option value="{{ $num }}" {{ (int) $bulan === (int) $num ? 'selected' : '' }}>{{ $lbl }}</option>
-                        @endforeach
-                    </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    </div>
-                </div>
-                <div class="filter-select-wrap">
-                    <select name="tahun" class="form-select filter-select" style="min-width:90px;" onchange="this.form.submit()">
-                        @for($y = date('Y') + 1; $y >= 2023; $y--)
-                            <option value="{{ $y }}" {{ (int) $tahun === (int) $y ? 'selected' : '' }}>{{ $y }}</option>
-                        @endfor
-                    </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <div class="filament-filter-field">
+                    <label>Bulan & Tahun</label>
+                    <div style="display:flex;gap:4px;">
+                        <select name="bulan" class="filament-filter-select" onchange="this.form.submit()">
+                            @foreach($namaBulanList as $num => $lbl)
+                                <option value="{{ $num }}" {{ (int) $bulan === (int) $num ? 'selected' : '' }}>{{ $lbl }}</option>
+                            @endforeach
+                        </select>
+                        <select name="tahun" class="filament-filter-select" style="min-width:75px;" onchange="this.form.submit()">
+                            @for($y = date('Y') + 1; $y >= 2023; $y--)
+                                <option value="{{ $y }}" {{ (int) $tahun === (int) $y ? 'selected' : '' }}>{{ $y }}</option>
+                            @endfor
+                        </select>
                     </div>
                 </div>
                 @endif
 
                 {{-- Filter Sesi Sholat --}}
-                <div class="filter-select-wrap">
-                    <select name="sesi_sholat" class="form-select filter-select" onchange="this.form.submit()">
+                <div class="filament-filter-field">
+                    <label>Sesi Sholat</label>
+                    <select name="sesi_sholat" class="filament-filter-select" onchange="this.form.submit()">
                         <option value="semua" {{ $filterSesiSholat === 'semua' ? 'selected' : '' }}>Semua Sholat</option>
                         <option value="subuh" {{ $filterSesiSholat === 'subuh' ? 'selected' : '' }}>Subuh</option>
                         <option value="dzuhur" {{ $filterSesiSholat === 'dzuhur' ? 'selected' : '' }}>Dzuhur</option>
-                        <option value="ashar" {{ $filterSesiSholat === 'ashar' ? 'selected' : '' }}>Ashar</option>
+                        <option value="ashar" {{ $filterSesiSholat === 'ashar' ? 'selected' : '' }}>Asar</option>
                         <option value="maghrib" {{ $filterSesiSholat === 'maghrib' ? 'selected' : '' }}>Maghrib</option>
                         <option value="isya" {{ $filterSesiSholat === 'isya' ? 'selected' : '' }}>Isya</option>
                     </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    </div>
                 </div>
 
                 {{-- Filter Kamar --}}
-                <div class="filter-select-wrap">
-                    <select name="kamar" class="form-select filter-select" onchange="this.form.submit()">
+                <div class="filament-filter-field">
+                    <label>Kamar Santri</label>
+                    <select name="kamar" class="filament-filter-select" onchange="this.form.submit()">
                         <option value="">Semua Kamar</option>
                         @foreach($kamarList as $kmr)
                             <option value="{{ $kmr }}" {{ $filterKamar === $kmr ? 'selected' : '' }}>{{ $kmr }}</option>
                         @endforeach
                     </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    </div>
                 </div>
 
-                {{-- Filter Jenjang (SMP / SMA / Reguler) --}}
-                <div class="filter-select-wrap">
-                    <select name="jenjang" class="form-select filter-select" onchange="this.form.submit()">
+                {{-- Filter Jenjang --}}
+                <div class="filament-filter-field">
+                    <label>Jenjang</label>
+                    <select name="jenjang" class="filament-filter-select" onchange="this.form.submit()">
                         <option value="semua" {{ $filterJenjang === 'semua' ? 'selected' : '' }}>Semua Jenjang</option>
                         <option value="smp" {{ $filterJenjang === 'smp' ? 'selected' : '' }}>SMP</option>
                         <option value="sma" {{ $filterJenjang === 'sma' ? 'selected' : '' }}>SMA</option>
                         <option value="reguler" {{ $filterJenjang === 'reguler' ? 'selected' : '' }}>Reguler</option>
                     </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                    </div>
                 </div>
 
                 {{-- Reset Button --}}
-                @if(request()->hasAny(['kamar', 'jenjang', 'sesi_sholat', 'search', 'bulan', 'tahun']) || request('rentang') === 'mingguan' || request('rentang') === 'bulanan')
-                <a href="{{ route('rekap.sholat.index') }}" class="btn btn-secondary filter-btn-reset">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                    Reset
-                </a>
-                @endif
-            </div>
+                <div style="display:flex;gap:6px;">
+                    <a href="{{ route('rekap.sholat.index') }}" class="filament-btn-icon" style="height:32px;font-size:0.78rem;">
+                        Reset
+                    </a>
+                </div>
+            </form>
+        </div>
 
-            {{-- Pencarian Nama Siswa / NISN --}}
-            <div class="filter-search-wrap">
-                <input type="text"
-                       name="search"
-                       id="inputSearchNama"
-                       value="{{ $search }}"
-                       class="form-control filter-search-input"
-                       placeholder="Cari nama santri / NISN...">
-                <button type="submit" class="btn btn-primary filter-search-btn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                </button>
-            </div>
-        </form>
-    </div>
-
-    {{-- 3. Tabel Rekap Presensi Sholat (Gaya Tabel Rekap Sekolah) --}}
-    <div class="table-card rekap-matrix-card">
-        <div class="table-wrapper rekap-scroll-wrap">
-            <table class="rekap-matrix-table" id="tablePresensiSholat">
+        {{-- Tabel Presensi Sholat (Hanya Nama, Hadir, Telat, Izin, Alfa) --}}
+        <div style="overflow-x:auto;">
+            <table class="filament-table" id="tablePresensiSholatFilament">
                 <thead>
-                    {{-- Baris 1: Header Atas --}}
                     <tr>
-                        <th rowspan="2" class="th-fixed th-col-no">NO</th>
-                        <th rowspan="2" class="th-fixed th-col-nama">NAMA SANTRI</th>
-                        <th rowspan="2" style="min-width:140px; text-align:left; padding-left:12px;">KAMAR / JENJANG</th>
-                        <th colspan="5" class="th-date-group" style="text-align:center;">
-                            WAKTU SHOLAT
-                            @if($rentang === 'harian')
-                                &mdash; {{ $tanggalCarbon->translatedFormat('d F Y') }}
-                            @elseif($rentang === 'mingguan')
-                                &mdash; {{ $startDate->translatedFormat('d M') }} s/d {{ $endDate->translatedFormat('d M Y') }}
-                            @else
-                                &mdash; {{ $namaBulan }} {{ $tahun }}
-                            @endif
-                        </th>
-                        <th colspan="4" class="th-stat-summary" style="text-align:center; background:#F1F5F9; color:#334155;">REKAPAN</th>
-                    </tr>
-
-                    {{-- Baris 2: Sub-Header 5 Waktu Sholat & Rekapan H T I A --}}
-                    <tr>
-                        <th class="th-mapel-code" style="text-align:center; min-width:70px; {{ $filterSesiSholat === 'subuh' ? 'background:#EFF6FF !important;' : '' }}">
-                            <span class="mapel-code" style="font-size:11.5px;">SUBUH</span>
-                        </th>
-                        <th class="th-mapel-code" style="text-align:center; min-width:70px; {{ $filterSesiSholat === 'dzuhur' ? 'background:#EFF6FF !important;' : '' }}">
-                            <span class="mapel-code" style="font-size:11.5px;">DZUHUR</span>
-                        </th>
-                        <th class="th-mapel-code" style="text-align:center; min-width:70px; {{ $filterSesiSholat === 'ashar' ? 'background:#EFF6FF !important;' : '' }}">
-                            <span class="mapel-code" style="font-size:11.5px;">ASHAR</span>
-                        </th>
-                        <th class="th-mapel-code" style="text-align:center; min-width:70px; {{ $filterSesiSholat === 'maghrib' ? 'background:#EFF6FF !important;' : '' }}">
-                            <span class="mapel-code" style="font-size:11.5px;">MAGHRIB</span>
-                        </th>
-                        <th class="th-mapel-code" style="text-align:center; min-width:70px; {{ $filterSesiSholat === 'isya' ? 'background:#EFF6FF !important;' : '' }}">
-                            <span class="mapel-code" style="font-size:11.5px;">ISYA</span>
-                        </th>
-
-                        {{-- Kolom Rekapan H, T, I, A --}}
-                        <th class="th-stat-summary col-stat-h" title="Hadir Tepat Waktu">H</th>
-                        <th class="th-stat-summary col-stat-t" title="Terlambat">T</th>
-                        <th class="th-stat-summary col-stat-i" title="Izin / Sakit">I</th>
-                        <th class="th-stat-summary col-stat-a" title="Alpha">A</th>
+                        <th style="width:38%;">Nama</th>
+                        <th style="text-align:center;width:15%;">Hadir</th>
+                        <th style="text-align:center;width:15%;">Telat</th>
+                        <th style="text-align:center;width:15%;">Izin</th>
+                        <th style="text-align:center;width:15%;">Alfa</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($rows as $idx => $row)
-                    <tr class="row-santri-sholat" data-search="{{ mb_strtolower($row['nama_lengkap'] . ' ' . $row['nisn'] . ' ' . $row['kamar'] . ' ' . $row['jenjang']) }}">
-                        {{-- Kolom No --}}
-                        <td class="td-col-no">{{ $idx + 1 }}</td>
-
-                        {{-- Kolom Nama Santri & NISN --}}
-                        <td class="td-col-nama">
-                            <div class="siswa-nama-text">{{ $row['nama_lengkap'] }}</div>
-                            <div class="siswa-nisn-text">NISN: {{ $row['nisn'] }}</div>
+                    @forelse($paginatedRows as $row)
+                    @php
+                        $jsonDetail = htmlspecialchars(json_encode([
+                            'nama'      => $row['nama_lengkap'],
+                            'nisn'      => $row['nisn'],
+                            'kamar'     => $row['kamar'],
+                            'jenjang'   => $row['jenjang'],
+                            'hadir'     => $row['total_h'],
+                            'terlambat' => $row['total_t'],
+                            'izin'      => $row['total_i'],
+                            'sakit'     => $row['total_s'],
+                            'alpa'      => $row['total_a'],
+                            'riwayat'   => $row['riwayat'],
+                        ]), ENT_QUOTES, 'UTF-8');
+                    @endphp
+                    <tr class="filament-row-santri" data-search="{{ mb_strtolower($row['nama_lengkap'] . ' ' . $row['nisn'] . ' ' . $row['kamar']) }}">
+                        {{-- Nama Santri Clickable (Memicu Pop-up Modal) --}}
+                        <td>
+                            <a href="javascript:void(0)"
+                               class="col-nama-link js-trigger-detail"
+                               data-detail="{{ $jsonDetail }}">
+                                {{ $row['nama_lengkap'] }}
+                            </a>
                         </td>
 
-                        {{-- Kolom Kamar / Jenjang --}}
-                        <td style="padding-left:12px;">
-                            <div style="font-weight:600; font-size:13px; color:#1E293B;">{{ $row['kamar'] }}</div>
-                            <div style="font-size:11.5px; color:#64748B;">{{ $row['jenjang'] }}</div>
+                        {{-- Hadir --}}
+                        <td style="text-align:center;font-weight:600;color:#0f172a;">
+                            {{ $row['total_h'] }}
                         </td>
 
-                        {{-- 5 Waktu Sholat: Subuh, Dzuhur, Ashar, Maghrib, Isya --}}
-                        @foreach(['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'] as $sKey)
-                            @php
-                                $shItem = $row['sholat'][$sKey] ?? null;
-                                $code = $shItem['code'] ?? '-';
-                                $disp = $shItem['display'] ?? '-';
-                                $jam = $shItem['jam'] ?? null;
-                            @endphp
-                            <td class="td-matrix-cell" style="{{ $filterSesiSholat === $sKey ? 'background:#F8FAFC;' : '' }}">
-                                @if($rentang === 'harian')
-                                    @if($code === 'H')
-                                        <span class="absen-pill pill-h" title="Hadir{{ $jam ? ' - ' . $jam : '' }}">{{ $jam ?: 'H' }}</span>
-                                    @elseif($code === 'T')
-                                        <span class="absen-pill pill-s" title="Terlambat{{ $jam ? ' - ' . $jam : '' }}">{{ $jam ?: 'T' }}</span>
-                                    @elseif($code === 'I')
-                                        <span class="absen-pill pill-i" title="Izin / Sakit">I</span>
-                                    @elseif($code === 'A')
-                                        <span class="absen-pill pill-a" title="Alpha">A</span>
-                                    @else
-                                        <span class="absen-pill-empty" title="Belum Berlangsung">&mdash;</span>
-                                    @endif
-                                @else
-                                    {{-- Mode Mingguan / Bulanan --}}
-                                    @if($disp !== '-')
-                                        <span style="font-size:12px; font-weight:700; color:#334155; padding:3px 6px; background:#F1F5F9; border-radius:6px;">
-                                            {{ $disp }}
-                                        </span>
-                                    @else
-                                        <span class="absen-pill-empty">&mdash;</span>
-                                    @endif
-                                @endif
-                            </td>
-                        @endforeach
+                        {{-- Telat --}}
+                        <td style="text-align:center;font-weight:600;color:#0f172a;">
+                            {{ $row['total_t'] }}
+                        </td>
 
-                        {{-- Kolom Total Rekapan H, T, I, A --}}
-                        <td class="td-stat-val val-h">{{ $row['total_h'] }}</td>
-                        <td class="td-stat-val val-t">{{ $row['total_t'] }}</td>
-                        <td class="td-stat-val {{ $row['total_i'] > 0 ? 'val-i-active' : 'val-muted' }}">{{ $row['total_i'] }}</td>
-                        <td class="td-stat-val {{ $row['total_a'] > 0 ? 'val-a-active' : 'val-muted' }}">{{ $row['total_a'] }}</td>
+                        {{-- Izin (Izin + Sakit) --}}
+                        <td style="text-align:center;font-weight:600;color:#0f172a;">
+                            {{ $row['total_i'] + $row['total_s'] }}
+                        </td>
+
+                        {{-- Alfa --}}
+                        <td style="text-align:center;font-weight:600;color:#0f172a;">
+                            {{ $row['total_a'] }}
+                        </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="12" class="rekap-empty-row">
-                            <div class="empty-state-wrap">
-                                <span class="empty-text">Tidak ada data presensi sholat santri yang sesuai filter.</span>
-                            </div>
+                        <td colspan="5" style="text-align:center;padding:40px 16px;color:#94a3b8;">
+                            Tidak ada data presensi sholat santri yang ditemukan.
                         </td>
                     </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
+
+        {{-- Footer Card: "Menampilkan 1 sampai 10 dari 238 hasil" & Pagination --}}
+        <div class="filament-card-footer">
+            <div>
+                @php
+                    $from = $paginatedRows->total() > 0 ? ($paginatedRows->currentPage() - 1) * $paginatedRows->perPage() + 1 : 0;
+                    $to = min($paginatedRows->currentPage() * $paginatedRows->perPage(), $paginatedRows->total());
+                @endphp
+                Menampilkan <strong>{{ $from }}</strong> sampai <strong>{{ $to }}</strong> dari <strong>{{ $paginatedRows->total() }}</strong> hasil
+            </div>
+
+            {{-- Pagination Links --}}
+            <div class="filament-pagination">
+                {{-- Previous --}}
+                @if($paginatedRows->onFirstPage())
+                    <span class="filament-page-btn" style="opacity:0.35;cursor:default;">&lt;</span>
+                @else
+                    <a href="{{ $paginatedRows->previousPageUrl() }}" class="filament-page-btn">&lt;</a>
+                @endif
+
+                {{-- Page Numbers (Compact Sliding Window) --}}
+                @php
+                    $last = $paginatedRows->lastPage();
+                    $curr = $paginatedRows->currentPage();
+                    $pages = [];
+                    if ($last <= 7) {
+                        $pages = range(1, $last);
+                    } else {
+                        if ($curr <= 3) {
+                            $pages = [1, 2, 3, 4, '...', $last];
+                        } elseif ($curr >= $last - 2) {
+                            $pages = [1, '...', $last - 3, $last - 2, $last - 1, $last];
+                        } else {
+                            $pages = [1, '...', $curr - 1, $curr, $curr + 1, '...', $last];
+                        }
+                    }
+                @endphp
+
+                @foreach($pages as $p)
+                    @if($p === '...')
+                        <span class="filament-page-ellipsis">&hellip;</span>
+                    @elseif((int) $p === (int) $curr)
+                        <span class="filament-page-btn active">{{ $p }}</span>
+                    @else
+                        <a href="{{ $paginatedRows->url($p) }}" class="filament-page-btn">{{ $p }}</a>
+                    @endif
+                @endforeach
+
+                {{-- Next --}}
+                @if($paginatedRows->hasMorePages())
+                    <a href="{{ $paginatedRows->nextPageUrl() }}" class="filament-page-btn">&gt;</a>
+                @else
+                    <span class="filament-page-btn" style="opacity:0.35;cursor:default;">&gt;</span>
+                @endif
+            </div>
+
+            {{-- Per Halaman Selector --}}
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span>per halaman</span>
+                <select class="filament-filter-select"
+                        style="width:auto;padding:3px 8px;height:28px;"
+                        onchange="changePerPage(this.value)">
+                    <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
+                    <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
+                    <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
+                    <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
+                </select>
+            </div>
+        </div>
+
     </div>
 
 </div>
 
+{{-- MODAL POP-UP RINCIAN KEHADIRAN SISWA (GAMBAR 2) --}}
+<div id="modalRincianSiswa" class="rp-modal-backdrop" style="display:none;">
+    <div class="rp-modal-dialog">
+
+        {{-- Modal Header --}}
+        <div class="rp-modal-header">
+            <div>
+                <h3 class="rp-modal-title">Rincian Kehadiran Siswa</h3>
+                <div class="rp-modal-sub" id="modalSubtitleText">Nama Siswa &bull; NISN: -</div>
+            </div>
+            <button type="button" class="rp-modal-close-btn" onclick="closeRincianModal()">&times;</button>
+        </div>
+
+        {{-- Modal Body --}}
+        <div class="rp-modal-body">
+
+            {{-- Kotak Metrik 5 Kolom Rounded --}}
+            <div class="rp-metrics-box">
+                <div class="rp-metric-item">
+                    <span class="rp-metric-label">HADIR</span>
+                    <span class="rp-metric-value" id="modalMetricHadir">0</span>
+                </div>
+                <div class="rp-metric-item">
+                    <span class="rp-metric-label">TERLAMBAT</span>
+                    <span class="rp-metric-value" id="modalMetricTerlambat">0</span>
+                </div>
+                <div class="rp-metric-item">
+                    <span class="rp-metric-label">IZIN</span>
+                    <span class="rp-metric-value" id="modalMetricIzin">0</span>
+                </div>
+                <div class="rp-metric-item">
+                    <span class="rp-metric-label">SAKIT</span>
+                    <span class="rp-metric-value" id="modalMetricSakit">0</span>
+                </div>
+                <div class="rp-metric-item">
+                    <span class="rp-metric-label">ALPA</span>
+                    <span class="rp-metric-value" id="modalMetricAlpa">0</span>
+                </div>
+            </div>
+
+            {{-- Tabel Riwayat Sesi Sholat --}}
+            <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+                <table class="rp-modal-table">
+                    <thead>
+                        <tr>
+                            <th style="width:25%;">TANGGAL</th>
+                            <th style="width:25%;">MATA PELAJARAN / SESI</th>
+                            <th style="width:18%;">STATUS</th>
+                            <th style="width:32%;">KETERANGAN</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalRiwayatTableBody">
+                        {{-- Diisi secara dinamis oleh JavaScript --}}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
+        {{-- Modal Footer --}}
+        <div class="rp-modal-footer">
+            <button type="button" class="rp-btn-tutup" onclick="closeRincianModal()">Tutup</button>
+        </div>
+
+    </div>
+</div>
+
 @push('scripts')
 <script>
+    function toggleFilterPanel() {
+        var p = document.getElementById('filamentFilterPanel');
+        if (p) {
+            p.style.display = (p.style.display === 'none' || p.style.display === '') ? 'grid' : 'none';
+        }
+    }
+
+    function changePerPage(val) {
+        var url = new URL(window.location.href);
+        url.searchParams.set('per_page', val);
+        url.searchParams.set('page', 1);
+        window.location.href = url.toString();
+    }
+
+    function openRincianModal(data) {
+        var modal = document.getElementById('modalRincianSiswa');
+        if (!modal) return;
+
+        document.getElementById('modalSubtitleText').textContent = (data.nama || '-') + ' • NISN: ' + (data.nisn || '-');
+        document.getElementById('modalMetricHadir').textContent = data.hadir || 0;
+        document.getElementById('modalMetricTerlambat').textContent = data.terlambat || 0;
+        document.getElementById('modalMetricIzin').textContent = data.izin || 0;
+        document.getElementById('modalMetricSakit').textContent = data.sakit || 0;
+        document.getElementById('modalMetricAlpa').textContent = data.alpa || 0;
+
+        var tbody = document.getElementById('modalRiwayatTableBody');
+        tbody.innerHTML = '';
+
+        var riwayat = data.riwayat || [];
+        if (riwayat.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:18px;color:#94a3b8;">Tidak ada data riwayat sholat.</td></tr>';
+        } else {
+            riwayat.forEach(function (item) {
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td>' + (item.tanggal || '-') + '</td>' +
+                               '<td><strong style="color:#0f172a;">' + (item.sesi || '-') + '</strong></td>' +
+                               '<td><span class="rp-badge-status ' + (item.badge || 'status-badge-alpa') + '">' + (item.status || 'ALPA') + '</span></td>' +
+                               '<td style="color:#64748b;font-size:0.75rem;">' + (item.keterangan || '-') + '</td>';
+                tbody.appendChild(tr);
+            });
+        }
+
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeRincianModal() {
+        var modal = document.getElementById('modalRincianSiswa');
+        if (modal) {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
-        var searchInput = document.getElementById('inputSearchNama');
+        // Klik pada Nama Santri memicu modal
+        document.querySelectorAll('.js-trigger-detail').forEach(function (el) {
+            el.addEventListener('click', function (e) {
+                e.preventDefault();
+                var raw = this.getAttribute('data-detail');
+                try {
+                    var data = JSON.parse(raw);
+                    openRincianModal(data);
+                } catch (err) {
+                    console.error('Error parsing detail JSON:', err);
+                }
+            });
+        });
+
+        // Close on backdrop click
+        var modal = document.getElementById('modalRincianSiswa');
+        if (modal) {
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) {
+                    closeRincianModal();
+                }
+            });
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeRincianModal();
+            }
+        });
+
+        // Live Search Input (Client side filter baris yang terlihat + Enter reload server side)
+        var searchInput = document.getElementById('filamentLiveSearch');
         if (searchInput) {
             searchInput.addEventListener('input', function () {
                 var q = (this.value || '').toLowerCase().trim();
-                var rows = document.querySelectorAll('#tablePresensiSholat tbody tr.row-santri-sholat');
+                var rows = document.querySelectorAll('#tablePresensiSholatFilament tbody tr.filament-row-santri');
                 rows.forEach(function (tr) {
                     var hay = tr.getAttribute('data-search') || '';
                     tr.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
                 });
+            });
+
+            searchInput.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('search', this.value.trim());
+                    url.searchParams.set('page', 1);
+                    window.location.href = url.toString();
+                }
             });
         }
     });

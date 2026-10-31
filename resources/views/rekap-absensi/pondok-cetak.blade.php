@@ -25,7 +25,7 @@
             margin-bottom: 18px;
         }
         .btn-print {
-            background: #2563eb;
+            background: #4f46e5;
             color: #ffffff;
             border: none;
             padding: 7px 14px;
@@ -61,7 +61,7 @@
         }
         th, td {
             border: 1px solid #94a3b8;
-            padding: 5px 6px;
+            padding: 6px 8px;
             text-align: left;
         }
         th {
@@ -108,32 +108,24 @@
 
     <div class="summary-row">
         <div class="summary-box"><strong>Total Santri:</strong> {{ $stats['total_target'] }}</div>
-        <div class="summary-box"><strong>Hadir Tepat (H):</strong> {{ $stats['hadir'] }}</div>
-        <div class="summary-box"><strong>Terlambat (T):</strong> {{ $stats['terlambat'] }}</div>
-        <div class="summary-box"><strong>Izin / Sakit (I):</strong> {{ $stats['izin_sakit'] }}</div>
-        <div class="summary-box"><strong>Alpha (A):</strong> {{ $stats['alfa'] }}</div>
+        <div class="summary-box"><strong>Hadir Tepat:</strong> {{ $stats['hadir'] }}</div>
+        <div class="summary-box"><strong>Terlambat:</strong> {{ $stats['terlambat'] }}</div>
+        <div class="summary-box"><strong>Izin / Sakit:</strong> {{ $stats['izin_sakit'] }}</div>
+        <div class="summary-box"><strong>Alpha:</strong> {{ $stats['alfa'] }}</div>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th rowspan="2" style="width:32px; text-align:center;">No</th>
-                <th rowspan="2">NISN</th>
-                <th rowspan="2">Nama Santri</th>
-                <th rowspan="2">Kamar / Jenjang</th>
-                <th colspan="5" style="text-align:center;">Waktu Sholat</th>
-                <th colspan="4" style="text-align:center;">Rekapan</th>
-            </tr>
-            <tr>
-                <th style="text-align:center;width:60px;">Subuh</th>
-                <th style="text-align:center;width:60px;">Dzuhur</th>
-                <th style="text-align:center;width:60px;">Ashar</th>
-                <th style="text-align:center;width:60px;">Maghrib</th>
-                <th style="text-align:center;width:60px;">Isya</th>
-                <th style="text-align:center;width:35px;">H</th>
-                <th style="text-align:center;width:35px;">T</th>
-                <th style="text-align:center;width:35px;">I</th>
-                <th style="text-align:center;width:35px;">A</th>
+                <th style="width:36px; text-align:center;">No</th>
+                <th style="width:110px;">NISN</th>
+                <th>Nama Santri</th>
+                <th>Kamar</th>
+                <th>Jenjang</th>
+                <th style="text-align:center;width:60px;">Hadir</th>
+                <th style="text-align:center;width:60px;">Telat</th>
+                <th style="text-align:center;width:60px;">Izin</th>
+                <th style="text-align:center;width:60px;">Alfa</th>
             </tr>
         </thead>
         <tbody>
@@ -142,20 +134,16 @@
                     <td style="text-align:center;">{{ $idx + 1 }}</td>
                     <td>{{ $r['nisn'] }}</td>
                     <td><strong>{{ $r['nama_lengkap'] }}</strong></td>
-                    <td>{{ $r['kamar'] }} / {{ $r['jenjang'] }}</td>
-                    <td style="text-align:center;">{{ $r['sholat']['subuh']['display'] ?? '-' }}</td>
-                    <td style="text-align:center;">{{ $r['sholat']['dzuhur']['display'] ?? '-' }}</td>
-                    <td style="text-align:center;">{{ $r['sholat']['ashar']['display'] ?? '-' }}</td>
-                    <td style="text-align:center;">{{ $r['sholat']['maghrib']['display'] ?? '-' }}</td>
-                    <td style="text-align:center;">{{ $r['sholat']['isya']['display'] ?? '-' }}</td>
-                    <td style="text-align:center;font-weight:700;">{{ $r['total_h'] }}</td>
-                    <td style="text-align:center;font-weight:700;">{{ $r['total_t'] }}</td>
-                    <td style="text-align:center;font-weight:700;">{{ $r['total_i'] }}</td>
-                    <td style="text-align:center;font-weight:700;">{{ $r['total_a'] }}</td>
+                    <td>{{ $r['kamar'] }}</td>
+                    <td>{{ $r['jenjang'] }}</td>
+                    <td style="text-align:center;font-weight:700;color:#15803d;">{{ $r['total_h'] }}</td>
+                    <td style="text-align:center;font-weight:700;color:#b45309;">{{ $r['total_t'] }}</td>
+                    <td style="text-align:center;font-weight:700;color:#1d4ed8;">{{ $r['total_i'] + $r['total_s'] }}</td>
+                    <td style="text-align:center;font-weight:700;color:#b91c1c;">{{ $r['total_a'] }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="13" style="text-align:center;padding:18px;">Tidak ada data santri.</td>
+                    <td colspan="9" style="text-align:center;padding:18px;">Tidak ada data santri.</td>
                 </tr>
             @endforelse
         </tbody>
