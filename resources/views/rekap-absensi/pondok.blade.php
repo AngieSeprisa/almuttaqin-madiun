@@ -274,6 +274,33 @@
         color: #111827;
     }
 
+    .fi-filter-card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        overflow: hidden;
+        margin-bottom: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    .btn-detail-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 14px;
+        border-radius: 20px;
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #dbeafe;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .btn-detail-pill:hover {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
     /* Buttons */
     .fi-btn-wa {
         display: inline-flex;
@@ -620,88 +647,67 @@
 
 <div class="rp-page-container">
 
-    {{-- 1. KARTU STATISTIK RINGKASAN (STATS CARDS) --}}
-    <div class="rp-stats-grid">
-        {{-- Card 1: Total Target Santri --}}
+    {{-- Breadcrumb & Title Sesuai Gambar 2 --}}
+    <div style="margin-bottom: 2px;">
+        <div style="font-size:12.5px; color:#64748b; margin-bottom:4px;">
+            Rekap Presensi Sholat &rsaquo; <span style="color:#0f172a; font-weight:600;">Sholat 5 Waktu</span>
+        </div>
+        <h2 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 16px 0;">{{ $pageTitle ?? 'Rekap Presensi Sholat' }}</h2>
+    </div>
+
+    @if(empty($forcedKategori))
+    {{-- Kartu Statistik Ringkasan --}}
+    <div class="rp-stats-grid" style="margin-bottom: 14px;">
         <div class="rp-stat-card">
             <div class="rp-stat-header">
                 <span class="rp-stat-label">Total Target Santri</span>
                 <div class="rp-stat-icon-wrap" style="background:#eff6ff;color:#2563eb;">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                 </div>
             </div>
             <div class="rp-stat-value">{{ $stats['total_target'] }}</div>
         </div>
-
-        {{-- Card 2: Hadir Tepat Waktu --}}
         <div class="rp-stat-card">
             <div class="rp-stat-header">
                 <span class="rp-stat-label">Hadir Tepat Waktu</span>
                 <div class="rp-stat-icon-wrap" style="background:#f0fdf4;color:#16a34a;">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                 </div>
             </div>
             <div class="rp-stat-value" style="color:#15803d;">{{ $stats['hadir'] }}</div>
         </div>
-
-        {{-- Card 3: Terlambat --}}
         <div class="rp-stat-card">
             <div class="rp-stat-header">
                 <span class="rp-stat-label">Terlambat</span>
                 <div class="rp-stat-icon-wrap" style="background:#fffbeb;color:#d97706;">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                 </div>
             </div>
             <div class="rp-stat-value" style="color:#b45309;">{{ $stats['terlambat'] }}</div>
         </div>
-
-        {{-- Card 4: Izin / Sakit --}}
         <div class="rp-stat-card">
             <div class="rp-stat-header">
                 <span class="rp-stat-label">Sakit / Izin</span>
                 <div class="rp-stat-icon-wrap" style="background:#f5f3ff;color:#7c3aed;">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                 </div>
             </div>
             <div class="rp-stat-value" style="color:#6d28d9;">{{ $stats['izin_sakit'] }}</div>
         </div>
-
-        {{-- Card 5: Tidak Hadir / Alfa --}}
         <div class="rp-stat-card">
             <div class="rp-stat-header">
                 <span class="rp-stat-label">Alpha / Tidak Hadir</span>
                 <div class="rp-stat-icon-wrap" style="background:#fef2f2;color:#dc2626;">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="15" y1="9" x2="9" y2="15"></line>
-                        <line x1="9" y1="9" x2="15" y2="15"></line>
-                    </svg>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
                 </div>
             </div>
             <div class="rp-stat-value" style="color:#b91c1c;">{{ $stats['alfa'] }}</div>
         </div>
     </div>
+    @endif
 
-    {{-- 2. FILAMENT TABLE CONTAINER (FILTERS + TOOLBAR + TABLE) --}}
-    <div class="fi-ta-ctn">
-
-        {{-- FILAMENT TABLE FILTERS (ABOVE CONTENT) --}}
+    {{-- 1. PANEL FILTER REKAP PRESENSI (PERSIS GAMBAR 2) --}}
+    <div class="fi-filter-card" id="panelFilterRekap">
         <form action="{{ route(($routeBase ?? 'rekap.pondok') . '.index') }}" method="GET" id="formFilamentFilters">
             <input type="hidden" name="search" id="filterHiddenSearch" value="{{ $search }}">
             <input type="hidden" name="per_page" value="{{ $perPage }}">
@@ -710,58 +716,31 @@
             @endif
 
             <div class="fi-ta-filters">
-                <div class="fi-ta-filters-header">
-                    <h4 class="fi-ta-filters-heading">Filters</h4>
-                    <a href="{{ route(($routeBase ?? 'rekap.pondok') . '.index') }}" class="fi-ta-filters-reset-btn">Reset</a>
+                <div class="fi-ta-filters-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6366f1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="4" y1="21" x2="4" y2="14"></line>
+                            <line x1="4" y1="10" x2="4" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12" y2="3"></line>
+                            <line x1="20" y1="21" x2="20" y2="16"></line>
+                            <line x1="20" y1="12" x2="20" y2="3"></line>
+                            <line x1="1" y1="14" x2="7" y2="14"></line>
+                            <line x1="9" y1="8" x2="15" y2="8"></line>
+                            <line x1="17" y1="16" x2="23" y2="16"></line>
+                        </svg>
+                        <h4 class="fi-ta-filters-heading" style="font-size:14px;font-weight:700;color:#1e293b;margin:0;">Filter Rekap Presensi</h4>
+                    </div>
+                    <a href="{{ route(($routeBase ?? 'rekap.pondok') . '.index') }}" class="fi-ta-filters-reset-btn" style="color:#e11d48;font-size:13px;font-weight:600;text-decoration:none;">
+                        Atur ulang filter &times;
+                    </a>
                 </div>
 
+                {{-- Baris 1: Periode, Sesi/Waktu, Tanggal, Asrama/Kamar --}}
                 <div class="fi-ta-filters-grid">
-                    {{-- Filter Kategori Kegiatan (hanya tampil jika tidak di-forced khusus Sholat/Pengajian) --}}
-                    @if(empty($forcedKategori))
+                    {{-- Periode --}}
                     <div class="fi-filter-item">
-                        <label class="fi-filter-label">Kategori Kegiatan</label>
-                        <select name="kategori" class="fi-select" onchange="this.form.submit()">
-                            @foreach($kategoriList as $kKey => $kLabel)
-                                <option value="{{ $kKey }}" {{ $kategori === $kKey ? 'selected' : '' }}>{{ $kLabel }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @endif
-
-                    {{-- Filter Sesi Spesifik --}}
-                    <div class="fi-filter-item">
-                        <label class="fi-filter-label">{{ $kategori === 'sholat' ? 'Sesi Sholat' : ($kategori === 'pengajian' ? 'Sesi Pengajian' : 'Sesi Presensi') }}</label>
-                        <select name="sesi_id" class="fi-select" onchange="this.form.submit()">
-                            @foreach($sesiOptions as $sId => $sLabel)
-                                <option value="{{ $sId }}" {{ (string) $sesi_id === (string) $sId ? 'selected' : '' }}>{{ $sLabel }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    {{-- Filter Kamar Asrama --}}
-                    <div class="fi-filter-item">
-                        <label class="fi-filter-label">Kamar Santri</label>
-                        <select name="kamar" class="fi-select" onchange="this.form.submit()">
-                            <option value="">Semua Kamar</option>
-                            @foreach($kamarList as $kmr)
-                                <option value="{{ $kmr }}" {{ $kamar === $kmr ? 'selected' : '' }}>{{ $kmr }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    {{-- Filter Jenjang --}}
-                    <div class="fi-filter-item">
-                        <label class="fi-filter-label">Jenjang</label>
-                        <select name="jenjang" class="fi-select" onchange="this.form.submit()">
-                            @foreach(($jenjangList ?? ['semua' => 'Semua Jenjang', 'smp' => 'SMP AL MUTTAQIN', 'sma' => 'SMA AL MUTTAQIN', 'reguler' => 'Reguler']) as $jKey => $jLabel)
-                                <option value="{{ $jKey }}" {{ strtolower($jenjang ?? 'semua') === strtolower($jKey) ? 'selected' : '' }}>{{ $jLabel }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    {{-- Filter Rentang Waktu --}}
-                    <div class="fi-filter-item">
-                        <label class="fi-filter-label">Rentang Waktu</label>
+                        <label class="fi-filter-label">Periode</label>
                         <select name="rentang" class="fi-select" onchange="this.form.submit()">
                             <option value="harian" {{ $rentang === 'harian' ? 'selected' : '' }}>Harian</option>
                             <option value="mingguan" {{ $rentang === 'mingguan' ? 'selected' : '' }}>Mingguan</option>
@@ -769,7 +748,17 @@
                         </select>
                     </div>
 
-                    {{-- Filter Tanggal / Bulan --}}
+                    {{-- Sesi / Waktu --}}
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Sesi / Waktu</label>
+                        <select name="sesi_id" class="fi-select" onchange="this.form.submit()">
+                            @foreach($sesiOptions as $sId => $sLabel)
+                                <option value="{{ $sId }}" {{ (string) $sesi_id === (string) $sId ? 'selected' : '' }}>{{ $sLabel }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Tanggal / Bulan --}}
                     <div class="fi-filter-item">
                         @if($rentang !== 'bulanan')
                             <label class="fi-filter-label">Tanggal</label>
@@ -791,44 +780,68 @@
                         @endif
                     </div>
 
-                    {{-- Filter Kelas Pengajian (tampil jika bukan sholat khusus) --}}
-                    @if($kategori !== 'sholat')
+                    {{-- Asrama / Kamar --}}
                     <div class="fi-filter-item">
-                        <label class="fi-filter-label">Kelas Pengajian</label>
-                        <select name="kelas_pengajian_id" class="fi-select" onchange="this.form.submit()">
-                            <option value="semua">Semua Kelas Pengajian</option>
-                            @foreach($kelasPengajianList as $kp)
-                                <option value="{{ $kp->id }}" {{ (string) $kelas_pengajian_id === (string) $kp->id ? 'selected' : '' }}>{{ $kp->nama_kelas }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @endif
-
-                    {{-- Filter Kelas Sekolah --}}
-                    <div class="fi-filter-item">
-                        <label class="fi-filter-label">Kelas Sekolah</label>
-                        <select name="kelas" class="fi-select" onchange="this.form.submit()">
-                            <option value="semua">Semua Kelas</option>
-                            @foreach($kelasList as $kls)
-                                <option value="{{ $kls }}" {{ $kelas === $kls ? 'selected' : '' }}>Kelas {{ $kls }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    {{-- Filter Gender --}}
-                    <div class="fi-filter-item">
-                        <label class="fi-filter-label">Gender (Jenis Kelamin)</label>
-                        <select name="gender" class="fi-select" onchange="this.form.submit()">
-                            @foreach($genderList as $gKey => $gLabel)
-                                <option value="{{ $gKey }}" {{ $gender === $gKey ? 'selected' : '' }}>{{ $gLabel }}</option>
+                        <label class="fi-filter-label">Asrama / Kamar</label>
+                        <select name="kamar" class="fi-select" onchange="this.form.submit()">
+                            <option value="">Semua Kamar</option>
+                            @foreach($kamarList as $kmr)
+                                <option value="{{ $kmr }}" {{ $kamar === $kmr ? 'selected' : '' }}>{{ $kmr }}</option>
                             @endforeach
                         </select>
                     </div>
                 </div>
+
+                {{-- Baris 2: Status Absensi Sesi & Urutan (Persis Gambar 2) --}}
+                <div style="display:grid;grid-template-columns:1.8fr 1.2fr;gap:14px;margin-top:14px;align-items:end;">
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Status Absensi Sesi:</label>
+                        @if($sesi_id === 'semua' || empty($sesi_id))
+                            <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;font-size:12px;color:#64748b;">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                                <span>Filter "Belum Absen" aktif setelah Anda memilih salah satu Sesi / Waktu di atas</span>
+                            </div>
+                        @else
+                            <select name="status_absensi" class="fi-select" onchange="this.form.submit()">
+                                <option value="">Semua Status</option>
+                                <option value="hadir" {{ ($statusAbsensi ?? '') === 'hadir' ? 'selected' : '' }}>Hadir</option>
+                                <option value="terlambat" {{ ($statusAbsensi ?? '') === 'terlambat' ? 'selected' : '' }}>Terlambat</option>
+                                <option value="izin" {{ ($statusAbsensi ?? '') === 'izin' ? 'selected' : '' }}>Izin / Sakit</option>
+                                <option value="alpa" {{ ($statusAbsensi ?? '') === 'alpa' ? 'selected' : '' }}>Alfa</option>
+                                <option value="belum_absen" {{ ($statusAbsensi ?? '') === 'belum_absen' ? 'selected' : '' }}>Belum Absen</option>
+                            </select>
+                        @endif
+                    </div>
+
+                    <div class="fi-filter-item">
+                        <label class="fi-filter-label">Urutan:</label>
+                        <select name="urutan" class="fi-select" onchange="this.form.submit()">
+                            <option value="kehadiran_desc" {{ ($urutan ?? 'kehadiran_desc') === 'kehadiran_desc' ? 'selected' : '' }}>Kehadiran Tertinggi ke Terendah</option>
+                            <option value="kehadiran_asc" {{ ($urutan ?? '') === 'kehadiran_asc' ? 'selected' : '' }}>Kehadiran Terendah ke Tertinggi</option>
+                            <option value="alfa_desc" {{ ($urutan ?? '') === 'alfa_desc' ? 'selected' : '' }}>Alfa Terbanyak</option>
+                            <option value="nama_asc" {{ ($urutan ?? '') === 'nama_asc' ? 'selected' : '' }}>Nama Santri (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+
+                {{-- Baris 3: Tombol Terapkan & Tutup Panel --}}
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9;">
+                    <button type="submit" class="fi-btn-primary" style="background:#2563eb;padding:0 22px;">
+                        Terapkan Filter
+                    </button>
+                    <button type="button" onclick="togglePanelFilter()" style="background:transparent;border:none;color:#64748b;font-size:12.5px;font-weight:600;cursor:pointer;">
+                        Tutup Panel Filter &times;
+                    </button>
+                </div>
             </div>
         </form>
+    </div>
 
-        <div class="fi-ta-divider"></div>
+    {{-- 2. FILAMENT TABLE CONTAINER (PERSIS GAMBAR 2) --}}
+    <div class="fi-ta-ctn">
 
         {{-- TOOLBAR SEARCH & ACTIONS --}}
         <div class="fi-ta-toolbar">
@@ -894,16 +907,17 @@
             </div>
         </div>
 
-        {{-- FILAMENT TABLE (HANYA NAMA, HADIR, TELAT, IZIN, ALFA) --}}
+        {{-- FILAMENT TABLE (HANYA NAMA, HADIR, TELAT, IZIN, ALFA, AKSI) --}}
         <div style="overflow-x:auto;">
             <table class="fi-table" id="tablePresensiPondokFilament">
                 <thead>
                     <tr>
-                        <th style="width:40%;">Nama</th>
-                        <th style="text-align:center;width:15%;">Hadir</th>
-                        <th style="text-align:center;width:15%;">Telat</th>
-                        <th style="text-align:center;width:15%;">Izin</th>
-                        <th style="text-align:center;width:15%;">Alfa</th>
+                        <th style="width:36%;">Nama</th>
+                        <th style="text-align:center;width:12%;">Hadir</th>
+                        <th style="text-align:center;width:12%;">Telat</th>
+                        <th style="text-align:center;width:12%;">Izin</th>
+                        <th style="text-align:center;width:12%;">Alfa</th>
+                        <th style="text-align:center;width:16%;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -914,7 +928,8 @@
                             <a href="javascript:void(0)"
                                class="fi-nama-link js-trigger-detail"
                                onclick="showRincianSantri({{ $row['siswa_id'] }})"
-                               data-siswa-id="{{ $row['siswa_id'] }}">
+                               data-siswa-id="{{ $row['siswa_id'] }}"
+                               style="font-weight:600;color:#1e293b;text-decoration:none;">
                                 {{ $row['nama_lengkap'] }}
                             </a>
                         </td>
@@ -938,10 +953,25 @@
                         <td style="text-align:center;font-weight:600;color:#dc2626;">
                             {{ $row['total_a'] }}
                         </td>
+
+                        {{-- Aksi (Tombol Detail Sesuai Gambar 2) --}}
+                        <td style="text-align:center;">
+                            <button type="button"
+                                    class="btn-detail-pill js-trigger-detail"
+                                    data-siswa-id="{{ $row['siswa_id'] }}"
+                                    onclick="showRincianSantri({{ $row['siswa_id'] }})"
+                                    title="Lihat Rincian Kehadiran Siswa">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                                <span>Detail</span>
+                            </button>
+                        </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" style="text-align:center;padding:48px 16px;color:#9ca3af;">
+                        <td colspan="6" style="text-align:center;padding:48px 16px;color:#9ca3af;">
                             Tidak ada data presensi pondok santri yang ditemukan sesuai filter.
                         </td>
                     </tr>
@@ -1191,51 +1221,70 @@
         window.location.href = url.toString();
     }
 
+    function togglePanelFilter() {
+        var panel = document.getElementById('panelFilterRekap');
+        if (!panel) return;
+        if (panel.style.display === 'none') {
+            panel.style.display = 'block';
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+
     // Modal 1: Rincian Kehadiran Siswa
     function showRincianSantri(id) {
-        if (!window.REKAP_PONDOK_DATA || !window.REKAP_PONDOK_DATA[id]) {
+        if (!window.REKAP_PONDOK_DATA) return;
+        var data = window.REKAP_PONDOK_DATA[id] || window.REKAP_PONDOK_DATA[String(id)];
+        if (!data) {
             console.warn('Data santri tidak ditemukan untuk ID:', id);
             return;
         }
-        openRincianModal(window.REKAP_PONDOK_DATA[id]);
+        openRincianModal(data);
     }
 
     function openRincianModal(data) {
         var modal = document.getElementById('modalRincianSiswa');
         if (!modal) return;
 
-        document.getElementById('modalSubtitleText').textContent = (data.nama || '-') + ' • NISN: ' + (data.nisn || '-');
-        document.getElementById('modalMetricHadir').textContent = data.hadir || 0;
-        document.getElementById('modalMetricTerlambat').textContent = data.terlambat || 0;
-        document.getElementById('modalMetricIzin').textContent = data.izin || 0;
-        document.getElementById('modalMetricSakit').textContent = data.sakit || 0;
-        document.getElementById('modalMetricAlpa').textContent = data.alpa || 0;
+        var elSub = document.getElementById('modalSubtitleText');
+        if (elSub) elSub.textContent = (data.nama || '-') + ' • NISN: ' + (data.nisn || '-');
+        var elH = document.getElementById('modalMetricHadir');
+        if (elH) elH.textContent = data.hadir || 0;
+        var elT = document.getElementById('modalMetricTerlambat');
+        if (elT) elT.textContent = data.terlambat || 0;
+        var elI = document.getElementById('modalMetricIzin');
+        if (elI) elI.textContent = data.izin || 0;
+        var elS = document.getElementById('modalMetricSakit');
+        if (elS) elS.textContent = data.sakit || 0;
+        var elA = document.getElementById('modalMetricAlpa');
+        if (elA) elA.textContent = data.alpa || 0;
 
         var tbody = document.getElementById('modalRiwayatTableBody');
-        tbody.innerHTML = '';
-
-        var riwayat = data.riwayat || [];
-        if (riwayat.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:18px;color:#9ca3af;">Tidak ada data riwayat presensi sesi.</td></tr>';
-        } else {
-            riwayat.forEach(function (item) {
-                var tr = document.createElement('tr');
-                tr.innerHTML = '<td>' + (item.tanggal || '-') + '</td>' +
-                               '<td><strong style="color:#111827;">' + (item.sesi || '-') + '</strong></td>' +
-                               '<td><span class="rp-badge-status ' + (item.badge || 'status-badge-alpa') + '">' + (item.status || 'ALPA') + '</span></td>' +
-                               '<td style="color:#6b7280;font-size:12px;">' + (item.keterangan || '-') + '</td>';
-                tbody.appendChild(tr);
-            });
+        if (tbody) {
+            tbody.innerHTML = '';
+            var riwayat = data.riwayat || [];
+            if (riwayat.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:18px;color:#9ca3af;">Tidak ada data riwayat presensi sesi.</td></tr>';
+            } else {
+                riwayat.forEach(function (item) {
+                    var tr = document.createElement('tr');
+                    tr.innerHTML = '<td>' + (item.tanggal || '-') + '</td>' +
+                                   '<td><strong style="color:#111827;">' + (item.sesi || '-') + '</strong></td>' +
+                                   '<td><span class="rp-badge-status ' + (item.badge || 'status-badge-alpa') + '">' + (item.status || 'ALPA') + '</span></td>' +
+                                   '<td style="color:#6b7280;font-size:12px;">' + (item.keterangan || '-') + '</td>';
+                    tbody.appendChild(tr);
+                });
+            }
         }
 
-        modal.style.display = 'flex';
+        modal.style.setProperty('display', 'flex', 'important');
         document.body.style.overflow = 'hidden';
     }
 
     function closeRincianModal() {
         var modal = document.getElementById('modalRincianSiswa');
         if (modal) {
-            modal.style.display = 'none';
+            modal.style.setProperty('display', 'none', 'important');
             document.body.style.overflow = '';
         }
     }
@@ -1244,7 +1293,7 @@
     function openWaModal() {
         var modal = document.getElementById('modalLaporanWA');
         if (!modal) return;
-        modal.style.display = 'flex';
+        modal.style.setProperty('display', 'flex', 'important');
         document.body.style.overflow = 'hidden';
 
         var notif = document.getElementById('waCopyNotification');
@@ -1260,7 +1309,7 @@
     function closeWaModal() {
         var modal = document.getElementById('modalLaporanWA');
         if (modal) {
-            modal.style.display = 'none';
+            modal.style.setProperty('display', 'none', 'important');
             document.body.style.overflow = '';
         }
     }
@@ -1433,8 +1482,11 @@
         if (trigger) {
             e.preventDefault();
             var id = trigger.getAttribute('data-siswa-id');
-            if (id && window.REKAP_PONDOK_DATA && window.REKAP_PONDOK_DATA[id]) {
-                openRincianModal(window.REKAP_PONDOK_DATA[id]);
+            if (id && window.REKAP_PONDOK_DATA) {
+                var d = window.REKAP_PONDOK_DATA[id] || window.REKAP_PONDOK_DATA[String(id)];
+                if (d) {
+                    openRincianModal(d);
+                }
             }
         }
 

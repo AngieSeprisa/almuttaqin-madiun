@@ -67,9 +67,14 @@ class RekapAbsensiController extends Controller
             'alpa'      => (clone $summaryQuery)->where('status', 'alpa')->count(),
         ];
 
+        $perPage = (int) $request->get('per_page', 15);
+        if ($perPage < 5 || $perPage > 200) {
+            $perPage = 15;
+        }
+
         $presensis = $query->orderBy('tanggal', 'desc')
             ->orderBy('jam_masuk', 'asc')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('rekap-absensi.guru', compact(

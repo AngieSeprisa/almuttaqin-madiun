@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
-@section('title', 'Rekap Absensi Guru')
+@section('title', 'Rekap Presensi Guru')
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px;">
-    <a href="{{ route('rekap-absensi.export', request()->all()) }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:8px 14px; font-size:13px;">
+    <a href="{{ route('rekap-absensi.export', request()->all()) }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:8px 14px; font-size:13px; border-radius:8px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="7 10 12 15 17 10"></polyline>
@@ -13,7 +13,7 @@
         <span>Ekspor Excel</span>
     </a>
 
-    <a href="{{ route('rekap-absensi.cetak', request()->all()) }}" target="_blank" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:8px 14px; font-size:13px;">
+    <a href="{{ route('rekap-absensi.cetak', request()->all()) }}" target="_blank" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:8px 14px; font-size:13px; border-radius:8px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
             <polyline points="6 9 6 2 18 2 18 9"></polyline>
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -25,7 +25,305 @@
 @endsection
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:20px;">
+<style>
+    .guru-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    /* 1. Header Banner Card (Persis Gambar 3) */
+    .guru-header-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 16px 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    .guru-header-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .guru-header-icon-box {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: #2563eb;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+    }
+    .guru-header-titles {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .guru-header-meta-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .guru-badge-header {
+        background: #2563eb;
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        padding: 2.5px 8px;
+        border-radius: 5px;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+    .guru-sub-institution {
+        font-size: 12.5px;
+        color: #64748b;
+        font-weight: 600;
+    }
+    .guru-title-date {
+        font-size: 21px;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 2px 0 0 0;
+        line-height: 1.25;
+    }
+
+    .guru-header-right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    .guru-pill-stat {
+        padding: 7px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        background: #ffffff;
+        transition: all 0.15s ease;
+    }
+    .pill-stat-tepat {
+        border: 1.5px solid #10b981;
+        color: #059669;
+    }
+    .pill-stat-total {
+        border: 1.5px solid #3b82f6;
+        color: #2563eb;
+    }
+
+    /* 2. Filter Bar Card */
+    .guru-filter-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 14px 20px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    }
+    .guru-filter-grid {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .guru-filter-select, .guru-filter-input {
+        height: 38px;
+        padding: 6px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #111827;
+        background: #ffffff;
+        outline: none;
+        transition: border-color 0.15s ease;
+    }
+    .guru-filter-select:focus, .guru-filter-input:focus {
+        border-color: #2563eb;
+    }
+
+    /* 3. Table Card (Persis Gambar 3) */
+    .guru-table-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    .guru-table-scroll {
+        overflow-x: auto;
+        width: 100%;
+    }
+    .guru-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        white-space: nowrap;
+    }
+    .guru-table th {
+        background: #ffffff;
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        padding: 14px 18px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .guru-table td {
+        padding: 14px 18px;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 13px;
+        color: #334155;
+        vertical-align: middle;
+    }
+    .guru-table tbody tr:hover td {
+        background-color: #f8fafc;
+    }
+
+    .guru-avatar-circle {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #dbeafe;
+        color: #1e40af;
+        font-size: 12.5px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .guru-name-text {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    .guru-jam-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 11px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12px;
+        font-weight: 600;
+        color: #0f172a;
+    }
+    .guru-jam-pill svg {
+        color: #64748b;
+    }
+
+    .guru-tidak-pulang-pill {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 6px;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 11.5px;
+        font-weight: 600;
+    }
+
+    /* Badges Status Kehadiran (Gambar 3) */
+    .guru-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .badge-tepat {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #16a34a;
+    }
+    .badge-terlambat {
+        background: #fffbeb;
+        border: 1px solid #fef08a;
+        color: #d97706;
+    }
+    .badge-izin {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #2563eb;
+    }
+    .badge-sakit {
+        background: #f5f3ff;
+        border: 1px solid #ddd6fe;
+        color: #7c3aed;
+    }
+    .badge-alpa {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+    }
+
+    .guru-action-eye-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .guru-action-eye-btn:hover {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        color: #2563eb;
+    }
+
+    /* Footer Pagination */
+    .guru-table-footer {
+        padding: 14px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-top: 1px solid #e2e8f0;
+        font-size: 12.5px;
+        color: #64748b;
+        flex-wrap: wrap;
+        gap: 12px;
+        background: #ffffff;
+    }
+    .guru-footer-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .guru-perpage-select {
+        height: 32px;
+        padding: 2px 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #111827;
+        background: #ffffff;
+        outline: none;
+    }
+</style>
+
+<div class="guru-container">
 
     {{-- Alert Banner --}}
     @if(session('success'))
@@ -37,375 +335,247 @@
     </div>
     @endif
 
-    {{-- 5 Kartu Ringkasan Statistik --}}
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px;">
-        <div class="stat-card" style="background:var(--bg-surface); padding:16px 20px; border-radius:14px; border:1px solid var(--border-light); box-shadow:var(--card-shadow); display:flex; align-items:center; justify-content:space-between;">
-            <div>
-                <span style="font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Hadir Tepat</span>
-                <div style="font-size:24px; font-weight:800; color:#059669; line-height:1.2; margin-top:2px;">{{ $ringkasan['hadir'] }}</div>
-            </div>
-            <div style="width:40px; height:40px; border-radius:10px; background:rgba(16, 185, 129, 0.1); display:flex; align-items:center; justify-content:center; color:#10B981;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
-                    <polyline points="20 6 9 17 4 12"></polyline>
+    {{-- 1. HEADER PRESENSI HARIAN (PERSIS GAMBAR 3) --}}
+    @php
+        $selectedLembaga = $lembagas->firstWhere('id', $lembagaId) ?: ($lembagas->first() ?? null);
+        $lembagaText = $selectedLembaga ? ($selectedLembaga->nama_singkat ?? $selectedLembaga->nama) : 'SMP Al Muttaqin';
+        $subHeader = $lembagaText . ' • Yayasan Muttaqin Kota Madiun';
+        $displayDate = $tanggal ? \Carbon\Carbon::parse($tanggal) : \Carbon\Carbon::now();
+        $dateFormatted = $displayDate->translatedFormat('l, d M Y');
+    @endphp
+
+    <div class="guru-header-card">
+        <div class="guru-header-left">
+            <div class="guru-header-icon-box">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
                 </svg>
+            </div>
+            <div class="guru-header-titles">
+                <div class="guru-header-meta-row">
+                    <span class="guru-badge-header">HEADER PRESENSI HARIAN</span>
+                    <span class="guru-sub-institution">{{ $subHeader }}</span>
+                </div>
+                <h1 class="guru-title-date">{{ $dateFormatted }}</h1>
             </div>
         </div>
 
-        <div class="stat-card" style="background:var(--bg-surface); padding:16px 20px; border-radius:14px; border:1px solid var(--border-light); box-shadow:var(--card-shadow); display:flex; align-items:center; justify-content:space-between;">
-            <div>
-                <span style="font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Terlambat</span>
-                <div style="font-size:24px; font-weight:800; color:#D97706; line-height:1.2; margin-top:2px;">{{ $ringkasan['terlambat'] }}</div>
+        <div class="guru-header-right">
+            <div class="guru-pill-stat pill-stat-tepat">
+                <span>{{ $ringkasan['hadir'] }} Tepat Waktu</span>
             </div>
-            <div style="width:40px; height:40px; border-radius:10px; background:rgba(245, 158, 11, 0.1); display:flex; align-items:center; justify-content:center; color:#F59E0B;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-            </div>
-        </div>
-
-        <div class="stat-card" style="background:var(--bg-surface); padding:16px 20px; border-radius:14px; border:1px solid var(--border-light); box-shadow:var(--card-shadow); display:flex; align-items:center; justify-content:space-between;">
-            <div>
-                <span style="font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Izin</span>
-                <div style="font-size:24px; font-weight:800; color:#2563EB; line-height:1.2; margin-top:2px;">{{ $ringkasan['izin'] }}</div>
-            </div>
-            <div style="width:40px; height:40px; border-radius:10px; background:rgba(37, 99, 235, 0.1); display:flex; align-items:center; justify-content:center; color:#2563EB;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                </svg>
-            </div>
-        </div>
-
-        <div class="stat-card" style="background:var(--bg-surface); padding:16px 20px; border-radius:14px; border:1px solid var(--border-light); box-shadow:var(--card-shadow); display:flex; align-items:center; justify-content:space-between;">
-            <div>
-                <span style="font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Sakit</span>
-                <div style="font-size:24px; font-weight:800; color:#7C3AED; line-height:1.2; margin-top:2px;">{{ $ringkasan['sakit'] }}</div>
-            </div>
-            <div style="width:40px; height:40px; border-radius:10px; background:rgba(124, 58, 237, 0.1); display:flex; align-items:center; justify-content:center; color:#7C3AED;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                </svg>
-            </div>
-        </div>
-
-        <div class="stat-card" style="background:var(--bg-surface); padding:16px 20px; border-radius:14px; border:1px solid var(--border-light); box-shadow:var(--card-shadow); display:flex; align-items:center; justify-content:space-between;">
-            <div>
-                <span style="font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Alpa</span>
-                <div style="font-size:24px; font-weight:800; color:#DC2626; line-height:1.2; margin-top:2px;">{{ $ringkasan['alpa'] }}</div>
-            </div>
-            <div style="width:40px; height:40px; border-radius:10px; background:rgba(220, 38, 38, 0.1); display:flex; align-items:center; justify-content:center; color:#DC2626;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:20px;height:20px;">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="15" y1="9" x2="9" y2="15"></line>
-                    <line x1="9" y1="9" x2="15" y2="15"></line>
-                </svg>
+            <div class="guru-pill-stat pill-stat-total">
+                <span>{{ $ringkasan['total'] }} Total Guru</span>
             </div>
         </div>
     </div>
 
-    {{-- Filter Bar --}}
-    <div class="form-section-card filter-card">
-        <form action="{{ route('rekap-absensi.guru') }}" method="GET" class="filter-form">
-            <div class="filter-group-left">
+    {{-- 2. FILTER KONTROL --}}
+    <div class="guru-filter-card">
+        <form action="{{ route('rekap-absensi.guru') }}" method="GET" class="guru-filter-grid">
+            {{-- Filter Lembaga --}}
+            @if($lembagas->count() > 1)
+            <select name="lembaga_id" class="guru-filter-select" onchange="this.form.submit()">
+                <option value="">Semua Lembaga</option>
+                @foreach($lembagas as $lem)
+                <option value="{{ $lem->id }}" {{ $lembagaId == $lem->id ? 'selected' : '' }}>
+                    {{ $lem->nama_singkat }}
+                </option>
+                @endforeach
+            </select>
+            @endif
 
-                {{-- Filter Lembaga --}}
-                @if($lembagas->count() > 1)
-                <div class="filter-select-wrap">
-                    <div class="filter-select-icon-left">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                        </svg>
-                    </div>
-                    <select name="lembaga_id" id="filter_rekap_lembaga" class="form-select filter-select" onchange="this.form.submit()">
-                        <option value="">Semua Lembaga</option>
-                        @foreach($lembagas as $lem)
-                        <option value="{{ $lem->id }}" {{ $lembagaId == $lem->id ? 'selected' : '' }}>
-                            {{ $lem->nama_singkat }}
-                        </option>
-                        @endforeach
-                    </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </div>
-                </div>
-                @endif
+            {{-- Filter Tanggal Harian --}}
+            <input type="date" name="tanggal" value="{{ $tanggal ?: date('Y-m-d') }}" class="guru-filter-input" onchange="this.form.submit()" title="Pilih Tanggal Presensi">
 
-                {{-- Filter Bulan --}}
-                <div class="filter-select-wrap">
-                    <div class="filter-select-icon-left">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                    </div>
-                    <select name="bulan" id="filter_rekap_bulan" class="form-select filter-select" onchange="this.form.submit()">
-                        @foreach([1=>'Januari', 2=>'Februari', 3=>'Maret', 4=>'April', 5=>'Mei', 6=>'Juni', 7=>'Juli', 8=>'Agustus', 9=>'September', 10=>'Oktober', 11=>'November', 12=>'Desember'] as $num => $namaBulan)
-                        <option value="{{ $num }}" {{ $bulan == $num ? 'selected' : '' }}>
-                            {{ $namaBulan }}
-                        </option>
-                        @endforeach
-                    </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </div>
-                </div>
+            {{-- Filter Status --}}
+            <select name="status" class="guru-filter-select" onchange="this.form.submit()">
+                <option value="">Semua Status</option>
+                <option value="hadir" {{ $status === 'hadir' ? 'selected' : '' }}>Tepat Waktu</option>
+                <option value="terlambat" {{ $status === 'terlambat' ? 'selected' : '' }}>Terlambat</option>
+                <option value="izin" {{ $status === 'izin' ? 'selected' : '' }}>Izin</option>
+                <option value="sakit" {{ $status === 'sakit' ? 'selected' : '' }}>Sakit</option>
+                <option value="alpa" {{ $status === 'alpa' ? 'selected' : '' }}>Alpa</option>
+            </select>
 
-                {{-- Filter Tahun --}}
-                <div class="filter-select-wrap">
-                    <div class="filter-select-icon-left">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                    </div>
-                    <select name="tahun" id="filter_rekap_tahun" class="form-select filter-select" onchange="this.form.submit()">
-                        @for($y = date('Y'); $y >= date('Y') - 3; $y--)
-                        <option value="{{ $y }}" {{ $tahun == $y ? 'selected' : '' }}>{{ $y }}</option>
-                        @endfor
-                    </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </div>
-                </div>
-
-                {{-- Filter Status --}}
-                <div class="filter-select-wrap">
-                    <div class="filter-select-icon-left">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                        </svg>
-                    </div>
-                    <select name="status" id="filter_rekap_status" class="form-select filter-select" onchange="this.form.submit()">
-                        <option value="">Semua Status</option>
-                        <option value="hadir" {{ $status === 'hadir' ? 'selected' : '' }}>Hadir</option>
-                        <option value="terlambat" {{ $status === 'terlambat' ? 'selected' : '' }}>Terlambat</option>
-                        <option value="izin" {{ $status === 'izin' ? 'selected' : '' }}>Izin</option>
-                        <option value="sakit" {{ $status === 'sakit' ? 'selected' : '' }}>Sakit</option>
-                        <option value="alpa" {{ $status === 'alpa' ? 'selected' : '' }}>Alpa</option>
-                    </select>
-                    <div class="filter-select-icon-right">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <polyline points="6 9 12 15 18 9"></polyline>
-                        </svg>
-                    </div>
-                </div>
-
-                @if($search || $status || request('tanggal'))
-                <a href="{{ route('rekap-absensi.guru', ['lembaga_id' => $lembagaId, 'bulan' => $bulan, 'tahun' => $tahun]) }}" class="btn btn-sm btn-secondary filter-btn-reset" title="Reset Filter">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                    <span>Reset</span>
-                </a>
-                @endif
-            </div>
-
-            <div class="filter-search-wrap">
-                <input type="text" name="search" value="{{ $search }}" placeholder="Cari nama atau NIP..."
-                       class="form-control filter-search-input">
-                <button type="submit" class="btn btn-secondary filter-search-btn" title="Cari">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+            {{-- Pencarian --}}
+            <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
+                <input type="text" name="search" value="{{ $search }}" placeholder="Cari nama guru..." class="guru-filter-input" style="width:220px;">
+                <button type="submit" class="btn btn-secondary" style="height:38px; padding:0 14px; border-radius:8px;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
                 </button>
+                @if($search || $status || request('tanggal'))
+                <a href="{{ route('rekap-absensi.guru') }}" class="btn btn-secondary" style="height:38px; display:inline-flex; align-items:center; border-radius:8px;" title="Reset Filter">
+                    ✕
+                </a>
+                @endif
             </div>
         </form>
     </div>
 
-    {{-- Tabel Rekap Data Presensi --}}
-    <div class="table-container table-card" style="background:var(--bg-surface); border-radius:14px; border:1px solid var(--border-light); overflow:hidden; box-shadow:var(--card-shadow);">
-        <table class="table" style="width:100%; border-collapse:collapse; text-align:left;">
-            <thead>
-                <tr style="background:var(--table-th-bg); border-bottom:1px solid var(--border-light);">
-                    <th style="padding:14px 18px; font-size:12.5px; font-weight:700; color:var(--text-secondary); width:50px;">No</th>
-                    <th style="padding:14px 18px; font-size:12.5px; font-weight:700; color:var(--text-secondary);">Tanggal</th>
-                    <th style="padding:14px 18px; font-size:12.5px; font-weight:700; color:var(--text-secondary);">Guru</th>
-                    <th style="padding:14px 18px; font-size:12.5px; font-weight:700; color:var(--text-secondary);">Lembaga</th>
-                    <th style="padding:14px 18px; font-size:12.5px; font-weight:700; color:var(--text-secondary);">Masuk</th>
-                    <th style="padding:14px 18px; font-size:12.5px; font-weight:700; color:var(--text-secondary);">Pulang</th>
-                    <th style="padding:14px 18px; font-size:12.5px; font-weight:700; color:var(--text-secondary);">Status</th>
-                    <th style="padding:14px 18px; font-size:12.5px; font-weight:700; color:var(--text-secondary); text-align:right; width:90px;">Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($presensis as $index => $row)
-                <tr style="border-bottom:1px solid var(--border-subtle); transition:background-color 0.15s ease;">
-                    <td style="padding:14px 18px; font-size:13px; color:var(--text-muted);">
-                        {{ $presensis->firstItem() + $index }}
-                    </td>
-                    <td style="padding:14px 18px; font-size:13.5px; font-weight:600; color:var(--text-primary); white-space:nowrap;">
-                        {{ $row->tanggal ? $row->tanggal->translatedFormat('d M Y') : '-' }}
-                    </td>
-                    <td style="padding:14px 18px;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <div style="width:34px; height:34px; border-radius:50%; background:rgba(0, 82, 255, 0.1); color:var(--electric-blue); font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                                {{ strtoupper(substr($row->user->name ?? 'G', 0, 1)) }}
-                            </div>
-                            <div>
-                                <div style="font-size:13.5px; font-weight:700; color:var(--text-primary);">
-                                    {{ $row->user->name ?? '-' }}
+    {{-- 3. TABEL PRESENSI GURU (PERSIS GAMBAR 3) --}}
+    <div class="guru-table-card">
+        <div class="guru-table-scroll">
+            <table class="guru-table">
+                <thead>
+                    <tr>
+                        <th style="width:50px;">NO</th>
+                        <th style="min-width:240px;">NAMA GURU</th>
+                        <th style="min-width:160px;">TANGGAL</th>
+                        <th style="min-width:160px;">JAM MASUK</th>
+                        <th style="min-width:160px;">JAM PULANG</th>
+                        <th style="min-width:160px;">STATUS KEHADIRAN</th>
+                        <th style="width:80px; text-align:center;">AKSI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($presensis as $index => $row)
+                    <tr>
+                        <td>
+                            {{ $presensis->firstItem() + $index }}
+                        </td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <div class="guru-avatar-circle">
+                                    {{ strtoupper(substr($row->user->name ?? 'G', 0, 1)) }}
                                 </div>
-                                <div style="font-size:12px; color:var(--text-muted);">
-                                    {{ $row->user->nip ?? ($row->user->jabatan ?? '-') }}
+                                <div>
+                                    <span class="guru-name-text">{{ $row->user->name ?? '-' }}</span>
                                 </div>
                             </div>
-                        </div>
-                    </td>
-                    <td style="padding:14px 18px; font-size:13px; color:var(--text-secondary); white-space:nowrap;">
-                        {{ $row->lembaga->singkatan ?? ($row->lembaga->nama ?? '-') }}
-                    </td>
-                    <td style="padding:14px 18px;">
-                        @if($row->jam_masuk)
-                        <div style="font-size:13.5px; font-weight:700; color:var(--text-primary); font-family:monospace;">
-                            {{ substr($row->jam_masuk, 0, 5) }}
-                        </div>
-                        @if($row->jarak_masuk_meter)
-                        <span style="font-size:11px; color:var(--text-muted);">{{ $row->jarak_masuk_meter }}m</span>
-                        @endif
-                        @else
-                        <span style="color:var(--text-muted); font-size:13px;">-</span>
-                        @endif
-                    </td>
-                    <td style="padding:14px 18px;">
-                        @if($row->jam_pulang)
-                        <div style="font-size:13.5px; font-weight:700; color:var(--text-primary); font-family:monospace;">
-                            {{ substr($row->jam_pulang, 0, 5) }}
-                        </div>
-                        @else
-                        <span style="color:var(--text-muted); font-size:13px;">-</span>
-                        @endif
-                    </td>
-                    <td style="padding:14px 18px;">
-                        @php
-                            $badgeStyles = match($row->status) {
-                                'hadir'     => 'background:rgba(16, 185, 129, 0.12); color:#059669;',
-                                'terlambat' => 'background:rgba(245, 158, 11, 0.12); color:#D97706;',
-                                'izin'      => 'background:rgba(37, 99, 235, 0.12); color:#2563EB;',
-                                'sakit'     => 'background:rgba(124, 58, 237, 0.12); color:#7C3AED;',
-                                default     => 'background:rgba(239, 68, 68, 0.12); color:#DC2626;',
-                            };
-                        @endphp
-                        <span style="display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:700; {{ $badgeStyles }}">
-                            {{ $row->status_label }}
-                        </span>
-                    </td>
-                    <td style="padding:14px 18px; text-align:right;">
-                        <button type="button" class="btn btn-secondary btn-koreksi"
-                                data-id="{{ $row->id }}"
-                                data-nama="{{ $row->user->name ?? '-' }}"
-                                data-tanggal="{{ $row->tanggal ? $row->tanggal->format('d/m/Y') : '' }}"
-                                data-status="{{ $row->status }}"
-                                data-masuk="{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '' }}"
-                                data-pulang="{{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '' }}"
-                                data-keterangan="{{ $row->keterangan ?? '' }}"
-                                style="padding:6px 12px; font-size:12px;">
-                            Koreksi
-                        </button>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="8" style="padding:40px 20px; text-align:center; color:var(--text-muted); font-size:14px;">
-                        Tidak ada data presensi guru untuk filter yang dipilih.
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
-
-        @if($presensis->hasPages())
-        <div style="padding:16px 20px; border-top:1px solid var(--border-light);">
-            {{ $presensis->links() }}
+                        </td>
+                        <td>
+                            {{ $row->tanggal ? $row->tanggal->translatedFormat('l, d M Y') : '-' }}
+                        </td>
+                        <td>
+                            @if($row->jam_masuk)
+                            <div class="guru-jam-pill">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                                <span>{{ strlen($row->jam_masuk) <= 5 ? $row->jam_masuk . ':00' : substr($row->jam_masuk, 0, 8) }} WIB</span>
+                            </div>
+                            @else
+                            <span style="color:#94a3b8; font-size:13px;">-</span>
+                            @endif
+                        </td>
+                        <td>
+                            @if($row->jam_pulang)
+                            <div class="guru-jam-pill">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                                <span>{{ strlen($row->jam_pulang) <= 5 ? $row->jam_pulang . ':00' : substr($row->jam_pulang, 0, 8) }} WIB</span>
+                            </div>
+                            @else
+                            <span class="guru-tidak-pulang-pill">Tidak Absen Pulang</span>
+                            @endif
+                        </td>
+                        <td>
+                            @if($row->status === 'hadir')
+                            <span class="guru-status-badge badge-tepat">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                <span>Tepat Waktu</span>
+                            </span>
+                            @elseif($row->status === 'terlambat')
+                            <span class="guru-status-badge badge-terlambat">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                                <span>Terlambat</span>
+                            </span>
+                            @elseif($row->status === 'izin')
+                            <span class="guru-status-badge badge-izin">Izin</span>
+                            @elseif($row->status === 'sakit')
+                            <span class="guru-status-badge badge-sakit">Sakit</span>
+                            @else
+                            <span class="guru-status-badge badge-alpa">Alpa</span>
+                            @endif
+                        </td>
+                        <td style="text-align:center;">
+                            <button type="button" class="guru-action-eye-btn btn-koreksi"
+                                    data-id="{{ $row->id }}"
+                                    data-nama="{{ $row->user->name ?? '-' }}"
+                                    data-tanggal="{{ $row->tanggal ? $row->tanggal->format('d/m/Y') : '' }}"
+                                    data-status="{{ $row->status }}"
+                                    data-masuk="{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '' }}"
+                                    data-pulang="{{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '' }}"
+                                    data-keterangan="{{ $row->keterangan ?? '' }}"
+                                    title="Lihat / Koreksi Presensi">
+                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="7" style="padding:48px 20px; text-align:center; color:#94a3b8; font-size:14px;">
+                            Tidak ada data presensi guru untuk filter yang dipilih.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
-        @endif
-    </div>
 
-    {{-- Card List untuk Tampilan Mobile (<= 768px) --}}
-    <div class="mobile-card-list">
-        @forelse($presensis as $index => $row)
-        <div class="mobile-card-item">
-            <div class="mobile-card-info">
-                <div class="mobile-card-title">{{ $row->user->name ?? '-' }}</div>
-                <div class="mobile-card-subtitle">
-                    {{ $row->tanggal ? $row->tanggal->translatedFormat('d M Y') : '-' }} &bull; {{ $row->user->nip ?? ($row->user->jabatan ?? '-') }}
-                </div>
-
-                <div class="mobile-card-meta-grid">
-                    <div class="mobile-card-meta-item">
-                        <span class="mobile-card-meta-label">Lembaga</span>
-                        <span class="mobile-card-pill mobile-card-pill-blue">{{ $row->lembaga->singkatan ?? ($row->lembaga->nama ?? '-') }}</span>
-                    </div>
-                    <div class="mobile-card-meta-item">
-                        <span class="mobile-card-meta-label">Jam</span>
-                        <span class="mobile-card-pill mobile-card-pill-gray" style="font-family:monospace;">{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '-' }} - {{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '-' }}</span>
-                    </div>
-                    <div class="mobile-card-meta-item">
-                        <span class="mobile-card-meta-label">&nbsp;</span>
-                        <span class="status-pill {{ $row->status === 'hadir' ? 'status-pill-active' : ($row->status === 'terlambat' ? 'status-pill-warning' : 'status-pill-inactive') }}">
-                            {{ $row->status_label }}
-                        </span>
-                    </div>
-                </div>
+        {{-- Footer Paginasi (Persis Gambar 3) --}}
+        <div class="guru-table-footer">
+            <div class="guru-footer-left">
+                <span>Menampilkan</span>
+                <select name="per_page" class="guru-perpage-select" onchange="changeGuruPerPage(this.value)">
+                    <option value="15" {{ request('per_page', 15) == 15 ? 'selected' : '' }}>15</option>
+                    <option value="25" {{ request('per_page', 15) == 25 ? 'selected' : '' }}>25</option>
+                    <option value="50" {{ request('per_page', 15) == 50 ? 'selected' : '' }}>50</option>
+                    <option value="100" {{ request('per_page', 15) == 100 ? 'selected' : '' }}>100</option>
+                </select>
+                <span>dari {{ $presensis->total() }} total baris rekapitulasi</span>
             </div>
-
-            <div class="mobile-card-actions">
-                <span class="mobile-card-action-title">Aksi</span>
-                <div class="mobile-card-action-buttons">
-                    <button type="button" class="mobile-btn-pastel mobile-btn-edit btn-koreksi"
-                            data-id="{{ $row->id }}"
-                            data-nama="{{ $row->user->name ?? '-' }}"
-                            data-tanggal="{{ $row->tanggal ? $row->tanggal->format('d/m/Y') : '' }}"
-                            data-status="{{ $row->status }}"
-                            data-masuk="{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '' }}"
-                            data-pulang="{{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '' }}"
-                            data-keterangan="{{ $row->keterangan ?? '' }}"
-                            title="Koreksi Presensi">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </button>
-                </div>
+            <div class="guru-footer-right">
+                @if($presensis->hasPages())
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        @if($presensis->onFirstPage())
+                            <span style="color:#cbd5e1; cursor:not-allowed;">&lsaquo;</span>
+                        @else
+                            <a href="{{ $presensis->previousPageUrl() }}" style="color:#2563eb; text-decoration:none;">&lsaquo;</a>
+                        @endif
+                        <span style="font-weight:600; color:#1e293b;">Halaman {{ $presensis->currentPage() }} dari {{ $presensis->lastPage() }}</span>
+                        @if($presensis->hasMorePages())
+                            <a href="{{ $presensis->nextPageUrl() }}" style="color:#2563eb; text-decoration:none;">&rsaquo;</a>
+                        @else
+                            <span style="color:#cbd5e1; cursor:not-allowed;">&rsaquo;</span>
+                        @endif
+                    </div>
+                @else
+                    <span style="font-weight:600; color:#1e293b;">Halaman 1 dari 1</span>
+                @endif
             </div>
         </div>
-        @empty
-        <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
-            Tidak ada data presensi guru untuk filter yang dipilih.
-        </div>
-        @endforelse
-
-        @if($presensis->hasPages())
-        <div style="margin-top:16px; display:flex; justify-content:center;">
-            {{ $presensis->links() }}
-        </div>
-        @endif
     </div>
 </div>
 
 {{-- Modal Koreksi Presensi --}}
-<div id="modalKoreksi" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; padding:16px;">
-    <div style="background:var(--bg-surface); border-radius:16px; border:1px solid var(--border-light); width:100%; max-width:440px; box-shadow:0 20px 40px rgba(0,0,0,0.2); overflow:hidden;">
-        <div style="padding:18px 22px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:center; justify-content:space-between;">
+<div id="modalKoreksi" style="display:none; position:fixed; inset:0; background:rgba(15, 23, 42, 0.45); backdrop-filter:blur(3px); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+    <div style="background:#ffffff; border-radius:16px; border:1px solid #e2e8f0; width:100%; max-width:440px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); overflow:hidden;">
+        <div style="padding:18px 22px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between;">
             <div>
-                <h3 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">Koreksi Presensi</h3>
-                <span id="modalGuruNama" style="font-size:12.5px; color:var(--text-muted); display:block; margin-top:2px;"></span>
+                <h3 style="font-size:16px; font-weight:700; color:#0f172a; margin:0;">Koreksi Presensi Guru</h3>
+                <span id="modalGuruNama" style="font-size:12.5px; color:#64748b; display:block; margin-top:2px;"></span>
             </div>
-            <button type="button" id="btnCloseModal" style="background:none; border:none; cursor:pointer; color:var(--text-muted); padding:4px;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
+            <button type="button" id="btnCloseModal" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size:20px;">
+                &times;
             </button>
         </div>
 
@@ -414,10 +584,10 @@
             @method('PUT')
 
             <div>
-                <label style="display:block; font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">Status</label>
+                <label style="display:block; font-size:13px; font-weight:600; color:#0f172a; margin-bottom:6px;">Status</label>
                 <select name="status" id="modalStatus" class="form-select" required
-                        style="width:100%; padding:9px 12px; font-size:13.5px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-surface); color:var(--text-primary);">
-                    <option value="hadir">Hadir</option>
+                        style="width:100%; padding:9px 12px; font-size:13.5px; border-radius:10px; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a;">
+                    <option value="hadir">Tepat Waktu</option>
                     <option value="terlambat">Terlambat</option>
                     <option value="izin">Izin</option>
                     <option value="sakit">Sakit</option>
@@ -427,32 +597,39 @@
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                 <div>
-                    <label style="display:block; font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">Jam Masuk</label>
+                    <label style="display:block; font-size:13px; font-weight:600; color:#0f172a; margin-bottom:6px;">Jam Masuk</label>
                     <input type="time" name="jam_masuk" id="modalMasuk" class="form-control"
-                           style="width:100%; padding:9px 12px; font-size:13.5px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-surface); color:var(--text-primary);">
+                           style="width:100%; padding:9px 12px; font-size:13.5px; border-radius:10px; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a;">
                 </div>
                 <div>
-                    <label style="display:block; font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">Jam Pulang</label>
+                    <label style="display:block; font-size:13px; font-weight:600; color:#0f172a; margin-bottom:6px;">Jam Pulang</label>
                     <input type="time" name="jam_pulang" id="modalPulang" class="form-control"
-                           style="width:100%; padding:9px 12px; font-size:13.5px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-surface); color:var(--text-primary);">
+                           style="width:100%; padding:9px 12px; font-size:13.5px; border-radius:10px; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a;">
                 </div>
             </div>
 
             <div>
-                <label style="display:block; font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px;">Keterangan Koreksi</label>
+                <label style="display:block; font-size:13px; font-weight:600; color:#0f172a; margin-bottom:6px;">Keterangan Koreksi</label>
                 <textarea name="keterangan" id="modalKeterangan" rows="2" class="form-control" placeholder="Contoh: Tugas luar kota / lupa scan..."
-                          style="width:100%; padding:9px 12px; font-size:13px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-surface); color:var(--text-primary); resize:vertical;"></textarea>
+                          style="width:100%; padding:9px 12px; font-size:13px; border-radius:10px; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a; resize:vertical;"></textarea>
             </div>
 
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
-                <button type="button" id="btnCancelModal" class="btn btn-secondary" style="padding:8px 16px; font-size:13px;">Batal</button>
-                <button type="submit" class="btn btn-primary" style="padding:8px 20px; font-size:13px; font-weight:600;">Simpan Koreksi</button>
+                <button type="button" id="btnCancelModal" class="btn btn-secondary" style="padding:8px 16px; font-size:13px; border-radius:8px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:8px 20px; font-size:13px; font-weight:600; border-radius:8px;">Simpan Koreksi</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
+function changeGuruPerPage(val) {
+    var url = new URL(window.location.href);
+    url.searchParams.set('per_page', val);
+    url.searchParams.set('page', 1);
+    window.location.href = url.toString();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     var modal = document.getElementById('modalKoreksi');
     var form = document.getElementById('formKoreksi');
