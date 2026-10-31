@@ -25,6 +25,11 @@ class MasterSesi extends Model
         return $this->belongsTo(MasterDevice::class, 'device_id_target', 'device_id');
     }
 
+    public function allocations()
+    {
+        return $this->hasMany(SesiDeviceAllocation::class, 'master_sesi_id');
+    }
+
     public function presensis()
     {
         return $this->hasMany(Presensi::class, 'sesi_id');

@@ -184,23 +184,51 @@ def sync_device_presence(cursor, device_id: str, ip_addr: str = "") -> dict:
 def get_active_sesi(cursor, device_id: str, current_time: str, strict: bool = True):
     """
     Mencari sesi aktif di master_sesis yang cocok dengan device_id dan jam saat ini.
-    Jika strict=True, hanya kembalikan sesi jika waktu sekarang benar-benar berada dalam rentang sesi.
-    Memuat seluruh kolom sesi (termasuk target_kategori/target_partisipan dan target_filter/filter_target).
+    Mendukung alokasi multi-perangkat via tabel sesi_device_allocations dan fallback ke master_sesis.
     """
-    query = """
-        SELECT *
-        FROM master_sesis
-        WHERE (device_id_target = %s OR device_id_target IS NULL OR device_id_target = '')
-          AND (
-            (jam_mulai <= jam_selesai AND %s BETWEEN jam_mulai AND jam_selesai)
-            OR
-            (jam_mulai > jam_selesai AND (%s >= jam_mulai OR %s <= jam_selesai))
-          )
-        ORDER BY (device_id_target = %s) DESC, jam_mulai ASC
-        LIMIT 1
-    """
-    cursor.execute(query, (device_id, current_time, current_time, current_time, device_id))
-    sesi = cursor.fetchone()
+    sesi = None
+    try:
+        # 1. Coba pencarian berbasis tabel relasi sesi_device_allocations
+        query_alloc = """
+            SELECT ms.*,
+                   sda.id as allocation_id,
+                   sda.target_kategori as alloc_target_kategori,
+                   sda.target_filter as alloc_target_filter,
+                   sda.target_gender as alloc_target_gender,
+                   sda.device_id as alloc_device_id
+            FROM master_sesis ms
+            JOIN sesi_device_allocations sda ON sda.master_sesi_id = ms.id
+            WHERE (sda.device_id = %s OR sda.device_id IS NULL OR sda.device_id = '' OR sda.device_id = 'ALL')
+              AND (
+                (ms.jam_mulai <= ms.jam_selesai AND %s BETWEEN ms.jam_mulai AND ms.jam_selesai)
+                OR
+                (ms.jam_mulai > ms.jam_selesai AND (%s >= ms.jam_mulai OR %s <= ms.jam_selesai))
+              )
+            ORDER BY (sda.device_id = %s) DESC, ms.jam_mulai ASC
+            LIMIT 1
+        """
+        cursor.execute(query_alloc, (device_id, current_time, current_time, current_time, device_id))
+        sesi = cursor.fetchone()
+    except Exception as ex_alloc:
+        logging.debug(f"[GET SESI ALLOC NOTICE] {ex_alloc}")
+        sesi = None
+
+    if not sesi:
+        # 2. Fallback ke kolom legacy master_sesis.device_id_target
+        query_legacy = """
+            SELECT *
+            FROM master_sesis
+            WHERE (device_id_target = %s OR device_id_target IS NULL OR device_id_target = '')
+              AND (
+                (jam_mulai <= jam_selesai AND %s BETWEEN jam_mulai AND jam_selesai)
+                OR
+                (jam_mulai > jam_selesai AND (%s >= jam_mulai OR %s <= jam_selesai))
+              )
+            ORDER BY (device_id_target = %s) DESC, jam_mulai ASC
+            LIMIT 1
+        """
+        cursor.execute(query_legacy, (device_id, current_time, current_time, current_time, device_id))
+        sesi = cursor.fetchone()
 
     # Jika strict=False dan tidak ada sesi pada jam ini, gunakan sesi fallback pertama
     if not sesi and not strict:
@@ -552,37 +580,78 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
     sesi_id = sesi["id"]
     sesi_name = sesi["nama_sesi"]
 
-    # 4. Validasi Filter Target Sesi (Kamar / Jenjang)
-    # Periksa kolom target_partisipan / target_kategori dan filter_target / target_filter
-    target_partisipan = str(sesi.get("target_partisipan") or sesi.get("target_kategori") or "").strip().lower()
-    filter_target = str(sesi.get("filter_target") or sesi.get("target_filter") or "").strip()
+    # 4. Validasi Filter Target Sesi (Kamar / Jenjang / Gender / Kelas)
+    # Periksa kolom target dari sesi_device_allocations atau master_sesis
+    target_partisipan = str(
+        sesi.get("alloc_target_kategori") or
+        sesi.get("target_partisipan") or
+        sesi.get("target_kategori") or ""
+    ).strip().lower()
+
+    filter_target = str(
+        sesi.get("alloc_target_filter") or
+        sesi.get("filter_target") or
+        sesi.get("target_filter") or ""
+    ).strip()
+
+    target_gender = str(
+        sesi.get("alloc_target_gender") or ""
+    ).strip().upper()
 
     is_kamar_session = target_partisipan in ["kamar", "kamar_khusus", "kamar khusus"]
     has_target_filter = bool(filter_target) and filter_target.lower() not in ["", "semua_santri", "semua santri", "all", "semua", "-"]
+    has_gender_requirement = target_gender in ["L", "P"] or target_partisipan in ["gender", "gender_putra", "gender_putri"]
 
-    if is_kamar_session or has_target_filter:
+    if is_kamar_session or has_target_filter or has_gender_requirement or target_partisipan in ["kelas_pengajian", "pengajian", "gender"]:
         if entity_type == "santri":
             santri_kamar = entity.get("kamar") or ""
             santri_gender = (entity.get("jenis_kelamin") or "").strip().lower()
             santri_kelas_pengajian = (entity.get("kelas_pengajian") or "").strip().lower()
+            is_male = santri_gender in ["l", "putra", "laki-laki", "pria", "ikhwan"]
+            is_female = santri_gender in ["p", "putri", "perempuan", "wanita", "akhwat"]
 
+            # 1. Pengecekan Alokasi Gender Mesin (Putra L / Putri P)
+            if target_gender == "L" or target_partisipan == "gender_putra" or (target_partisipan == "gender" and "[gender: putra]" in filter_target.lower()):
+                if not is_male:
+                    cursor.close()
+                    logging.warning(
+                        f"[REJECT] Santri '{entity_name}' (Gender: {santri_gender}) ditolak pada alat '{device_id}' (Khusus Santri Putra)."
+                    )
+                    return {
+                        "device_id": device_id,
+                        "nama": lcd_name,
+                        "status": "AKSES DITOLAK",
+                        "kode": "WRONG_GENDER",
+                        "sesi": sesi_name
+                    }
+            elif target_gender == "P" or target_partisipan == "gender_putri" or (target_partisipan == "gender" and "[gender: putri]" in filter_target.lower()):
+                if not is_female:
+                    cursor.close()
+                    logging.warning(
+                        f"[REJECT] Santri '{entity_name}' (Gender: {santri_gender}) ditolak pada alat '{device_id}' (Khusus Santri Putri)."
+                    )
+                    return {
+                        "device_id": device_id,
+                        "nama": lcd_name,
+                        "status": "AKSES DITOLAK",
+                        "kode": "WRONG_GENDER",
+                        "sesi": sesi_name
+                    }
+
+            # 2. Pengecekan Target Kelas Pengajian
             if target_partisipan in ["kelas_pengajian", "pengajian"]:
-                # Pengecekan target kelas pengajian & gender
                 matched = True
                 reject_reason = ""
                 target_lower = filter_target.lower()
 
-                # 1. Pengecekan batas Gender jika dispesifikasikan di filter_target
-                if "[gender: putra]" in target_lower:
-                    if santri_gender not in ["l", "putra", "laki-laki", "pria"]:
-                        matched = False
-                        reject_reason = "Sesi khusus santri Putra"
-                elif "[gender: putri]" in target_lower:
-                    if santri_gender not in ["p", "putri", "perempuan", "wanita"]:
-                        matched = False
-                        reject_reason = "Sesi khusus santri Putri"
+                # Pengecekan gender jika dispesifikasikan di filter_target
+                if "[gender: putra]" in target_lower and not is_male:
+                    matched = False
+                    reject_reason = "Sesi khusus santri Putra"
+                elif "[gender: putri]" in target_lower and not is_female:
+                    matched = False
+                    reject_reason = "Sesi khusus santri Putri"
 
-                # 2. Pengecekan batas Kelas Pengajian jika dispesifikasikan
                 classes_part = re.sub(r'\[gender:\s*(putra|putri)\]', '', filter_target, flags=re.IGNORECASE).strip()
                 target_classes = [c.strip().lower() for c in classes_part.split(',') if c.strip()]
                 if matched and target_classes:
@@ -602,7 +671,9 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
                         "kode": "WRONG_CLASS",
                         "sesi": sesi_name
                     }
-            elif is_kamar_session or (target_partisipan not in ["sekolah", "jenjang", "pegawai", "kelas_pengajian", "pengajian"] and has_target_filter):
+
+            # 3. Pengecekan Target Kamar
+            elif is_kamar_session or (target_partisipan in ["kamar", "kamar_khusus"] and has_target_filter):
                 if not is_target_room_matched(santri_kamar, filter_target):
                     cursor.close()
                     logging.warning(
@@ -615,9 +686,12 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
                         "kode": "WRONG_ROOM",
                         "sesi": sesi_name
                     }
-            elif target_partisipan in ["sekolah", "jenjang"] and has_target_filter:
+
+            # 4. Pengecekan Target Jenjang Sekolah
+            elif target_partisipan in ["sekolah", "kelas_sekolah", "jenjang"] and has_target_filter:
                 santri_jenjang = entity.get("jenjang") or ""
-                if santri_jenjang.lower() != filter_target.lower():
+                target_levels = [lvl.strip().lower() for lvl in filter_target.split(',') if lvl.strip()]
+                if target_levels and santri_jenjang.lower() not in target_levels and filter_target.lower() != 'all':
                     cursor.close()
                     logging.warning(
                         f"[REJECT] Santri '{entity_name}' dari jenjang '{santri_jenjang}' tidak terdaftar pada sesi sekolah '{filter_target}'."
@@ -629,7 +703,8 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
                         "kode": "WRONG_LEVEL",
                         "sesi": sesi_name
                     }
-        elif entity_type != "santri" and (is_kamar_session or target_partisipan in ["semua_santri", "kamar", "kamar_khusus"]):
+
+        elif entity_type != "santri" and (is_kamar_session or target_partisipan in ["semua_santri", "kamar", "kamar_khusus", "kelas_pengajian", "gender"]):
             cursor.close()
             logging.warning(
                 f"[REJECT] Pegawai '{entity_name}' tidak terdaftar pada sesi santri/kamar '{sesi_name}'."
@@ -638,6 +713,9 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
                 "device_id": device_id,
                 "nama": lcd_name,
                 "status": "AKSES DITOLAK",
+                "kode": "WRONG_ROLE",
+                "sesi": sesi_name
+            }
                 "kode": "WRONG_ROLE",
                 "sesi": sesi_name
             }

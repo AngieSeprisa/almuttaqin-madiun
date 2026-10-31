@@ -35,7 +35,7 @@
 
 // ================= KONFIGURASI PERANGKAT =======================
 // Masukkan Device ID yang didaftarkan di Menu Pengaturan Sesi Web (default: "tap_masjid")
-const char* DEVICE_ID = "tap_masjid";
+const char* DEVICE_ID = "tap_masjid_utara";
 
 // ================= KONFIGURASI WIFI & VPS MQTT =================
 const char* WIFI_SSID     = "Kota_pintar_kls_LT.1";

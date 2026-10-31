@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Kamar;
 use App\Models\MasterKelasPengajian;
+use App\Models\MasterSesi;
+use App\Models\SesiDeviceAllocation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -15,16 +17,17 @@ class PengaturanSesiController extends Controller
      */
     public function index()
     {
-        $sesis = DB::table('master_sesis')
-            ->leftJoin('master_devices', 'master_sesis.device_id_target', '=', 'master_devices.device_id')
-            ->select(
-                'master_sesis.*',
-                'master_devices.nama_lokasi',
-                'master_devices.kategori_area',
-                'master_devices.status_aktif as device_aktif'
-            )
-            ->orderBy('master_sesis.jam_mulai')
-            ->get();
+        $sesis = MasterSesi::with(['allocations.device', 'device'])
+            ->orderBy('jam_mulai')
+            ->get()
+            ->map(function ($s) {
+                if (!isset($s->nama_lokasi)) {
+                    $s->nama_lokasi = $s->device->nama_lokasi ?? null;
+                    $s->kategori_area = $s->device->kategori_area ?? null;
+                    $s->device_aktif = $s->device->status_aktif ?? false;
+                }
+                return $s;
+            });
 
         $devices = DB::table('master_devices')
             ->where('status_aktif', 1)
@@ -33,10 +36,11 @@ class PengaturanSesiController extends Controller
             ->get();
 
         $allDevices = DB::table('master_devices')
+            ->leftJoin('sesi_device_allocations', 'master_devices.device_id', '=', 'sesi_device_allocations.device_id')
             ->leftJoin('master_sesis', 'master_devices.device_id', '=', 'master_sesis.device_id_target')
             ->select(
                 'master_devices.*',
-                DB::raw('COUNT(master_sesis.id) as total_sesi')
+                DB::raw('COUNT(DISTINCT COALESCE(sesi_device_allocations.master_sesi_id, master_sesis.id)) as total_sesi')
             )
             ->groupBy(
                 'master_devices.id',
@@ -70,8 +74,9 @@ class PengaturanSesiController extends Controller
             ->get();
         $kamars = Kamar::daftarNamaKamarAktif();
         $kelasPengajians = MasterKelasPengajian::orderBy('nama_kelas')->get();
+        $allocations = collect();
 
-        return view('pengaturan-sesi.form', compact('devices', 'kamars', 'kelasPengajians'));
+        return view('pengaturan-sesi.form', compact('devices', 'kamars', 'kelasPengajians', 'allocations'));
     }
 
     /**
@@ -79,7 +84,7 @@ class PengaturanSesiController extends Controller
      */
     public function edit($id)
     {
-        $sesi = DB::table('master_sesis')->where('id', $id)->first();
+        $sesi = MasterSesi::with(['allocations.device'])->find($id);
         if (!$sesi) {
             return redirect()->route('pengaturan.sesi')->with('error', 'Data sesi tidak ditemukan.');
         }
@@ -91,8 +96,9 @@ class PengaturanSesiController extends Controller
             ->get();
         $kamars = Kamar::daftarNamaKamarAktif();
         $kelasPengajians = MasterKelasPengajian::orderBy('nama_kelas')->get();
+        $allocations = $sesi->allocations;
 
-        return view('pengaturan-sesi.form', compact('sesi', 'devices', 'kamars', 'kelasPengajians'));
+        return view('pengaturan-sesi.form', compact('sesi', 'devices', 'kamars', 'kelasPengajians', 'allocations'));
     }
 
     /**
@@ -177,6 +183,7 @@ class PengaturanSesiController extends Controller
         $targetKategori = $validated['target_kategori'] ?? 'semua_santri';
         $rawTargetFilter = $request->input('target_filter');
 
+        $legacyGender = 'ALL';
         if (in_array($targetKategori, ['kamar_khusus', 'sekolah'], true)) {
             if (is_array($rawTargetFilter)) {
                 $filtered = array_filter(array_map('trim', $rawTargetFilter));
@@ -195,8 +202,10 @@ class PengaturanSesiController extends Controller
 
             $genderInput = strtolower(trim((string) $request->input('target_filter_gender', 'semua')));
             if ($genderInput === 'putra') {
+                $legacyGender = 'L';
                 $targetFilter = $kelasStr ? "{$kelasStr} [Gender: Putra]" : '[Gender: Putra]';
             } elseif ($genderInput === 'putri') {
+                $legacyGender = 'P';
                 $targetFilter = $kelasStr ? "{$kelasStr} [Gender: Putri]" : '[Gender: Putri]';
             } else {
                 $targetFilter = $kelasStr ?: null;
@@ -205,19 +214,57 @@ class PengaturanSesiController extends Controller
             $targetFilter = null;
         }
 
-        DB::table('master_sesis')->insert([
-            'device_id_target' => !empty($validated['device_id_target']) ? $validated['device_id_target'] : null,
+        $fallbackLegacy = [
+            'device_id' => !empty($validated['device_id_target']) ? $validated['device_id_target'] : null,
+            'target_kategori' => match($targetKategori) {
+                'kamar_khusus' => 'kamar',
+                'sekolah' => 'kelas_sekolah',
+                'kelas_pengajian' => 'kelas_pengajian',
+                'pegawai' => 'pegawai',
+                default => 'semua',
+            },
+            'target_filter' => $targetFilter,
+            'target_gender' => $legacyGender,
+        ];
+
+        $allocations = $this->parseAllocationsFromRequest($request, $fallbackLegacy);
+
+        $firstAlloc = $allocations[0] ?? null;
+        $legacyDev = count($allocations) === 1 ? ($firstAlloc['device_id'] ?? null) : null;
+        $legacyKat = $firstAlloc ? match($firstAlloc['target_kategori']) {
+            'kamar' => 'kamar_khusus',
+            'kelas_sekolah' => 'sekolah',
+            'kelas_pengajian' => 'kelas_pengajian',
+            'pegawai' => 'pegawai',
+            default => 'semua_santri'
+        } : $targetKategori;
+        $legacyFil = $firstAlloc ? $firstAlloc['target_filter'] : $targetFilter;
+
+        $sesiId = DB::table('master_sesis')->insertGetId([
+            'device_id_target' => $legacyDev,
             'kode_sesi' => $validated['kode_sesi'],
             'nama_sesi' => trim($validated['nama_sesi']),
             'jam_mulai' => $this->normalizeTime($validated['jam_mulai']),
             'jam_selesai' => $this->normalizeTime($validated['jam_selesai']),
             'toleransi_menit' => isset($validated['toleransi_menit']) ? (int) $validated['toleransi_menit'] : 15,
             'kategori' => $validated['kategori'] ?? 'sholat',
-            'target_kategori' => $targetKategori,
-            'target_filter' => $targetFilter,
+            'target_kategori' => $legacyKat,
+            'target_filter' => $legacyFil,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        foreach ($allocations as $alloc) {
+            DB::table('sesi_device_allocations')->insert([
+                'master_sesi_id' => $sesiId,
+                'device_id' => $alloc['device_id'],
+                'target_kategori' => $alloc['target_kategori'],
+                'target_filter' => $alloc['target_filter'],
+                'target_gender' => $alloc['target_gender'] ?? 'ALL',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         return redirect()->route('pengaturan.sesi')->with('success', 'Sesi presensi baru berhasil ditambahkan.');
     }
@@ -246,13 +293,14 @@ class PengaturanSesiController extends Controller
             'toleransi_menit' => ['nullable', 'integer', 'min:0', 'max:240'],
             'device_id_target' => ['nullable', 'string', 'max:50', 'exists:master_devices,device_id'],
             'kategori' => ['required', Rule::in(['sholat', 'pengajian', 'sekolah', 'makan', 'pegawai'])],
-            'target_kategori' => ['required', Rule::in(['semua_santri', 'kamar_khusus', 'kelas_pengajian', 'sekolah', 'pegawai'])],
+            'target_kategori' => ['nullable', Rule::in(['semua_santri', 'kamar_khusus', 'kelas_pengajian', 'sekolah', 'pegawai'])],
             'target_filter' => ['nullable'],
         ]);
 
-        $targetKategori = $validated['target_kategori'];
+        $targetKategori = $validated['target_kategori'] ?? 'semua_santri';
         $rawTargetFilter = $request->input('target_filter');
 
+        $legacyGender = 'ALL';
         if (in_array($targetKategori, ['kamar_khusus', 'sekolah'], true)) {
             if (is_array($rawTargetFilter)) {
                 $filtered = array_filter(array_map('trim', $rawTargetFilter));
@@ -271,8 +319,10 @@ class PengaturanSesiController extends Controller
 
             $genderInput = strtolower(trim((string) $request->input('target_filter_gender', 'semua')));
             if ($genderInput === 'putra') {
+                $legacyGender = 'L';
                 $targetFilter = $kelasStr ? "{$kelasStr} [Gender: Putra]" : '[Gender: Putra]';
             } elseif ($genderInput === 'putri') {
+                $legacyGender = 'P';
                 $targetFilter = $kelasStr ? "{$kelasStr} [Gender: Putri]" : '[Gender: Putri]';
             } else {
                 $targetFilter = $kelasStr ?: null;
@@ -281,15 +331,41 @@ class PengaturanSesiController extends Controller
             $targetFilter = null;
         }
 
+        $fallbackLegacy = [
+            'device_id' => !empty($validated['device_id_target']) ? $validated['device_id_target'] : null,
+            'target_kategori' => match($targetKategori) {
+                'kamar_khusus' => 'kamar',
+                'sekolah' => 'kelas_sekolah',
+                'kelas_pengajian' => 'kelas_pengajian',
+                'pegawai' => 'pegawai',
+                default => 'semua',
+            },
+            'target_filter' => $targetFilter,
+            'target_gender' => $legacyGender,
+        ];
+
+        $allocations = $this->parseAllocationsFromRequest($request, $fallbackLegacy);
+
+        $firstAlloc = $allocations[0] ?? null;
+        $legacyDev = count($allocations) === 1 ? ($firstAlloc['device_id'] ?? null) : null;
+        $legacyKat = $firstAlloc ? match($firstAlloc['target_kategori']) {
+            'kamar' => 'kamar_khusus',
+            'kelas_sekolah' => 'sekolah',
+            'kelas_pengajian' => 'kelas_pengajian',
+            'pegawai' => 'pegawai',
+            default => 'semua_santri'
+        } : $targetKategori;
+        $legacyFil = $firstAlloc ? $firstAlloc['target_filter'] : $targetFilter;
+
         $updatePayload = [
-            'device_id_target' => !empty($validated['device_id_target']) ? $validated['device_id_target'] : null,
+            'device_id_target' => $legacyDev,
             'nama_sesi' => trim($validated['nama_sesi']),
             'jam_mulai' => $this->normalizeTime($validated['jam_mulai']),
             'jam_selesai' => $this->normalizeTime($validated['jam_selesai']),
             'toleransi_menit' => isset($validated['toleransi_menit']) ? (int) $validated['toleransi_menit'] : 15,
             'kategori' => $validated['kategori'],
-            'target_kategori' => $targetKategori,
-            'target_filter' => $targetFilter,
+            'target_kategori' => $legacyKat,
+            'target_filter' => $legacyFil,
             'updated_at' => now(),
         ];
 
@@ -298,6 +374,20 @@ class PengaturanSesiController extends Controller
         }
 
         DB::table('master_sesis')->where('id', $id)->update($updatePayload);
+
+        // Sinkronisasi alokasi perangkat
+        DB::table('sesi_device_allocations')->where('master_sesi_id', $id)->delete();
+        foreach ($allocations as $alloc) {
+            DB::table('sesi_device_allocations')->insert([
+                'master_sesi_id' => $id,
+                'device_id' => $alloc['device_id'],
+                'target_kategori' => $alloc['target_kategori'],
+                'target_filter' => $alloc['target_filter'],
+                'target_gender' => $alloc['target_gender'] ?? 'ALL',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
 
         return redirect()->route('pengaturan.sesi')->with('success', 'Pengaturan sesi berhasil diperbarui.');
     }
@@ -453,5 +543,57 @@ class PengaturanSesiController extends Controller
             return $clean . ':00';
         }
         return $clean;
+    }
+
+    /**
+     * Parsing dan normalisasi data alokasi perangkat dari request.
+     */
+    private function parseAllocationsFromRequest(Request $request, array $fallbackLegacy = []): array
+    {
+        $allocationsInput = $request->input('allocations');
+        if (empty($allocationsInput) && $request->filled('allocations_json')) {
+            $decoded = json_decode((string) $request->input('allocations_json'), true);
+            if (is_array($decoded)) {
+                $allocationsInput = $decoded;
+            }
+        }
+
+        $processed = [];
+        if (is_array($allocationsInput) && !empty($allocationsInput)) {
+            foreach ($allocationsInput as $alloc) {
+                if (!is_array($alloc)) continue;
+
+                $devId = !empty($alloc['device_id']) && $alloc['device_id'] !== 'ALL' ? trim((string)$alloc['device_id']) : null;
+                $kat = !empty($alloc['target_kategori']) ? trim((string)$alloc['target_kategori']) : 'semua';
+                if ($kat === 'semua_santri') $kat = 'semua';
+                if ($kat === 'kamar_khusus') $kat = 'kamar';
+                if ($kat === 'sekolah') $kat = 'kelas_sekolah';
+
+                $gender = !empty($alloc['target_gender']) ? strtoupper(trim((string)$alloc['target_gender'])) : 'ALL';
+                if (!in_array($gender, ['ALL', 'L', 'P'], true)) {
+                    $gender = 'ALL';
+                }
+
+                $rawFilter = $alloc['target_filter'] ?? null;
+                if (is_array($rawFilter)) {
+                    $filterStr = implode(', ', array_filter(array_map('trim', $rawFilter)));
+                } else {
+                    $filterStr = trim((string)$rawFilter);
+                }
+
+                $processed[] = [
+                    'device_id' => $devId,
+                    'target_kategori' => $kat,
+                    'target_filter' => $filterStr ?: null,
+                    'target_gender' => $gender,
+                ];
+            }
+        }
+
+        if (empty($processed) && !empty($fallbackLegacy)) {
+            $processed[] = $fallbackLegacy;
+        }
+
+        return $processed;
     }
 }

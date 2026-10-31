@@ -1,5 +1,7 @@
 @php
     $sesisJson = $sesis->map(function ($s) {
+        $allocDeviceIds = isset($s->allocations) ? $s->allocations->pluck('device_id')->filter()->join(' ') : '';
+        $allocTargets = isset($s->allocations) ? $s->allocations->pluck('target_filter')->filter()->join(' ') : '';
         return [
             'id' => $s->id,
             'kode_sesi' => $s->kode_sesi,
@@ -12,6 +14,8 @@
             'kategori' => strtolower((string) ($s->kategori ?? 'sholat')),
             'target_kategori' => $s->target_kategori ?? 'semua_santri',
             'target_filter' => $s->target_filter ?? '',
+            'alloc_devices' => $allocDeviceIds,
+            'alloc_targets' => $allocTargets,
         ];
     })->values();
 
@@ -505,7 +509,50 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
 
                             <!-- Perangkat ESP32 -->
                             <td class="py-3.5 px-4" x-show="sesiCols.perangkat">
-                                @if($s->device_id_target)
+                                @if(isset($s->allocations) && $s->allocations->isNotEmpty())
+                                    <div class="flex flex-col gap-1.5">
+                                        @foreach($s->allocations as $alloc)
+                                            @php
+                                                $genderTag = '';
+                                                if ($alloc->target_gender === 'L') {
+                                                    $genderTag = ' [Putra]';
+                                                } elseif ($alloc->target_gender === 'P') {
+                                                    $genderTag = ' [Putri]';
+                                                }
+
+                                                $badgeColor = match($alloc->target_gender) {
+                                                    'L' => 'bg-[#EFF4FF] text-[#0052FF] border-[#0052FF]/20',
+                                                    'P' => 'bg-pink-50 text-pink-700 border-pink-200',
+                                                    default => 'bg-gray-100 text-gray-800 border-gray-200',
+                                                };
+
+                                                $targetDetail = '';
+                                                if ($alloc->target_kategori === 'kamar' && $alloc->target_filter) {
+                                                    $targetDetail = 'Kamar: ' . \Illuminate\Support\Str::limit($alloc->target_filter, 18);
+                                                } elseif ($alloc->target_kategori === 'kelas_pengajian' && $alloc->target_filter) {
+                                                    $targetDetail = 'Pengajian: ' . \Illuminate\Support\Str::limit($alloc->target_filter, 18);
+                                                } elseif ($alloc->target_kategori === 'kelas_sekolah' && $alloc->target_filter) {
+                                                    $targetDetail = 'Sekolah: ' . $alloc->target_filter;
+                                                }
+                                            @endphp
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded font-mono text-[11px] font-bold border {{ $badgeColor }}">
+                                                    <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+                                                        <rect x="9" y="9" width="6" height="6"></rect>
+                                                    </svg>
+                                                    <span>{{ $alloc->device_id ?: 'Semua Mesin' }}{{ $genderTag }}</span>
+                                                </span>
+                                                @if($alloc->device && $alloc->device->nama_lokasi)
+                                                    <span class="text-[11px] text-gray-500 font-medium">({{ $alloc->device->nama_lokasi }})</span>
+                                                @endif
+                                                @if($targetDetail)
+                                                    <span class="text-[10.5px] text-gray-400">• {{ $targetDetail }}</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @elseif($s->device_id_target)
                                     <div class="font-mono text-xs font-semibold text-[#0052FF]">{{ $s->device_id_target }}</div>
                                     <div class="text-xs text-gray-500 mt-0.5">{{ $s->nama_lokasi ?? 'Lokasi belum diatur' }}</div>
                                 @else
@@ -541,7 +588,22 @@ x-data="pengaturanSesiApp()" x-init="initApp()" @nfc-tab-switch.window="switchTa
                                     {{ $jamMulaiShort }} - {{ $jamSelesaiShort }} WIB
                                 </div>
                                 <div class="text-xs text-gray-500 mt-0.5">
-                                    @if($targetKat === 'kamar_khusus')
+                                    @if(isset($s->allocations) && $s->allocations->isNotEmpty())
+                                        @php
+                                            $targetSummaries = $s->allocations->map(function($a) {
+                                                $g = $a->target_gender === 'L' ? 'Putra' : ($a->target_gender === 'P' ? 'Putri' : '');
+                                                return match($a->target_kategori) {
+                                                    'gender' => ($g ? "Khusus $g" : 'Semua Santri'),
+                                                    'kamar' => 'Kamar: ' . ($a->target_filter ?: 'Semua') . ($g ? " [$g]" : ''),
+                                                    'kelas_pengajian' => 'Pengajian: ' . ($a->target_filter ?: 'Semua') . ($g ? " [$g]" : ''),
+                                                    'kelas_sekolah' => 'Sekolah: ' . ($a->target_filter ?: 'Semua') . ($g ? " [$g]" : ''),
+                                                    'pegawai' => 'Pegawai',
+                                                    default => 'Semua Santri' . ($g ? " [$g]" : ''),
+                                                };
+                                            })->unique()->values();
+                                        @endphp
+                                        <span>{{ $targetSummaries->implode(' • ') }}</span>
+                                    @elseif($targetKat === 'kamar_khusus')
                                         Kamar: <span class="font-semibold text-gray-700">{{ $s->target_filter ?: 'Reguler' }}</span>
                                     @elseif($targetKat === 'sekolah')
                                         Sekolah ({{ $s->target_filter ?: 'Semua Siswa' }})

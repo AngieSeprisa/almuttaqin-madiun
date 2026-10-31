@@ -366,4 +366,119 @@ class PengaturanSesiTest extends TestCase
             'target_filter' => 'Kelas Lambatan SMP, Kelas Cepatan SMP [Gender: Putra]',
         ]);
     }
+
+    public function test_dapat_menyimpan_dan_mengubah_alokasi_multi_perangkat_dengan_target_masing_masing(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        // Siapkan 2 device
+        DB::table('master_devices')->insert([
+            [
+                'device_id' => 'tap_masjid',
+                'nama_lokasi' => 'Pintu Putra Masjid',
+                'kategori_area' => 'pondok',
+                'status_aktif' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'device_id' => 'ESP32_Presensi_Santri',
+                'nama_lokasi' => 'Pintu Putri Masjid',
+                'kategori_area' => 'pondok',
+                'status_aktif' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        // Simpan sesi tunggal dengan 2 alokasi mesin (Dzuhur Putra & Putri dalam 1 sesi)
+        $allocations = [
+            [
+                'device_id' => 'tap_masjid',
+                'target_kategori' => 'gender',
+                'target_gender' => 'L',
+                'target_filter' => null,
+            ],
+            [
+                'device_id' => 'ESP32_Presensi_Santri',
+                'target_kategori' => 'gender',
+                'target_gender' => 'P',
+                'target_filter' => null,
+            ],
+        ];
+
+        $storeResponse = $this->actingAs($yayasan)->post(route('pengaturan.sesi.store'), [
+            'kode_sesi' => 'DZUHUR_BERSAMA',
+            'nama_sesi' => 'Sholat Dzuhur Berjamaah',
+            'jam_mulai' => '11:45',
+            'jam_selesai' => '12:30',
+            'toleransi_menit' => 10,
+            'kategori' => 'sholat',
+            'allocations_json' => json_encode($allocations),
+        ]);
+
+        $storeResponse->assertRedirect(route('pengaturan.sesi'));
+        $storeResponse->assertSessionHas('success');
+
+        $sesi = DB::table('master_sesis')->where('kode_sesi', 'DZUHUR_BERSAMA')->first();
+        $this->assertNotNull($sesi);
+
+        // Pastikan tabel sesi_device_allocations terisi 2 baris
+        $this->assertDatabaseHas('sesi_device_allocations', [
+            'master_sesi_id' => $sesi->id,
+            'device_id' => 'tap_masjid',
+            'target_kategori' => 'gender',
+            'target_gender' => 'L',
+        ]);
+        $this->assertDatabaseHas('sesi_device_allocations', [
+            'master_sesi_id' => $sesi->id,
+            'device_id' => 'ESP32_Presensi_Santri',
+            'target_kategori' => 'gender',
+            'target_gender' => 'P',
+        ]);
+
+        // Periksa tampilan halaman index tabel sesi memiliki badge perangkat & targetnya
+        $indexResponse = $this->actingAs($yayasan)->get(route('pengaturan.sesi'));
+        $indexResponse->assertStatus(200);
+        $indexResponse->assertSee('tap_masjid');
+        $indexResponse->assertSee('[Putra]');
+        $indexResponse->assertSee('ESP32_Presensi_Santri');
+        $indexResponse->assertSee('[Putri]');
+
+        // Update alokasi: ganti target mesin putri ke kamar khusus
+        $updatedAllocations = [
+            [
+                'device_id' => 'tap_masjid',
+                'target_kategori' => 'gender',
+                'target_gender' => 'L',
+                'target_filter' => null,
+            ],
+            [
+                'device_id' => 'ESP32_Presensi_Santri',
+                'target_kategori' => 'kamar',
+                'target_gender' => 'P',
+                'target_filter' => 'Kamar Kelas 7 Putri, Kamar Kelas 8 Putri',
+            ],
+        ];
+
+        $updateResponse = $this->actingAs($yayasan)->put(route('pengaturan.sesi.update', $sesi->id), [
+            'kode_sesi' => 'DZUHUR_BERSAMA',
+            'nama_sesi' => 'Sholat Dzuhur Berjamaah Santri',
+            'jam_mulai' => '11:45',
+            'jam_selesai' => '12:30',
+            'toleransi_menit' => 10,
+            'kategori' => 'sholat',
+            'allocations_json' => json_encode($updatedAllocations),
+        ]);
+
+        $updateResponse->assertRedirect(route('pengaturan.sesi'));
+
+        $this->assertDatabaseHas('sesi_device_allocations', [
+            'master_sesi_id' => $sesi->id,
+            'device_id' => 'ESP32_Presensi_Santri',
+            'target_kategori' => 'kamar',
+            'target_gender' => 'P',
+            'target_filter' => 'Kamar Kelas 7 Putri, Kamar Kelas 8 Putri',
+        ]);
+    }
 }
