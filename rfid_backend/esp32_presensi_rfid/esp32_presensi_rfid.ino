@@ -179,6 +179,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     // 1. UPDATE SESI AKTIF (Topik: presensi/devices/{device_id}/sesi atau rfid/device/{device_id}/sesi dll)
     if (topStr.indexOf("sesi") >= 0 || topStr.indexOf("display") >= 0) {
         String targetDevice = doc["device_id"] | "";
+        if (targetDevice.length() == 0) {
+            targetDevice = doc["serial"] | "";
+        }
         // Jika payload menyertakan target device_id, abaikan jika bukan ditujukan untuk alat ini
         if (targetDevice.length() > 0 && !targetDevice.equalsIgnoreCase(activeDeviceId)) {
             return; // Pesan untuk device lain, abaikan
@@ -193,7 +196,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         if (adaSesi) {
             hasActiveSesi   = true;
             currentKategori = doc["kategori"]  | "Presensi";
-            currentSesiName = doc["nama_sesi"] | currentKategori;
+            const char* nSesi = doc["nama_sesi"] | doc["sesi"] | "";
+            if (strlen(nSesi) > 0) {
+                currentSesiName = String(nSesi);
+            } else {
+                currentSesiName = currentKategori;
+            }
         } else {
             hasActiveSesi   = false;
             currentKategori = "";
@@ -269,6 +277,8 @@ void reconnectMQTT() {
             mqttClient.subscribe(topicSesiDevice2.c_str());
             mqttClient.subscribe(topicSesiDevice3.c_str());
             mqttClient.subscribe("presensi/sesi_aktif");
+            mqttClient.subscribe("rfid/presensi/status_sesi");
+            mqttClient.subscribe("presensi/santri/status_sesi");
 
             // Kirim sinyal boot ke backend agar status online terdata & sesi langsung dikirim balik
             publishHeartbeat("boot");

@@ -289,9 +289,8 @@ def get_active_sesi(cursor, device_id: str, current_time: str, strict: bool = Tr
 
 def broadcast_device_session(client, db, device_id: str):
     """
-    Mengirimkan informasi sesi aktif spesifik ke topik MQTT per-device_id.
-    Publish HANYA ke topik spesifik perangkat tersebut (bukan topik global bersama),
-    sehingga setiap mesin hanya menampilkan sesi yang dialokasikan untuknya dan tidak saling menimpa.
+    Mengirimkan informasi sesi aktif spesifik ke topik MQTT per-device_id dan topik kompatibilitas bersama.
+    Sertakan device_id di payload JSON agar setiap boks hanya memproses sesi yang dialokasikan untuknya.
     """
     if not device_id:
         return
@@ -311,8 +310,10 @@ def broadcast_device_session(client, db, device_id: str):
                 "status": "aktif",
                 "ada_sesi": True,
                 "device_id": device_id,
+                "serial": device_id,
                 "kategori": kat_title,
                 "nama_sesi": nama_raw,
+                "sesi": nama_raw,
                 "kode_sesi": sesi.get("kode_sesi", ""),
                 "jam_mulai": str(sesi.get("jam_mulai", "")),
                 "jam_selesai": str(sesi.get("jam_selesai", "")),
@@ -324,9 +325,15 @@ def broadcast_device_session(client, db, device_id: str):
                 "status": "tidak_ada_sesi",
                 "ada_sesi": False,
                 "device_id": device_id,
+                "serial": device_id,
                 "kategori": "",
                 "nama_sesi": "",
-                "kode_sesi": ""
+                "sesi": "",
+                "kode_sesi": "",
+                "jam_mulai": "",
+                "jam_selesai": "",
+                "target_kategori": "",
+                "target_gender": "ALL"
             }
 
         payload_json = json.dumps(payload)
@@ -337,8 +344,18 @@ def broadcast_device_session(client, db, device_id: str):
         client.publish(f"rfid/device/{device_id}/sesi", payload_json, qos=1, retain=True)
         client.publish(f"rfid/{device_id}/sesi", payload_json, qos=1, retain=True)
         client.publish(f"rfid/{device_id}/display", payload_json, qos=1, retain=True)
+        client.publish(f"rfid/presensi/status_sesi/{device_id}", payload_json, qos=1, retain=True)
+        client.publish(f"presensi/sesi_aktif/{device_id}", payload_json, qos=1, retain=True)
+        client.publish(f"presensi/santri/status_sesi/{device_id}", payload_json, qos=1, retain=True)
 
-        logging.info(f"[BROADCAST SESI PER-DEVICE] {device_id} -> ada_sesi={payload['ada_sesi']}, sesi='{payload.get('nama_sesi', '-')}' (Target: {payload.get('target_kategori')}, Gender: {payload.get('target_gender')})")
+        # 2. Topik bersama / fallback kompatibilitas firmware boks yang subscribe topik lama
+        # Sertakan device_id di payload agar hanya diproses oleh boks yang sesuai targetDevice (tanpa retain agar tidak saling menimpa)
+        client.publish("presensi/sesi_aktif", payload_json, qos=1, retain=False)
+        client.publish("rfid/presensi/status_sesi", payload_json, qos=1, retain=False)
+        client.publish("presensi/santri/status_sesi", payload_json, qos=1, retain=False)
+        client.publish("presensi/status_sesi", payload_json, qos=1, retain=False)
+
+        logging.info(f"[BROADCAST SESI] {device_id} -> ada_sesi={payload['ada_sesi']}, sesi='{payload.get('nama_sesi', '-')}' (Target: {payload.get('target_kategori')}, Gender: {payload.get('target_gender')})")
     except Exception as ex:
         logging.error(f"Gagal broadcast sesi {device_id}: {ex}")
 
@@ -939,15 +956,10 @@ def periodic_session_broadcaster(client, userdata):
                 target_devs.add("tap_masjid")
                 target_devs.add("tap_masjid_utara")
 
-                # Bersihkan retained message pada topik global agar tidak menimpa device manapun
-                try:
-                    client.publish("presensi/sesi_aktif", "", qos=1, retain=True)
-                except Exception:
-                    pass
-
-                # Broadcast sesi aktif khusus ke masing-masing device_id
+                # Broadcast sesi aktif ke seluruh topik (spesifik per-device & bersama)
                 for dev_id in sorted(target_devs):
                     broadcast_device_session(client, db, dev_id)
+                    time.sleep(0.05)
         except Exception as err:
             logging.debug(f"Periodic broadcast loop error: {err}")
         time.sleep(15)
@@ -971,12 +983,6 @@ def on_connect(client, userdata, flags, rc, properties=None):
 
         logging.info("Berlangganan topik tap, heartbeat, ping, & get_sesi.")
 
-        # Bersihkan retained message pada topik global
-        try:
-            client.publish("presensi/sesi_aktif", "", qos=1, retain=True)
-        except Exception:
-            pass
-
         # Broadcast sesi awal secara spesifik untuk setiap perangkat
         db = userdata.get("db") if userdata else None
         if db:
@@ -990,6 +996,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
                 dev_list.add("tap_masjid_utara")
                 for d_id in sorted(dev_list):
                     broadcast_device_session(client, db, d_id)
+                    time.sleep(0.05)
             except Exception as e:
                 logging.debug(f"Initial broadcast error: {e}")
     else:
