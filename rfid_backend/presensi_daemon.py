@@ -289,12 +289,13 @@ def get_active_sesi(cursor, device_id: str, current_time: str, strict: bool = Tr
 
 def broadcast_device_session(client, db, device_id: str):
     """
-    Mengirimkan informasi sesi aktif ke topik MQTT per-device dan global.
-    Jika ada sesi aktif:
-      status="aktif", ada_sesi=True, kategori="...", nama_sesi="..."
-    Jika tidak ada sesi:
-      status="tidak_ada_sesi", ada_sesi=False, kategori="", nama_sesi=""
+    Mengirimkan informasi sesi aktif spesifik ke topik MQTT per-device_id.
+    Publish HANYA ke topik spesifik perangkat tersebut (bukan topik global bersama),
+    sehingga setiap mesin hanya menampilkan sesi yang dialokasikan untuknya dan tidak saling menimpa.
     """
+    if not device_id:
+        return
+
     try:
         cur = db.cursor(dictionary=True)
         now_time = datetime.now().strftime("%H:%M:%S")
@@ -314,7 +315,9 @@ def broadcast_device_session(client, db, device_id: str):
                 "nama_sesi": nama_raw,
                 "kode_sesi": sesi.get("kode_sesi", ""),
                 "jam_mulai": str(sesi.get("jam_mulai", "")),
-                "jam_selesai": str(sesi.get("jam_selesai", ""))
+                "jam_selesai": str(sesi.get("jam_selesai", "")),
+                "target_kategori": sesi.get("alloc_target_kategori", ""),
+                "target_gender": sesi.get("alloc_target_gender", "ALL")
             }
         else:
             payload = {
@@ -327,12 +330,15 @@ def broadcast_device_session(client, db, device_id: str):
             }
 
         payload_json = json.dumps(payload)
-        # 1. Topik per-device (retained agar ESP32 yang baru boot/reconnect langsung menerima)
+
+        # 1. Topik per-device (retained agar ESP32 yang baru boot/reconnect langsung menerima sesi aktifnya)
         client.publish(f"presensi/devices/{device_id}/sesi", payload_json, qos=1, retain=True)
         client.publish(f"presensi/sesi/{device_id}", payload_json, qos=1, retain=True)
-        # 2. Topik global (retained)
-        client.publish("presensi/sesi_aktif", payload_json, qos=1, retain=True)
-        logging.info(f"[BROADCAST SESI] {device_id} -> ada_sesi={payload['ada_sesi']}, sesi='{payload.get('nama_sesi', '-')}' ({payload.get('jam_mulai')}-{payload.get('jam_selesai')})")
+        client.publish(f"rfid/device/{device_id}/sesi", payload_json, qos=1, retain=True)
+        client.publish(f"rfid/{device_id}/sesi", payload_json, qos=1, retain=True)
+        client.publish(f"rfid/{device_id}/display", payload_json, qos=1, retain=True)
+
+        logging.info(f"[BROADCAST SESI PER-DEVICE] {device_id} -> ada_sesi={payload['ada_sesi']}, sesi='{payload.get('nama_sesi', '-')}' (Target: {payload.get('target_kategori')}, Gender: {payload.get('target_gender')})")
     except Exception as ex:
         logging.error(f"Gagal broadcast sesi {device_id}: {ex}")
 
@@ -896,7 +902,7 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
 def periodic_session_broadcaster(client, userdata):
     """
     Secara periodik memeriksa dan mem-broadcast status sesi aktif
-    ke seluruh perangkat ESP32 setiap 15 detik via MQTT.
+    ke seluruh perangkat ESP32 setiap 15 detik via MQTT secara spesifik per device_id.
     """
     logging.info("[BROADCASTER] Background thread broadcast sesi aktif dimulai.")
     while True:
@@ -912,15 +918,35 @@ def periodic_session_broadcaster(client, userdata):
 
             if db and db.is_connected():
                 cur = db.cursor(dictionary=True)
+                
+                # 1. Ambil seluruh device dari master_devices yang aktif
                 cur.execute("SELECT device_id FROM master_devices WHERE status_aktif = 1")
                 rows = cur.fetchall()
+                target_devs = {r["device_id"].strip() for r in rows if r.get("device_id") and r["device_id"].strip()}
+
+                # 2. Ambil device_id yang dialokasikan pada sesi presensi
+                try:
+                    cur.execute("SELECT DISTINCT device_id FROM sesi_device_allocations WHERE device_id IS NOT NULL AND device_id != '' AND device_id != 'ALL'")
+                    alloc_rows = cur.fetchall()
+                    for ar in alloc_rows:
+                        if ar.get("device_id") and ar["device_id"].strip():
+                            target_devs.add(ar["device_id"].strip())
+                except Exception:
+                    pass
+
                 cur.close()
 
-                target_devs = [r["device_id"] for r in rows if r.get("device_id")]
-                if "tap_masjid" not in target_devs:
-                    target_devs.append("tap_masjid")
+                target_devs.add("tap_masjid")
+                target_devs.add("tap_masjid_utara")
 
-                for dev_id in target_devs:
+                # Bersihkan retained message pada topik global agar tidak menimpa device manapun
+                try:
+                    client.publish("presensi/sesi_aktif", "", qos=1, retain=True)
+                except Exception:
+                    pass
+
+                # Broadcast sesi aktif khusus ke masing-masing device_id
+                for dev_id in sorted(target_devs):
                     broadcast_device_session(client, db, dev_id)
         except Exception as err:
             logging.debug(f"Periodic broadcast loop error: {err}")
@@ -945,10 +971,27 @@ def on_connect(client, userdata, flags, rc, properties=None):
 
         logging.info("Berlangganan topik tap, heartbeat, ping, & get_sesi.")
 
-        # Broadcast sesi awal untuk tap_masjid saat daemon baru terkoneksi
+        # Bersihkan retained message pada topik global
+        try:
+            client.publish("presensi/sesi_aktif", "", qos=1, retain=True)
+        except Exception:
+            pass
+
+        # Broadcast sesi awal secara spesifik untuk setiap perangkat
         db = userdata.get("db") if userdata else None
         if db:
-            broadcast_device_session(client, db, "tap_masjid")
+            try:
+                cur = db.cursor(dictionary=True)
+                cur.execute("SELECT device_id FROM master_devices WHERE status_aktif = 1")
+                rows = cur.fetchall()
+                cur.close()
+                dev_list = {r["device_id"].strip() for r in rows if r.get("device_id") and r["device_id"].strip()}
+                dev_list.add("tap_masjid")
+                dev_list.add("tap_masjid_utara")
+                for d_id in sorted(dev_list):
+                    broadcast_device_session(client, db, d_id)
+            except Exception as e:
+                logging.debug(f"Initial broadcast error: {e}")
     else:
         logging.error(f"Koneksi MQTT Gagal dengan kode: {rc}")
 

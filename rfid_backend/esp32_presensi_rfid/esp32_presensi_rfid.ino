@@ -176,10 +176,11 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 
     String topStr = String(topic);
 
-    // 1. UPDATE SESI AKTIF (Topik: presensi/devices/{device_id}/sesi atau presensi/sesi_aktif)
-    if (topStr.indexOf("sesi") >= 0) {
+    // 1. UPDATE SESI AKTIF (Topik: presensi/devices/{device_id}/sesi atau rfid/device/{device_id}/sesi dll)
+    if (topStr.indexOf("sesi") >= 0 || topStr.indexOf("display") >= 0) {
         String targetDevice = doc["device_id"] | "";
-        if (targetDevice.length() > 0 && !targetDevice.equalsIgnoreCase(activeDeviceId) && topStr.indexOf("sesi_aktif") < 0) {
+        // Jika payload menyertakan target device_id, abaikan jika bukan ditujukan untuk alat ini
+        if (targetDevice.length() > 0 && !targetDevice.equalsIgnoreCase(activeDeviceId)) {
             return; // Pesan untuk device lain, abaikan
         }
 
@@ -260,9 +261,13 @@ void reconnectMQTT() {
             mqttClient.subscribe(topicResp1.c_str());
             mqttClient.subscribe(topicResp2.c_str());
 
-            // 2. Dengarkan broadcast sesi aktif (khusus device ini & global)
-            String topicSesiDevice = "presensi/devices/" + activeDeviceId + "/sesi";
-            mqttClient.subscribe(topicSesiDevice.c_str());
+            // 2. Dengarkan broadcast sesi aktif (khusus device ini & fallback)
+            String topicSesiDevice1 = "presensi/devices/" + activeDeviceId + "/sesi";
+            String topicSesiDevice2 = "rfid/device/" + activeDeviceId + "/sesi";
+            String topicSesiDevice3 = "rfid/" + activeDeviceId + "/display";
+            mqttClient.subscribe(topicSesiDevice1.c_str());
+            mqttClient.subscribe(topicSesiDevice2.c_str());
+            mqttClient.subscribe(topicSesiDevice3.c_str());
             mqttClient.subscribe("presensi/sesi_aktif");
 
             // Kirim sinyal boot ke backend agar status online terdata & sesi langsung dikirim balik
