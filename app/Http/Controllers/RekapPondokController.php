@@ -23,31 +23,31 @@ class RekapPondokController extends Controller
     public const SHOLAT_SLOTS = [
         'subuh' => [
             'key'       => 'subuh',
-            'label'     => 'SUBUH',
+            'label'     => 'Subuh',
             'jam_mulai' => '04:00',
             'jam_akhir' => '06:30',
         ],
         'dzuhur' => [
             'key'       => 'dzuhur',
-            'label'     => 'DZUHUR',
+            'label'     => 'Dzuhur',
             'jam_mulai' => '11:30',
             'jam_akhir' => '13:30',
         ],
         'ashar' => [
             'key'       => 'ashar',
-            'label'     => 'ASAR',
+            'label'     => 'Ashar',
             'jam_mulai' => '14:45',
             'jam_akhir' => '17:00',
         ],
         'maghrib' => [
             'key'       => 'maghrib',
-            'label'     => 'MAGHRIB',
+            'label'     => 'Maghrib',
             'jam_mulai' => '17:30',
             'jam_akhir' => '18:45',
         ],
         'isya' => [
             'key'       => 'isya',
-            'label'     => 'ISYA',
+            'label'     => 'Isya',
             'jam_mulai' => '18:45',
             'jam_akhir' => '21:30',
         ],
@@ -459,22 +459,23 @@ class RekapPondokController extends Controller
         // C. Sesi Spesifik Dropdown Options
         $sesiOptions = [];
         if ($kategori === 'sholat') {
-            $sesiOptions['semua'] = 'Semua Sesi Sholat';
-            foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
-                $sesiOptions[$slotKey] = 'Sholat: ' . $slotMeta['label'];
-            }
-            foreach ($dbSesiList as $s) {
-                $sesiOptions[(string) $s->id] = "Sesi: {$s->nama_sesi}";
-            }
+            $sesiOptions = [
+                'semua'   => 'Semua Sesi Sholat',
+                'subuh'   => 'Subuh',
+                'dzuhur'  => 'Dzuhur',
+                'ashar'   => 'Ashar',
+                'maghrib' => 'Maghrib',
+                'isya'    => 'Isya',
+            ];
         } elseif ($kategori === 'pengajian') {
             $sesiOptions['semua'] = 'Semua Sesi Pengajian';
             foreach ($dbSesiList as $s) {
-                $sesiOptions[(string) $s->id] = "Pengajian: {$s->nama_sesi}";
+                $sesiOptions[(string) $s->id] = $s->nama_sesi;
             }
         } else {
             $sesiOptions['semua'] = 'Semua Sesi';
             foreach (self::SHOLAT_SLOTS as $slotKey => $slotMeta) {
-                $sesiOptions[$slotKey] = 'Sholat: ' . $slotMeta['label'];
+                $sesiOptions[$slotKey] = $slotMeta['label'];
             }
             foreach ($dbSesiList as $s) {
                 $katLabel = ucfirst($s->kategori ?? 'sesi');
@@ -486,6 +487,12 @@ class RekapPondokController extends Controller
         $selectedSesiModel = null;
         if ($filterSesiId !== 'semua' && is_numeric($filterSesiId)) {
             $selectedSesiModel = MasterSesi::find((int) $filterSesiId);
+            if ($selectedSesiModel && $kategori === 'sholat') {
+                $detected = self::detectSlotSholat($selectedSesiModel);
+                if ($detected) {
+                    $filterSesiId = $detected;
+                }
+            }
         }
 
         // D. Daftar Kelas Sekolah
@@ -1138,13 +1145,14 @@ class RekapPondokController extends Controller
         $sessions = [];
         $slotsToBuild = $evaluateSlots;
 
-        // Jika semua sholat dievaluasi, susun daftar opsi sesi untuk WhatsApp
-        if (empty($slotsToBuild)) {
+        // Jika kategori sholat atau slotsToBuild kosong, gunakan 5 sesi sholat standar
+        if (empty($slotsToBuild) || $kategori === 'sholat') {
             $slotsToBuild = self::SHOLAT_SLOTS;
         }
 
         foreach ($slotsToBuild as $slotKey => $slotMeta) {
             $slotLabel = strtoupper($slotMeta['label'] ?? $slotKey);
+            $dropdownLabel = ucfirst(strtolower($slotMeta['label'] ?? $slotKey));
             $isPengajian = ($kategori === 'pengajian') || (isset($slotMeta['model']) && ($slotMeta['model']->kategori === 'pengajian'));
 
             $headerKegiatan = $isPengajian ? 'PENGAJIAN' : 'SHOLAT';
@@ -1190,7 +1198,7 @@ class RekapPondokController extends Controller
 
             $sessions[$slotKey] = [
                 'slot_key'               => $slotKey,
-                'label'                  => $slotLabel,
+                'label'                  => $dropdownLabel,
                 'header_kegiatan'        => $headerKegiatan,
                 'text'                   => $fullMessage,
                 'total_hadir'            => $hadirCount,

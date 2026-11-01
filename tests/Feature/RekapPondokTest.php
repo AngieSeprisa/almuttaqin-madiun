@@ -81,6 +81,15 @@ class RekapPondokTest extends TestCase
         $resSholat->assertSee('Rekap Presensi Sholat');
         $resSholat->assertSee('Data Presensi Sholat');
         $resSholat->assertSee('Sesi Sholat');
+        // Pastikan opsi dropdown sholat hanya 5 waktu baku tanpa duplikasi Sholat:/Sesi:
+        $resSholat->assertSee('Semua Sesi Sholat');
+        $resSholat->assertSee('>Subuh<', false);
+        $resSholat->assertSee('>Dzuhur<', false);
+        $resSholat->assertSee('>Ashar<', false);
+        $resSholat->assertSee('>Maghrib<', false);
+        $resSholat->assertSee('>Isya<', false);
+        $resSholat->assertDontSee('Sholat: SUBUH');
+        $resSholat->assertDontSee('Sesi: SUBUH');
 
         // 3. Akses menu terpisah rekap.pengajian.index
         $resPengajian = $this->actingAs($this->admin)->get(route('rekap.pengajian.index'));
