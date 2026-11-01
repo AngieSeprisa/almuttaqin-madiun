@@ -643,8 +643,9 @@ class RekapPondokController extends Controller
                 if ($search !== '') {
                     $needle = mb_strtolower($search);
                     $nama = mb_strtolower((string) $siswa->nama_lengkap);
+                    $namaBersih = mb_strtolower(self::cleanStudentName((string) $siswa->nama_lengkap));
                     $nisn = mb_strtolower((string) ($siswa->pendaftaran?->nisn ?? $siswa->nisn ?? ''));
-                    if (!str_contains($nama, $needle) && !str_contains($nisn, $needle)) {
+                    if (!str_contains($nama, $needle) && !str_contains($namaBersih, $needle) && !str_contains($nisn, $needle)) {
                         return false;
                     }
                 }

@@ -174,3 +174,4 @@ class PerizinanHaidController extends Controller
             ->with('success', "Data perizinan haid {$nama} berhasil dihapus.");
     }
 }
+

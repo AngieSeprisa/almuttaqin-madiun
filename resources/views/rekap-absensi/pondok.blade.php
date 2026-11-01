@@ -224,12 +224,39 @@
     }
     .fi-ta-search-wrap {
         position: relative;
-        width: 240px;
+        width: 260px;
+        display: flex;
+        align-items: center;
+    }
+    .fi-ta-search-btn {
+        position: absolute;
+        left: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #64748b;
+        border-radius: 6px;
+        transition: color 0.15s ease;
+        z-index: 2;
+    }
+    .fi-ta-search-btn:hover {
+        color: #2563eb;
+    }
+    .fi-ta-search-icon {
+        width: 15px;
+        height: 15px;
+        color: currentColor;
     }
     .fi-ta-search-input {
         width: 100%;
         height: 38px;
-        padding: 7px 12px 7px 36px;
+        padding: 7px 32px 7px 32px;
         font-size: 13px;
         border: 1px solid #d1d5db;
         border-radius: 8px;
@@ -244,15 +271,28 @@
         border-color: #6366f1;
         box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
     }
-    .fi-ta-search-icon {
+    .fi-ta-search-clear {
         position: absolute;
-        left: 11px;
+        right: 8px;
         top: 50%;
         transform: translateY(-50%);
-        width: 16px;
-        height: 16px;
-        color: #9ca3af;
-        pointer-events: none;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #e2e8f0;
+        color: #64748b;
+        border: none;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        transition: all 0.15s ease;
+        z-index: 2;
+    }
+    .fi-ta-search-clear:hover {
+        background: #cbd5e1;
+        color: #0f172a;
     }
     .fi-btn-icon {
         display: inline-flex;
@@ -923,15 +963,24 @@
             <div class="fi-ta-actions">
                 {{-- Live Search --}}
                 <div class="fi-ta-search-wrap">
-                    <svg class="fi-ta-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
+                    <button type="button" class="fi-ta-search-btn" id="btnExecuteSearch" title="Cari Santri">
+                        <svg class="fi-ta-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
                     <input type="text"
                            id="filamentLiveSearch"
                            value="{{ $search }}"
-                           placeholder="Cari nama atau NISN"
-                           class="fi-ta-search-input">
+                           placeholder="Cari nama atau NISN..."
+                           class="fi-ta-search-input"
+                           autocomplete="off">
+                    <button type="button" id="btnSearchClear" class="fi-ta-search-clear" title="Hapus pencarian" style="{{ empty($search) ? 'display:none;' : 'display:flex;' }}">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
                 </div>
 
                 {{-- Refresh Button --}}
@@ -1918,25 +1967,69 @@
         }
     });
 
-    // Client-side search & Enter server-side
+    // Server-side live search with debounce & instant triggers
     var searchInput = document.getElementById('filamentLiveSearch');
+    var clearBtn = document.getElementById('btnSearchClear');
+    var searchBtn = document.getElementById('btnExecuteSearch');
+    var searchTimer = null;
+
+    function updateClearBtn() {
+        if (clearBtn && searchInput) {
+            clearBtn.style.display = searchInput.value.trim().length > 0 ? 'flex' : 'none';
+        }
+    }
+
+    function executeSearch(query) {
+        var url = new URL(window.location.href);
+        var q = (query || '').trim();
+        if (q) {
+            url.searchParams.set('search', q);
+        } else {
+            url.searchParams.delete('search');
+        }
+        url.searchParams.set('page', 1);
+        window.location.href = url.toString();
+    }
+
     if (searchInput) {
+        updateClearBtn();
+
+        // Otomatis cari ke server setelah user berhenti mengetik 500ms
         searchInput.addEventListener('input', function () {
-            var q = (this.value || '').toLowerCase().trim();
-            var rows = document.querySelectorAll('#tablePresensiPondokFilament tbody tr.fi-row-santri');
-            rows.forEach(function (tr) {
-                var hay = tr.getAttribute('data-search') || '';
-                tr.style.display = (!q || hay.indexOf(q) !== -1) ? '' : 'none';
-            });
+            updateClearBtn();
+            clearTimeout(searchTimer);
+            var q = this.value;
+            searchTimer = setTimeout(function () {
+                executeSearch(q);
+            }, 500);
         });
 
+        // Tekan Enter untuk langsung cari tanpa menunggu jeda 500ms
         searchInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                var url = new URL(window.location.href);
-                url.searchParams.set('search', this.value.trim());
-                url.searchParams.set('page', 1);
-                window.location.href = url.toString();
+                clearTimeout(searchTimer);
+                executeSearch(this.value);
+            }
+        });
+    }
+
+    if (searchBtn) {
+        searchBtn.addEventListener('click', function () {
+            if (searchInput) {
+                clearTimeout(searchTimer);
+                executeSearch(searchInput.value);
+            }
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+            if (searchInput) {
+                searchInput.value = '';
+                updateClearBtn();
+                clearTimeout(searchTimer);
+                executeSearch('');
             }
         });
     }

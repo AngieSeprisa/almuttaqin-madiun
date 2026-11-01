@@ -70,3 +70,4 @@ class PerizinanHaid extends Model
         return $dateStr <= $maxDate;
     }
 }
+
