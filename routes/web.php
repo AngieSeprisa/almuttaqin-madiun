@@ -199,6 +199,11 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
         ->name('rekap.pondok.export');
 
+    // Ubah status kehadiran per sesi langsung dari modal rincian presensi
+    Route::post('/rekap-absensi/update-status-sesi', [RekapPondokController::class, 'updateStatusSesi'])
+        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_sholat|rekap_pengajian|pengaturan_pondok|siswa,edit')
+        ->name('rekap.pondok.update-status');
+
     Route::prefix('rekap-absensi')->name('rekap-absensi.')->group(function () {
         Route::get('/sekolah', [SekolahController::class, 'rekapAbsensi'])
             ->middleware('permission:sekolah,view')

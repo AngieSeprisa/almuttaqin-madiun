@@ -11,6 +11,7 @@ use App\Models\PerizinanSambang;
 use App\Models\Presensi;
 use App\Models\Siswa;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -799,31 +800,63 @@ class RekapPondokController extends Controller
                     }
 
                     if ($matchedTap) {
-                        $isLate = ($matchedTap->status_kehadiran === 'terlambat');
-                        if (!$isLate && $matchedTap->sesi && !empty($matchedTap->sesi->jam_mulai)) {
-                            try {
-                                $jamMulaiDt = Carbon::parse($dStr . ' ' . $matchedTap->sesi->jam_mulai);
-                                $toleransi = (int) ($matchedTap->sesi->toleransi_menit ?? 15);
-                                $batasDt = (clone $jamMulaiDt)->addMinutes($toleransi);
-                                if ($matchedTap->waktu_tap && $matchedTap->waktu_tap->gt($batasDt)) {
-                                    $isLate = true;
-                                }
-                            } catch (\Throwable $e) {}
-                        }
-
+                        $stK = (string) $matchedTap->status_kehadiran;
                         $jamTapStr = $matchedTap->waktu_tap ? $matchedTap->waktu_tap->format('H:i:s') : '-';
-                        if ($isLate) {
-                            $siswaRow['total_t']++;
-                            $statusCode = 'T';
-                            $statusLabel = 'TERLAMBAT';
-                            $statusBadge = 'status-badge-terlambat';
-                            $keterangan = "Tap pukul {$jamTapStr} WIB (Melewati Toleransi)";
+
+                        if ($stK === 'alpa') {
+                            $siswaRow['total_a']++;
+                            $statusCode = 'A';
+                            $statusLabel = 'ALPA';
+                            $statusBadge = 'status-badge-alpa';
+                            $keterangan = "Manual oleh Pengurus (Tidak Hadir)";
+                            $waEmoji = '❌ - ALPA';
+                            $statusKey = 'alpa';
+                        } elseif ($stK === 'izin') {
+                            $siswaRow['total_i']++;
+                            $statusCode = 'I';
+                            $statusLabel = 'IZIN';
+                            $statusBadge = 'status-badge-izin';
+                            $keterangan = "Manual oleh Pengurus (Izin)";
+                            $waEmoji = '✉️ - IZIN';
+                            $statusKey = 'izin';
+                        } elseif ($stK === 'sakit') {
+                            $siswaRow['total_s']++;
+                            $statusCode = 'S';
+                            $statusLabel = 'SAKIT';
+                            $statusBadge = 'status-badge-sakit';
+                            $keterangan = "Manual oleh Pengurus (Sakit)";
+                            $waEmoji = '✉️ - SAKIT';
+                            $statusKey = 'sakit';
                         } else {
-                            $siswaRow['total_h']++;
-                            $statusCode = 'H';
-                            $statusLabel = 'HADIR';
-                            $statusBadge = 'status-badge-hadir';
-                            $keterangan = "Tap pukul {$jamTapStr} WIB (Tepat Waktu)";
+                            $isLate = ($stK === 'terlambat');
+                            if (!$isLate && $matchedTap->sesi && !empty($matchedTap->sesi->jam_mulai)) {
+                                try {
+                                    $jamMulaiDt = Carbon::parse($dStr . ' ' . $matchedTap->sesi->jam_mulai);
+                                    $toleransi = (int) ($matchedTap->sesi->toleransi_menit ?? 15);
+                                    $batasDt = (clone $jamMulaiDt)->addMinutes($toleransi);
+                                    if ($matchedTap->waktu_tap && $matchedTap->waktu_tap->gt($batasDt)) {
+                                        $isLate = true;
+                                    }
+                                } catch (\Throwable $e) {}
+                            }
+
+                            if ($isLate) {
+                                $siswaRow['total_t']++;
+                                $statusCode = 'T';
+                                $statusLabel = 'TERLAMBAT';
+                                $statusBadge = 'status-badge-terlambat';
+                                $keterangan = ($matchedTap->device_id === 'manual_admin') ? "Manual oleh Pengurus (Terlambat)" : "Tap pukul {$jamTapStr} WIB (Melewati Toleransi)";
+                                $waEmoji = '⚠️ - (telat)';
+                                $statusKey = 'terlambat';
+                            } else {
+                                $siswaRow['total_h']++;
+                                $statusCode = 'H';
+                                $statusLabel = 'HADIR';
+                                $statusBadge = 'status-badge-hadir';
+                                $keterangan = ($matchedTap->device_id === 'manual_admin') ? "Manual oleh Pengurus (Tepat Waktu)" : "Tap pukul {$jamTapStr} WIB (Tepat Waktu)";
+                                $waEmoji = '✅';
+                                $statusKey = 'hadir';
+                            }
                         }
 
                         if (isset($siswaRow['sholat'][$slotKey])) {
@@ -833,6 +866,8 @@ class RekapPondokController extends Controller
                         }
 
                         $siswaRow['riwayat'][] = [
+                            'siswa_id'   => $siswa->id,
+                            'slot_key'   => $slotKey,
                             'tanggal'    => $dStr,
                             'sesi'       => $slotMeta['label'],
                             'status'     => $statusLabel,
@@ -841,9 +876,9 @@ class RekapPondokController extends Controller
                         ];
 
                         $siswaRow['status_per_sesi'][$slotKey] = [
-                            'status'    => $isLate ? 'terlambat' : 'hadir',
+                            'status'    => $statusKey,
                             'jam'       => $jamTapStr,
-                            'wa_emoji'  => $isLate ? '⚠️ - (telat)' : '✅',
+                            'wa_emoji'  => $waEmoji,
                         ];
                     } elseif ($izinInfo) {
                         if ($izinInfo['status'] === 'sakit') {
@@ -866,6 +901,8 @@ class RekapPondokController extends Controller
                         }
 
                         $siswaRow['riwayat'][] = [
+                            'siswa_id'   => $siswa->id,
+                            'slot_key'   => $slotKey,
                             'tanggal'    => $dStr,
                             'sesi'       => $slotMeta['label'],
                             'status'     => $statusLabel,
@@ -888,6 +925,8 @@ class RekapPondokController extends Controller
                             }
 
                             $siswaRow['riwayat'][] = [
+                                'siswa_id'   => $siswa->id,
+                                'slot_key'   => $slotKey,
                                 'tanggal'    => $dStr,
                                 'sesi'       => $slotMeta['label'],
                                 'status'     => 'ALPA',
@@ -902,6 +941,16 @@ class RekapPondokController extends Controller
                             ];
                         } else {
                             // Masa Depan
+                            $siswaRow['riwayat'][] = [
+                                'siswa_id'   => $siswa->id,
+                                'slot_key'   => $slotKey,
+                                'tanggal'    => $dStr,
+                                'sesi'       => $slotMeta['label'],
+                                'status'     => 'BELUM',
+                                'badge'      => 'status-badge-empty',
+                                'keterangan' => 'Belum dimulai (Masa Depan)',
+                            ];
+
                             $siswaRow['status_per_sesi'][$slotKey] = [
                                 'status'    => 'belum',
                                 'jam'       => '-',
@@ -1713,5 +1762,202 @@ class RekapPondokController extends Controller
             'pageTitle'        => 'Rekap Presensi Pengajian',
             'routeBase'        => 'rekap.pengajian',
         ];
+    }
+
+    /**
+     * Memperbarui status presensi siswa pada sesi & tanggal tertentu secara langsung via AJAX.
+     */
+    public function updateStatusSesi(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'siswa_id' => 'required|integer|exists:siswas,id',
+            'tanggal'  => 'required|date_format:Y-m-d',
+            'slot_key' => 'required|string',
+            'status'   => 'required|string|in:hadir,terlambat,izin,sakit,alpa',
+        ]);
+
+        $siswaId = (int) $validated['siswa_id'];
+        $tanggal = $validated['tanggal'];
+        $slotKey = strtolower(trim($validated['slot_key']));
+        $newStatus = strtolower(trim($validated['status']));
+
+        $siswa = Siswa::findOrFail($siswaId);
+
+        // Cari MasterSesi yang sesuai
+        $sesi = null;
+        if (str_starts_with($slotKey, 'sesi_')) {
+            $sesiId = (int) substr($slotKey, 5);
+            $sesi = MasterSesi::find($sesiId);
+        } elseif (is_numeric($slotKey)) {
+            $sesi = MasterSesi::find((int) $slotKey);
+        }
+
+        if (!$sesi) {
+            $sesi = MasterSesi::where(function ($q) use ($slotKey) {
+                $q->where('kode_sesi', 'LIKE', "%{$slotKey}%")
+                  ->orWhere('nama_sesi', 'LIKE', "%{$slotKey}%");
+            })->first();
+        }
+
+        if (!$sesi && isset(self::SHOLAT_SLOTS[$slotKey])) {
+            $meta = self::SHOLAT_SLOTS[$slotKey];
+            $sesi = MasterSesi::firstOrCreate(
+                ['kode_sesi' => 'SHOLAT_' . strtoupper($slotKey)],
+                [
+                    'nama_sesi'       => $meta['label'],
+                    'kategori'        => 'sholat',
+                    'jam_mulai'       => $meta['jam_mulai'] . ':00',
+                    'jam_selesai'     => $meta['jam_akhir'] . ':00',
+                    'toleransi_menit' => 15,
+                    'is_active'       => true,
+                ]
+            );
+        }
+
+        if (!$sesi) {
+            $sesi = MasterSesi::where('kategori', 'sholat')->first();
+        }
+
+        // Cari presensi yang sudah ada pada tanggal dan sesi/slot tersebut
+        $startOfDay = Carbon::parse($tanggal)->startOfDay();
+        $endOfDay = Carbon::parse($tanggal)->endOfDay();
+
+        $tapsToday = Presensi::where('tipe_entitas', 'santri')
+            ->where('entitas_id', $siswaId)
+            ->whereBetween('waktu_tap', [$startOfDay, $endOfDay])
+            ->get();
+
+        $matchedTap = null;
+        foreach ($tapsToday as $tap) {
+            if ($sesi && (int) $tap->sesi_id === (int) $sesi->id) {
+                $matchedTap = $tap;
+                break;
+            }
+            $detected = self::detectSlotSholat($tap->sesi, $tap->waktu_tap);
+            if ($detected === $slotKey) {
+                $matchedTap = $tap;
+                break;
+            }
+        }
+
+        $jamMulai = ($sesi && !empty($sesi->jam_mulai)) ? $sesi->jam_mulai : '12:00:00';
+        $waktuTapBase = Carbon::parse($tanggal . ' ' . $jamMulai);
+
+        if ($newStatus === 'alpa') {
+            if ($matchedTap) {
+                $matchedTap->delete();
+            }
+            $statusLabel = 'ALPA';
+            $statusBadge = 'status-badge-alpa';
+            $keterangan = 'Manual oleh Pengurus (Tidak Hadir)';
+            $code = 'A';
+            $waEmoji = '❌ - ALPA';
+        } elseif ($newStatus === 'terlambat') {
+            $waktuTap = (clone $waktuTapBase)->addMinutes(25);
+            if ($matchedTap) {
+                $matchedTap->status_kehadiran = 'terlambat';
+                $matchedTap->waktu_tap = $waktuTap;
+                if ($sesi) $matchedTap->sesi_id = $sesi->id;
+                $matchedTap->save();
+            } else {
+                Presensi::create([
+                    'device_id'        => 'manual_admin',
+                    'sesi_id'          => $sesi ? $sesi->id : 1,
+                    'tipe_entitas'     => 'santri',
+                    'entitas_id'       => $siswaId,
+                    'rfid_uid'         => $siswa->rfid_uid ?: ($siswa->nisn ?: 'MANUAL'),
+                    'waktu_tap'        => $waktuTap,
+                    'status_kehadiran' => 'terlambat',
+                ]);
+            }
+            $statusLabel = 'TERLAMBAT';
+            $statusBadge = 'status-badge-terlambat';
+            $keterangan = 'Manual oleh Pengurus (Terlambat)';
+            $code = 'T';
+            $waEmoji = '⚠️ - (telat)';
+        } elseif ($newStatus === 'izin') {
+            if ($matchedTap) {
+                $matchedTap->status_kehadiran = 'izin';
+                $matchedTap->waktu_tap = $waktuTapBase;
+                if ($sesi) $matchedTap->sesi_id = $sesi->id;
+                $matchedTap->save();
+            } else {
+                Presensi::create([
+                    'device_id'        => 'manual_admin',
+                    'sesi_id'          => $sesi ? $sesi->id : 1,
+                    'tipe_entitas'     => 'santri',
+                    'entitas_id'       => $siswaId,
+                    'rfid_uid'         => $siswa->rfid_uid ?: ($siswa->nisn ?: 'MANUAL'),
+                    'waktu_tap'        => $waktuTapBase,
+                    'status_kehadiran' => 'izin',
+                ]);
+            }
+            $statusLabel = 'IZIN';
+            $statusBadge = 'status-badge-izin';
+            $keterangan = 'Manual oleh Pengurus (Izin)';
+            $code = 'I';
+            $waEmoji = '✉️ - IZIN';
+        } elseif ($newStatus === 'sakit') {
+            if ($matchedTap) {
+                $matchedTap->status_kehadiran = 'sakit';
+                $matchedTap->waktu_tap = $waktuTapBase;
+                if ($sesi) $matchedTap->sesi_id = $sesi->id;
+                $matchedTap->save();
+            } else {
+                Presensi::create([
+                    'device_id'        => 'manual_admin',
+                    'sesi_id'          => $sesi ? $sesi->id : 1,
+                    'tipe_entitas'     => 'santri',
+                    'entitas_id'       => $siswaId,
+                    'rfid_uid'         => $siswa->rfid_uid ?: ($siswa->nisn ?: 'MANUAL'),
+                    'waktu_tap'        => $waktuTapBase,
+                    'status_kehadiran' => 'sakit',
+                ]);
+            }
+            $statusLabel = 'SAKIT';
+            $statusBadge = 'status-badge-sakit';
+            $keterangan = 'Manual oleh Pengurus (Sakit)';
+            $code = 'S';
+            $waEmoji = '✉️ - SAKIT';
+        } else {
+            // Hadir (tepat waktu)
+            if ($matchedTap) {
+                $matchedTap->status_kehadiran = 'tepat_waktu';
+                $matchedTap->waktu_tap = $waktuTapBase;
+                if ($sesi) $matchedTap->sesi_id = $sesi->id;
+                $matchedTap->save();
+            } else {
+                Presensi::create([
+                    'device_id'        => 'manual_admin',
+                    'sesi_id'          => $sesi ? $sesi->id : 1,
+                    'tipe_entitas'     => 'santri',
+                    'entitas_id'       => $siswaId,
+                    'rfid_uid'         => $siswa->rfid_uid ?: ($siswa->nisn ?: 'MANUAL'),
+                    'waktu_tap'        => $waktuTapBase,
+                    'status_kehadiran' => 'tepat_waktu',
+                ]);
+            }
+            $statusLabel = 'HADIR';
+            $statusBadge = 'status-badge-hadir';
+            $keterangan = 'Manual oleh Pengurus (Tepat Waktu)';
+            $code = 'H';
+            $waEmoji = '✅';
+        }
+
+        return response()->json([
+            'success'    => true,
+            'message'    => "Status berhasil diperbarui menjadi {$statusLabel}",
+            'data'       => [
+                'siswa_id'   => $siswaId,
+                'slot_key'   => $slotKey,
+                'tanggal'    => $tanggal,
+                'status'     => $statusLabel,
+                'status_raw' => $newStatus,
+                'badge'      => $statusBadge,
+                'keterangan' => $keterangan,
+                'code'       => $code,
+                'wa_emoji'   => $waEmoji,
+            ],
+        ]);
     }
 }

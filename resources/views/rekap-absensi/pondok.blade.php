@@ -597,6 +597,83 @@
     .status-badge-sakit { background: #f3e8ff; color: #7e22ce; }
     .status-badge-belum { background: #f3f4f6; color: #9ca3af; }
 
+    /* Interactive Status Badge & Popover */
+    .rp-badge-clickable {
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+        border: none;
+        outline: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+        user-select: none;
+        padding: 3px 8px;
+    }
+    .rp-badge-clickable:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 6px rgba(0,0,0,0.12);
+        filter: brightness(0.96);
+    }
+    .rp-status-popover {
+        position: fixed;
+        z-index: 10000000;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        width: 210px;
+        padding: 6px;
+        box-sizing: border-box;
+    }
+    .rp-status-popover-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: #94a3b8;
+        padding: 4px 8px 6px;
+        letter-spacing: 0.5px;
+    }
+    .rp-status-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 7px 10px;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        font-size: 12px;
+        text-align: left;
+        transition: background 0.15s ease;
+    }
+    .rp-status-option:hover {
+        background: #f1f5f9;
+    }
+    .rp-status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .rp-toast-notification {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 10000001;
+        padding: 10px 18px;
+        border-radius: 10px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: opacity 0.25s ease;
+    }
+
     .rp-modal-footer {
         padding: 12px 22px 16px;
         border-top: 1px solid #f3f4f6;
@@ -927,22 +1004,22 @@
                         </td>
 
                         {{-- Hadir --}}
-                        <td style="text-align:center;font-weight:600;color:#15803d;">
+                        <td id="colHadir-{{ $row['siswa_id'] }}" style="text-align:center;font-weight:600;color:#15803d;">
                             {{ $row['total_h'] }}
                         </td>
 
                         {{-- Telat --}}
-                        <td style="text-align:center;font-weight:600;color:#b45309;">
+                        <td id="colTelat-{{ $row['siswa_id'] }}" style="text-align:center;font-weight:600;color:#b45309;">
                             {{ $row['total_t'] }}
                         </td>
 
                         {{-- Izin (Izin + Sakit) --}}
-                        <td style="text-align:center;font-weight:600;color:#4338ca;">
+                        <td id="colIzin-{{ $row['siswa_id'] }}" style="text-align:center;font-weight:600;color:#4338ca;">
                             {{ $row['total_i'] + $row['total_s'] }}
                         </td>
 
                         {{-- Alfa --}}
-                        <td style="text-align:center;font-weight:600;color:#dc2626;">
+                        <td id="colAlfa-{{ $row['siswa_id'] }}" style="text-align:center;font-weight:600;color:#dc2626;">
                             {{ $row['total_a'] }}
                         </td>
 
@@ -1098,6 +1175,39 @@
     </div>
 </div>
 
+{{-- POPOVER CEPAT UBAH STATUS KEHADIRAN --}}
+<div id="popoverStatusPresensi" class="rp-status-popover" style="display:none;">
+    <div class="rp-status-popover-title">UBAH STATUS KEHADIRAN:</div>
+    <button type="button" class="rp-status-option" data-status="hadir" onclick="selectQuickStatus('hadir')">
+        <span class="rp-status-dot" style="background:#22c55e;"></span>
+        <span style="font-weight:600;color:#15803d;">HADIR</span>
+        <span style="font-size:11px;color:#6b7280;margin-left:auto;">(Tepat Waktu)</span>
+    </button>
+    <button type="button" class="rp-status-option" data-status="terlambat" onclick="selectQuickStatus('terlambat')">
+        <span class="rp-status-dot" style="background:#f59e0b;"></span>
+        <span style="font-weight:600;color:#b45309;">TERLAMBAT</span>
+        <span style="font-size:11px;color:#6b7280;margin-left:auto;">(Lewat Toleransi)</span>
+    </button>
+    <button type="button" class="rp-status-option" data-status="izin" onclick="selectQuickStatus('izin')">
+        <span class="rp-status-dot" style="background:#3b82f6;"></span>
+        <span style="font-weight:600;color:#1d4ed8;">IZIN</span>
+        <span style="font-size:11px;color:#6b7280;margin-left:auto;">(Izin Manual)</span>
+    </button>
+    <button type="button" class="rp-status-option" data-status="sakit" onclick="selectQuickStatus('sakit')">
+        <span class="rp-status-dot" style="background:#a855f7;"></span>
+        <span style="font-weight:600;color:#7e22ce;">SAKIT</span>
+        <span style="font-size:11px;color:#6b7280;margin-left:auto;">(Sakit/Rawat)</span>
+    </button>
+    <button type="button" class="rp-status-option" data-status="alpa" onclick="selectQuickStatus('alpa')">
+        <span class="rp-status-dot" style="background:#ef4444;"></span>
+        <span style="font-weight:600;color:#dc2626;">ALPA</span>
+        <span style="font-size:11px;color:#6b7280;margin-left:auto;">(Tidak Hadir)</span>
+    </button>
+</div>
+
+{{-- TOAST NOTIFIKASI HASIL UBAH STATUS --}}
+<div id="toastStatusPresensi" class="rp-toast-notification" style="display:none;"></div>
+
 {{-- MODAL 2: LAPORAN WHATSAPP (FORMAT BERSIH SESUAI STANDAR) --}}
 <div id="modalLaporanWA" class="rp-modal-backdrop" style="display:none;">
     <div class="rp-modal-dialog">
@@ -1183,6 +1293,7 @@
 @php
     $santriMap = collect($rows)->keyBy('siswa_id')->map(function ($item) {
         return [
+            'siswa_id'        => $item['siswa_id'],
             'nama'            => $item['nama_lengkap'],
             'nama_bersih'     => $item['nama_bersih'] ?? \App\Http\Controllers\RekapPondokController::cleanStudentName($item['nama_lengkap']),
             'nisn'            => $item['nisn'],
@@ -1260,10 +1371,24 @@
             } else {
                 riwayat.forEach(function (item) {
                     var tr = document.createElement('tr');
-                    tr.innerHTML = '<td>' + (item.tanggal || '-') + '</td>' +
+                    var siswaId = item.siswa_id || data.siswa_id;
+                    var slotKey = item.slot_key || '';
+                    var tanggal = item.tanggal || '';
+                    var status = item.status || 'ALPA';
+                    var badge = item.badge || 'status-badge-alpa';
+                    var keterangan = item.keterangan || '-';
+
+                    tr.innerHTML = '<td>' + tanggal + '</td>' +
                                    '<td><strong style="color:#111827;">' + (item.sesi || '-') + '</strong></td>' +
-                                   '<td><span class="rp-badge-status ' + (item.badge || 'status-badge-alpa') + '">' + (item.status || 'ALPA') + '</span></td>' +
-                                   '<td style="color:#6b7280;font-size:12px;">' + (item.keterangan || '-') + '</td>';
+                                   '<td>' +
+                                       '<button type="button" class="rp-badge-status rp-badge-clickable ' + badge + '" ' +
+                                               'onclick="toggleStatusPopover(this, event, ' + siswaId + ', \'' + slotKey + '\', \'' + tanggal + '\', \'' + status + '\')" ' +
+                                               'title="Klik untuk mengubah status kehadiran">' +
+                                           '<span>' + status + '</span>' +
+                                           '<svg viewBox="0 0 20 20" fill="currentColor" style="width:11px;height:11px;margin-left:3px;opacity:0.75;"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>' +
+                                       '</button>' +
+                                   '</td>' +
+                                   '<td class="js-col-keterangan" style="color:#6b7280;font-size:12px;">' + keterangan + '</td>';
                     tbody.appendChild(tr);
                 });
             }
@@ -1274,6 +1399,10 @@
     }
 
     function closeRincianModal() {
+        var popover = document.getElementById('popoverStatusPresensi');
+        if (popover) popover.style.display = 'none';
+        currentTargetContext = null;
+
         var modal = document.getElementById('modalRincianSiswa');
         if (modal) {
             modal.style.setProperty('display', 'none', 'important');
@@ -1512,6 +1641,202 @@
         window.open(url, '_blank');
     }
 
+    // Interactive Quick Status Popover Logic
+    var currentTargetContext = null;
+
+    function toggleStatusPopover(btnEl, e, siswaId, slotKey, tanggal, currentStatus) {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+
+        var popover = document.getElementById('popoverStatusPresensi');
+        if (!popover) return;
+
+        if (popover.style.display === 'block' && currentTargetContext && currentTargetContext.btnEl === btnEl) {
+            popover.style.display = 'none';
+            currentTargetContext = null;
+            return;
+        }
+
+        currentTargetContext = {
+            btnEl: btnEl,
+            siswaId: siswaId,
+            slotKey: slotKey,
+            tanggal: tanggal,
+            currentStatus: currentStatus,
+            rowEl: btnEl.closest('tr')
+        };
+
+        var rect = btnEl.getBoundingClientRect();
+        var popLeft = rect.left;
+        var popTop = rect.bottom + 6;
+
+        if (popLeft + 220 > window.innerWidth) {
+            popLeft = window.innerWidth - 230;
+        }
+        if (popTop + 220 > window.innerHeight) {
+            popTop = Math.max(10, rect.top - 220);
+        }
+
+        popover.style.left = popLeft + 'px';
+        popover.style.top = popTop + 'px';
+        popover.style.display = 'block';
+    }
+
+    function selectQuickStatus(newStatus) {
+        var popover = document.getElementById('popoverStatusPresensi');
+        if (popover) popover.style.display = 'none';
+
+        if (!currentTargetContext) return;
+        var ctx = currentTargetContext;
+        currentTargetContext = null;
+
+        var btnEl = ctx.btnEl;
+        var siswaId = ctx.siswaId;
+        var slotKey = ctx.slotKey;
+        var tanggal = ctx.tanggal;
+        var rowEl = ctx.rowEl;
+
+        var origHtml = btnEl.innerHTML;
+        btnEl.innerHTML = '<span style="opacity:0.8;">Simpan...</span>';
+        btnEl.disabled = true;
+
+        fetch('{{ route('rekap.pondok.update-status') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                siswa_id: siswaId,
+                tanggal: tanggal,
+                slot_key: slotKey,
+                status: newStatus
+            })
+        })
+        .then(function (res) {
+            return res.json().then(function (json) {
+                return { ok: res.ok, data: json };
+            });
+        })
+        .then(function (result) {
+            btnEl.disabled = false;
+            if (!result.ok || !result.data.success) {
+                btnEl.innerHTML = origHtml;
+                alert('Gagal mengubah status: ' + ((result.data && result.data.message) || 'Terjadi kesalahan sistem'));
+                return;
+            }
+
+            var itemData = result.data.data;
+
+            // 1. Update button status badge & text
+            btnEl.className = 'rp-badge-status rp-badge-clickable ' + itemData.badge;
+            btnEl.innerHTML = '<span>' + itemData.status + '</span><svg viewBox="0 0 20 20" fill="currentColor" style="width:11px;height:11px;margin-left:3px;opacity:0.75;"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
+
+            // 2. Update kolom keterangan
+            if (rowEl) {
+                var ketCell = rowEl.querySelector('.js-col-keterangan');
+                if (ketCell) ketCell.textContent = itemData.keterangan;
+            }
+
+            // 3. Update window.REKAP_PONDOK_DATA cache
+            if (window.REKAP_PONDOK_DATA && window.REKAP_PONDOK_DATA[siswaId]) {
+                var sData = window.REKAP_PONDOK_DATA[siswaId];
+
+                if (sData.riwayat) {
+                    sData.riwayat.forEach(function (r) {
+                        if (r.slot_key === slotKey && r.tanggal === tanggal) {
+                            r.status = itemData.status;
+                            r.badge = itemData.badge;
+                            r.keterangan = itemData.keterangan;
+                        }
+                    });
+                }
+
+                if (!sData.status_per_sesi) sData.status_per_sesi = {};
+                sData.status_per_sesi[slotKey] = {
+                    status: itemData.status_raw,
+                    jam: (itemData.status_raw === 'hadir' || itemData.status_raw === 'terlambat') ? 'Manual' : '-',
+                    wa_emoji: itemData.wa_emoji
+                };
+
+                // Hitung ulang rincian
+                var newH = 0, newT = 0, newI = 0, newS = 0, newA = 0;
+                if (sData.riwayat) {
+                    sData.riwayat.forEach(function (r) {
+                        var st = (r.status || '').toUpperCase();
+                        if (st === 'HADIR') newH++;
+                        else if (st === 'TERLAMBAT') newT++;
+                        else if (st === 'IZIN') newI++;
+                        else if (st === 'SAKIT') newS++;
+                        else if (st === 'ALPA') newA++;
+                    });
+                }
+                sData.hadir = newH;
+                sData.terlambat = newT;
+                sData.izin = newI;
+                sData.sakit = newS;
+                sData.alpa = newA;
+
+                // 4. Update metrics di modal
+                var elH = document.getElementById('modalMetricHadir');
+                if (elH) elH.textContent = newH;
+                var elT = document.getElementById('modalMetricTerlambat');
+                if (elT) elT.textContent = newT;
+                var elI = document.getElementById('modalMetricIzin');
+                if (elI) elI.textContent = newI;
+                var elS = document.getElementById('modalMetricSakit');
+                if (elS) elS.textContent = newS;
+                var elA = document.getElementById('modalMetricAlpa');
+                if (elA) elA.textContent = newA;
+
+                // 5. Update baris di tabel latar belakang
+                var colH = document.getElementById('colHadir-' + siswaId);
+                if (colH) colH.textContent = newH;
+                var colT = document.getElementById('colTelat-' + siswaId);
+                if (colT) colT.textContent = newT;
+                var colI = document.getElementById('colIzin-' + siswaId);
+                if (colI) colI.textContent = (newI + newS);
+                var colA = document.getElementById('colAlfa-' + siswaId);
+                if (colA) colA.textContent = newA;
+            }
+
+            // 6. Tampilkan toast
+            showStatusToast('Status presensi berhasil diubah ke ' + itemData.status);
+
+            // 7. Update laporan WA bila preview terbuka
+            if (typeof renderWaReportPreview === 'function') {
+                renderWaReportPreview();
+            }
+        })
+        .catch(function (err) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = origHtml;
+            alert('Terjadi kesalahan koneksi saat memperbarui status.');
+        });
+    }
+
+    function showStatusToast(msg) {
+        var toast = document.getElementById('toastStatusPresensi');
+        if (!toast) return;
+        toast.textContent = msg;
+        toast.style.display = 'flex';
+        toast.style.opacity = '1';
+        setTimeout(function () {
+            toast.style.opacity = '0';
+            setTimeout(function () {
+                toast.style.display = 'none';
+            }, 300);
+        }, 2500);
+    }
+
+    // Expose fungsi ke window
+    window.toggleStatusPopover = toggleStatusPopover;
+    window.selectQuickStatus = selectQuickStatus;
+    window.showStatusToast = showStatusToast;
+
     // Pindahkan modals ke root <body>
     function setupModalDom() {
         var modal1 = document.getElementById('modalRincianSiswa');
@@ -1521,6 +1846,14 @@
         var modal2 = document.getElementById('modalLaporanWA');
         if (modal2 && modal2.parentElement !== document.body) {
             document.body.appendChild(modal2);
+        }
+        var pop = document.getElementById('popoverStatusPresensi');
+        if (pop && pop.parentElement !== document.body) {
+            document.body.appendChild(pop);
+        }
+        var toast = document.getElementById('toastStatusPresensi');
+        if (toast && toast.parentElement !== document.body) {
+            document.body.appendChild(toast);
         }
     }
 
@@ -1532,6 +1865,14 @@
 
     // Event delegation klik
     document.addEventListener('click', function (e) {
+        var popover = document.getElementById('popoverStatusPresensi');
+        if (popover && popover.style.display === 'block') {
+            if (!popover.contains(e.target) && (!currentTargetContext || !currentTargetContext.btnEl.contains(e.target))) {
+                popover.style.display = 'none';
+                currentTargetContext = null;
+            }
+        }
+
         var trigger = e.target.closest('.js-trigger-detail');
         if (trigger) {
             e.preventDefault();
@@ -1557,6 +1898,11 @@
 
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
+            var popover = document.getElementById('popoverStatusPresensi');
+            if (popover && popover.style.display === 'block') {
+                popover.style.display = 'none';
+                currentTargetContext = null;
+            }
             closeRincianModal();
             closeWaModal();
         }

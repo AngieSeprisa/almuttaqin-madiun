@@ -634,4 +634,121 @@ class RekapPondokTest extends TestCase
         $this->assertStringContainsString('id="modalLaporanWA"', $contentPengajian);
         $this->assertStringContainsString('window.openWaModal = openWaModal;', $contentPengajian);
     }
+
+    public function test_update_status_sesi_langsung_dari_modal_rincian(): void
+    {
+        $tanggal = '2026-11-01';
+        $santri = $this->createSantriWithPendaftaran([
+            'nama_lengkap' => 'Bintang Nur Ihsan',
+            'kelas'        => '7A',
+            'rfid_uid'     => 'UID-BINTANG',
+        ]);
+
+        $sesiDzuhur = MasterSesi::create([
+            'kode_sesi'       => 'SHOLAT_DZUHUR',
+            'nama_sesi'       => 'Dzuhur',
+            'kategori'        => 'sholat',
+            'jam_mulai'       => '11:30:00',
+            'jam_selesai'     => '13:00:00',
+            'toleransi_menit' => 15,
+            'is_active'       => true,
+        ]);
+
+        // 1. Awalnya santri belum absen / ALPA, admin klik ubah status ke HADIR
+        $responseHadir = $this->actingAs($this->admin)->postJson(route('rekap.pondok.update-status'), [
+            'siswa_id' => $santri->id,
+            'tanggal'  => $tanggal,
+            'slot_key' => 'dzuhur',
+            'status'   => 'hadir',
+        ]);
+
+        $responseHadir->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data'    => [
+                    'status'     => 'HADIR',
+                    'status_raw' => 'hadir',
+                    'code'       => 'H',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('presensis', [
+            'tipe_entitas'     => 'santri',
+            'entitas_id'       => $santri->id,
+            'sesi_id'          => $sesiDzuhur->id,
+            'status_kehadiran' => 'tepat_waktu',
+        ]);
+
+        // 2. Ubah status menjadi TERLAMBAT
+        $responseTelat = $this->actingAs($this->admin)->postJson(route('rekap.pondok.update-status'), [
+            'siswa_id' => $santri->id,
+            'tanggal'  => $tanggal,
+            'slot_key' => 'dzuhur',
+            'status'   => 'terlambat',
+        ]);
+
+        $responseTelat->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data'    => [
+                    'status' => 'TERLAMBAT',
+                    'code'   => 'T',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('presensis', [
+            'entitas_id'       => $santri->id,
+            'status_kehadiran' => 'terlambat',
+        ]);
+
+        // 3. Ubah status menjadi IZIN
+        $responseIzin = $this->actingAs($this->admin)->postJson(route('rekap.pondok.update-status'), [
+            'siswa_id' => $santri->id,
+            'tanggal'  => $tanggal,
+            'slot_key' => 'dzuhur',
+            'status'   => 'izin',
+        ]);
+
+        $responseIzin->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data'    => [
+                    'status' => 'IZIN',
+                    'code'   => 'I',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('presensis', [
+            'entitas_id'       => $santri->id,
+            'status_kehadiran' => 'izin',
+        ]);
+
+        // 4. Ubah status kembali menjadi ALPA (menghapus record tap)
+        $responseAlpa = $this->actingAs($this->admin)->postJson(route('rekap.pondok.update-status'), [
+            'siswa_id' => $santri->id,
+            'tanggal'  => $tanggal,
+            'slot_key' => 'dzuhur',
+            'status'   => 'alpa',
+        ]);
+
+        $responseAlpa->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data'    => [
+                    'status' => 'ALPA',
+                    'code'   => 'A',
+                ],
+            ]);
+
+        $this->assertDatabaseMissing('presensis', [
+            'entitas_id' => $santri->id,
+        ]);
+
+        // 5. Verifikasi HTML memiliki komponen popover dan badge interaktif
+        $resView = $this->actingAs($this->admin)->get(route('rekap.sholat.index', ['tanggal' => $tanggal]));
+        $resView->assertStatus(200);
+        $resView->assertSee('id="popoverStatusPresensi"', false);
+        $resView->assertSee('toggleStatusPopover', false);
+        $resView->assertSee('selectQuickStatus', false);
+    }
 }

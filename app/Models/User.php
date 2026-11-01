@@ -211,8 +211,8 @@ class User extends Authenticatable
             return true;
         }
 
-        // Guru & Musyrif memiliki akses lihat ke Rekap Sholat, Pengajian, Pondok & Rekap Absensi
-        if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, ['rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi']) && $action === 'view') {
+        // Guru & Musyrif memiliki akses lihat & ubah status ke Rekap Sholat, Pengajian, Pondok & Rekap Absensi
+        if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, ['rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi']) && in_array($action, ['view', 'edit'])) {
             return true;
         }
 
