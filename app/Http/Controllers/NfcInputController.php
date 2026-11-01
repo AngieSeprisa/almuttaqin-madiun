@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Siswa;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class NfcInputController extends Controller
@@ -20,23 +21,73 @@ class NfcInputController extends Controller
             ->orderBy('nama_lengkap', 'asc')
             ->get(['id', 'nama_lengkap', 'jenjang', 'kelas', 'kamar', 'rfid_uid']);
 
-        // Riwayat kartu terakhir yang diinput (10 data terakhir)
-        $recentPairings = Siswa::forLembaga($activeRoom)
+        // Daftar guru & pegawai untuk dropdown / selector
+        $gurus = User::where('is_active', true)
+            ->orderBy('name', 'asc')
+            ->get(['id', 'name', 'nip', 'role', 'jabatan', 'rfid_uid']);
+
+        // Riwayat kartu terakhir yang diinput (santri + guru)
+        $recentSantri = Siswa::forLembaga($activeRoom)
             ->whereNotNull('rfid_uid')
             ->orderBy('updated_at', 'desc')
-            ->limit(10)
-            ->get();
+            ->limit(15)
+            ->get()
+            ->map(function ($s) {
+                return (object)[
+                    'id' => $s->id,
+                    'tipe' => 'siswa',
+                    'nama_lengkap' => $s->nama_lengkap,
+                    'nama' => $s->nama_lengkap,
+                    'jenjang' => $s->jenjang ?: 'Pondok',
+                    'kelas' => $s->kelas,
+                    'kamar' => $s->kamar ?: '-',
+                    'rfid_uid' => $s->rfid_uid,
+                    'updated_at' => $s->updated_at,
+                ];
+            });
+
+        $recentGuru = User::where('is_active', true)
+            ->whereNotNull('rfid_uid')
+            ->orderBy('updated_at', 'desc')
+            ->limit(15)
+            ->get()
+            ->map(function ($u) {
+                return (object)[
+                    'id' => $u->id,
+                    'tipe' => 'guru',
+                    'nama_lengkap' => $u->name,
+                    'nama' => $u->name,
+                    'jenjang' => 'Guru',
+                    'kelas' => $u->jabatan ?: ucfirst($u->role ?? 'Pegawai'),
+                    'kamar' => 'Staf / Pendidik',
+                    'rfid_uid' => $u->rfid_uid,
+                    'updated_at' => $u->updated_at,
+                ];
+            });
+
+        $recentPairings = $recentSantri->concat($recentGuru)
+            ->sortByDesc('updated_at')
+            ->take(15)
+            ->values();
 
         $totalSiswa = Siswa::forLembaga($activeRoom)->where('status', 'aktif')->count();
         $totalTerdaftar = Siswa::forLembaga($activeRoom)->where('status', 'aktif')->whereNotNull('rfid_uid')->count();
         $totalBelum = max(0, $totalSiswa - $totalTerdaftar);
 
+        $totalGuru = User::where('is_active', true)->count();
+        $totalGuruTerdaftar = User::where('is_active', true)->whereNotNull('rfid_uid')->count();
+        $totalGuruBelum = max(0, $totalGuru - $totalGuruTerdaftar);
+
         return view('nfc.index', compact(
             'siswas',
+            'gurus',
             'recentPairings',
             'totalSiswa',
             'totalTerdaftar',
-            'totalBelum'
+            'totalBelum',
+            'totalGuru',
+            'totalGuruTerdaftar',
+            'totalGuruBelum'
         ));
     }
 
@@ -253,7 +304,43 @@ class NfcInputController extends Controller
     }
 
     /**
-     * Cek status nomor serial kartu (apakah baru atau sudah terdaftar).
+     * Mencari user (guru / pegawai) berdasarkan serial RFID dengan seluruh varian format.
+     */
+    public static function findUserByUid(string $serial, $excludeId = null): ?User
+    {
+        $serial = rtrim(trim($serial), '?');
+        if (empty($serial)) {
+            return null;
+        }
+
+        $variants = self::getUidVariants($serial);
+        $strippedDigits = array_values(array_unique(array_filter(array_map(function ($v) {
+            return ctype_digit($v) ? ltrim($v, '0') : null;
+        }, $variants))));
+
+        $query = User::query();
+        $query->where(function ($q) use ($variants, $strippedDigits) {
+            $q->whereIn('rfid_uid', $variants);
+            if (!empty($strippedDigits)) {
+                $driver = \DB::connection()->getDriverName();
+                $placeholders = implode(',', array_fill(0, count($strippedDigits), '?'));
+                if ($driver === 'sqlite') {
+                    $q->orWhereRaw("LTRIM(rfid_uid, '0') IN ({$placeholders})", $strippedDigits);
+                } else {
+                    $q->orWhereRaw("TRIM(LEADING '0' FROM TRIM(rfid_uid)) IN ({$placeholders})", $strippedDigits);
+                }
+            }
+        });
+
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->first();
+    }
+
+    /**
+     * Cek status nomor serial kartu (apakah baru atau sudah terdaftar di Santri maupun Guru).
      */
     public function checkCard(Request $request)
     {
@@ -267,11 +354,18 @@ class NfcInputController extends Controller
         }
 
         $siswa = self::findSiswaByUid($serial);
-
         if ($siswa) {
             return response()->json([
                 'status' => 'assigned',
+                'tipe' => 'siswa',
                 'serial' => $serial,
+                'entity' => [
+                    'id' => $siswa->id,
+                    'nama_lengkap' => $siswa->nama_lengkap,
+                    'jenjang' => $siswa->jenjang ?? 'Pondok',
+                    'kelas' => $siswa->kelas ?? '-',
+                    'kamar' => $siswa->kamar ?? '-',
+                ],
                 'siswa' => [
                     'id' => $siswa->id,
                     'nama_lengkap' => $siswa->nama_lengkap,
@@ -279,7 +373,23 @@ class NfcInputController extends Controller
                     'kelas' => $siswa->kelas ?? '-',
                     'kamar' => $siswa->kamar ?? '-',
                 ],
-                'message' => "Kartu ini sudah terdaftar atas nama {$siswa->nama_lengkap} (" . ($siswa->jenjang ?: 'Pondok') . ' • ' . ($siswa->kamar ?: '-') . ').',
+                'message' => "Kartu ini sudah terdaftar atas nama Santri: {$siswa->nama_lengkap} (" . ($siswa->jenjang ?: 'Pondok') . ' • ' . ($siswa->kamar ?: '-') . ').',
+            ]);
+        }
+
+        $user = self::findUserByUid($serial);
+        if ($user) {
+            return response()->json([
+                'status' => 'assigned',
+                'tipe' => 'guru',
+                'serial' => $serial,
+                'entity' => [
+                    'id' => $user->id,
+                    'nama_lengkap' => $user->name,
+                    'role' => ucfirst($user->role ?? 'Guru/Pegawai'),
+                    'jabatan' => $user->jabatan ?? '-',
+                ],
+                'message' => "Kartu ini sudah terdaftar atas nama Guru/Pegawai: {$user->name} (" . ($user->jabatan ?: ucfirst($user->role ?? 'Guru')) . ').',
             ]);
         }
 
@@ -291,10 +401,67 @@ class NfcInputController extends Controller
     }
 
     /**
-     * Simpan / pasangkan nomor kartu NFC ke santri terpilih.
+     * Simpan / pasangkan nomor kartu NFC ke santri atau guru terpilih.
      */
     public function assign(Request $request)
     {
+        $tipe = $request->input('tipe', 'siswa');
+        if ($request->has('user_id') && !$request->has('siswa_id')) {
+            $tipe = 'guru';
+        }
+
+        if ($tipe === 'guru') {
+            $request->validate([
+                'rfid_uid' => 'required|string|max:32',
+                'user_id'  => 'required|exists:users,id',
+            ], [
+                'rfid_uid.required' => 'Nomor serial kartu wajib ada (tempelkan kartu pada reader).',
+                'user_id.required'  => 'Silakan pilih nama Guru/Pegawai terlebih dahulu.',
+                'user_id.exists'    => 'Data Guru/Pegawai tidak ditemukan.',
+            ]);
+
+            $serial = rtrim(trim($request->rfid_uid), '?');
+            $user = User::findOrFail($request->user_id);
+
+            // Lepas kartu jika sebelumnya dimiliki santri atau user lain
+            $prevSiswa = self::findSiswaByUid($serial);
+            if ($prevSiswa) {
+                $prevSiswa->update(['rfid_uid' => null]);
+            }
+            $prevUser = self::findUserByUid($serial, $user->id);
+            if ($prevUser) {
+                $prevUser->update(['rfid_uid' => null]);
+            }
+
+            $decimalSerial = self::toDecimal32($serial);
+            $user->update(['rfid_uid' => $decimalSerial]);
+
+            $msg = "Kartu {$decimalSerial} berhasil dipasangkan ke Guru/Pegawai {$user->name}.";
+            if ($prevUser) {
+                $msg .= " (Dialihkan dari {$prevUser->name})";
+            } elseif ($prevSiswa) {
+                $msg .= " (Dialihkan dari Santri {$prevSiswa->nama_lengkap})";
+            }
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $msg,
+                    'tipe' => 'guru',
+                    'entity' => [
+                        'id' => $user->id,
+                        'nama' => $user->name,
+                        'keterangan' => $user->jabatan ?: ucfirst($user->role ?? 'Guru/Pegawai'),
+                        'rfid_uid' => $user->rfid_uid,
+                        'updated_at' => $user->updated_at->locale('id')->diffForHumans(),
+                    ],
+                ]);
+            }
+
+            return redirect()->route('nfc.index')->with('success', $msg);
+        }
+
+        // Tipe Siswa
         $request->validate([
             'rfid_uid' => 'required|string|max:32',
             'siswa_id' => 'required|exists:siswas,id',
@@ -307,27 +474,38 @@ class NfcInputController extends Controller
         $serial = rtrim(trim($request->rfid_uid), '?');
         $siswa = Siswa::findOrFail($request->siswa_id);
 
-        $variants = self::getUidVariants($serial);
-
-        // Jika kartu ini sebelumnya ada di santri lain (dalam varian apapun / leading zero), lepas dari santri lama agar tidak duplikat
-        $previousOwner = self::findSiswaByUid($serial, $siswa->id);
-
-        if ($previousOwner) {
-            $previousOwner->update(['rfid_uid' => null]);
+        // Lepas kartu dari pemilik sebelumnya jika ada
+        $prevSiswa = self::findSiswaByUid($serial, $siswa->id);
+        if ($prevSiswa) {
+            $prevSiswa->update(['rfid_uid' => null]);
+        }
+        $prevUser = self::findUserByUid($serial);
+        if ($prevUser) {
+            $prevUser->update(['rfid_uid' => null]);
         }
 
         $decimalSerial = self::toDecimal32($serial);
         $siswa->update(['rfid_uid' => $decimalSerial]);
 
         $msg = "Kartu {$decimalSerial} berhasil dipasangkan ke {$siswa->nama_lengkap}.";
-        if ($previousOwner) {
-            $msg .= " (Dialihkan dari {$previousOwner->nama_lengkap})";
+        if ($prevSiswa) {
+            $msg .= " (Dialihkan dari {$prevSiswa->nama_lengkap})";
+        } elseif ($prevUser) {
+            $msg .= " (Dialihkan dari Guru {$prevUser->name})";
         }
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'message' => $msg,
+                'tipe' => 'siswa',
+                'entity' => [
+                    'id' => $siswa->id,
+                    'nama' => $siswa->nama_lengkap,
+                    'keterangan' => ($siswa->jenjang ?: 'Pondok') . ($siswa->kamar ? " • Kamar {$siswa->kamar}" : ''),
+                    'rfid_uid' => $siswa->rfid_uid,
+                    'updated_at' => $siswa->updated_at->locale('id')->diffForHumans(),
+                ],
                 'siswa' => [
                     'id' => $siswa->id,
                     'nama_lengkap' => $siswa->nama_lengkap,
@@ -344,19 +522,32 @@ class NfcInputController extends Controller
     }
 
     /**
-     * Lepas pairing kartu dari santri.
+     * Lepas pairing kartu dari santri atau guru.
      */
     public function unpair(Request $request)
     {
-        $request->validate([
-            'siswa_id' => 'required|exists:siswas,id',
-        ]);
+        $tipe = $request->input('tipe', 'siswa');
+        if ($request->has('user_id') && !$request->has('siswa_id')) {
+            $tipe = 'guru';
+        }
 
-        $siswa = Siswa::findOrFail($request->siswa_id);
-        $oldSerial = $siswa->rfid_uid;
-        $siswa->update(['rfid_uid' => null]);
-
-        $msg = "Kartu {$oldSerial} berhasil dilepas dari {$siswa->nama_lengkap}.";
+        if ($tipe === 'guru') {
+            $request->validate([
+                'user_id' => 'required|exists:users,id',
+            ]);
+            $user = User::findOrFail($request->user_id);
+            $oldSerial = $user->rfid_uid;
+            $user->update(['rfid_uid' => null]);
+            $msg = "Kartu {$oldSerial} berhasil dilepas dari Guru/Pegawai {$user->name}.";
+        } else {
+            $request->validate([
+                'siswa_id' => 'required|exists:siswas,id',
+            ]);
+            $siswa = Siswa::findOrFail($request->siswa_id);
+            $oldSerial = $siswa->rfid_uid;
+            $siswa->update(['rfid_uid' => null]);
+            $msg = "Kartu {$oldSerial} berhasil dilepas dari {$siswa->nama_lengkap}.";
+        }
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([

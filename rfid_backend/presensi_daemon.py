@@ -760,7 +760,7 @@ def find_entity_by_uid(cursor, clean_uid: str, all_candidates: list = None):
         user_stripped_params = stripped_digits
 
     query_user = f"""
-        SELECT id, name, email, rfid_uid 
+        SELECT id, name, email, rfid_uid, primary_lembaga_id 
         FROM users 
         WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) 
            OR TRIM(rfid_uid) IN ({placeholders})
@@ -775,7 +775,8 @@ def find_entity_by_uid(cursor, clean_uid: str, all_candidates: list = None):
             "type": "guru_pegawai",
             "id": user["id"],
             "nama": user["name"],
-            "sub": "Guru/Pegawai"
+            "sub": "Guru/Pegawai",
+            "primary_lembaga_id": user.get("primary_lembaga_id")
         }
 
     logging.warning(f"[UNREGISTERED] UID '{clean_uid}' tidak ditemukan di tabel siswas maupun users (varian: {variants}).")
@@ -832,6 +833,133 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "", all_candidates:
     lcd_name = format_lcd_name(entity_name)
 
     save_last_tap_info(clean_uid, device_id, is_registered=True, name=entity_name, ip_addr=ip_addr)
+
+    # 2.5 Khusus Guru & Pegawai: Presensi Tap Mandiri (Masuk & Pulang Otomatis)
+    if entity_type in ["guru_pegawai", "user"]:
+        sesi = get_active_sesi(cursor, device_id, current_time, strict=False)
+        sesi_id = sesi["id"] if sesi else None
+        sesi_name = sesi["nama_sesi"] if sesi else "Presensi Pegawai"
+
+        try:
+            lembaga_id = entity.get("primary_lembaga_id")
+            if not lembaga_id:
+                cursor.execute("SELECT primary_lembaga_id FROM users WHERE id = %s", (entity_id,))
+                u_row = cursor.fetchone()
+                lembaga_id = u_row["primary_lembaga_id"] if u_row and u_row.get("primary_lembaga_id") else None
+            if not lembaga_id:
+                cursor.execute("SELECT lembaga_id FROM user_lembagas WHERE user_id = %s LIMIT 1", (entity_id,))
+                ul_row = cursor.fetchone()
+                lembaga_id = ul_row["lembaga_id"] if ul_row and ul_row.get("lembaga_id") else 1
+
+            # Cek pengaturan jam kerja lembaga jika ada
+            cursor.execute("""
+                SELECT jam_masuk, toleransi_terlambat_menit, jam_pulang 
+                FROM pengaturan_absensis 
+                WHERE lembaga_id = %s AND is_active = 1 
+                LIMIT 1
+            """, (lembaga_id,))
+            setting = cursor.fetchone()
+
+            status_guru = "hadir"
+            if setting and setting.get("jam_masuk"):
+                try:
+                    jm_str = str(setting['jam_masuk'])
+                    fmt = "%Y-%m-%d %H:%M:%S" if len(jm_str) > 5 else "%Y-%m-%d %H:%M"
+                    jm_dt = datetime.strptime(f"{today_date} {jm_str}", fmt)
+                    tol = int(setting.get("toleransi_terlambat_menit") or 0)
+                    if now > (jm_dt + timedelta(minutes=tol)):
+                        status_guru = "terlambat"
+                except Exception as ex_time:
+                    logging.warning(f"Error parsing jam setting: {ex_time}")
+
+            # Cek apakah sudah ada presensi guru hari ini
+            cursor.execute("""
+                SELECT id, jam_masuk, jam_pulang 
+                FROM presensi_gurus 
+                WHERE user_id = %s AND tanggal = %s AND lembaga_id = %s 
+                LIMIT 1
+            """, (entity_id, today_date, lembaga_id))
+            p_guru = cursor.fetchone()
+
+            if not p_guru:
+                # 1. Tap Pertama Hari Ini: Catat Jam Masuk
+                cursor.execute("""
+                    INSERT INTO presensi_gurus (user_id, lembaga_id, tanggal, jam_masuk, status, metode_masuk, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, 'rfid_tap', NOW(), NOW())
+                """, (entity_id, lembaga_id, today_date, current_time, status_guru))
+
+                # Riwayat log di tabel presensis
+                cursor.execute("""
+                    INSERT INTO presensis (device_id, sesi_id, tipe_entitas, entitas_id, rfid_uid, waktu_tap, status_kehadiran, created_at, updated_at)
+                    VALUES (%s, %s, 'guru_pegawai', %s, %s, %s, %s, NOW(), NOW())
+                """, (device_id, sesi_id, entity_id, clean_uid, now_full, status_guru))
+
+                cursor.close()
+                logging.info(f"[SUCCESS GURU MASUK] '{entity_name}' absen masuk pukul {current_time} ({status_guru}) via '{device_id}'.")
+                return {
+                    "device_id": device_id,
+                    "nama": lcd_name,
+                    "status": "HADIR MASUK",
+                    "pesan": "HADIR MASUK",
+                    "kode": "SUCCESS",
+                    "sesi": "Presensi Guru"
+                }
+            else:
+                # 2. Sudah Pernah Tap: Cek Debounce Anti Double Tap Tak Sengaja
+                last_time_str = p_guru.get("jam_pulang") or p_guru.get("jam_masuk")
+                if last_time_str:
+                    try:
+                        lt_str = str(last_time_str)
+                        fmt = "%Y-%m-%d %H:%M:%S" if len(lt_str) > 5 else "%Y-%m-%d %H:%M"
+                        last_dt = datetime.strptime(f"{today_date} {lt_str}", fmt)
+                        if (now - last_dt).total_seconds() < 180: # Debounce 3 menit
+                            cursor.close()
+                            logging.info(f"[DUPLICATE GURU] '{entity_name}' baru saja tap < 3 menit lalu.")
+                            return {
+                                "device_id": device_id,
+                                "nama": lcd_name,
+                                "status": "SUDAH ABSEN",
+                                "pesan": "SUDAH ABSEN",
+                                "kode": "DUPLICATE",
+                                "sesi": "Presensi Guru"
+                            }
+                    except Exception as ex_dbnc:
+                        logging.warning(f"Error debounce check: {ex_dbnc}")
+
+                # Update Jam Pulang
+                cursor.execute("""
+                    UPDATE presensi_gurus 
+                    SET jam_pulang = %s, metode_pulang = 'rfid_tap', updated_at = NOW()
+                    WHERE id = %s
+                """, (current_time, p_guru["id"]))
+
+                cursor.execute("""
+                    INSERT INTO presensis (device_id, sesi_id, tipe_entitas, entitas_id, rfid_uid, waktu_tap, status_kehadiran, created_at, updated_at)
+                    VALUES (%s, %s, 'guru_pegawai', %s, %s, %s, 'pulang', NOW(), NOW())
+                """, (device_id, sesi_id, entity_id, clean_uid, now_full))
+
+                cursor.close()
+                logging.info(f"[SUCCESS GURU PULANG] '{entity_name}' absen pulang pukul {current_time} via '{device_id}'.")
+                return {
+                    "device_id": device_id,
+                    "nama": lcd_name,
+                    "status": "HADIR PULANG",
+                    "pesan": "HADIR PULANG",
+                    "kode": "SUCCESS",
+                    "sesi": "Presensi Guru"
+                }
+
+        except Exception as ex_guru:
+            logging.error(f"[ERROR GURU PRESENSI] Gagal memproses presensi guru '{entity_name}': {ex_guru}")
+            cursor.close()
+            return {
+                "device_id": device_id,
+                "nama": lcd_name,
+                "status": "GAGAL SIMPAN",
+                "pesan": "SYSTEM ERROR",
+                "kode": "ERROR",
+                "sesi": "Presensi Guru"
+            }
 
     # 3. Penentuan Sesi Dinamis (Strict: hanya sesi yang benar-benar aktif saat ini)
     sesi = get_active_sesi(cursor, device_id, current_time, strict=True)

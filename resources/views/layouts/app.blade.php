@@ -221,21 +221,7 @@
                 </a>
                 @endif
 
-                {{-- Menu Presensi Guru --}}
-
-                @if(!$authUser || $authUser->canDo('presensi', 'view'))
-                <a href="{{ route('presensi.index') }}" class="nav-item {{ request()->routeIs('presensi*') ? 'active' : '' }}" title="Presensi Guru">
-                    <span class="nav-item-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                        </svg>
-                    </span>
-                    <span class="nav-item-text">Presensi Guru</span>
-                </a>
-                @endif
+                {{-- Menu Presensi Guru dialihkan sepenuhnya ke alat tap RFID (lihat Rekap -> Guru) --}}
 
                 {{-- Menu Rekap dengan Submenu Sholat, Pengajian, Sekolah & Guru --}}
                 @if(!$authUser || $authUser->canDo('rekap_absensi', 'view') || $authUser->canDo('rekap_pondok', 'view') || $authUser->canDo('rekap_sholat', 'view') || $authUser->canDo('rekap_pengajian', 'view') || $authUser->canDo('sekolah', 'view'))

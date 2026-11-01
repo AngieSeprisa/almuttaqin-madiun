@@ -56,9 +56,30 @@ class MqttPresensiListener extends Command
                 $pesanLcd   = 'Berhasil Hadir';
             } elseif ($user) {
                 $statusScan = 'SUCCESS';
-                // Batasi nama maksimal 16 karakter agar pas di baris LCD 16x2
                 $namaTampil = substr($user->name, 0, 16);
-                $pesanLcd   = 'Berhasil Hadir';
+
+                $today = Carbon::today()->toDateString();
+                $nowTime = Carbon::now()->toTimeString();
+                $lembagaId = $user->primary_lembaga_id ?: ($user->lembagas()->first()?->id ?: 1);
+
+                $presensiGuru = \App\Models\PresensiGuru::firstOrNew([
+                    'user_id'    => $user->id,
+                    'tanggal'    => $today,
+                    'lembaga_id' => $lembagaId,
+                ]);
+
+                if (!$presensiGuru->exists || is_null($presensiGuru->jam_masuk)) {
+                    $presensiGuru->jam_masuk = $nowTime;
+                    $presensiGuru->status = 'hadir';
+                    $presensiGuru->metode_masuk = 'rfid_tap';
+                    $presensiGuru->save();
+                    $pesanLcd = 'HADIR MASUK';
+                } else {
+                    $presensiGuru->jam_pulang = $nowTime;
+                    $presensiGuru->metode_pulang = 'rfid_tap';
+                    $presensiGuru->save();
+                    $pesanLcd = 'HADIR PULANG';
+                }
             }
 
             // 2. Balas pesan balik ke topik spesifik perangkat tersebut

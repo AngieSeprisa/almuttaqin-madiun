@@ -5,12 +5,20 @@
 @section('header-actions')
 <div class="nfc-top-stats">
     <div class="nfc-stat-pill">
-        <span class="nfc-stat-label">Terdaftar</span>
+        <span class="nfc-stat-label">Santri Terdaftar</span>
         <strong class="nfc-stat-value" id="statTerdaftar">{{ $totalTerdaftar }}</strong>
     </div>
     <div class="nfc-stat-pill nfc-stat-pill-warn">
-        <span class="nfc-stat-label">Belum Ada Kartu</span>
+        <span class="nfc-stat-label">Santri Belum</span>
         <strong class="nfc-stat-value" id="statBelum">{{ $totalBelum }}</strong>
+    </div>
+    <div class="nfc-stat-pill">
+        <span class="nfc-stat-label">Guru Terdaftar</span>
+        <strong class="nfc-stat-value" id="statGuruTerdaftar">{{ $totalGuruTerdaftar ?? 0 }}</strong>
+    </div>
+    <div class="nfc-stat-pill nfc-stat-pill-warn">
+        <span class="nfc-stat-label">Guru Belum</span>
+        <strong class="nfc-stat-value" id="statGuruBelum">{{ $totalGuruBelum ?? 0 }}</strong>
     </div>
 </div>
 @endsection
@@ -32,6 +40,23 @@
     <div class="fi-section-card">
         <form id="nfcAssignForm" action="{{ route('nfc.assign', [], false) }}" method="POST" autocomplete="off">
             @csrf
+
+            {{-- Mode Pemilihan Target: Santri vs Guru/Pegawai --}}
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border-light, #f1f5f9); flex-wrap:wrap; gap:10px;">
+                <div class="nfc-target-pills">
+                    <button type="button" class="nfc-pill-btn active" id="btnTabSiswa" data-target="siswa">
+                        👨‍🎓 Santri
+                    </button>
+                    <button type="button" class="nfc-pill-btn" id="btnTabGuru" data-target="guru">
+                        👨‍🏫 Guru / Pegawai
+                    </button>
+                </div>
+                <span class="nfc-filter-hint" id="targetHintText" style="font-size:12px; color:var(--text-muted, #64748b);">
+                    Mode Pairing: <strong>Santri</strong>
+                </span>
+            </div>
+            <input type="hidden" name="tipe" id="targetTypeInput" value="siswa">
+            <input type="hidden" name="user_id" id="selectedUserId">
 
             <div class="nfc-form-grid">
                 {{-- 1. Input Nomor Serial Kartu --}}
@@ -66,7 +91,7 @@
                         </button>
                     </div>
 
-                    {{-- Peringatan jika kartu sudah milik santri lain --}}
+                    {{-- Peringatan jika kartu sudah milik orang lain --}}
                     <div id="cardOwnerAlert" class="nfc-warning-banner" style="display:none;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
@@ -77,10 +102,10 @@
                     </div>
                 </div>
 
-                {{-- 2. Pilih Nama Santri --}}
+                {{-- 2. Pilih Nama Santri / Guru --}}
                 <div class="nfc-field-wrap">
                     <div class="nfc-field-head">
-                        <label for="siswaSearchInput" class="nfc-field-label">
+                        <label for="siswaSearchInput" class="nfc-field-label" id="labelTargetSearch">
                             Pilih Nama Santri
                         </label>
                         <span id="selectedSiswaBadge" class="nfc-selected-tag" style="display:none;">
@@ -89,7 +114,7 @@
                     </div>
 
                     <div class="nfc-combobox-wrap" id="siswaCombobox">
-                        <input type="hidden" name="siswa_id" id="selectedSiswaId" required>
+                        <input type="hidden" name="siswa_id" id="selectedSiswaId">
 
                         <div class="nfc-combobox-input-box">
                             <div class="nfc-input-icon">
@@ -168,15 +193,15 @@
                     <tr>
                         <th style="width: 50px;">No</th>
                         <th>Nomor Serial Kartu</th>
-                        <th>Nama Santri</th>
-                        <th>Jenjang / Kelas</th>
-                        <th>Kamar</th>
+                        <th>Nama (Santri / Guru)</th>
+                        <th>Peran / Jenjang</th>
+                        <th>Kamar / Staf</th>
                         <th style="width: 140px; text-align: center;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="recentListBody">
                     @forelse($recentPairings as $idx => $r)
-                    <tr id="row-siswa-{{ $r->id }}" data-id="{{ $r->id }}" data-serial="{{ $r->rfid_uid }}">
+                    <tr id="row-{{ $r->tipe ?? 'siswa' }}-{{ $r->id }}" data-id="{{ $r->id }}" data-tipe="{{ $r->tipe ?? 'siswa' }}" data-serial="{{ $r->rfid_uid }}">
                         <td style="color:var(--text-muted); font-size:12px;">{{ $idx + 1 }}</td>
                         <td>
                             <span class="nfc-table-serial-badge">
@@ -191,17 +216,24 @@
                             <span class="nama-text" style="font-weight:600;">{{ $r->nama_lengkap }}</span>
                         </td>
                         <td>
-                            @php
-                                $j = $r->jenjang ?? ($r->pendaftaran?->jenjang ?? 'Reguler');
-                                $badgeColor = match($j) {
-                                    'SMP' => 'smp',
-                                    'SMA' => 'sma',
-                                    default => 'pondok',
-                                };
-                            @endphp
-                            <span class="badge-lembaga badge-lembaga-{{ $badgeColor }}">{{ $j }}</span>
-                            @if($r->kelas)
-                                <span style="font-size:12px; color:var(--text-muted); margin-left:4px;">{{ $r->kelas }}</span>
+                            @if(($r->tipe ?? 'siswa') === 'guru')
+                                <span class="badge-lembaga badge-lembaga-sma" style="background:#e0e7ff; color:#3730a3; font-weight:700;">Guru / Pegawai</span>
+                                @if($r->kelas)
+                                    <span style="font-size:12px; color:var(--text-muted); margin-left:4px;">{{ $r->kelas }}</span>
+                                @endif
+                            @else
+                                @php
+                                    $j = $r->jenjang ?? ($r->pendaftaran?->jenjang ?? 'Reguler');
+                                    $badgeColor = match(strtoupper($j)) {
+                                        'SMP' => 'smp',
+                                        'SMA' => 'sma',
+                                        default => 'pondok',
+                                    };
+                                @endphp
+                                <span class="badge-lembaga badge-lembaga-{{ $badgeColor }}">{{ $j }}</span>
+                                @if($r->kelas)
+                                    <span style="font-size:12px; color:var(--text-muted); margin-left:4px;">{{ $r->kelas }}</span>
+                                @endif
                             @endif
                         </td>
                         <td style="color:var(--text-muted);">{{ $r->kamar ?: '-' }}</td>
@@ -209,9 +241,10 @@
                             <button type="button"
                                     class="action-btn action-btn-koreksi btn-unpair-card"
                                     data-id="{{ $r->id }}"
+                                    data-tipe="{{ $r->tipe ?? 'siswa' }}"
                                     data-nama="{{ $r->nama_lengkap }}"
                                     data-serial="{{ $r->rfid_uid }}"
-                                    title="Lepas Kartu dari Santri Ini">
+                                    title="Lepas Kartu">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
                                     <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -233,13 +266,39 @@
     </div>
 </div>
 
-{{-- Data Santri untuk Client-Side Autocomplete Cepat --}}
+{{-- Data Santri & Guru untuk Client-Side Autocomplete Cepat --}}
 <script>
     window.DATA_SISWAS = @json($siswas);
+    window.DATA_GURUS = @json($gurus);
 </script>
 
 <style>
 /* ==================== TAMPILAN FILAMENT CLEAN ==================== */
+.nfc-target-pills {
+    display: inline-flex;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 8px;
+    background: #f1f5f9;
+}
+
+.nfc-pill-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.nfc-pill-btn.active {
+    background: #ffffff;
+    color: #0052ff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
 .nfc-page-wrapper {
     display: flex;
     flex-direction: column;
@@ -719,8 +778,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const cardOwnerAlert = document.getElementById('cardOwnerAlert');
     const cardOwnerText = document.getElementById('cardOwnerText');
 
+    const btnTabSiswa = document.getElementById('btnTabSiswa');
+    const btnTabGuru = document.getElementById('btnTabGuru');
+    const targetTypeInput = document.getElementById('targetTypeInput');
+    const targetHintText = document.getElementById('targetHintText');
+    const labelTargetSearch = document.getElementById('labelTargetSearch');
+
     const inputSiswaSearch = document.getElementById('siswaSearchInput');
     const inputSiswaId = document.getElementById('selectedSiswaId');
+    const inputUserId = document.getElementById('selectedUserId');
     const btnClearSiswa = document.getElementById('btnClearSiswa');
     const siswaDropdown = document.getElementById('siswaDropdownList');
     const siswaDropdownItems = document.getElementById('siswaDropdownItems');
@@ -736,6 +802,54 @@ document.addEventListener('DOMContentLoaded', function () {
     const recentTbody = document.getElementById('recentListBody');
 
     const siswasData = window.DATA_SISWAS || [];
+    const gurusData = window.DATA_GURUS || [];
+
+    let currentTarget = 'siswa'; // 'siswa' | 'guru'
+
+    btnTabSiswa.addEventListener('click', function () {
+        setTargetMode('siswa');
+    });
+
+    btnTabGuru.addEventListener('click', function () {
+        setTargetMode('guru');
+    });
+
+    function setTargetMode(mode) {
+        currentTarget = mode;
+        targetTypeInput.value = mode;
+
+        if (mode === 'siswa') {
+            btnTabSiswa.classList.add('active');
+            btnTabGuru.classList.remove('active');
+            labelTargetSearch.textContent = 'Pilih Nama Santri';
+            inputSiswaSearch.placeholder = 'Ketik 2-3 huruf nama santri...';
+            targetHintText.innerHTML = 'Mode Pairing: <strong>Santri</strong>';
+            selectedSiswaBadge.textContent = 'Santri Terpilih';
+            btnChangeSiswa.title = 'Ganti Santri';
+        } else {
+            btnTabGuru.classList.add('active');
+            btnTabSiswa.classList.remove('active');
+            labelTargetSearch.textContent = 'Pilih Nama Guru / Pegawai';
+            inputSiswaSearch.placeholder = 'Ketik 2-3 huruf nama guru/pegawai...';
+            targetHintText.innerHTML = 'Mode Pairing: <strong>Guru / Pegawai</strong>';
+            selectedSiswaBadge.textContent = 'Guru Terpilih';
+            btnChangeSiswa.title = 'Ganti Guru';
+        }
+
+        clearSelectedEntity();
+        if (inputSiswaSearch.value.trim()) {
+            showDropdown(inputSiswaSearch.value.trim());
+        }
+    }
+
+    function clearSelectedEntity() {
+        inputSiswaId.value = '';
+        inputUserId.value = '';
+        selectedSiswaCard.style.display = 'none';
+        inputSiswaSearch.parentElement.style.display = 'flex';
+        selectedSiswaBadge.style.display = 'none';
+        checkInputCompleteness();
+    }
 
     // Focus awal pada input nomor serial
     setTimeout(() => inputSerial.focus(), 100);
@@ -779,7 +893,7 @@ document.addEventListener('DOMContentLoaded', function () {
         badgeStatus.className = 'nfc-live-badge ready';
         badgeStatus.innerHTML = '<span class="pulse-indicator"></span><span>Kartu Terbaca</span>';
 
-        // Cek ke server apakah kartu sudah terdaftar (gunakan relative URL agar tidak bentrok dengan APP_URL localhost)
+        // Cek ke server apakah kartu sudah terdaftar (santri atau guru)
         fetch(`{{ route('nfc.check-card', [], false) }}?serial=${encodeURIComponent(serial)}`, {
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
@@ -787,16 +901,16 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(data => {
             if (data.status === 'assigned') {
                 cardOwnerAlert.style.display = 'flex';
-                cardOwnerText.innerHTML = `<strong>Perhatian:</strong> ${data.message} Jika Anda menyimpan, kartu akan dipindahkan ke santri baru.`;
+                cardOwnerText.innerHTML = `<strong>Perhatian:</strong> ${data.message} Jika Anda menyimpan, kartu akan dipindahkan ke pemilik baru.`;
             } else {
                 cardOwnerAlert.style.display = 'none';
                 cardOwnerText.textContent = '';
             }
 
-            // Langkah 2: Kursor otomatis berpindah ke kotak 'Pilih Nama Santri'
-            if (!inputSiswaId.value) {
+            // Kursor otomatis berpindah ke kotak pencarian
+            if (!inputSiswaId.value && !inputUserId.value) {
                 inputSiswaSearch.focus();
-                showSiswaDropdown('');
+                showDropdown('');
             }
             checkInputCompleteness();
         })
@@ -806,15 +920,15 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 2. Logika Pemilihan Nama Santri (Combobox)
+    // 2. Logika Pemilihan Nama (Combobox)
     inputSiswaSearch.addEventListener('focus', function () {
-        showSiswaDropdown(this.value.trim());
+        showDropdown(this.value.trim());
     });
 
     inputSiswaSearch.addEventListener('input', function () {
         const query = this.value.trim();
         btnClearSiswa.style.display = query ? 'flex' : 'none';
-        showSiswaDropdown(query);
+        showDropdown(query);
     });
 
     document.addEventListener('click', function (e) {
@@ -826,19 +940,15 @@ document.addEventListener('DOMContentLoaded', function () {
     btnClearSiswa.addEventListener('click', function () {
         inputSiswaSearch.value = '';
         btnClearSiswa.style.display = 'none';
-        showSiswaDropdown('');
+        showDropdown('');
         inputSiswaSearch.focus();
     });
 
     btnChangeSiswa.addEventListener('click', function () {
-        selectedSiswaCard.style.display = 'none';
-        inputSiswaSearch.parentElement.style.display = 'flex';
-        selectedSiswaBadge.style.display = 'none';
-        inputSiswaId.value = '';
+        clearSelectedEntity();
         inputSiswaSearch.value = '';
         inputSiswaSearch.focus();
-        showSiswaDropdown('');
-        checkInputCompleteness();
+        showDropdown('');
     });
 
     function formatKamar(kamar) {
@@ -853,60 +963,104 @@ document.addEventListener('DOMContentLoaded', function () {
         return /^kelas\b/i.test(kelas) ? kelas : 'Kelas ' + kelas;
     }
 
-    function showSiswaDropdown(query) {
+    function showDropdown(query) {
         const q = query.toLowerCase();
-        let matches = siswasData;
-        if (q) {
-            matches = siswasData.filter(s => {
-                const nama = (s.nama_lengkap || '').toLowerCase();
-                const jenjang = (s.jenjang || '').toLowerCase();
-                const kamar = (s.kamar || '').toLowerCase();
-                return nama.includes(q) || jenjang.includes(q) || kamar.includes(q);
-            });
-        }
-
         siswaDropdownItems.innerHTML = '';
 
-        if (matches.length === 0) {
-            siswaDropdownItems.innerHTML = '<div class="nfc-dropdown-empty">Tidak ada santri yang cocok.</div>';
-            siswaDropdown.style.display = 'block';
-            return;
+        if (currentTarget === 'guru') {
+            let matches = gurusData;
+            if (q) {
+                matches = gurusData.filter(g => {
+                    const name = (g.name || '').toLowerCase();
+                    const nip = (g.nip || '').toLowerCase();
+                    const jabatan = (g.jabatan || '').toLowerCase();
+                    const role = (g.role || '').toLowerCase();
+                    return name.includes(q) || nip.includes(q) || jabatan.includes(q) || role.includes(q);
+                });
+            }
+
+            if (matches.length === 0) {
+                siswaDropdownItems.innerHTML = '<div class="nfc-dropdown-empty">Tidak ada Guru/Pegawai yang cocok.</div>';
+                siswaDropdown.style.display = 'block';
+                return;
+            }
+
+            matches.slice(0, 20).forEach(g => {
+                const item = document.createElement('div');
+                item.className = 'nfc-dropdown-item';
+
+                const meta = [
+                    g.jabatan ? g.jabatan : (g.role ? g.role.toUpperCase() : 'GURU/PEGAWAI'),
+                    g.nip ? 'NIP: ' + g.nip : null
+                ].filter(Boolean).join(' • ');
+
+                const badgeHtml = g.rfid_uid
+                    ? `<span class="nfc-item-badge nfc-badge-has">Kartu: ${g.rfid_uid}</span>`
+                    : `<span class="nfc-item-badge nfc-badge-empty">Belum Ber-kartu</span>`;
+
+                item.innerHTML = `
+                    <div>
+                        <div class="nfc-item-name">${escapeHtml(g.name)}</div>
+                        <div class="nfc-item-sub">${escapeHtml(meta)}</div>
+                    </div>
+                    <div>${badgeHtml}</div>
+                `;
+
+                item.addEventListener('click', () => selectGuru(g));
+                siswaDropdownItems.appendChild(item);
+            });
+        } else {
+            let matches = siswasData;
+            if (q) {
+                matches = siswasData.filter(s => {
+                    const nama = (s.nama_lengkap || '').toLowerCase();
+                    const jenjang = (s.jenjang || '').toLowerCase();
+                    const kamar = (s.kamar || '').toLowerCase();
+                    return nama.includes(q) || jenjang.includes(q) || kamar.includes(q);
+                });
+            }
+
+            if (matches.length === 0) {
+                siswaDropdownItems.innerHTML = '<div class="nfc-dropdown-empty">Tidak ada santri yang cocok.</div>';
+                siswaDropdown.style.display = 'block';
+                return;
+            }
+
+            matches.slice(0, 20).forEach(s => {
+                const item = document.createElement('div');
+                item.className = 'nfc-dropdown-item';
+
+                const metaInfo = [
+                    s.jenjang || 'Pondok', 
+                    s.kelas ? formatKelas(s.kelas) : null, 
+                    s.kamar ? formatKamar(s.kamar) : null
+                ].filter(Boolean).join(' • ');
+
+                const badgeHtml = s.rfid_uid
+                    ? `<span class="nfc-item-badge nfc-badge-has">Kartu: ${s.rfid_uid}</span>`
+                    : `<span class="nfc-item-badge nfc-badge-empty">Belum Ber-kartu</span>`;
+
+                item.innerHTML = `
+                    <div>
+                        <div class="nfc-item-name">${escapeHtml(s.nama_lengkap)}</div>
+                        <div class="nfc-item-sub">${escapeHtml(metaInfo)}</div>
+                    </div>
+                    <div>${badgeHtml}</div>
+                `;
+
+                item.addEventListener('click', () => selectSiswa(s));
+                siswaDropdownItems.appendChild(item);
+            });
         }
-
-        // Tampilkan maksimal 20 rekomendasi untuk performa cepat
-        matches.slice(0, 20).forEach(s => {
-            const item = document.createElement('div');
-            item.className = 'nfc-dropdown-item';
-            
-            const metaInfo = [
-                s.jenjang || 'Pondok', 
-                s.kelas ? formatKelas(s.kelas) : null, 
-                s.kamar ? formatKamar(s.kamar) : null
-            ].filter(Boolean).join(' • ');
-
-            const badgeHtml = s.rfid_uid
-                ? `<span class="nfc-item-badge nfc-badge-has">Kartu: ${s.rfid_uid}</span>`
-                : `<span class="nfc-item-badge nfc-badge-empty">Belum Ber-kartu</span>`;
-
-            item.innerHTML = `
-                <div>
-                    <div class="nfc-item-name">${escapeHtml(s.nama_lengkap)}</div>
-                    <div class="nfc-item-sub">${escapeHtml(metaInfo)}</div>
-                </div>
-                <div>${badgeHtml}</div>
-            `;
-
-            item.addEventListener('click', () => selectSiswa(s));
-            siswaDropdownItems.appendChild(item);
-        });
 
         siswaDropdown.style.display = 'block';
     }
 
     function selectSiswa(s) {
         inputSiswaId.value = s.id;
+        inputUserId.value = '';
         prevNama.textContent = s.nama_lengkap;
-        
+
         const metaInfo = [
             s.jenjang || 'Pondok', 
             s.kelas ? formatKelas(s.kelas) : null, 
@@ -920,8 +1074,28 @@ document.addEventListener('DOMContentLoaded', function () {
         siswaDropdown.style.display = 'none';
 
         checkInputCompleteness();
+        if (inputSerial.value.trim().length >= 4) {
+            btnSubmitForm.focus();
+        }
+    }
 
-        // Jika nomor serial sudah ada, fokus langsung ke tombol Simpan
+    function selectGuru(g) {
+        inputUserId.value = g.id;
+        inputSiswaId.value = '';
+        prevNama.textContent = g.name;
+
+        const meta = [
+            g.jabatan ? g.jabatan : (g.role ? g.role.toUpperCase() : 'GURU/PEGAWAI'),
+            g.nip ? 'NIP: ' + g.nip : null
+        ].filter(Boolean).join(' • ');
+        prevMeta.textContent = meta;
+
+        selectedSiswaCard.style.display = 'flex';
+        inputSiswaSearch.parentElement.style.display = 'none';
+        selectedSiswaBadge.style.display = 'inline-block';
+        siswaDropdown.style.display = 'none';
+
+        checkInputCompleteness();
         if (inputSerial.value.trim().length >= 4) {
             btnSubmitForm.focus();
         }
@@ -930,8 +1104,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // 3. Validasi Kelengkapan Input
     function checkInputCompleteness() {
         const hasSerial = inputSerial.value.trim().length >= 4;
-        const hasSiswa = inputSiswaId.value !== '';
-        btnSubmitForm.disabled = !(hasSerial && hasSiswa);
+        const hasTarget = currentTarget === 'guru' ? (inputUserId.value !== '') : (inputSiswaId.value !== '');
+        btnSubmitForm.disabled = !(hasSerial && hasTarget);
     }
 
     // 4. Tombol Reset / Batal
@@ -946,11 +1120,24 @@ document.addEventListener('DOMContentLoaded', function () {
         e.preventDefault();
         const serial = inputSerial.value.trim();
         const siswaId = inputSiswaId.value;
+        const userId = inputUserId.value;
 
-        if (!serial || !siswaId) return;
+        if (!serial) return;
+        if (currentTarget === 'guru' && !userId) return;
+        if (currentTarget === 'siswa' && !siswaId) return;
 
         btnSubmitForm.disabled = true;
         btnSubmitForm.innerHTML = '<span>Menyimpan...</span>';
+
+        const payload = {
+            rfid_uid: serial,
+            tipe: currentTarget,
+        };
+        if (currentTarget === 'guru') {
+            payload.user_id = userId;
+        } else {
+            payload.siswa_id = siswaId;
+        }
 
         fetch('{{ route("nfc.assign", [], false) }}', {
             method: 'POST',
@@ -959,7 +1146,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 'X-CSRF-TOKEN': '{{ csrf_token() }}',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({ rfid_uid: serial, siswa_id: siswaId })
+            body: JSON.stringify(payload)
         })
         .then(async res => {
             const data = await res.json().catch(() => ({}));
@@ -971,7 +1158,6 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .then(data => {
             if (data.success) {
-                // Notifikasi Sukses
                 if (window.Swal) {
                     Swal.fire({
                         icon: 'success',
@@ -987,22 +1173,46 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
 
                 // Tambahkan baris baru ke tabel riwayat
-                prependRecentRow(data.siswa);
+                if (currentTarget === 'guru') {
+                    prependRecentRow({
+                        id: userId,
+                        tipe: 'guru',
+                        nama_lengkap: prevNama.textContent,
+                        jenjang: 'Guru',
+                        kelas: prevMeta.textContent,
+                        kamar: 'Staf / Pendidik',
+                        rfid_uid: serial
+                    });
+                    const foundG = gurusData.find(g => g.id == userId);
+                    if (foundG) foundG.rfid_uid = serial;
 
-                // Update data memori lokal
-                const found = siswasData.find(s => s.id == siswaId);
-                if (found) found.rfid_uid = (data.siswa && data.siswa.rfid_uid) ? data.siswa.rfid_uid : serial;
+                    const statG = document.getElementById('statGuruTerdaftar');
+                    const statGB = document.getElementById('statGuruBelum');
+                    if (statG && statGB) {
+                        statG.textContent = parseInt(statG.textContent || '0', 10) + 1;
+                        statGB.textContent = Math.max(0, parseInt(statGB.textContent || '0', 10) - 1);
+                    }
+                } else {
+                    prependRecentRow(data.siswa || {
+                        id: siswaId,
+                        tipe: 'siswa',
+                        nama_lengkap: prevNama.textContent,
+                        jenjang: 'Pondok',
+                        kelas: '',
+                        kamar: '',
+                        rfid_uid: serial
+                    });
+                    const foundS = siswasData.find(s => s.id == siswaId);
+                    if (foundS) foundS.rfid_uid = serial;
 
-                // Update indikator statistik
-                const statTerdaftar = document.getElementById('statTerdaftar');
-                const statBelum = document.getElementById('statBelum');
-                if (statTerdaftar && statBelum) {
-                    statTerdaftar.textContent = parseInt(statTerdaftar.textContent || '0', 10) + 1;
-                    const b = Math.max(0, parseInt(statBelum.textContent || '0', 10) - 1);
-                    statBelum.textContent = b;
+                    const statTerdaftar = document.getElementById('statTerdaftar');
+                    const statBelum = document.getElementById('statBelum');
+                    if (statTerdaftar && statBelum) {
+                        statTerdaftar.textContent = parseInt(statTerdaftar.textContent || '0', 10) + 1;
+                        statBelum.textContent = Math.max(0, parseInt(statBelum.textContent || '0', 10) - 1);
+                    }
                 }
 
-                // Reset form dan langsung siap untuk kartu santri berikutnya!
                 resetSerialField();
                 btnChangeSiswa.click();
                 inputSerial.focus();
@@ -1034,10 +1244,18 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!btn) return;
 
         const id = btn.dataset.id;
+        const tipe = btn.dataset.tipe || 'siswa';
         const nama = btn.dataset.nama;
         const serial = btn.dataset.serial;
 
         const confirmAction = () => {
+            const payload = { tipe: tipe };
+            if (tipe === 'guru') {
+                payload.user_id = id;
+            } else {
+                payload.siswa_id = id;
+            }
+
             fetch('{{ route("nfc.unpair", [], false) }}', {
                 method: 'POST',
                 headers: {
@@ -1045,23 +1263,32 @@ document.addEventListener('DOMContentLoaded', function () {
                     'X-CSRF-TOKEN': '{{ csrf_token() }}',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify({ siswa_id: id })
+                body: JSON.stringify(payload)
             })
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    const row = document.getElementById(`row-siswa-${id}`);
+                    const row = document.getElementById(`row-${tipe}-${id}`);
                     if (row) row.remove();
 
-                    const found = siswasData.find(s => s.id == id);
-                    if (found) found.rfid_uid = null;
-
-                    // Update statistik
-                    const statTerdaftar = document.getElementById('statTerdaftar');
-                    const statBelum = document.getElementById('statBelum');
-                    if (statTerdaftar && statBelum) {
-                        statTerdaftar.textContent = Math.max(0, parseInt(statTerdaftar.textContent || '0', 10) - 1);
-                        statBelum.textContent = parseInt(statBelum.textContent || '0', 10) + 1;
+                    if (tipe === 'guru') {
+                        const foundG = gurusData.find(g => g.id == id);
+                        if (foundG) foundG.rfid_uid = null;
+                        const statG = document.getElementById('statGuruTerdaftar');
+                        const statGB = document.getElementById('statGuruBelum');
+                        if (statG && statGB) {
+                            statG.textContent = Math.max(0, parseInt(statG.textContent || '0', 10) - 1);
+                            statGB.textContent = parseInt(statGB.textContent || '0', 10) + 1;
+                        }
+                    } else {
+                        const foundS = siswasData.find(s => s.id == id);
+                        if (foundS) foundS.rfid_uid = null;
+                        const statTerdaftar = document.getElementById('statTerdaftar');
+                        const statBelum = document.getElementById('statBelum');
+                        if (statTerdaftar && statBelum) {
+                            statTerdaftar.textContent = Math.max(0, parseInt(statTerdaftar.textContent || '0', 10) - 1);
+                            statBelum.textContent = parseInt(statBelum.textContent || '0', 10) + 1;
+                        }
                     }
 
                     if (window.Swal) {
@@ -1080,10 +1307,11 @@ document.addEventListener('DOMContentLoaded', function () {
             .catch(err => console.error('Unpair error:', err));
         };
 
+        const targetLabel = tipe === 'guru' ? 'Guru/Pegawai' : 'Santri';
         if (window.Swal) {
             Swal.fire({
-                title: 'Lepas Kartu Santri?',
-                html: `Apakah Anda yakin ingin melepas kartu <strong>${escapeHtml(serial)}</strong> dari santri <strong>${escapeHtml(nama)}</strong>?`,
+                title: `Lepas Kartu ${targetLabel}?`,
+                html: `Apakah Anda yakin ingin melepas kartu <strong>${escapeHtml(serial)}</strong> dari ${targetLabel} <strong>${escapeHtml(nama)}</strong>?`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#DC2626',
@@ -1098,20 +1326,33 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    function prependRecentRow(siswa) {
+    function prependRecentRow(item) {
         const emptyRow = document.getElementById('rowEmptyRecent');
         if (emptyRow) emptyRow.remove();
 
-        // Hapus baris lama jika santri ini sudah ada di tabel sebelumnya
-        const oldRow = document.getElementById(`row-siswa-${siswa.id}`);
+        const tipe = item.tipe || 'siswa';
+        const oldRow = document.getElementById(`row-${tipe}-${item.id}`);
         if (oldRow) oldRow.remove();
 
         const tr = document.createElement('tr');
-        tr.id = `row-siswa-${siswa.id}`;
-        tr.dataset.id = siswa.id;
-        tr.dataset.serial = siswa.rfid_uid;
+        tr.id = `row-${tipe}-${item.id}`;
+        tr.dataset.id = item.id;
+        tr.dataset.tipe = tipe;
+        tr.dataset.serial = item.rfid_uid;
 
-        const badgeColor = (siswa.jenjang || '').toUpperCase() === 'SMP' ? 'smp' : ((siswa.jenjang || '').toUpperCase() === 'SMA' ? 'sma' : 'pondok');
+        let badgeHtml = '';
+        if (tipe === 'guru') {
+            badgeHtml = `<span class="badge-lembaga badge-lembaga-sma" style="background:#e0e7ff; color:#3730a3; font-weight:700;">Guru / Pegawai</span>`;
+            if (item.kelas) {
+                badgeHtml += `<span style="font-size:12px; color:var(--text-muted); margin-left:4px;">${escapeHtml(item.kelas)}</span>`;
+            }
+        } else {
+            const badgeColor = (item.jenjang || '').toUpperCase() === 'SMP' ? 'smp' : ((item.jenjang || '').toUpperCase() === 'SMA' ? 'sma' : 'pondok');
+            badgeHtml = `<span class="badge-lembaga badge-lembaga-${badgeColor}">${escapeHtml(item.jenjang || 'Pondok')}</span>`;
+            if (item.kelas) {
+                badgeHtml += `<span style="font-size:12px; color:var(--text-muted); margin-left:4px;">${escapeHtml(item.kelas)}</span>`;
+            }
+        }
 
         tr.innerHTML = `
             <td style="color:var(--text-muted); font-size:12px;">Baru</td>
@@ -1121,24 +1362,24 @@ document.addEventListener('DOMContentLoaded', function () {
                         <rect x="2" y="5" width="20" height="14" rx="2"></rect>
                         <line x1="2" y1="10" x2="22" y2="10"></line>
                     </svg>
-                    <code>${escapeHtml(siswa.rfid_uid)}</code>
+                    <code>${escapeHtml(item.rfid_uid)}</code>
                 </span>
             </td>
             <td class="cell-nama">
-                <span class="nama-text" style="font-weight:600;">${escapeHtml(siswa.nama_lengkap)}</span>
+                <span class="nama-text" style="font-weight:600;">${escapeHtml(item.nama_lengkap || item.nama)}</span>
             </td>
             <td>
-                <span class="badge-lembaga badge-lembaga-${badgeColor}">${escapeHtml(siswa.jenjang || 'Pondok')}</span>
-                ${siswa.kelas ? `<span style="font-size:12px; color:var(--text-muted); margin-left:4px;">${escapeHtml(siswa.kelas)}</span>` : ''}
+                ${badgeHtml}
             </td>
-            <td style="color:var(--text-muted);">${escapeHtml(siswa.kamar || '-')}</td>
+            <td style="color:var(--text-muted);">${escapeHtml(item.kamar || (tipe === 'guru' ? 'Staf / Pendidik' : '-'))}</td>
             <td style="text-align: center;">
                 <button type="button"
                         class="action-btn action-btn-koreksi btn-unpair-card"
-                        data-id="${siswa.id}"
-                        data-nama="${escapeHtml(siswa.nama_lengkap)}"
-                        data-serial="${escapeHtml(siswa.rfid_uid)}"
-                        title="Lepas Kartu dari Santri Ini">
+                        data-id="${item.id}"
+                        data-tipe="${tipe}"
+                        data-nama="${escapeHtml(item.nama_lengkap || item.nama)}"
+                        data-serial="${escapeHtml(item.rfid_uid)}"
+                        title="Lepas Kartu">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -1150,6 +1391,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         recentTbody.insertBefore(tr, recentTbody.firstChild);
     }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+});
+</script>
 
     function escapeHtml(str) {
         if (!str) return '';

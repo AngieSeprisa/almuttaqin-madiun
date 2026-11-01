@@ -115,12 +115,12 @@ class QuickSearchController extends Controller
                 'permission' => 'pendaftaran',
             ],
             [
-                'title' => 'Presensi Guru',
-                'description' => 'Scan QR Code kehadiran & izin harian',
-                'url' => route('presensi.index'),
+                'title' => 'Rekap Presensi Guru',
+                'description' => 'Rekapitulasi kehadiran guru & pegawai (Tap RFID)',
+                'url' => route('rekap-absensi.guru'),
                 'icon' => 'check-square',
-                'keywords' => 'presensi guru absen masuk pulang qr scan',
-                'permission' => 'presensi',
+                'keywords' => 'presensi guru rekap absensi tap rfid kehadiran',
+                'permission' => 'rekap_absensi',
             ],
             [
                 'title' => 'Guru Sekolah',
