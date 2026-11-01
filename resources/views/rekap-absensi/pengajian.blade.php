@@ -573,17 +573,35 @@
         textarea.value = header + "\n\n" + body + "\n\n" + summary;
     }
 
+    function setupModalDom() {
+        var modal = document.getElementById('modalLaporanWA');
+        if (modal && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupModalDom);
+    } else {
+        setupModalDom();
+    }
+
     function openWaModal() {
         var modal = document.getElementById('modalLaporanWA');
         if (modal) {
-            modal.style.display = 'flex';
+            setupModalDom();
+            modal.style.setProperty('display', 'flex', 'important');
+            document.body.style.overflow = 'hidden';
             renderPengajianWaPreview();
         }
     }
 
     function closeWaModal() {
         var modal = document.getElementById('modalLaporanWA');
-        if (modal) modal.style.display = 'none';
+        if (modal) {
+            modal.style.setProperty('display', 'none', 'important');
+            document.body.style.overflow = '';
+        }
     }
 
     function copyWaText() {
@@ -611,6 +629,27 @@
         var encoded = encodeURIComponent(textarea.value);
         window.open('https://web.whatsapp.com/send?text=' + encoded, '_blank');
     }
+
+    // Expose fungsi ke window untuk kemudahan akses
+    window.openWaModal = openWaModal;
+    window.closeWaModal = closeWaModal;
+    window.copyWaText = copyWaText;
+    window.openWaWeb = openWaWeb;
+    window.renderPengajianWaPreview = renderPengajianWaPreview;
+
+    // Klik di luar dialog untuk menutup & Tombol Escape
+    document.addEventListener('click', function(e) {
+        var modal = document.getElementById('modalLaporanWA');
+        if (modal && e.target === modal) {
+            closeWaModal();
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeWaModal();
+        }
+    });
 
     // Inisialisasi awal saat load
     document.addEventListener('DOMContentLoaded', function() {

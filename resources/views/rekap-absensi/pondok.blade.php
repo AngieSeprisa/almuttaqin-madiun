@@ -1442,8 +1442,12 @@
         textarea.value = header + "\n\n" + body + "\n\n" + summary;
     }
 
-        textarea.value = header + "\n\n" + body + "\n\n" + summary;
-    }
+    // Expose fungsi ke window untuk akses instan dari event handler inline HTML
+    window.openWaModal = openWaModal;
+    window.closeWaModal = closeWaModal;
+    window.renderWaReportPreview = renderWaReportPreview;
+    window.copyWaText = copyWaText;
+    window.openWhatsAppWeb = openWhatsAppWeb;
 
     function switchWaSession(slotKey) {
         renderWaReportPreview();

@@ -606,4 +606,25 @@ class RekapPondokTest extends TestCase
         $rowsCombo = collect($resCombo->viewData('rows'))->pluck('nama_lengkap')->all();
         $this->assertContains('Ali Santri Baru', $rowsCombo);
     }
+
+    public function test_tombol_dan_modal_laporan_wa_tersedia_di_rekap_sholat_dan_pengajian(): void
+    {
+        // 1. Rekap Sholat (/rekap-absensi/sholat)
+        $resSholat = $this->actingAs($this->admin)->get(route('rekap.sholat.index'));
+        $resSholat->assertStatus(200);
+        $contentSholat = $resSholat->getContent();
+        $this->assertStringContainsString('onclick="openWaModal()"', $contentSholat);
+        $this->assertStringContainsString('id="modalLaporanWA"', $contentSholat);
+        $this->assertStringContainsString('window.openWaModal = openWaModal;', $contentSholat);
+        // Pastikan tidak ada duplikasi penutup fungsi syntax error
+        $this->assertStringNotContainsString("textarea.value = header + \"\\n\\n\" + body + \"\\n\\n\" + summary;\n    }\n\n        textarea.value", $contentSholat);
+
+        // 2. Rekap Pengajian (/rekap-absensi/pengajian)
+        $resPengajian = $this->actingAs($this->admin)->get(route('rekap.pengajian.index'));
+        $resPengajian->assertStatus(200);
+        $contentPengajian = $resPengajian->getContent();
+        $this->assertStringContainsString('onclick="openWaModal()"', $contentPengajian);
+        $this->assertStringContainsString('id="modalLaporanWA"', $contentPengajian);
+        $this->assertStringContainsString('window.openWaModal = openWaModal;', $contentPengajian);
+    }
 }
