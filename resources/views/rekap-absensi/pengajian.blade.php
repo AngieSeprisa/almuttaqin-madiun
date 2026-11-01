@@ -535,6 +535,7 @@
 
         filtered.forEach(function(r, idx) {
             var emojis = [];
+            var ketNotes = [];
             if (sessions.length === 0) {
                 emojis.push('✅');
             } else {
@@ -542,17 +543,25 @@
                     var cellKey = (dateObj ? dateObj.date : selDate) + '_' + sess.key;
                     var cell = (r.cells && r.cells[cellKey]) ? r.cells[cellKey] : null;
                     var code = cell ? cell.code : 'H';
+                    var sessName = (sess.short || sess.label || sess.key || '').toLowerCase();
                     if (code === 'H') {
                         emojis.push('✅');
                         totalHadir++;
                     } else if (code === 'T') {
                         emojis.push('⚠️');
+                        ketNotes.push('telat - ' + sessName);
                         totalTelatIzin++;
-                    } else if (code === 'I' || code === 'S') {
+                    } else if (code === 'I') {
                         emojis.push('✉️');
+                        ketNotes.push('izin - ' + sessName);
+                        totalTelatIzin++;
+                    } else if (code === 'S') {
+                        emojis.push('✉️');
+                        ketNotes.push('sakit - ' + sessName);
                         totalTelatIzin++;
                     } else if (code === 'A') {
                         emojis.push('❌');
+                        ketNotes.push('tidak absen - ' + sessName);
                         totalAlfa++;
                     } else {
                         emojis.push('✅');
@@ -560,7 +569,8 @@
                     }
                 });
             }
-            lines.push((idx + 1) + '. ' + (r.nama_bersih || r.nama_lengkap) + ' ' + emojis.join(' '));
+            var ketStr = ketNotes.length > 0 ? ' (' + ketNotes.join(', ') + ')' : '';
+            lines.push((idx + 1) + '. ' + (r.nama_bersih || r.nama_lengkap) + ' ' + emojis.join(' ') + ketStr);
         });
 
         var body = lines.length > 0 ? lines.join("\n") : "Tidak ada siswa pada kelompok ini.";

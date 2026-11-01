@@ -1380,6 +1380,14 @@
 
         var isSemua = (selSession === 'semua');
         var slots = ['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'];
+        var slotNames = {
+            'subuh': 'subuh',
+            'dzuhur': 'dzuhur',
+            'ashar': 'asar',
+            'asar': 'asar',
+            'maghrib': 'maghrib',
+            'isya': 'isya'
+        };
 
         matchedStudents.forEach(function (s, idx) {
             var cleanName = s.nama_bersih || s.nama || '';
@@ -1387,7 +1395,9 @@
             if (isSemua) {
                 // Sesi Secara Default Semua: 5x absen hadir maka 5 icon centang
                 var emojis = [];
+                var ketNotes = [];
                 slots.forEach(function (slotKey) {
+                    var sName = slotNames[slotKey] || slotKey;
                     var stObj = (s.status_per_sesi && s.status_per_sesi[slotKey]) ? s.status_per_sesi[slotKey] : null;
                     if (stObj) {
                         var st = stObj.status;
@@ -1396,20 +1406,29 @@
                             hadirCount++;
                         } else if (st === 'terlambat') {
                             emojis.push('⚠️');
+                            ketNotes.push('telat - ' + sName);
                             izinTerlambatCount++;
-                        } else if (st === 'izin' || st === 'sakit') {
+                        } else if (st === 'izin') {
                             emojis.push('✉️');
+                            ketNotes.push('izin - ' + sName);
+                            izinTerlambatCount++;
+                        } else if (st === 'sakit') {
+                            emojis.push('✉️');
+                            ketNotes.push('sakit - ' + sName);
                             izinTerlambatCount++;
                         } else {
                             emojis.push('❌');
+                            ketNotes.push('tidak absen - ' + sName);
                             alpaCount++;
                         }
                     } else {
                         emojis.push('❌');
+                        ketNotes.push('tidak absen - ' + sName);
                         alpaCount++;
                     }
                 });
-                lines.push((idx + 1) + '. ' + cleanName + ' ' + emojis.join(' '));
+                var ketStr = ketNotes.length > 0 ? ' (' + ketNotes.join(', ') + ')' : '';
+                lines.push((idx + 1) + '. ' + cleanName + ' ' + emojis.join(' ') + ketStr);
             } else {
                 // Sesi Spesifik Tunggal
                 var sesiStatus = (s.status_per_sesi && s.status_per_sesi[selSession]) ? s.status_per_sesi[selSession] : null;

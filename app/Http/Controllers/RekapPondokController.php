@@ -1218,8 +1218,10 @@ class RekapPondokController extends Controller
             foreach ($rows as $idx => $r) {
                 $cleanName = self::cleanStudentName($r['nama_lengkap']);
                 $emojis = [];
+                $ketNotes = [];
                 foreach ($sholat5Slots as $sKey) {
                     $sesiStatus = $r['status_per_sesi'][$sKey] ?? null;
+                    $slotLabelIndo = ($sKey === 'ashar') ? 'asar' : $sKey;
                     if ($sesiStatus) {
                         $st = $sesiStatus['status'];
                         if ($st === 'hadir') {
@@ -1227,20 +1229,29 @@ class RekapPondokController extends Controller
                             $totalHadirSemua++;
                         } elseif ($st === 'terlambat') {
                             $emojis[] = '⚠️';
+                            $ketNotes[] = "telat - {$slotLabelIndo}";
                             $totalTelatIzinSemua++;
-                        } elseif (in_array($st, ['izin', 'sakit'], true)) {
+                        } elseif ($st === 'izin') {
                             $emojis[] = '✉️';
+                            $ketNotes[] = "izin - {$slotLabelIndo}";
+                            $totalTelatIzinSemua++;
+                        } elseif ($st === 'sakit') {
+                            $emojis[] = '✉️';
+                            $ketNotes[] = "sakit - {$slotLabelIndo}";
                             $totalTelatIzinSemua++;
                         } else {
                             $emojis[] = '❌';
+                            $ketNotes[] = "tidak absen - {$slotLabelIndo}";
                             $totalAlpaSemua++;
                         }
                     } else {
                         $emojis[] = '❌';
+                        $ketNotes[] = "tidak absen - {$slotLabelIndo}";
                         $totalAlpaSemua++;
                     }
                 }
-                $linesSemua[] = sprintf('%d. %s %s', $idx + 1, $cleanName, implode(' ', $emojis));
+                $ketStr = !empty($ketNotes) ? ' (' . implode(', ', $ketNotes) . ')' : '';
+                $linesSemua[] = sprintf('%d. %s %s%s', $idx + 1, $cleanName, implode(' ', $emojis), $ketStr);
             }
 
             $headerSemua = "📅 *LAPORAN ABSENSI SHOLAT SISWA KELAS {$sasaran}*\n{$dateFormatted}\n\n*Waktu Sholat:* Semua Sesi (5 Waktu)\n\n*Daftar Kehadiran Siswa:*";

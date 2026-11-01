@@ -456,7 +456,14 @@ class RekapPondokTest extends TestCase
         $resSemua->assertStatus(200);
         $waSemuaText = $resSemua->viewData('waText');
         $this->assertStringContainsString('*Waktu Sholat:* Semua Sesi (5 Waktu)', $waSemuaText);
+        // Santri yang hadir semua sesi sholat (5x) tidak memiliki keterangan tambahan
         $this->assertStringContainsString('1. Ahmad Fauzi ✅ ✅ ✅ ✅ ✅', $waSemuaText);
+        $this->assertStringNotContainsString('1. Ahmad Fauzi ✅ ✅ ✅ ✅ ✅ (', $waSemuaText);
+
+        // Santri yang selain hadir memiliki rincian keterangan sesi di belakang namanya
+        $this->assertStringContainsString('2. Bambang Wijaya', $waSemuaText);
+        $this->assertStringContainsString('telat - dzuhur', $waSemuaText);
+        $this->assertStringContainsString('tidak absen - asar', $waSemuaText);
     }
 
     public function test_rentang_mingguan_bulanan_dan_ekspor(): void
