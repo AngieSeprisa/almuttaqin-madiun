@@ -408,8 +408,8 @@
         </div>
 
         <div class="rp-modal-body" style="padding:18px 20px;">
-            {{-- Filter Grid (Tanggal, Filter Kelas, Filter Kamar) --}}
-            <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:10px; margin-bottom:14px;">
+            {{-- Filter Grid (Tanggal & Filter Kamar Sesuai Gambar Mockup) --}}
+            <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:14px; margin-bottom:14px;">
                 <div>
                     <label style="display:block; font-size:10.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px;">PILIH TANGGAL LAPORAN</label>
                     <select id="waDateSelect" class="pj-select" style="height:38px; font-size:12px; padding:6px 10px;" onchange="renderPengajianWaPreview()">
@@ -417,16 +417,6 @@
                             <option value="{{ $dItem['date'] }}" {{ $loop->last ? 'selected' : '' }}>
                                 {{ $dItem['formatted'] }}
                             </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <label style="display:block; font-size:10.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:5px;">FILTER KELAS</label>
-                    <select id="waKelasSekolahSelect" class="pj-select" style="height:38px; font-size:12px; padding:6px 10px;" onchange="renderPengajianWaPreview()">
-                        <option value="semua">-- Semua Kelas --</option>
-                        @foreach($kelasSekolahList as $cName)
-                            <option value="{{ $cName }}">{{ $cName }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -498,13 +488,11 @@
 
     function renderPengajianWaPreview() {
         var dateEl = document.getElementById('waDateSelect');
-        var kelasEl = document.getElementById('waKelasSekolahSelect');
         var kamarEl = document.getElementById('waKamarSelect');
         var textarea = document.getElementById('waTextarea');
         if (!textarea) return;
 
         var selDate = dateEl ? dateEl.value : '';
-        var selKelas = kelasEl ? kelasEl.value : 'semua';
         var selKamar = kamarEl ? kamarEl.value : 'semua';
 
         var dateObj = null;
@@ -525,9 +513,6 @@
         var sessions = (dateObj && dateObj.sessions) ? dateObj.sessions : [];
 
         var targetKelas = window.PENGAJIAN_KELAS_NAME;
-        if (selKelas !== 'semua') {
-            targetKelas += ' - KELAS ' + selKelas.toUpperCase();
-        }
         if (selKamar !== 'semua') {
             targetKelas += ' (KAMAR ' + selKamar.toUpperCase() + ')';
         }
@@ -537,9 +522,6 @@
                      "*Daftar Kehadiran Siswa:*";
 
         var filtered = (window.PENGAJIAN_MATRIX_ROWS || []).filter(function(r) {
-            if (selKelas !== 'semua' && r.kelas && r.kelas.toLowerCase().indexOf(selKelas.toLowerCase()) === -1) {
-                return false;
-            }
             if (selKamar !== 'semua' && r.kamar && r.kamar.toLowerCase().indexOf(selKamar.toLowerCase()) === -1) {
                 return false;
             }

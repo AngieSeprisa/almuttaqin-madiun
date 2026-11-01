@@ -89,15 +89,13 @@ class RekapPondokTest extends TestCase
         $resPengajian->assertSee('Data Presensi Pengajian');
         $resPengajian->assertSee('Sesi Pengajian');
 
-        // 4. Verifikasi dropdown Jenjang, Kelas, Kamar, dan Sesi di Modal WhatsApp
+        // 4. Verifikasi dropdown Jenjang, Kamar, dan Sesi di Modal WhatsApp
         $response->assertSee('id="waJenjangSelect"', false);
-        $response->assertSee('id="waKelasSelect"', false);
         $response->assertSee('id="waKamarSelect"', false);
         $response->assertSee('id="waSessionSelect"', false);
 
-        // Verifikasi dropdown Tanggal, Kelas, dan Kamar di Modal WhatsApp Pengajian
+        // Verifikasi dropdown Tanggal dan Kamar di Modal WhatsApp Pengajian
         $resPengajian->assertSee('id="waDateSelect"', false);
-        $resPengajian->assertSee('id="waKelasSekolahSelect"', false);
         $resPengajian->assertSee('id="waKamarSelect"', false);
         $resPengajian->assertSee('Preview Laporan WhatsApp');
 
@@ -416,6 +414,40 @@ class RekapPondokTest extends TestCase
         $resJenjang->assertStatus(200);
         $waJenjangText = $resJenjang->viewData('waText');
         $this->assertStringContainsString('📅 *LAPORAN ABSENSI SHOLAT SISWA KELAS SMP*', $waJenjangText);
+
+        // 9. Uji laporan WhatsApp default semua sesi sholat (5x hadir = 5x centang)
+        $sesiSubuh = MasterSesi::firstOrCreate(['kode_sesi' => 'SHOLAT_SUBUH'], ['nama_sesi' => 'Subuh', 'kategori' => 'sholat', 'jam_mulai' => '04:30:00', 'jam_selesai' => '05:30:00', 'is_active' => true]);
+        $sesiAshar = MasterSesi::firstOrCreate(['kode_sesi' => 'SHOLAT_ASHAR'], ['nama_sesi' => 'Ashar', 'kategori' => 'sholat', 'jam_mulai' => '15:00:00', 'jam_selesai' => '16:00:00', 'is_active' => true]);
+        $sesiMaghrib = MasterSesi::firstOrCreate(['kode_sesi' => 'SHOLAT_MAGHRIB'], ['nama_sesi' => 'Maghrib', 'kategori' => 'sholat', 'jam_mulai' => '17:40:00', 'jam_selesai' => '18:30:00', 'is_active' => true]);
+        $sesiIsya = MasterSesi::firstOrCreate(['kode_sesi' => 'SHOLAT_ISYA'], ['nama_sesi' => 'Isya', 'kategori' => 'sholat', 'jam_mulai' => '19:00:00', 'jam_selesai' => '20:00:00', 'is_active' => true]);
+
+        foreach ([
+            ['sesi' => $sesiSubuh, 'jam' => '04:45:00'],
+            ['sesi' => $sesiAshar, 'jam' => '15:15:00'],
+            ['sesi' => $sesiMaghrib, 'jam' => '17:50:00'],
+            ['sesi' => $sesiIsya, 'jam' => '19:15:00'],
+        ] as $entry) {
+            Presensi::create([
+                'device_id'        => 'tap_masjid',
+                'sesi_id'          => $entry['sesi']->id,
+                'tipe_entitas'     => 'santri',
+                'entitas_id'       => $s1->id,
+                'rfid_uid'         => 'UID-TEST-1',
+                'tanggal'          => $tanggal,
+                'waktu_tap'        => "{$tanggal} {$entry['jam']}",
+                'status_kehadiran' => 'tepat_waktu',
+            ]);
+        }
+
+        $resSemua = $this->actingAs($this->admin)->get(route('rekap.pondok.index', [
+            'kelas'   => '7A',
+            'tanggal' => $tanggal,
+            'sesi_id' => 'semua',
+        ]));
+        $resSemua->assertStatus(200);
+        $waSemuaText = $resSemua->viewData('waText');
+        $this->assertStringContainsString('*Waktu Sholat:* Semua Sesi (5 Waktu)', $waSemuaText);
+        $this->assertStringContainsString('1. Ahmad Fauzi ✅ ✅ ✅ ✅ ✅', $waSemuaText);
     }
 
     public function test_rentang_mingguan_bulanan_dan_ekspor(): void

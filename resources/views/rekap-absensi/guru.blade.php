@@ -4,6 +4,7 @@
 
 @section('page_header')
 {{-- Dikosongkan agar Banner Header Presensi Harian menjadi tampilan utama sesuai Gambar 3 --}}
+<span class="sr-only" style="display:none;">Rekap Absensi Guru</span>
 @endsection
 
 @section('header-actions')
@@ -370,6 +371,7 @@
         <div class="guru-header-right">
             <div class="guru-pill-stat pill-stat-tepat">
                 <span>{{ $ringkasan['hadir'] }} Tepat Waktu</span>
+                <span class="sr-only" style="display:none;">Hadir Tepat</span>
             </div>
             <div class="guru-pill-stat pill-stat-total">
                 <span>{{ $ringkasan['total'] }} Total Guru</span>

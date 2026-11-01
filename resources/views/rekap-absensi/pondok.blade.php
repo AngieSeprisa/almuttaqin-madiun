@@ -1113,7 +1113,7 @@
             <button type="button" class="rp-modal-close-btn" onclick="closeWaModal()">&times;</button>
         </div>
         <div class="rp-modal-body">
-            <div style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:10px;">
+            <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:12px;">
                 {{-- Dropdown Jenjang --}}
                 <div class="fi-filter-item">
                     <label class="fi-filter-label">Jenjang</label>
@@ -1122,18 +1122,6 @@
                         <option value="smp" {{ strtolower($jenjang ?? '') === 'smp' ? 'selected' : '' }}>SMP</option>
                         <option value="sma" {{ strtolower($jenjang ?? '') === 'sma' ? 'selected' : '' }}>SMA</option>
                         <option value="reguler" {{ strtolower($jenjang ?? '') === 'reguler' ? 'selected' : '' }}>Reguler</option>
-                    </select>
-                </div>
-
-                {{-- Dropdown Kelas --}}
-                <div class="fi-filter-item">
-                    <label class="fi-filter-label">Kelas</label>
-                    <select id="waKelasSelect" class="fi-select" onchange="renderWaReportPreview()">
-                        <option value="semua">Semua Kelas</option>
-                        @foreach($kelasList as $kls)
-                            @php $klsName = is_object($kls) ? $kls->nama_kelas : $kls; @endphp
-                            <option value="{{ $klsName }}" {{ ($kelas ?? '') === $klsName ? 'selected' : '' }}>{{ $klsName }}</option>
-                        @endforeach
                     </select>
                 </div>
 
@@ -1148,7 +1136,7 @@
                     </select>
                 </div>
 
-                {{-- Dropdown Sesi --}}
+                {{-- Dropdown Sesi (Default: Semua Sesi Sholat 5 Waktu) --}}
                 <div class="fi-filter-item">
                     <label class="fi-filter-label">Sesi</label>
                     <select id="waSessionSelect" class="fi-select" onchange="renderWaReportPreview()">
@@ -1327,16 +1315,15 @@
         if (!textarea) return;
 
         var selJenjang = jenjangEl ? (jenjangEl.value || 'semua').toLowerCase() : 'semua';
-        var selKelas = kelasEl ? (kelasEl.value || 'semua').trim() : 'semua';
         var selKamar = kamarEl ? (kamarEl.value || 'semua').trim() : 'semua';
-        var selSession = sessionEl ? sessionEl.value : 'dzuhur';
+        var selSession = sessionEl ? sessionEl.value : 'semua';
 
         var sessionMeta = (window.WA_SESSIONS_DATA && window.WA_SESSIONS_DATA[selSession]) ? window.WA_SESSIONS_DATA[selSession] : {};
-        var sessionLabel = sessionMeta.label || selSession.toUpperCase();
+        var sessionLabel = (selSession === 'semua') ? 'Semua Sesi (5 Waktu)' : (sessionMeta.label || selSession.toUpperCase());
         var headerKegiatan = sessionMeta.header_kegiatan || 'SHOLAT';
         var headerWaktuLabel = (headerKegiatan === 'PENGAJIAN') ? 'Waktu Pengajian' : 'Waktu Sholat';
 
-        // Filter santri berdasarkan Jenjang, Kelas & Kamar
+        // Filter santri berdasarkan Jenjang & Kamar
         var matchedStudents = [];
         var allSantri = Object.values(window.REKAP_PONDOK_DATA || {});
 
@@ -1357,14 +1344,6 @@
                 }
             }
 
-            // Filter Kelas
-            if (selKelas !== 'semua' && selKelas !== '') {
-                var cls = (s.kelas || '').toLowerCase();
-                if (cls.indexOf(selKelas.toLowerCase()) === -1) {
-                    return;
-                }
-            }
-
             // Filter Kamar
             if (selKamar !== 'semua' && selKamar !== '') {
                 var k = (s.kamar || '').toLowerCase();
@@ -1379,17 +1358,14 @@
         });
 
         // Tentukan Sasaran Header
-        var sasaranParts = [];
-        if (selKelas !== 'semua' && selKelas !== '') {
-            sasaranParts.push(selKelas.toUpperCase());
+        var sasaran = 'SEMUA SANTRI';
+        if (selJenjang !== 'semua' && selKamar !== 'semua' && selKamar !== '') {
+            sasaran = selJenjang.toUpperCase() + ' - KAMAR ' + selKamar.toUpperCase();
+        } else if (selJenjang !== 'semua') {
+            sasaran = selJenjang.toUpperCase();
+        } else if (selKamar !== 'semua' && selKamar !== '') {
+            sasaran = 'KAMAR ' + selKamar.toUpperCase();
         }
-        if (selKamar !== 'semua' && selKamar !== '') {
-            sasaranParts.push('KAMAR ' + selKamar.toUpperCase());
-        }
-        if (selJenjang !== 'semua' && selJenjang !== '' && sasaranParts.length === 0) {
-            sasaranParts.push(selJenjang.toUpperCase());
-        }
-        var sasaran = sasaranParts.length > 0 ? sasaranParts.join(' - ') : 'SEMUA SANTRI';
 
         var dateLine = window.WA_DATE_FORMATTED ? (window.WA_DATE_FORMATTED + "\n\n") : '';
         var header = "📅 *LAPORAN ABSENSI " + headerKegiatan + " SISWA KELAS " + sasaran + "*\n" +
@@ -1402,31 +1378,69 @@
         var izinTerlambatCount = 0;
         var alpaCount = 0;
 
+        var isSemua = (selSession === 'semua');
+        var slots = ['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'];
+
         matchedStudents.forEach(function (s, idx) {
-            var sesiStatus = (s.status_per_sesi && s.status_per_sesi[selSession]) ? s.status_per_sesi[selSession] : null;
-            var tag = '❌ - ALPA';
-            if (sesiStatus) {
-                tag = sesiStatus.wa_emoji || '❌ - ALPA';
-                var st = sesiStatus.status;
-                if (st === 'hadir') {
-                    hadirCount++;
-                } else if (st === 'terlambat' || st === 'izin' || st === 'sakit') {
-                    izinTerlambatCount++;
+            var cleanName = s.nama_bersih || s.nama || '';
+
+            if (isSemua) {
+                // Sesi Secara Default Semua: 5x absen hadir maka 5 icon centang
+                var emojis = [];
+                slots.forEach(function (slotKey) {
+                    var stObj = (s.status_per_sesi && s.status_per_sesi[slotKey]) ? s.status_per_sesi[slotKey] : null;
+                    if (stObj) {
+                        var st = stObj.status;
+                        if (st === 'hadir') {
+                            emojis.push('✅');
+                            hadirCount++;
+                        } else if (st === 'terlambat') {
+                            emojis.push('⚠️');
+                            izinTerlambatCount++;
+                        } else if (st === 'izin' || st === 'sakit') {
+                            emojis.push('✉️');
+                            izinTerlambatCount++;
+                        } else {
+                            emojis.push('❌');
+                            alpaCount++;
+                        }
+                    } else {
+                        emojis.push('❌');
+                        alpaCount++;
+                    }
+                });
+                lines.push((idx + 1) + '. ' + cleanName + ' ' + emojis.join(' '));
+            } else {
+                // Sesi Spesifik Tunggal
+                var sesiStatus = (s.status_per_sesi && s.status_per_sesi[selSession]) ? s.status_per_sesi[selSession] : null;
+                var tag = '❌ - ALPA';
+                if (sesiStatus) {
+                    tag = sesiStatus.wa_emoji || '❌ - ALPA';
+                    var st = sesiStatus.status;
+                    if (st === 'hadir') {
+                        hadirCount++;
+                    } else if (st === 'terlambat' || st === 'izin' || st === 'sakit') {
+                        izinTerlambatCount++;
+                    } else {
+                        alpaCount++;
+                    }
                 } else {
                     alpaCount++;
                 }
-            } else {
-                alpaCount++;
+                lines.push((idx + 1) + '. ' + cleanName + ' ' + tag);
             }
-            var cleanName = s.nama_bersih || s.nama || '';
-            lines.push((idx + 1) + '. ' + cleanName + ' ' + tag);
         });
 
         var body = lines.length > 0 ? lines.join("\n") : "Tidak ada siswa dalam kelompok ini.";
         var summary = "*Ringkasan Kehadiran:*\n" +
-                      "• Hadir: " + hadirCount + " Siswa\n" +
-                      "• Sakit/Izin/Terlambat: " + izinTerlambatCount + " Siswa\n" +
-                      "• Alpha: " + alpaCount + " Siswa";
+                      "• Total Santri: " + matchedStudents.length + " Siswa\n" +
+                      (isSemua ?
+                          ("• Total Hadir: " + hadirCount + " Siswa\n• Total Izin/Sakit/Terlambat: " + izinTerlambatCount + " Siswa\n• Total Alpha: " + alpaCount + " Siswa") :
+                          ("• Hadir: " + hadirCount + " Siswa\n• Sakit/Izin/Terlambat: " + izinTerlambatCount + " Siswa\n• Alpha: " + alpaCount + " Siswa")
+                      );
+
+        textarea.value = header + "\n\n" + body + "\n\n" + summary;
+    }
 
         textarea.value = header + "\n\n" + body + "\n\n" + summary;
     }

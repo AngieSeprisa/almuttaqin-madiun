@@ -1199,15 +1199,72 @@ class RekapPondokController extends Controller
             ];
         }
 
-        // Tentukan sesi primer default
-        $primarySlot = 'dzuhur';
-        if (isset($sessions[$filterSesiId])) {
+        // Susun opsi sesi "semua" (Semua Sesi Sholat 5 Waktu) secara default
+        if ($kategori !== 'pengajian') {
+            $sholat5Slots = ['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'];
+            $linesSemua = [];
+            $totalHadirSemua = 0;
+            $totalTelatIzinSemua = 0;
+            $totalAlpaSemua = 0;
+
+            foreach ($rows as $idx => $r) {
+                $cleanName = self::cleanStudentName($r['nama_lengkap']);
+                $emojis = [];
+                foreach ($sholat5Slots as $sKey) {
+                    $sesiStatus = $r['status_per_sesi'][$sKey] ?? null;
+                    if ($sesiStatus) {
+                        $st = $sesiStatus['status'];
+                        if ($st === 'hadir') {
+                            $emojis[] = '✅';
+                            $totalHadirSemua++;
+                        } elseif ($st === 'terlambat') {
+                            $emojis[] = '⚠️';
+                            $totalTelatIzinSemua++;
+                        } elseif (in_array($st, ['izin', 'sakit'], true)) {
+                            $emojis[] = '✉️';
+                            $totalTelatIzinSemua++;
+                        } else {
+                            $emojis[] = '❌';
+                            $totalAlpaSemua++;
+                        }
+                    } else {
+                        $emojis[] = '❌';
+                        $totalAlpaSemua++;
+                    }
+                }
+                $linesSemua[] = sprintf('%d. %s %s', $idx + 1, $cleanName, implode(' ', $emojis));
+            }
+
+            $headerSemua = "📅 *LAPORAN ABSENSI SHOLAT SISWA KELAS {$sasaran}*\n{$dateFormatted}\n\n*Waktu Sholat:* Semua Sesi (5 Waktu)\n\n*Daftar Kehadiran Siswa:*";
+            $bodySemua = implode("\n", $linesSemua);
+            $summarySemua = "*Ringkasan Kehadiran:*\n" .
+                            "• Total Santri: " . count($rows) . " Siswa\n" .
+                            "• Total Hadir: {$totalHadirSemua}\n" .
+                            "• Total Izin/Sakit/Terlambat: {$totalTelatIzinSemua}\n" .
+                            "• Total Alpha: {$totalAlpaSemua}";
+
+            $sessions = array_merge([
+                'semua' => [
+                    'slot_key'             => 'semua',
+                    'label'                => 'Semua Sesi Sholat (5 Waktu)',
+                    'header_kegiatan'      => 'SHOLAT',
+                    'text'                 => "{$headerSemua}\n\n{$bodySemua}\n\n{$summarySemua}",
+                    'total_hadir'          => $totalHadirSemua,
+                    'total_izin_terlambat' => $totalTelatIzinSemua,
+                    'total_alpa'           => $totalAlpaSemua,
+                ]
+            ], $sessions);
+        }
+
+        // Tentukan sesi primer default (default ke 'semua' untuk 5x centang)
+        $primarySlot = 'semua';
+        if ($filterSesiId && $filterSesiId !== 'semua' && isset($sessions[$filterSesiId])) {
             $primarySlot = $filterSesiId;
         } elseif ($selectedSesiModel && isset($sessions['sesi_' . $selectedSesiModel->id])) {
             $primarySlot = 'sesi_' . $selectedSesiModel->id;
         } elseif (!isset($sessions[$primarySlot])) {
             $keys = array_keys($sessions);
-            $primarySlot = reset($keys) ?: 'dzuhur';
+            $primarySlot = reset($keys) ?: 'semua';
         }
 
         return [
