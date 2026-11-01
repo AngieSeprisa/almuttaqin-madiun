@@ -89,10 +89,17 @@ class RekapPondokTest extends TestCase
         $resPengajian->assertSee('Data Presensi Pengajian');
         $resPengajian->assertSee('Sesi Pengajian');
 
-        // 4. Verifikasi dropdown Jenjang, Kamar, dan Sesi di Modal WhatsApp
+        // 4. Verifikasi dropdown Jenjang, Kelas, Kamar, dan Sesi di Modal WhatsApp
         $response->assertSee('id="waJenjangSelect"', false);
+        $response->assertSee('id="waKelasSelect"', false);
         $response->assertSee('id="waKamarSelect"', false);
         $response->assertSee('id="waSessionSelect"', false);
+
+        // Verifikasi dropdown Tanggal, Kelas, dan Kamar di Modal WhatsApp Pengajian
+        $resPengajian->assertSee('id="waDateSelect"', false);
+        $resPengajian->assertSee('id="waKelasSekolahSelect"', false);
+        $resPengajian->assertSee('id="waKamarSelect"', false);
+        $resPengajian->assertSee('Preview Laporan WhatsApp');
 
         // 5. Verifikasi teks deskripsi berlebih sudah dihilangkan agar tampilan elegan & bersih
         $response->assertDontSee('Santri aktif dalam sasaran sesi');

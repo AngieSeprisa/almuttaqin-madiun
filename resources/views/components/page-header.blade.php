@@ -33,7 +33,19 @@
                 $bcParent = 'Sekolah';
                 $bcParentRoute = route('sekolah.rekap-jurnal');
                 $bcChild = 'Rekap Jurnal';
-            } elseif (request()->routeIs('rekap.pondok.*') || request()->routeIs('rekap.sholat.*')) {
+            } elseif (request()->routeIs('rekap.sholat.*')) {
+                $customBreadcrumbHtml = null;
+                $breadcrumbsList = [
+                    ['label' => 'Rekap Presensi Sholat', 'url' => route('rekap.sholat.index')],
+                    ['label' => 'Sholat 5 Waktu', 'url' => null],
+                ];
+            } elseif (request()->routeIs('rekap.pengajian.*')) {
+                $customBreadcrumbHtml = null;
+                $breadcrumbsList = [
+                    ['label' => 'Rekap', 'url' => route('rekap.pengajian.index')],
+                    ['label' => 'Pengajian', 'url' => null],
+                ];
+            } elseif (request()->routeIs('rekap.pondok.*')) {
                 $bcParent = 'Rekap';
                 $bcParentRoute = route('rekap.pondok.index');
                 $bcChild = 'Pondok';

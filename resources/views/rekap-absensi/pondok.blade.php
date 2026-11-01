@@ -647,14 +647,6 @@
 
 <div class="rp-page-container">
 
-    {{-- Breadcrumb & Title Sesuai Gambar 2 --}}
-    <div style="margin-bottom: 2px;">
-        <div style="font-size:12.5px; color:#64748b; margin-bottom:4px;">
-            Rekap Presensi Sholat &rsaquo; <span style="color:#0f172a; font-weight:600;">Sholat 5 Waktu</span>
-        </div>
-        <h2 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 16px 0;">{{ $pageTitle ?? 'Rekap Presensi Sholat' }}</h2>
-    </div>
-
     @if(empty($forcedKategori))
     {{-- Kartu Statistik Ringkasan --}}
     <div class="rp-stats-grid" style="margin-bottom: 14px;">
@@ -1121,7 +1113,7 @@
             <button type="button" class="rp-modal-close-btn" onclick="closeWaModal()">&times;</button>
         </div>
         <div class="rp-modal-body">
-            <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:10px;">
+            <div style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:10px;">
                 {{-- Dropdown Jenjang --}}
                 <div class="fi-filter-item">
                     <label class="fi-filter-label">Jenjang</label>
@@ -1130,6 +1122,18 @@
                         <option value="smp" {{ strtolower($jenjang ?? '') === 'smp' ? 'selected' : '' }}>SMP</option>
                         <option value="sma" {{ strtolower($jenjang ?? '') === 'sma' ? 'selected' : '' }}>SMA</option>
                         <option value="reguler" {{ strtolower($jenjang ?? '') === 'reguler' ? 'selected' : '' }}>Reguler</option>
+                    </select>
+                </div>
+
+                {{-- Dropdown Kelas --}}
+                <div class="fi-filter-item">
+                    <label class="fi-filter-label">Kelas</label>
+                    <select id="waKelasSelect" class="fi-select" onchange="renderWaReportPreview()">
+                        <option value="semua">Semua Kelas</option>
+                        @foreach($kelasList as $kls)
+                            @php $klsName = is_object($kls) ? $kls->nama_kelas : $kls; @endphp
+                            <option value="{{ $klsName }}" {{ ($kelas ?? '') === $klsName ? 'selected' : '' }}>{{ $klsName }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -1316,12 +1320,14 @@
 
     function renderWaReportPreview() {
         var jenjangEl = document.getElementById('waJenjangSelect');
+        var kelasEl = document.getElementById('waKelasSelect');
         var kamarEl = document.getElementById('waKamarSelect');
         var sessionEl = document.getElementById('waSessionSelect');
         var textarea = document.getElementById('waMessageTextarea');
         if (!textarea) return;
 
         var selJenjang = jenjangEl ? (jenjangEl.value || 'semua').toLowerCase() : 'semua';
+        var selKelas = kelasEl ? (kelasEl.value || 'semua').trim() : 'semua';
         var selKamar = kamarEl ? (kamarEl.value || 'semua').trim() : 'semua';
         var selSession = sessionEl ? sessionEl.value : 'dzuhur';
 
@@ -1330,7 +1336,7 @@
         var headerKegiatan = sessionMeta.header_kegiatan || 'SHOLAT';
         var headerWaktuLabel = (headerKegiatan === 'PENGAJIAN') ? 'Waktu Pengajian' : 'Waktu Sholat';
 
-        // Filter santri berdasarkan Jenjang & Kamar
+        // Filter santri berdasarkan Jenjang, Kelas & Kamar
         var matchedStudents = [];
         var allSantri = Object.values(window.REKAP_PONDOK_DATA || {});
 
@@ -1351,6 +1357,14 @@
                 }
             }
 
+            // Filter Kelas
+            if (selKelas !== 'semua' && selKelas !== '') {
+                var cls = (s.kelas || '').toLowerCase();
+                if (cls.indexOf(selKelas.toLowerCase()) === -1) {
+                    return;
+                }
+            }
+
             // Filter Kamar
             if (selKamar !== 'semua' && selKamar !== '') {
                 var k = (s.kamar || '').toLowerCase();
@@ -1365,14 +1379,17 @@
         });
 
         // Tentukan Sasaran Header
-        var sasaran = 'SEMUA SANTRI';
-        if (selJenjang !== 'semua' && selKamar !== 'semua' && selKamar !== '') {
-            sasaran = selJenjang.toUpperCase() + ' - ' + selKamar.toUpperCase();
-        } else if (selJenjang !== 'semua') {
-            sasaran = selJenjang.toUpperCase();
-        } else if (selKamar !== 'semua' && selKamar !== '') {
-            sasaran = selKamar.toUpperCase();
+        var sasaranParts = [];
+        if (selKelas !== 'semua' && selKelas !== '') {
+            sasaranParts.push(selKelas.toUpperCase());
         }
+        if (selKamar !== 'semua' && selKamar !== '') {
+            sasaranParts.push('KAMAR ' + selKamar.toUpperCase());
+        }
+        if (selJenjang !== 'semua' && selJenjang !== '' && sasaranParts.length === 0) {
+            sasaranParts.push(selJenjang.toUpperCase());
+        }
+        var sasaran = sasaranParts.length > 0 ? sasaranParts.join(' - ') : 'SEMUA SANTRI';
 
         var dateLine = window.WA_DATE_FORMATTED ? (window.WA_DATE_FORMATTED + "\n\n") : '';
         var header = "📅 *LAPORAN ABSENSI " + headerKegiatan + " SISWA KELAS " + sasaran + "*\n" +

@@ -2,6 +2,10 @@
 
 @section('title', 'Rekap Presensi Guru')
 
+@section('page_header')
+{{-- Dikosongkan agar Banner Header Presensi Harian menjadi tampilan utama sesuai Gambar 3 --}}
+@endsection
+
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px;">
     <a href="{{ route('rekap-absensi.export', request()->all()) }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:8px 14px; font-size:13px; border-radius:8px;">

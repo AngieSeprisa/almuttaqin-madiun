@@ -1585,7 +1585,31 @@ class RekapPondokController extends Controller
             $matrixRows[] = $row;
         }
 
-        // 5. Teks WhatsApp Laporan Pengajian
+        // 5. Teks WhatsApp Laporan Pengajian & Filter Data
+        $kamarList = $santris->pluck('kamar')->filter(function ($k) {
+            return !empty($k) && $k !== '-';
+        })->unique()->sort()->values();
+
+        $kelasSekolahList = $santris->pluck('kelas')->filter(function ($c) {
+            return !empty($c) && $c !== '-';
+        })->unique()->sort()->values();
+
+        if ($kelasSekolahList->isEmpty()) {
+            $kelasSekolahList = Classroom::where('is_active', true)->orderBy('nama_kelas')->pluck('nama_kelas')->values();
+        }
+
+        $dateList = [];
+        foreach ($dateColumns as $dStr => $col) {
+            $cDate = Carbon::parse($dStr);
+            $dateList[] = [
+                'date'      => $dStr,
+                'day_num'   => $col['day_num'],
+                'day_name'  => $cDate->locale('id')->isoFormat('dddd'),
+                'formatted' => $cDate->locale('id')->isoFormat('D MMMM Y'),
+                'sessions'  => $col['sessions'],
+            ];
+        }
+
         $monthName = $startDate->translatedFormat('F Y');
         $namaKelasUpper = strtoupper($selectedKelas ? $selectedKelas->nama_kelas : 'SEMUA KELAS');
         $waLines = [];
@@ -1605,6 +1629,9 @@ class RekapPondokController extends Controller
             'dateColumns'      => $dateColumns,
             'matrixRows'       => $matrixRows,
             'totalSantri'      => count($matrixRows),
+            'kamarList'        => $kamarList,
+            'kelasSekolahList' => $kelasSekolahList,
+            'dateList'         => $dateList,
             'waText'           => $waText,
             'waEncoded'        => urlencode($waText),
             'pageTitle'        => 'Rekap Presensi Pengajian',
