@@ -595,6 +595,7 @@
     .status-badge-terlambat { background: #fef3c7; color: #b45309; }
     .status-badge-izin { background: #dbeafe; color: #1d4ed8; }
     .status-badge-sakit { background: #f3e8ff; color: #7e22ce; }
+    .status-badge-haid { background: #fdf2f8; color: #db2777; border: 1px solid #fbcfe8; }
     .status-badge-belum { background: #f3f4f6; color: #9ca3af; }
 
     /* Interactive Status Badge & Popover */
@@ -1198,6 +1199,11 @@
         <span style="font-weight:600;color:#7e22ce;">SAKIT</span>
         <span style="font-size:11px;color:#6b7280;margin-left:auto;">(Sakit/Rawat)</span>
     </button>
+    <button type="button" class="rp-status-option" data-status="haid" onclick="selectQuickStatus('haid')">
+        <span class="rp-status-dot" style="background:#db2777;"></span>
+        <span style="font-weight:600;color:#db2777;">HAID</span>
+        <span style="font-size:11px;color:#6b7280;margin-left:auto;">(Udzur Sholat)</span>
+    </button>
     <button type="button" class="rp-status-option" data-status="alpa" onclick="selectQuickStatus('alpa')">
         <span class="rp-status-dot" style="background:#ef4444;"></span>
         <span style="font-weight:600;color:#dc2626;">ALPA</span>
@@ -1537,6 +1543,10 @@
                             emojis.push('⚠️');
                             ketNotes.push('telat - ' + sName);
                             izinTerlambatCount++;
+                        } else if (st === 'haid') {
+                            emojis.push('🌸');
+                            ketNotes.push('haid - ' + sName);
+                            izinTerlambatCount++;
                         } else if (st === 'izin') {
                             emojis.push('✉️');
                             ketNotes.push('izin - ' + sName);
@@ -1567,7 +1577,7 @@
                     var st = sesiStatus.status;
                     if (st === 'hadir') {
                         hadirCount++;
-                    } else if (st === 'terlambat' || st === 'izin' || st === 'sakit') {
+                    } else if (st === 'terlambat' || st === 'izin' || st === 'sakit' || st === 'haid') {
                         izinTerlambatCount++;
                     } else {
                         alpaCount++;
@@ -1769,7 +1779,7 @@
                         var st = (r.status || '').toUpperCase();
                         if (st === 'HADIR') newH++;
                         else if (st === 'TERLAMBAT') newT++;
-                        else if (st === 'IZIN') newI++;
+                        else if (st === 'IZIN' || st === 'HAID') newI++;
                         else if (st === 'SAKIT') newS++;
                         else if (st === 'ALPA') newA++;
                     });

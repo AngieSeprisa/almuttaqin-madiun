@@ -206,13 +206,13 @@ class User extends Authenticatable
             return true;
         }
 
-        // Admin Lembaga Pondok memiliki akses default ke modul Pengaturan Pondok & Plotting Kamar / Pengajian & Rekap Pondok / Sholat / Pengajian
-        if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, ['pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi'])) {
+        // Admin Lembaga Pondok memiliki akses default ke modul Pengaturan Pondok & Plotting Kamar / Pengajian & Rekap & Perizinan
+        if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, ['pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'])) {
             return true;
         }
 
-        // Guru & Musyrif memiliki akses lihat & ubah status ke Rekap Sholat, Pengajian, Pondok & Rekap Absensi
-        if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, ['rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi']) && in_array($action, ['view', 'edit'])) {
+        // Guru & Musyrif memiliki akses ke Rekap Sholat, Pengajian, Pondok, Rekap Absensi, & Perizinan Pondok (Haid, Sakit, Sambang)
+        if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, ['rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'])) {
             return true;
         }
 
@@ -220,7 +220,7 @@ class User extends Authenticatable
         if ($this->role === 'admin_lembaga' && in_array($menuCode, [
             'presensi', 'rekap_absensi', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'pengaturan_absensi', 'guru_sekolah', 
             'plotting_mapel', 'plotting_kelas', 'jadwal_pelajaran',
-            'data_master', 'master_kelas', 'master_jam', 'master_lembaga', 'master_import_siswa'
+            'data_master', 'master_kelas', 'master_jam', 'master_lembaga', 'master_import_siswa', 'perizinan_haid'
         ])) {
             return true;
         }

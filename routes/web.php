@@ -18,6 +18,7 @@ use App\Http\Controllers\PlottingKelasController;
 use App\Http\Controllers\PlottingKelasPengajianController;
 use App\Http\Controllers\PlottingMapelController;
 use App\Http\Controllers\PerizinanController;
+use App\Http\Controllers\PerizinanHaidController;
 use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuickSearchController;
@@ -148,6 +149,25 @@ Route::middleware('auth')->group(function () {
     Route::delete('/perizinan/sakit/{id}', [PerizinanController::class, 'destroySakit'])
         ->middleware('permission:perizinan_sakit,delete')
         ->name('perizinan.sakit.destroy');
+
+    // Menu Perizinan: Haid (Udzur Sholat Santriwati)
+    Route::middleware('permission:perizinan_haid|perizinan_sakit|rekap_pondok,view')->prefix('perizinan')->name('perizinan.')->group(function () {
+        Route::get('/haid', [PerizinanHaidController::class, 'index'])->name('haid');
+    });
+
+    Route::middleware('permission:perizinan_haid|perizinan_sakit|rekap_pondok,create')->prefix('perizinan')->name('perizinan.')->group(function () {
+        Route::get('/haid/tambah', [PerizinanHaidController::class, 'create'])->name('haid.create');
+        Route::post('/haid', [PerizinanHaidController::class, 'store'])->name('haid.store');
+    });
+
+    Route::middleware('permission:perizinan_haid|perizinan_sakit|rekap_pondok,edit')->prefix('perizinan')->name('perizinan.')->group(function () {
+        Route::post('/haid/{id}/suci', [PerizinanHaidController::class, 'suci'])->name('haid.suci');
+        Route::put('/haid/{id}', [PerizinanHaidController::class, 'update'])->name('haid.update');
+    });
+
+    Route::delete('/perizinan/haid/{id}', [PerizinanHaidController::class, 'destroy'])
+        ->middleware('permission:perizinan_haid|perizinan_sakit|rekap_pondok,delete')
+        ->name('perizinan.haid.destroy');
 
     // Menu Presensi Guru (Scan QR dari Perangkat Guru & Layar Kiosk)
     Route::prefix('presensi')->name('presensi.')->group(function () {

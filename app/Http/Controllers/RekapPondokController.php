@@ -6,6 +6,7 @@ use App\Models\Classroom;
 use App\Models\Kamar;
 use App\Models\MasterKelasPengajian;
 use App\Models\MasterSesi;
+use App\Models\PerizinanHaid;
 use App\Models\PerizinanSakit;
 use App\Models\PerizinanSambang;
 use App\Models\Presensi;
@@ -704,6 +705,14 @@ class RekapPondokController extends Controller
             ->whereDate('tanggal_kembali', '>=', $startDateStr)
             ->get();
 
+        $haids = PerizinanHaid::whereDate('tanggal_mulai', '<=', $endDateStr)
+            ->where(function ($q) use ($startDateStr) {
+                $q->whereNull('tanggal_selesai')
+                  ->orWhereDate('tanggal_selesai', '>=', $startDateStr)
+                  ->orWhere('status', 'sedang_haid');
+            })
+            ->get();
+
         // 6. Evaluasi Presensi per Santri
         $rows = [];
         $grandTotalH = 0;
@@ -773,7 +782,7 @@ class RekapPondokController extends Controller
 
             foreach ($evalDates as $dStr) {
                 $tapsToday = $presensisBySantri[$siswa->id][$dStr] ?? [];
-                $izinInfo = $this->findSantriIzin($siswa, $dStr, $sakits, $sambangs);
+                $izinInfo = $this->findSantriIzin($siswa, $dStr, $sakits, $sambangs, $haids);
 
                 foreach ($evaluateSlots as $slotKey => $slotMeta) {
                     $matchedTap = null;
@@ -819,6 +828,14 @@ class RekapPondokController extends Controller
                             $keterangan = "Manual oleh Pengurus (Izin)";
                             $waEmoji = '✉️ - IZIN';
                             $statusKey = 'izin';
+                        } elseif ($stK === 'haid') {
+                            $siswaRow['total_i']++;
+                            $statusCode = 'HD';
+                            $statusLabel = 'HAID';
+                            $statusBadge = 'status-badge-haid';
+                            $keterangan = "Manual oleh Pengurus (Udzur Haid)";
+                            $waEmoji = '🌸 - HAID';
+                            $statusKey = 'haid';
                         } elseif ($stK === 'sakit') {
                             $siswaRow['total_s']++;
                             $statusCode = 'S';
@@ -887,6 +904,12 @@ class RekapPondokController extends Controller
                             $statusLabel = 'SAKIT';
                             $statusBadge = 'status-badge-sakit';
                             $waEmoji = '✉️ - SAKIT';
+                        } elseif ($izinInfo['status'] === 'haid') {
+                            $siswaRow['total_i']++;
+                            $statusCode = 'HD';
+                            $statusLabel = 'HAID';
+                            $statusBadge = 'status-badge-haid';
+                            $waEmoji = '🌸 - HAID';
                         } else {
                             $siswaRow['total_i']++;
                             $statusCode = 'I';
@@ -1223,7 +1246,7 @@ class RekapPondokController extends Controller
                     $st = $sesiStatus['status'];
                     if ($st === 'hadir') {
                         $hadirCount++;
-                    } elseif (in_array($st, ['terlambat', 'izin', 'sakit'], true)) {
+                    } elseif (in_array($st, ['terlambat', 'izin', 'sakit', 'haid'], true)) {
                         $izinTerlambatCount++;
                     } else {
                         $alpaCount++;
@@ -1279,6 +1302,10 @@ class RekapPondokController extends Controller
                         } elseif ($st === 'terlambat') {
                             $emojis[] = '⚠️';
                             $ketNotes[] = "telat - {$slotLabelIndo}";
+                            $totalTelatIzinSemua++;
+                        } elseif ($st === 'haid') {
+                            $emojis[] = '🌸';
+                            $ketNotes[] = "haid - {$slotLabelIndo}";
                             $totalTelatIzinSemua++;
                         } elseif ($st === 'izin') {
                             $emojis[] = '✉️';
@@ -1384,7 +1411,7 @@ class RekapPondokController extends Controller
     /**
      * Cek data perizinan santri pada tanggal tertentu.
      */
-    private function findSantriIzin(Siswa $siswa, string $dateStr, Collection $sakits, Collection $sambangs): ?array
+    private function findSantriIzin(Siswa $siswa, string $dateStr, Collection $sakits, Collection $sambangs, ?Collection $haids = null): ?array
     {
         // 1. Cek Perizinan Sakit
         $sakitMatch = $sakits->first(function (PerizinanSakit $sk) use ($siswa, $dateStr) {
@@ -1417,6 +1444,23 @@ class RekapPondokController extends Controller
                 'status' => 'izin',
                 'label'  => 'Izin: ' . ($sambangMatch->keterangan ?: 'Sambang / Pulang'),
             ];
+        }
+
+        // 3. Cek Perizinan Haid (Udzur Syar'i)
+        if ($haids) {
+            $haidMatch = $haids->first(function (PerizinanHaid $hd) use ($siswa, $dateStr) {
+                $same = ($hd->siswa_id && (int) $hd->siswa_id === (int) $siswa->id)
+                    || (!$hd->siswa_id && mb_strtolower(trim((string) $hd->nama)) === mb_strtolower(trim((string) $siswa->nama_lengkap)));
+                if (!$same) return false;
+                return $hd->isActiveOn($dateStr);
+            });
+
+            if ($haidMatch) {
+                return [
+                    'status' => 'haid',
+                    'label'  => 'Udzur Syar\'i: Haid' . ($haidMatch->keterangan ? ' (' . $haidMatch->keterangan . ')' : ''),
+                ];
+            }
         }
 
         return null;
@@ -1773,7 +1817,7 @@ class RekapPondokController extends Controller
             'siswa_id' => 'required|integer|exists:siswas,id',
             'tanggal'  => 'required|date_format:Y-m-d',
             'slot_key' => 'required|string',
-            'status'   => 'required|string|in:hadir,terlambat,izin,sakit,alpa',
+            'status'   => 'required|string|in:hadir,terlambat,izin,sakit,alpa,haid',
         ]);
 
         $siswaId = (int) $validated['siswa_id'];
@@ -1897,6 +1941,28 @@ class RekapPondokController extends Controller
             $keterangan = 'Manual oleh Pengurus (Izin)';
             $code = 'I';
             $waEmoji = '✉️ - IZIN';
+        } elseif ($newStatus === 'haid') {
+            if ($matchedTap) {
+                $matchedTap->status_kehadiran = 'haid';
+                $matchedTap->waktu_tap = $waktuTapBase;
+                if ($sesi) $matchedTap->sesi_id = $sesi->id;
+                $matchedTap->save();
+            } else {
+                Presensi::create([
+                    'device_id'        => 'manual_admin',
+                    'sesi_id'          => $sesi ? $sesi->id : 1,
+                    'tipe_entitas'     => 'santri',
+                    'entitas_id'       => $siswaId,
+                    'rfid_uid'         => $siswa->rfid_uid ?: ($siswa->nisn ?: 'MANUAL'),
+                    'waktu_tap'        => $waktuTapBase,
+                    'status_kehadiran' => 'haid',
+                ]);
+            }
+            $statusLabel = 'HAID';
+            $statusBadge = 'status-badge-haid';
+            $keterangan = 'Manual oleh Pengurus (Udzur Haid)';
+            $code = 'HD';
+            $waEmoji = '🌸 - HAID';
         } elseif ($newStatus === 'sakit') {
             if ($matchedTap) {
                 $matchedTap->status_kehadiran = 'sakit';

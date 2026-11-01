@@ -195,6 +195,13 @@
                             <span class="subnav-text">Sakit</span>
                         </a>
                         @endif
+
+                        @if(!$authUser || $authUser->canDo('perizinan_haid', 'view') || $authUser->canDo('perizinan_sakit', 'view') || $authUser->canDo('rekap_pondok', 'view'))
+                        <a href="{{ route('perizinan.haid') }}" class="subnav-item {{ request()->routeIs('perizinan.haid*') ? 'active' : '' }}" title="Perizinan Haid (Udzur Sholat Santriwati)">
+                            <span class="subnav-dot" style="background:#ec4899;"></span>
+                            <span class="subnav-text">Haid (Udzur)</span>
+                        </a>
+                        @endif
                     </div>
                 </div>
                 @endif

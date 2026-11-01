@@ -65,6 +65,10 @@
                 $bcParent = 'Perizinan';
                 $bcParentRoute = route('perizinan.sakit');
                 $bcChild = request()->routeIs('*.create') ? 'Input Sakit' : 'Sakit';
+            } elseif (request()->routeIs('perizinan.haid*')) {
+                $bcParent = 'Perizinan';
+                $bcParentRoute = route('perizinan.haid');
+                $bcChild = request()->routeIs('*.create') ? 'Catat Haid' : 'Haid (Udzur)';
             } elseif (request()->routeIs('pendaftaran*')) {
                 $bcParent = 'Pendaftaran';
                 $bcParentRoute = route('pendaftaran.index');
