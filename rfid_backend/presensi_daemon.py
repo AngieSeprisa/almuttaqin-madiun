@@ -464,10 +464,22 @@ def get_uid_variants(raw_uid: str) -> list:
 
     variants.extend([clean, clean.upper(), clean.lower()])
 
+    # Jika angka murni, tambahkan varian tanpa leading zero dan dengan leading zero 10-digit (misal: 0086028247 <-> 86028247)
+    if re.match(r'^\d+$', clean):
+        stripped = clean.lstrip('0')
+        if stripped:
+            variants.append(stripped)
+            variants.append(stripped.zfill(10))
+            variants.append(stripped.zfill(9))
+            variants.append(stripped.zfill(8))
+        else:
+            variants.append('0')
+            variants.append('0'.zfill(10))
+
     hex_candidates = []
 
     # 1. Format split desimal: ;42992,47057 atau 42992,47057
-    m = re.match(r'^;?(\d{1,5}),(\d{1,5})$', raw_str)
+    m = re.match(r'^;?(\d{1,5}),(\d{1,5})$/', raw_str)
     if m:
         w1, w2 = int(m.group(1)), int(m.group(2))
         variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{m.group(1)}{m.group(2)}"])
@@ -476,25 +488,35 @@ def get_uid_variants(raw_uid: str) -> list:
         hex_val = (h1 + h2).upper()
         hex_candidates.append(hex_val)
 
-    # 2. Format HEX (misal: 6116F1A7, A7F0B7D1, D1B7F0A7)
+    # 2. Format HEX (misal: 6116F1A7, A7F0B7D1, D1B7F0A7, 0520AFD7)
     is_hex = bool(re.match(r'^[0-9A-Fa-f]{4,16}$', clean))
     is_pure_digits = bool(re.match(r'^\d+$', clean))
 
     if is_hex and (not is_pure_digits or len(clean) == 8):
         try:
             dec_from_hex = int(clean, 16)
-            variants.append(str(dec_from_hex))
+            dec_hex_str = str(dec_from_hex)
+            variants.append(dec_hex_str)
+            variants.append(f"{dec_from_hex:010d}")
+            variants.append(f"{dec_from_hex:09d}")
+            variants.append(f"{dec_from_hex:08d}")
+            variants.append(dec_hex_str.lstrip('0'))
             if 0 <= dec_from_hex <= 0xFFFFFFFF:
                 hex8 = f"{dec_from_hex:08X}".upper()
                 hex_candidates.append(hex8)
         except ValueError:
             pass
 
-    # 3. Format desimal murni (misal: 1628893607, 2817570769, 3518492839)
+    # 3. Format desimal murni (misal: 1628893607, 2817570769, 3518492839, 86028247, 0086028247)
     if is_pure_digits:
         try:
             dec_val = int(clean)
-            variants.append(str(dec_val))
+            dec_str = str(dec_val)
+            variants.append(dec_str)
+            variants.append(f"{dec_val:010d}")
+            variants.append(f"{dec_val:09d}")
+            variants.append(f"{dec_val:08d}")
+            variants.append(dec_str.lstrip('0'))
             if 0 <= dec_val <= 0xFFFFFFFF:
                 hex8 = f"{dec_val:08X}".upper()
                 hex_candidates.append(hex8)
@@ -507,7 +529,12 @@ def get_uid_variants(raw_uid: str) -> list:
         variants.extend([h_upper, h_upper.lower()])
         try:
             d_val = int(h_upper, 16)
-            variants.append(str(d_val))
+            d_str = str(d_val)
+            variants.append(d_str)
+            variants.append(f"{d_val:010d}")
+            variants.append(f"{d_val:09d}")
+            variants.append(f"{d_val:08d}")
+            variants.append(d_str.lstrip('0'))
             w1 = (d_val >> 16) & 0xFFFF
             w2 = d_val & 0xFFFF
             variants.extend([f";{w1},{w2}", f"{w1},{w2}", f"{w1}{w2}"])
@@ -520,7 +547,12 @@ def get_uid_variants(raw_uid: str) -> list:
             variants.extend([h_rev, h_rev.lower()])
             try:
                 d_rev = int(h_rev, 16)
-                variants.append(str(d_rev))
+                d_rev_str = str(d_rev)
+                variants.append(d_rev_str)
+                variants.append(f"{d_rev:010d}")
+                variants.append(f"{d_rev:09d}")
+                variants.append(f"{d_rev:08d}")
+                variants.append(d_rev_str.lstrip('0'))
                 w1_rev = (d_rev >> 16) & 0xFFFF
                 w2_rev = d_rev & 0xFFFF
                 variants.extend([f";{w1_rev},{w2_rev}", f"{w1_rev},{w2_rev}", f"{w1_rev}{w2_rev}"])
@@ -609,24 +641,45 @@ def is_target_room_matched(santri_kamar: str, target_filter: str) -> bool:
 
     return False
 
-def find_entity_by_uid(cursor, clean_uid: str):
+def find_entity_by_uid(cursor, clean_uid: str, all_candidates: list = None):
     """
     Mencari entitas pemilik kartu:
     1. Cek tabel siswas (santri/siswa)
     2. Cek tabel users (guru/pegawai)
-    Mendukung varian format UID: HEX (6116F1A7), desimal 32-bit (1628893607), maupun split (;24854,61863).
+    Mendukung varian format UID: HEX (6116F1A7), desimal 32-bit (1628893607), 
+    desimal dengan leading-zero (misal 0086028247 <-> 86028247), maupun split (;24854,61863).
     """
-    variants = get_uid_variants(clean_uid)
+    variants = []
+    if all_candidates:
+        for c in all_candidates:
+            if c:
+                variants.extend(get_uid_variants(str(c)))
+    if clean_uid:
+        variants.extend(get_uid_variants(clean_uid))
+
+    variants = list(dict.fromkeys(filter(None, variants)))
     if not variants:
         variants = [clean_uid.strip().upper()]
 
-    logging.info(f"[SEARCH UID] Mencari pemilik kartu '{clean_uid}', varian diperiksa: {variants}")
+    # Ekstrak varian digit murni untuk pencocokan TRIM LEADING '0'
+    stripped_digits = list(dict.fromkeys([
+        v.lstrip('0') for v in variants if v.isdigit() and v.lstrip('0')
+    ]))
+
+    logging.info(f"[SEARCH UID] Mencari pemilik kartu '{clean_uid}', total {len(variants)} varian diperiksa: {variants[:10]}...")
 
     placeholders = ", ".join(["%s"] * len(variants))
 
     # Deteksi keberadaan kolom jenis_kelamin / gender di tabel siswas
     cols = get_siswa_columns(cursor)
     jk_col = "s.jenis_kelamin" if "jenis_kelamin" in cols else ("s.gender" if "gender" in cols else "NULL")
+
+    stripped_clause = ""
+    stripped_params = []
+    if stripped_digits:
+        s_placeholders = ", ".join(["%s"] * len(stripped_digits))
+        stripped_clause = f" OR TRIM(LEADING '0' FROM TRIM(s.rfid_uid)) IN ({s_placeholders})"
+        stripped_params = stripped_digits
 
     query_siswa = f"""
         SELECT s.id, s.nama_lengkap, s.kamar, s.jenjang, s.status, s.rfid_uid, s.kelas_pengajian_id,
@@ -637,11 +690,13 @@ def find_entity_by_uid(cursor, clean_uid: str):
         LEFT JOIN master_kelas_pengajians kp ON s.kelas_pengajian_id = kp.id
         WHERE UPPER(TRIM(s.rfid_uid)) IN ({placeholders}) 
            OR TRIM(s.rfid_uid) IN ({placeholders})
+           {stripped_clause}
         LIMIT 1
     """
     santri = None
+    params_siswa = tuple(variants) + tuple(variants) + tuple(stripped_params)
     try:
-        cursor.execute(query_siswa, tuple(variants) + tuple(variants))
+        cursor.execute(query_siswa, params_siswa)
         santri = cursor.fetchone()
     except Exception as ex_siswa:
         # Fallback jika kolom baru atau tabel belum tersedia
@@ -654,19 +709,22 @@ def find_entity_by_uid(cursor, clean_uid: str):
                 LEFT JOIN pendaftarans p ON s.pendaftaran_id = p.id
                 WHERE UPPER(TRIM(s.rfid_uid)) IN ({placeholders}) 
                    OR TRIM(s.rfid_uid) IN ({placeholders})
+                   {stripped_clause}
                 LIMIT 1
             """
-            cursor.execute(query_fallback, tuple(variants) + tuple(variants))
+            cursor.execute(query_fallback, params_siswa)
             santri = cursor.fetchone()
         except Exception:
+            minimal_stripped_clause = f" OR TRIM(LEADING '0' FROM TRIM(rfid_uid)) IN ({s_placeholders})" if stripped_digits else ""
             query_minimal = f"""
                 SELECT id, nama_lengkap, kamar, jenjang, status, rfid_uid 
                 FROM siswas 
                 WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) 
                    OR TRIM(rfid_uid) IN ({placeholders})
+                   {minimal_stripped_clause}
                 LIMIT 1
             """
-            cursor.execute(query_minimal, tuple(variants) + tuple(variants))
+            cursor.execute(query_minimal, params_siswa)
             santri = cursor.fetchone()
 
     if santri:
@@ -694,14 +752,22 @@ def find_entity_by_uid(cursor, clean_uid: str):
             "kelas_pengajian": santri.get("nama_kelas_pengajian") or ""
         }
 
+    user_stripped_clause = ""
+    user_stripped_params = []
+    if stripped_digits:
+        u_placeholders = ", ".join(["%s"] * len(stripped_digits))
+        user_stripped_clause = f" OR TRIM(LEADING '0' FROM TRIM(rfid_uid)) IN ({u_placeholders})"
+        user_stripped_params = stripped_digits
+
     query_user = f"""
         SELECT id, name, email, rfid_uid 
         FROM users 
         WHERE UPPER(TRIM(rfid_uid)) IN ({placeholders}) 
            OR TRIM(rfid_uid) IN ({placeholders})
+           {user_stripped_clause}
         LIMIT 1
     """
-    cursor.execute(query_user, tuple(variants) + tuple(variants))
+    cursor.execute(query_user, tuple(variants) + tuple(variants) + tuple(user_stripped_params))
     user = cursor.fetchone()
     if user:
         logging.info(f"[MATCH FOUND] Kartu '{clean_uid}' cocok dengan user: '{user['name']}' (DB rfid_uid: '{user.get('rfid_uid')}')")
@@ -715,7 +781,7 @@ def find_entity_by_uid(cursor, clean_uid: str):
     logging.warning(f"[UNREGISTERED] UID '{clean_uid}' tidak ditemukan di tabel siswas maupun users (varian: {variants}).")
     return None
 
-def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
+def process_tap(db, uid: str, device_id: str, ip_addr: str = "", all_candidates: list = None) -> dict:
     """
     Logika Pemrosesan Multi-Lokasi & Sesi Otomatis berbasis Serial Perangkat:
     1. Sinkronisasi Serial Perangkat & Cek Status Aktif
@@ -747,7 +813,7 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "") -> dict:
         }
 
     # 2. Pengecekan Entitas Pemilik Kartu (Santri atau Guru/Pegawai)
-    entity = find_entity_by_uid(cursor, clean_uid)
+    entity = find_entity_by_uid(cursor, clean_uid, all_candidates=all_candidates)
 
     if not entity:
         cursor.close()
@@ -1080,12 +1146,20 @@ def on_message(client, userdata, msg):
                 broadcast_device_session(client, db, device_id)
             return
 
-        uid = data.get("rfid_uid") or data.get("uid") or data.get("rfid_uid_rev") or data.get("uid_rev")
-        if not uid:
+        candidates = [
+            data.get("rfid_uid"),
+            data.get("uid"),
+            data.get("rfid_uid_pad"),
+            data.get("rfid_uid_rev"),
+            data.get("rfid_uid_rev_pad"),
+            data.get("uid_rev"),
+        ]
+        candidates = [str(c).strip() for c in candidates if c is not None and str(c).strip()]
+        if not candidates:
             logging.warning("Pesan tap diterima tanpa parameter 'rfid_uid' / 'uid'. Diabaikan.")
             return
 
-        clean_uid = str(uid).strip().upper()
+        clean_uid = candidates[0].upper()
         now_ts = time.time()
 
         # Proteksi Debounce (Anti-spam tap)
@@ -1106,7 +1180,7 @@ def on_message(client, userdata, msg):
                 "kode": "SERVER_OFFLINE"
             }
         else:
-            response_payload = process_tap(db, clean_uid, device_id, ip_addr)
+            response_payload = process_tap(db, clean_uid, device_id, ip_addr, all_candidates=candidates)
 
         # Ringkas payload respons tap agar selalu di bawah 256 byte (batas PubSubClient ESP32)
         compact_resp = {

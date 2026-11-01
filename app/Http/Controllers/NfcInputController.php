@@ -128,6 +128,20 @@ class NfcInputController extends Controller
         $variants[] = strtoupper($clean);
         $variants[] = strtolower($clean);
 
+        // Normalisasi angka desimal jika pure digits (misal: 0086028247 <-> 86028247)
+        if (ctype_digit($clean)) {
+            $stripped = ltrim($clean, '0');
+            if ($stripped !== '') {
+                $variants[] = $stripped;
+                $variants[] = str_pad($stripped, 10, '0', STR_PAD_LEFT);
+                $variants[] = str_pad($stripped, 9, '0', STR_PAD_LEFT);
+                $variants[] = str_pad($stripped, 8, '0', STR_PAD_LEFT);
+            } else {
+                $variants[] = '0';
+                $variants[] = str_pad('0', 10, '0', STR_PAD_LEFT);
+            }
+        }
+
         $hexCandidates = [];
 
         // 1. Jika format split desimal: ;42992,47057 atau 42992,47057
@@ -146,10 +160,10 @@ class NfcInputController extends Controller
         elseif (preg_match('/^[0-9A-Fa-f]{8}$/', $clean) && !ctype_digit($clean)) {
             $hexCandidates[] = strtoupper($clean);
         }
-        // 3. Jika format desimal 32-bit (angka murni, misal 2817570769 atau 3518492839)
-        elseif (preg_match('/^\d{5,12}$/', $clean)) {
+        // 3. Jika format desimal 32-bit (angka murni, misal 2817570769, 86028247, atau 0086028247)
+        elseif (preg_match('/^\d{1,12}$/', $clean)) {
             $decVal = (float)$clean;
-            if ($decVal > 0 && $decVal <= 4294967295) {
+            if ($decVal >= 0 && $decVal <= 4294967295) {
                 $hexCandidates[] = strtoupper(str_pad(dechex((int)$decVal), 8, '0', STR_PAD_LEFT));
             }
         }
@@ -161,7 +175,13 @@ class NfcInputController extends Controller
             $variants[] = strtolower($hex);
 
             $dec = hexdec($hex);
-            $variants[] = (string)$dec;
+            $decStr = (string)$dec;
+            $variants[] = $decStr;
+            $variants[] = str_pad($decStr, 10, '0', STR_PAD_LEFT);
+            $variants[] = str_pad($decStr, 9, '0', STR_PAD_LEFT);
+            $variants[] = str_pad($decStr, 8, '0', STR_PAD_LEFT);
+            $variants[] = ltrim($decStr, '0');
+
             $w1 = hexdec(substr($hex, 0, 4));
             $w2 = hexdec(substr($hex, 4, 4));
             $variants[] = ";{$w1},{$w2}";
@@ -175,7 +195,13 @@ class NfcInputController extends Controller
                 $variants[] = strtolower($hexRev);
 
                 $decRev = hexdec($hexRev);
-                $variants[] = (string)$decRev;
+                $decRevStr = (string)$decRev;
+                $variants[] = $decRevStr;
+                $variants[] = str_pad($decRevStr, 10, '0', STR_PAD_LEFT);
+                $variants[] = str_pad($decRevStr, 9, '0', STR_PAD_LEFT);
+                $variants[] = str_pad($decRevStr, 8, '0', STR_PAD_LEFT);
+                $variants[] = ltrim($decRevStr, '0');
+
                 $w1Rev = hexdec(substr($hexRev, 0, 4));
                 $w2Rev = hexdec(substr($hexRev, 4, 4));
                 $variants[] = ";{$w1Rev},{$w2Rev}";
@@ -184,7 +210,46 @@ class NfcInputController extends Controller
             }
         }
 
-        return array_values(array_unique(array_filter($variants)));
+        return array_values(array_unique(array_filter($variants, function ($v) {
+            return $v !== null && $v !== '';
+        })));
+    }
+
+    /**
+     * Mencari siswa berdasarkan serial RFID dengan dukungan seluruh varian format
+     * dan penanganan fleksibel leading-zero (misal: 0086028247 <-> 86028247).
+     */
+    public static function findSiswaByUid(string $serial, $excludeId = null): ?Siswa
+    {
+        $serial = rtrim(trim($serial), '?');
+        if (empty($serial)) {
+            return null;
+        }
+
+        $variants = self::getUidVariants($serial);
+        $strippedDigits = array_values(array_unique(array_filter(array_map(function ($v) {
+            return ctype_digit($v) ? ltrim($v, '0') : null;
+        }, $variants))));
+
+        $query = Siswa::query();
+        $query->where(function ($q) use ($variants, $strippedDigits) {
+            $q->whereIn('rfid_uid', $variants);
+            if (!empty($strippedDigits)) {
+                $driver = \DB::connection()->getDriverName();
+                $placeholders = implode(',', array_fill(0, count($strippedDigits), '?'));
+                if ($driver === 'sqlite') {
+                    $q->orWhereRaw("LTRIM(rfid_uid, '0') IN ({$placeholders})", $strippedDigits);
+                } else {
+                    $q->orWhereRaw("TRIM(LEADING '0' FROM TRIM(rfid_uid)) IN ({$placeholders})", $strippedDigits);
+                }
+            }
+        });
+
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->first();
     }
 
     /**
@@ -201,8 +266,7 @@ class NfcInputController extends Controller
             ]);
         }
 
-        $variants = self::getUidVariants($serial);
-        $siswa = Siswa::whereIn('rfid_uid', $variants)->first();
+        $siswa = self::findSiswaByUid($serial);
 
         if ($siswa) {
             return response()->json([
@@ -245,14 +309,12 @@ class NfcInputController extends Controller
 
         $variants = self::getUidVariants($serial);
 
-        // Jika kartu ini sebelumnya ada di santri lain (dalam varian apapun), lepas dari santri lama agar tidak duplikat
-        $previousOwner = Siswa::whereIn('rfid_uid', $variants)
-            ->where('id', '!=', $siswa->id)
-            ->first();
+        // Jika kartu ini sebelumnya ada di santri lain (dalam varian apapun / leading zero), lepas dari santri lama agar tidak duplikat
+        $previousOwner = self::findSiswaByUid($serial, $siswa->id);
 
-        Siswa::whereIn('rfid_uid', $variants)
-            ->where('id', '!=', $siswa->id)
-            ->update(['rfid_uid' => null]);
+        if ($previousOwner) {
+            $previousOwner->update(['rfid_uid' => null]);
+        }
 
         $decimalSerial = self::toDecimal32($serial);
         $siswa->update(['rfid_uid' => $decimalSerial]);

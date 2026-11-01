@@ -31,27 +31,34 @@ class MqttPresensiListener extends Command
             $this->info("Menerima data dari topik [{$topic}]: {$message}");
 
             $data = json_decode($message, true);
-            $rfidUid  = $data['rfid_uid'] ?? null;
+            $rfidUid  = $data['rfid_uid'] ?? ($data['uid'] ?? null);
             $deviceId = $data['device_id'] ?? 'device01';
 
             if (!$rfidUid) {
                 return;
             }
 
-            // 1. Logika Pencarian Data (Cek User/Guru atau Santri)
-            $user = User::where('rfid_uid', strtoupper(trim($rfidUid)))->first();
+            // 1. Logika Pencarian Data (Cek Santri atau User/Guru)
+            $siswa = \App\Http\Controllers\NfcInputController::findSiswaByUid($rfidUid);
+            $user = null;
+            if (!$siswa) {
+                $variants = \App\Http\Controllers\NfcInputController::getUidVariants($rfidUid);
+                $user = User::whereIn('rfid_uid', $variants)->first();
+            }
 
             $statusScan = 'FAIL';
             $namaTampil = 'Tidak Terdaftar';
             $pesanLcd   = 'Hubungi Admin';
 
-            if ($user) {
+            if ($siswa) {
+                $statusScan = 'SUCCESS';
+                $namaTampil = substr($siswa->nama_lengkap, 0, 16);
+                $pesanLcd   = 'Berhasil Hadir';
+            } elseif ($user) {
                 $statusScan = 'SUCCESS';
                 // Batasi nama maksimal 16 karakter agar pas di baris LCD 16x2
                 $namaTampil = substr($user->name, 0, 16);
                 $pesanLcd   = 'Berhasil Hadir';
-
-                // TODO: Nanti kita pasang logika insert presensi masuk/pulang ke database di sini
             }
 
             // 2. Balas pesan balik ke topik spesifik perangkat tersebut

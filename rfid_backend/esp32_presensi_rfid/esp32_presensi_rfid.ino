@@ -413,15 +413,23 @@ void loop() {
     waitingResponse = true;
     tapSentAtMs = millis();
 
+    // Format 10 digit zero-padded sesuai format USB Desktop Reader (misal 0086028247)
+    char dec32Padded[16];
+    snprintf(dec32Padded, sizeof(dec32Padded), "%010lu", (unsigned long)uidDec32);
+    char dec32RevPadded[16];
+    snprintf(dec32RevPadded, sizeof(dec32RevPadded), "%010lu", (unsigned long)uidDec32Rev);
+
     // Kirim payload ke MQTT
     StaticJsonDocument<384> doc;
-    doc["device_id"]    = activeDeviceId;
-    doc["serial"]       = activeDeviceId;
-    doc["uid"]          = uidHex;
-    doc["rfid_uid"]     = String(uidDec32);
-    doc["uid_rev"]      = uidHexRev;
-    doc["rfid_uid_rev"] = String(uidDec32Rev);
-    doc["ip"]           = WiFi.localIP().toString();
+    doc["device_id"]        = activeDeviceId;
+    doc["serial"]           = activeDeviceId;
+    doc["uid"]              = uidHex;
+    doc["rfid_uid"]         = String(uidDec32);
+    doc["rfid_uid_pad"]     = String(dec32Padded);
+    doc["uid_rev"]          = uidHexRev;
+    doc["rfid_uid_rev"]     = String(uidDec32Rev);
+    doc["rfid_uid_rev_pad"] = String(dec32RevPadded);
+    doc["ip"]               = WiFi.localIP().toString();
 
     char payload[256];
     serializeJson(doc, payload);

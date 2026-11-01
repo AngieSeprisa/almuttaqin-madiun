@@ -294,5 +294,101 @@ class NfcInputTest extends TestCase
             ],
         ]);
     }
+
+    public function test_pencocokan_kartu_dengan_awalan_nol_leading_zeros(): void
+    {
+        // 1. Santri terdaftar dengan serial berawalan 0 dari USB reader (misal 0086028247)
+        $harum = Siswa::create([
+            'nama_lengkap' => 'Harum Solikhah Muktisari',
+            'jenjang' => 'SMP',
+            'kelas' => '7 Putri',
+            'kamar' => 'Kamar Kelas 7 Putri',
+            'status' => 'aktif',
+            'rfid_uid' => '0086028247',
+        ]);
+
+        // Cek kartu menggunakan format ESP32 tanpa awalan 0 (86028247) -> HARUS TERBACA
+        $respEspNoZero = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => '86028247']));
+        $respEspNoZero->assertStatus(200);
+        $respEspNoZero->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $harum->id,
+                'nama_lengkap' => 'Harum Solikhah Muktisari',
+            ],
+        ]);
+
+        // Cek kartu menggunakan format USB Reader dengan awalan 0 (0086028247) -> HARUS TERBACA
+        $respUsbWithZero = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => '0086028247']));
+        $respUsbWithZero->assertStatus(200);
+        $respUsbWithZero->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $harum->id,
+                'nama_lengkap' => 'Harum Solikhah Muktisari',
+            ],
+        ]);
+
+        // Cek kartu menggunakan format HEX (0520AFD7) -> HARUS TERBACA
+        $respHex = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => '0520AFD7']));
+        $respHex->assertStatus(200);
+        $respHex->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $harum->id,
+                'nama_lengkap' => 'Harum Solikhah Muktisari',
+            ],
+        ]);
+
+        // Cek kartu menggunakan format Reversed HEX (D7AF2005) & Reversed DEC (3618578437) -> HARUS TERBACA
+        $respRevHex = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => 'D7AF2005']));
+        $respRevHex->assertStatus(200);
+        $respRevHex->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $harum->id,
+            ],
+        ]);
+
+        $respRevDec = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => '3618578437']));
+        $respRevDec->assertStatus(200);
+        $respRevDec->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $harum->id,
+            ],
+        ]);
+
+        // 2. Kasus Kebalikan: Santri didaftarkan tanpa awalan 0 (86028247), dicek dengan USB Reader 0086028247
+        $harum->update(['rfid_uid' => '86028247']);
+        $respOpposite = $this->actingAs($this->admin)->get(route('nfc.check-card', ['serial' => '0086028247']));
+        $respOpposite->assertStatus(200);
+        $respOpposite->assertJson([
+            'status' => 'assigned',
+            'siswa' => [
+                'id' => $harum->id,
+                'nama_lengkap' => 'Harum Solikhah Muktisari',
+            ],
+        ]);
+
+        // 3. Pasangkan kartu berformat tanpa 0 (86028247) ke santri baru -> kartu lama (0086028247) terlepas
+        $harum->update(['rfid_uid' => '0086028247']);
+        $santriBaru = Siswa::create([
+            'nama_lengkap' => 'Santri Pemilik Pengganti',
+            'jenjang' => 'SMP',
+            'status' => 'aktif',
+        ]);
+
+        $respAssign = $this->actingAs($this->admin)->postJson(route('nfc.assign'), [
+            'rfid_uid' => '86028247',
+            'siswa_id' => $santriBaru->id,
+        ]);
+        $respAssign->assertStatus(200);
+
+        $harum->refresh();
+        $santriBaru->refresh();
+        $this->assertNull($harum->rfid_uid);
+        $this->assertEquals('86028247', $santriBaru->rfid_uid);
+    }
 }
 

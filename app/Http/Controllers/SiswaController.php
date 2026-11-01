@@ -336,6 +336,18 @@ class SiswaController extends Controller
         ]);
 
         $rawUid = !empty($validated['rfid_uid']) ? trim($validated['rfid_uid']) : null;
+        if ($rawUid) {
+            $existing = NfcInputController::findSiswaByUid($rawUid, $siswa->id);
+            if ($existing) {
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'message' => "UID RFID ini sudah terdaftar untuk santri {$existing->nama_lengkap}!",
+                        'errors' => ['rfid_uid' => ["UID RFID ini sudah terdaftar untuk santri {$existing->nama_lengkap}!"]],
+                    ], 422);
+                }
+                return redirect()->back()->withErrors(['rfid_uid' => "UID RFID ini sudah terdaftar untuk santri {$existing->nama_lengkap}!"]);
+            }
+        }
         $uid = $rawUid ? NfcInputController::toDecimal32($rawUid) : null;
         $siswa->update(['rfid_uid' => $uid]);
 
