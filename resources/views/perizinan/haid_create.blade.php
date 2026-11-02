@@ -51,10 +51,7 @@
                 🌸
             </div>
             <div>
-                <h2 style="font-size:17px; font-weight:700; color:var(--text-primary); margin:0;">Formulir Udzur Sholat (Haid)</h2>
-                <div style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">
-                    Catat santriwati yang mulai berhalangan syar'i agar otomatis berstatus <strong>HAID</strong> pada presensi sholat.
-                </div>
+                <h2 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">Catat Santriwati Haid</h2>
             </div>
         </div>
 
@@ -93,9 +90,6 @@
                 <div class="form-group">
                     <label for="tanggal_selesai" class="form-label">Estimasi Selesai (7 Hari)</label>
                     <input type="date" name="tanggal_selesai" id="tanggal_selesai" value="{{ old('tanggal_selesai', $estimasiSelesai) }}" class="form-control">
-                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">
-                        *Dapat diperbarui atau klik "Sudah Suci" sewaktu-waktu jika suci lebih cepat.
-                    </div>
                 </div>
             </div>
 

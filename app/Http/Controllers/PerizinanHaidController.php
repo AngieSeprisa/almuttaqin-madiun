@@ -35,7 +35,12 @@ class PerizinanHaidController extends Controller
             $query->where('kamar', $request->kamar);
         }
 
-        $perizinan = $query->latest('id')->get();
+        $perPage = (int) $request->get('per_page', 15);
+        if (!in_array($perPage, [10, 15, 25, 50, 100])) {
+            $perPage = 15;
+        }
+
+        $perizinan = $query->latest('id')->paginate($perPage)->withQueryString();
 
         // Ambil daftar kamar putri unik
         $kamars = PerizinanHaid::whereNotNull('kamar')
@@ -49,8 +54,9 @@ class PerizinanHaidController extends Controller
         $totalBulanIni = PerizinanHaid::whereMonth('tanggal_mulai', Carbon::today()->month)
             ->whereYear('tanggal_mulai', Carbon::today()->year)
             ->count();
+        $totalSuci = PerizinanHaid::where('status', 'sudah_suci')->count();
 
-        return view('perizinan.haid', compact('perizinan', 'kamars', 'today', 'totalAktif', 'totalBulanIni'));
+        return view('perizinan.haid', compact('perizinan', 'kamars', 'today', 'totalAktif', 'totalBulanIni', 'totalSuci'));
     }
 
     /**
