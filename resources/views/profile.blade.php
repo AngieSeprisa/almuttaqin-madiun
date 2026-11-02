@@ -261,53 +261,26 @@
                     {{-- Input / Select Mata Pelajaran --}}
                     <div class="clean-input-group">
                         <label for="registrasi_mata_pelajaran" class="clean-input-label">
-                            Pilih / Ketik Mata Pelajaran yang Diampu <span style="color:#EF4444;">*</span>
+                            Mata Pelajaran yang Diampu <span style="color:#EF4444;">*</span>
                         </label>
                         <input type="text" name="mata_pelajaran" id="registrasi_mata_pelajaran" list="listMapelProfile" class="clean-input-control" required
-                               value="{{ old('mata_pelajaran', $user->mapel_status === 'menunggu' ? $user->mapel_diajukan : ($user->mata_pelajaran ?: 'Informatika')) }}"
-                               placeholder="Contoh: Informatika, Matematika, Fiqih...">
+                               value="{{ old('mata_pelajaran', $user->mapel_status === 'menunggu' ? $user->mapel_diajukan : ($user->mata_pelajaran ?: '')) }}"
+                               placeholder="Pilih mata pelajaran...">
                         <datalist id="listMapelProfile">
-                            <option value="Informatika">
-                            <option value="Matematika">
-                            <option value="Bahasa Indonesia">
-                            <option value="Bahasa Inggris">
-                            <option value="Ilmu Pengetahuan Alam (IPA)">
-                            <option value="Fisika">
-                            <option value="Biologi">
-                            <option value="Kimia">
-                            <option value="Ilmu Pengetahuan Sosial (IPS)">
-                            <option value="Sejarah Indonesia">
-                            <option value="Geografi">
-                            <option value="Ekonomi">
-                            <option value="Sosiologi">
-                            <option value="Pendidikan Agama Islam (PAI)">
-                            <option value="Al-Qur'an Hadits">
-                            <option value="Fiqih">
-                            <option value="Akidah Akhlak">
-                            <option value="Sejarah Kebudayaan Islam (SKI)">
-                            <option value="Bahasa Arab">
-                            <option value="Tahfidz Al-Qur'an">
-                            <option value="Nahwu & Shorof">
-                            <option value="Pendidikan Pancasila & Kewarganegaraan (PPKn)">
-                            <option value="Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)">
-                            <option value="Seni Budaya">
-                            <option value="Prakarya & Kewirausahaan">
-                            <option value="Bimbingan Konseling (BK)">
+                            @if(isset($daftarMapel))
+                                @foreach($daftarMapel as $mapelItem)
+                                    <option value="{{ $mapelItem }}">
+                                @endforeach
+                            @endif
                         </datalist>
-                        <small style="color:var(--text-muted); font-size:11.5px; margin-top:4px; display:block;">
-                            Pilih dari rekomendasi mata pelajaran di atas atau ketik langsung jika belum tersedia.
-                        </small>
                     </div>
 
                     {{-- Catatan / Keterangan Pengajuan --}}
                     <div class="clean-input-group">
-                        <label for="registrasi_catatan" class="clean-input-label">Catatan / Keterangan Tambahan untuk Yayasan (Opsional)</label>
+                        <label for="registrasi_catatan" class="clean-input-label">Catatan Tambahan (Opsional)</label>
                         <input type="text" name="catatan" id="registrasi_catatan" class="clean-input-control"
                                value="{{ old('catatan', $user->mapel_status === 'menunggu' ? $user->mapel_catatan : '') }}"
-                               placeholder="Contoh: Mengajar kelas VII dan VIII SMP IT Al-Muttaqin">
-                        <small style="color:var(--text-muted); font-size:11.5px; margin-top:4px; display:block;">
-                            Sertakan jenjang kelas atau detail tugas mengajar jika relevan.
-                        </small>
+                               placeholder="Catatan untuk Yayasan">
                     </div>
                 </div>
 

@@ -411,7 +411,7 @@
                 </svg>
             </div>
             <div style="min-width:0;">
-                <h4 style="margin:0 0 2px 0; font-size:13.5px; font-weight:700; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                <h4 style="margin:0; font-size:14px; font-weight:700; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     @if($isYayasan)
                         @if($currentLembaga)
                             Plotting Mata Pelajaran &bull; {{ $currentLembaga->nama }}
@@ -422,13 +422,6 @@
                         Plotting Mata Pelajaran &bull; {{ $currentLembaga?->nama ?? 'Sekolah' }}
                     @endif
                 </h4>
-                <p style="margin:0; font-size:12px; color:var(--text-secondary); line-height:1.4;">
-                    @if($isYayasan)
-                        Yayasan dapat mengatur mata pelajaran unit sekolah (SMP & SMA).
-                    @else
-                        Mengatur mata pelajaran yang diajarkan pada {{ $currentLembaga?->nama ?? 'sekolah' }}.
-                    @endif
-                </p>
             </div>
         </div>
 
@@ -439,7 +432,7 @@
         @endif
     </div>
 
-    {{-- Kartu Ringkasan Sederhana (Responsif 100% Fit) --}}
+    {{-- Kartu Ringkasan Sederhana (Filament Clean Style) --}}
     <div class="mapel-stats-grid">
         <div class="mapel-stat-box">
             <div class="mapel-stat-icon" style="background:rgba(37, 99, 235, 0.1); color:#2563EB;">
@@ -451,7 +444,6 @@
             <div style="min-width:0;">
                 <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted);">Total Mata Pelajaran</div>
                 <div style="font-size:22px; font-weight:800; color:var(--text-primary); margin-top:2px; line-height:1.2;">{{ $stats['total_mapel'] }}</div>
-                <div style="font-size:11.5px; color:var(--text-secondary); margin-top:2px;">Mata pelajaran terdaftar</div>
             </div>
         </div>
 
@@ -467,7 +459,6 @@
             <div style="min-width:0;">
                 <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#059669;">Kode Mata Pelajaran</div>
                 <div style="font-size:22px; font-weight:800; color:#059669; margin-top:2px; line-height:1.2;">{{ $stats['total_kode'] }}</div>
-                <div style="font-size:11.5px; color:var(--text-secondary); margin-top:2px;">Kode unik tersimpan</div>
             </div>
         </div>
     </div>

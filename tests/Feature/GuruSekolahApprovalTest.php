@@ -151,6 +151,31 @@ class GuruSekolahApprovalTest extends TestCase
         $this->assertEquals('disetujui', $guru->mapel_status);
     }
 
+    public function test_yayasan_can_assign_multiple_subjects_to_a_teacher(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+        $guru = User::where('email', 'guru.pondok.smp@almuttaqin.id')->firstOrFail();
+
+        // Yayasan menetapkan 2 mata pelajaran sekaligus (bisa array atau comma-separated)
+        $response = $this->actingAs($yayasan)->post(route('guru-sekolah.assign', $guru->id), [
+            'mata_pelajaran' => ['Informatika', 'Matematika'],
+            'catatan'        => 'Mengampu 2 mapel',
+        ]);
+
+        $response->assertSessionHas('success');
+
+        $guru->refresh();
+        $this->assertEquals('Informatika, Matematika', $guru->mata_pelajaran);
+        $this->assertEquals('disetujui', $guru->mapel_status);
+        $this->assertEquals(['Informatika', 'Matematika'], $guru->daftar_mata_pelajaran);
+
+        // Halaman guru sekolah menampilkan kedua mapel
+        $viewResponse = $this->actingAs($yayasan)->get(route('guru-sekolah.index'));
+        $viewResponse->assertStatus(200);
+        $viewResponse->assertSee('Informatika');
+        $viewResponse->assertSee('Matematika');
+    }
+
     public function test_unauthorized_user_cannot_access_guru_sekolah(): void
     {
         $guru = User::where('email', 'guru.pondok.smp@almuttaqin.id')->firstOrFail();

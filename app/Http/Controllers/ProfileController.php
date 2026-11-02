@@ -21,7 +21,15 @@ class ProfileController extends Controller
 
         $theme = $this->resolveTheme($user);
 
-        return view('profile', compact('user', 'theme'));
+        // Ambil mata pelajaran yang disinkronkan langsung dari menu Plotting Mata Pelajaran
+        $daftarMapel = \App\Models\MataPelajaran::orderBy('mata_pelajaran')
+            ->pluck('mata_pelajaran')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        return view('profile', compact('user', 'theme', 'daftarMapel'));
     }
 
     /**
@@ -77,26 +85,29 @@ class ProfileController extends Controller
     }
 
     /**
-     * Ajukan registrasi mata pelajaran yang diampu oleh guru ke Yayasan.
+     * Ajukan registrasi mata pelajaran yang diampu oleh guru ke Yayasan (bisa 1 atau lebih mapel).
      */
     public function ajukanMapel(Request $request)
     {
         /** @var User $user */
         $user = Auth::user();
 
-        $validated = $request->validate([
-            'mata_pelajaran' => 'required|string|max:100',
-            'catatan'        => 'nullable|string|max:500',
-        ], [
-            'mata_pelajaran.required' => 'Mata pelajaran wajib dipilih atau diisi.',
-            'mata_pelajaran.max'      => 'Nama mata pelajaran maksimal 100 karakter.',
-        ]);
+        $rawMapel = $request->input('mata_pelajaran');
+        if (is_array($rawMapel)) {
+            $items = array_values(array_unique(array_filter(array_map('trim', $rawMapel))));
+            $mapelBaru = implode(', ', $items);
+        } else {
+            $items = array_values(array_unique(array_filter(array_map('trim', preg_split('/[,|;]/', (string)$rawMapel)))));
+            $mapelBaru = implode(', ', $items);
+        }
 
-        $mapelBaru = trim($validated['mata_pelajaran']);
+        if (empty($mapelBaru)) {
+            return redirect()->back()->withErrors(['mata_pelajaran' => 'Pilih setidaknya satu mata pelajaran yang diampu.']);
+        }
 
         $user->mapel_diajukan = $mapelBaru;
         $user->mapel_status = 'menunggu';
-        $user->mapel_catatan = $validated['catatan'] ?? null;
+        $user->mapel_catatan = $request->filled('catatan') ? trim($request->catatan) : null;
         $user->mapel_diajukan_at = now();
         $user->save();
 

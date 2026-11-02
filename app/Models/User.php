@@ -270,4 +270,24 @@ class User extends Authenticatable
         return strtoupper(mb_substr($name, 0, min(2, mb_strlen($name))));
     }
 
+    /**
+     * Daftar array mata pelajaran aktif yang diampu guru (mendukung 2 mapel atau lebih).
+     */
+    public function getDaftarMataPelajaranAttribute(): array
+    {
+        $raw = trim((string)($this->mata_pelajaran ?? ''));
+        if (empty($raw)) return [];
+        return array_values(array_filter(array_map('trim', preg_split('/[,|;]/', $raw))));
+    }
+
+    /**
+     * Daftar array mata pelajaran yang diajukan guru (mendukung 2 mapel atau lebih).
+     */
+    public function getDaftarMapelDiajukanAttribute(): array
+    {
+        $raw = trim((string)($this->mapel_diajukan ?? ''));
+        if (empty($raw)) return [];
+        return array_values(array_filter(array_map('trim', preg_split('/[,|;]/', $raw))));
+    }
+
 }

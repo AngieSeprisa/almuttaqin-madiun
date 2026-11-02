@@ -102,14 +102,18 @@ class GuruSekolahController extends Controller
 
         $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
 
-        // Rekomendasi mata pelajaran standar
-        $daftarMapel = self::daftarMataPelajaran();
+        // Ambil data mata pelajaran yang disinkronkan langsung dari menu Plotting Mata Pelajaran
+        $plottingMapels = \App\Models\MataPelajaran::with('lembaga')
+            ->orderBy('mata_pelajaran')
+            ->get();
 
-        return view('guru-sekolah.index', compact('users', 'stats', 'lembagas', 'daftarMapel', 'authUser'));
+        $daftarMapel = $plottingMapels->pluck('mata_pelajaran')->unique()->values()->toArray();
+
+        return view('guru-sekolah.index', compact('users', 'stats', 'lembagas', 'daftarMapel', 'plottingMapels', 'authUser'));
     }
 
     /**
-     * Menyetujui (Approve) registrasi mata pelajaran yang diajukan oleh guru.
+     * Menyetujui (Approve) registrasi mata pelajaran yang diajukan oleh guru (1 atau lebih mapel).
      */
     public function approve(Request $request, User $user)
     {
@@ -120,18 +124,21 @@ class GuruSekolahController extends Controller
             abort(403, 'Anda tidak memiliki hak untuk menyetujui pengajuan.');
         }
 
-        $request->validate([
-            'mata_pelajaran' => 'nullable|string|max:100',
-            'catatan'        => 'nullable|string|max:500',
-        ]);
-
-        // Gunakan mapel yang diajukan atau mapel yang diedit yayasan jika diisi
-        $mapelDisetujui = $request->filled('mata_pelajaran') 
-            ? trim($request->mata_pelajaran) 
-            : ($user->mapel_diajukan ?: $user->mata_pelajaran);
+        $rawMapel = $request->input('mata_pelajaran');
+        if (!empty($rawMapel)) {
+            if (is_array($rawMapel)) {
+                $items = array_values(array_unique(array_filter(array_map('trim', $rawMapel))));
+                $mapelDisetujui = implode(', ', $items);
+            } else {
+                $items = array_values(array_unique(array_filter(array_map('trim', preg_split('/[,|;]/', (string)$rawMapel)))));
+                $mapelDisetujui = implode(', ', $items);
+            }
+        } else {
+            $mapelDisetujui = $user->mapel_diajukan ?: $user->mata_pelajaran;
+        }
 
         if (empty($mapelDisetujui)) {
-            return redirect()->back()->withErrors(['mata_pelajaran' => 'Nama mata pelajaran tidak boleh kosong.']);
+            return redirect()->back()->withErrors(['mata_pelajaran' => 'Pilih setidaknya satu mata pelajaran.']);
         }
 
         $user->mata_pelajaran = $mapelDisetujui;
@@ -179,7 +186,7 @@ class GuruSekolahController extends Controller
     }
 
     /**
-     * Tetapkan mata pelajaran secara langsung oleh yayasan tanpa perlu pengajuan mandiri.
+     * Tetapkan mata pelajaran secara langsung oleh yayasan tanpa perlu pengajuan mandiri (1 atau lebih mapel).
      */
     public function assign(Request $request, User $user)
     {
@@ -190,22 +197,25 @@ class GuruSekolahController extends Controller
             abort(403, 'Anda tidak memiliki hak untuk menetapkan mata pelajaran.');
         }
 
-        $validated = $request->validate([
-            'mata_pelajaran'     => 'required|string|max:100',
-            'primary_lembaga_id' => 'nullable|exists:lembagas,id',
-            'catatan'            => 'nullable|string|max:500',
-        ], [
-            'mata_pelajaran.required' => 'Mata pelajaran wajib dipilih atau diisi.',
-        ]);
+        $rawMapel = $request->input('mata_pelajaran');
+        if (is_array($rawMapel)) {
+            $items = array_values(array_unique(array_filter(array_map('trim', $rawMapel))));
+            $mapel = implode(', ', $items);
+        } else {
+            $items = array_values(array_unique(array_filter(array_map('trim', preg_split('/[,|;]/', (string)$rawMapel)))));
+            $mapel = implode(', ', $items);
+        }
 
-        $mapel = trim($validated['mata_pelajaran']);
+        if (empty($mapel)) {
+            return redirect()->back()->withErrors(['mata_pelajaran' => 'Pilih setidaknya satu mata pelajaran yang diampu.']);
+        }
 
         $user->mata_pelajaran = $mapel;
         $user->mapel_diajukan = $mapel;
         $user->mapel_status = 'disetujui';
         $user->mapel_diverifikasi_at = now();
         $user->mapel_diverifikasi_by = $authUser->id;
-        $user->mapel_catatan = $validated['catatan'] ?: 'Ditetapkan langsung oleh Yayasan';
+        $user->mapel_catatan = $request->filled('catatan') ? trim($request->catatan) : 'Ditetapkan langsung oleh Yayasan';
 
         if ($request->filled('primary_lembaga_id')) {
             $user->primary_lembaga_id = $request->primary_lembaga_id;
@@ -218,7 +228,7 @@ class GuruSekolahController extends Controller
 
         $user->save();
 
-        return redirect()->back()->with('success', 'Mata pelajaran untuk Guru ' . $user->name . ' berhasil diperbarui menjadi "' . $mapel . '".');
+        return redirect()->back()->with('success', 'Mata pelajaran untuk Guru ' . $user->name . ' berhasil diperbarui menjadi: ' . $mapel . '.');
     }
 
     /**
@@ -242,48 +252,18 @@ class GuruSekolahController extends Controller
     }
 
     /**
-     * Daftar rekomendasi mata pelajaran yang umum di pesantren dan sekolah formal.
+     * Daftar mata pelajaran yang disinkronkan langsung dari tabel Plotting Mata Pelajaran (mata_pelajarans).
      */
     public static function daftarMataPelajaran(?int $lembagaId = null): array
     {
-        $defaultMapel = [
-            'Informatika',
-            'Matematika',
-            'Bahasa Indonesia',
-            'Bahasa Inggris',
-            'Ilmu Pengetahuan Alam (IPA)',
-            'Fisika',
-            'Biologi',
-            'Kimia',
-            'Ilmu Pengetahuan Sosial (IPS)',
-            'Sejarah Indonesia',
-            'Geografi',
-            'Ekonomi',
-            'Sosiologi',
-            'Pendidikan Agama Islam (PAI)',
-            'Al-Qur\'an Hadits',
-            'Fiqih',
-            'Akidah Akhlak',
-            'Sejarah Kebudayaan Islam (SKI)',
-            'Bahasa Arab',
-            'Tahfidz Al-Qur\'an',
-            'Nahwu & Shorof',
-            'Pendidikan Pancasila & Kewarganegaraan (PPKn)',
-            'Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)',
-            'Seni Budaya',
-            'Prakarya & Kewirausahaan',
-            'Bimbingan Konseling (BK)',
-        ];
-
         try {
             $query = \App\Models\MataPelajaran::query();
             if ($lembagaId) {
                 $query->where('lembaga_id', $lembagaId);
             }
-            $dbMapel = $query->pluck('mata_pelajaran')->toArray();
-            return array_values(array_unique(array_merge($dbMapel, $defaultMapel)));
+            return $query->pluck('mata_pelajaran')->filter()->map(fn($v) => trim((string)$v))->unique()->values()->toArray();
         } catch (\Throwable $e) {
-            return $defaultMapel;
+            return [];
         }
     }
 }
