@@ -455,23 +455,22 @@
      - Nama (diambil dari akun yang terdaftar)
      - Lembaga (SMP/SMA) isinya hanya SMP dan SMA
      - Mapel (diambil dari mapel di menu plotting mapel sesuai lembaga)
-     - Bersih tanpa deskripsi
+     - Bersih tanpa deskripsi, tampilan Filament seragam & scrollable
      ======================================================== --}}
-<div id="modalTambahGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
-    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:520px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left;">
+<div id="modalTambahGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:flex-start; justify-content:center; padding:32px 16px; overflow-y:auto; backdrop-filter:blur(3px); -webkit-overflow-scrolling:touch;">
+    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:520px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:visible !important; text-align:left; position:relative; margin:auto;">
         <form action="{{ route('guru-sekolah.store') }}" method="POST" id="formTambahGuru" style="margin:0;">
             @csrf
-            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between;">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between; border-top-left-radius:14px; border-top-right-radius:14px; background:var(--bg-surface, #ffffff);">
                 <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary, #0f172a);">Tambah Guru</h3>
                 <button type="button" onclick="tutupModalTambahGuru()" style="background:none; border:none; color:var(--text-muted, #94a3b8); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
             </div>
 
-            <div style="padding:20px; display:flex; flex-direction:column; gap:14px;">
+            <div style="padding:20px; display:flex; flex-direction:column; gap:16px; position:relative;">
                 {{-- Nama Guru (Akun Terdaftar) --}}
-                <div>
+                <div style="position:relative; z-index:30;">
                     <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Nama Guru <span style="color:#ef4444;">*</span></label>
-                    <select name="user_id" id="tambah_user_id" class="form-select" required
-                            style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc);">
+                    <select name="user_id" id="tambah_user_id" class="form-select" required style="width:100%;">
                         <option value="">-- Pilih Akun Terdaftar --</option>
                         @foreach($akunUsers as $akun)
                             <option value="{{ $akun->id }}">{{ $akun->name }} ({{ $akun->nip ? 'NIP: ' . $akun->nip : $akun->email }})</option>
@@ -480,10 +479,9 @@
                 </div>
 
                 {{-- Lembaga (HANYA SMP dan SMA) --}}
-                <div>
+                <div style="position:relative; z-index:20;">
                     <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Lembaga <span style="color:#ef4444;">*</span></label>
-                    <select name="lembaga_id" id="tambah_lembaga_id" class="form-select" required onchange="filterMapelTambah(this.value)"
-                            style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc);">
+                    <select name="lembaga_id" id="tambah_lembaga_id" class="form-select" required onchange="filterMapelTambah(this.value)" style="width:100%;">
                         <option value="">-- Pilih Lembaga (SMP / SMA) --</option>
                         @foreach($sekolahLembagas as $lem)
                             <option value="{{ $lem->id }}">{{ $lem->nama_singkat ?? $lem->singkatan }}</option>
@@ -491,32 +489,43 @@
                     </select>
                 </div>
 
-                {{-- Mata Pelajaran yang Diampu (Dropdown Multi-Select) --}}
-                <div style="position:relative;">
+                {{-- Mata Pelajaran yang Diampu (Dropdown Multi-Select Seragam dengan Filament) --}}
+                <div style="position:relative; z-index:10;">
                     <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Mata Pelajaran yang Diampu <span style="color:#ef4444;">*</span></label>
                     
-                    {{-- Dropdown Trigger (Sama Persis Seperti Select Lembaga) --}}
-                    <div id="tambah_mapel_dropdown_btn" class="form-select" onclick="toggleMapelDropdown('tambah', event)"
-                         style="width:100%; min-height:38px; padding:6px 36px 6px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc); color:var(--text-primary); cursor:pointer; display:flex; align-items:center; position:relative; box-sizing:border-box; user-select:none;">
-                        <div id="tambah_mapel_display" style="display:flex; align-items:center; flex-wrap:wrap; gap:4px; width:100%;">
-                            <span style="color:var(--text-muted, #94a3b8);">-- Pilih Lembaga Terlebih Dahulu --</span>
+                    {{-- Dropdown Trigger (Seragam 100% dengan Filament Select) --}}
+                    <div class="fi-select-wrap" id="tambah_mapel_wrap" style="position:relative;">
+                        <div class="fi-select-trigger" id="tambah_mapel_dropdown_btn" onclick="toggleMapelDropdown('tambah', event)"
+                             style="cursor:pointer; background:var(--bg-main, #f8fafc); border:1px solid var(--border-light, #cbd5e1); min-height:38px;">
+                            <div class="fi-select-main">
+                                <span class="fi-select-prefix-icon">
+                                    <svg viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01-.25-2.762zM9.3 11.712l-2.05-.879v3.407a10.96 10.96 0 005.5 0v-3.407l-2.05.879a1.002 1.002 0 01-.9 0zM15 10.12l1.69-.723a11.115 11.115 0 01-.25 2.762 1 1 0 01-.89.89 8.968 8.968 0 00-1.05.174V10.12z"/>
+                                    </svg>
+                                </span>
+                                <div class="fi-select-label-wrap" id="tambah_mapel_display">
+                                    <span class="fi-select-placeholder">-- Pilih Lembaga Terlebih Dahulu --</span>
+                                </div>
+                            </div>
+                            <div class="fi-select-actions">
+                                <span class="fi-select-chevron">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px;">
+                                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+                                    </svg>
+                                </span>
+                            </div>
                         </div>
-                        <div style="position:absolute; right:12px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--text-muted, #94a3b8); display:flex; align-items:center;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </div>
-                    </div>
 
-                    {{-- Dropdown Menu List --}}
-                    <div id="tambah_mapel_menu"
-                         style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:100%; background:var(--bg-surface, #ffffff); border:1px solid var(--border-light, #cbd5e1); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.12); z-index:1000; max-height:220px; overflow-y:auto; padding:6px;">
-                        <div style="font-size:12.5px; color:var(--text-muted, #94a3b8); padding:8px 10px;">Pilih lembaga sekolah terlebih dahulu.</div>
+                        {{-- Dropdown Menu List Popover --}}
+                        <div class="fi-select-popover" id="tambah_mapel_menu"
+                             style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:100%; background:var(--bg-surface, #ffffff); border:1px solid var(--border-light, #cbd5e1); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.15); z-index:1050; max-height:220px; overflow-y:auto; padding:6px; scrollbar-width:thin;">
+                            <div style="font-size:12.5px; color:var(--text-muted, #94a3b8); padding:8px 10px;">Pilih lembaga sekolah terlebih dahulu.</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc);">
+            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc); border-bottom-left-radius:14px; border-bottom-right-radius:14px; position:relative; z-index:1;">
                 <button type="button" class="btn btn-secondary" onclick="tutupModalTambahGuru()" style="padding:7px 14px; border-radius:8px; font-size:12.5px;">Batal</button>
                 <button type="submit" class="btn btn-primary" style="padding:7px 18px; border-radius:8px; font-size:12.5px; font-weight:700;">Simpan Guru</button>
             </div>
@@ -527,59 +536,80 @@
 {{-- ========================================================
      MODAL 2: UBAH GURU SEKOLAH
      ======================================================== --}}
-<div id="modalUbahGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
-    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:520px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left;">
+<div id="modalUbahGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:flex-start; justify-content:center; padding:32px 16px; overflow-y:auto; backdrop-filter:blur(3px); -webkit-overflow-scrolling:touch;">
+    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:520px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:visible !important; text-align:left; position:relative; margin:auto;">
         <form action="" method="POST" id="formUbahGuru" style="margin:0;">
             @csrf
-            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between;">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between; border-top-left-radius:14px; border-top-right-radius:14px; background:var(--bg-surface, #ffffff);">
                 <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary, #0f172a);">Ubah Data Guru</h3>
                 <button type="button" onclick="tutupModalUbahGuru()" style="background:none; border:none; color:var(--text-muted, #94a3b8); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
             </div>
 
-            <div style="padding:20px; display:flex; flex-direction:column; gap:14px;">
-                {{-- Nama Guru (Static Display) --}}
-                <div>
+            <div style="padding:20px; display:flex; flex-direction:column; gap:16px; position:relative;">
+                {{-- Nama Guru (Static Display Seragam dengan Prefix Icon) --}}
+                <div style="position:relative; z-index:30;">
                     <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Nama Guru</label>
-                    <input type="text" id="ubah_nama_guru" class="form-control" readonly
-                           style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:#f1f5f9; color:var(--text-primary); font-weight:600;">
+                    <div class="fi-select-trigger" style="background:#f1f5f9; border:1px solid var(--border-light, #cbd5e1); cursor:default; min-height:38px; width:100%;">
+                        <div class="fi-select-main">
+                            <span class="fi-select-prefix-icon">
+                                <svg viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z"/>
+                                </svg>
+                            </span>
+                            <div class="fi-select-label-wrap">
+                                <input type="text" id="ubah_nama_guru" readonly
+                                       style="border:none; background:transparent; font-size:13px; font-weight:700; color:var(--text-primary); outline:none; width:100%; padding:0;">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Lembaga (HANYA SMP dan SMA) --}}
-                <div>
+                <div style="position:relative; z-index:20;">
                     <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Lembaga <span style="color:#ef4444;">*</span></label>
-                    <select name="primary_lembaga_id" id="ubah_lembaga_id" class="form-select" required onchange="filterMapelUbah(this.value)"
-                            style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc);">
+                    <select name="primary_lembaga_id" id="ubah_lembaga_id" class="form-select" required onchange="filterMapelUbah(this.value)" style="width:100%;">
                         @foreach($sekolahLembagas as $lem)
                             <option value="{{ $lem->id }}">{{ $lem->nama_singkat ?? $lem->singkatan }}</option>
                         @endforeach
                     </select>
                 </div>
 
-                {{-- Mata Pelajaran yang Diampu (Dropdown Multi-Select) --}}
-                <div style="position:relative;">
+                {{-- Mata Pelajaran yang Diampu (Dropdown Multi-Select Seragam dengan Filament) --}}
+                <div style="position:relative; z-index:10;">
                     <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Mata Pelajaran yang Diampu <span style="color:#ef4444;">*</span></label>
                     
-                    {{-- Dropdown Trigger (Sama Persis Seperti Select Lembaga) --}}
-                    <div id="ubah_mapel_dropdown_btn" class="form-select" onclick="toggleMapelDropdown('ubah', event)"
-                         style="width:100%; min-height:38px; padding:6px 36px 6px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc); color:var(--text-primary); cursor:pointer; display:flex; align-items:center; position:relative; box-sizing:border-box; user-select:none;">
-                        <div id="ubah_mapel_display" style="display:flex; align-items:center; flex-wrap:wrap; gap:4px; width:100%;">
-                            <span style="color:var(--text-muted, #94a3b8);">-- Pilih Mata Pelajaran --</span>
+                    {{-- Dropdown Trigger (Seragam 100% dengan Filament Select) --}}
+                    <div class="fi-select-wrap" id="ubah_mapel_wrap" style="position:relative;">
+                        <div class="fi-select-trigger" id="ubah_mapel_dropdown_btn" onclick="toggleMapelDropdown('ubah', event)"
+                             style="cursor:pointer; background:var(--bg-main, #f8fafc); border:1px solid var(--border-light, #cbd5e1); min-height:38px;">
+                            <div class="fi-select-main">
+                                <span class="fi-select-prefix-icon">
+                                    <svg viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01-.25-2.762zM9.3 11.712l-2.05-.879v3.407a10.96 10.96 0 005.5 0v-3.407l-2.05.879a1.002 1.002 0 01-.9 0zM15 10.12l1.69-.723a11.115 11.115 0 01-.25 2.762 1 1 0 01-.89.89 8.968 8.968 0 00-1.05.174V10.12z"/>
+                                    </svg>
+                                </span>
+                                <div class="fi-select-label-wrap" id="ubah_mapel_display">
+                                    <span class="fi-select-placeholder">-- Pilih Mata Pelajaran --</span>
+                                </div>
+                            </div>
+                            <div class="fi-select-actions">
+                                <span class="fi-select-chevron">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px;">
+                                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+                                    </svg>
+                                </span>
+                            </div>
                         </div>
-                        <div style="position:absolute; right:12px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--text-muted, #94a3b8); display:flex; align-items:center;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </div>
-                    </div>
 
-                    {{-- Dropdown Menu List --}}
-                    <div id="ubah_mapel_menu"
-                         style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:100%; background:var(--bg-surface, #ffffff); border:1px solid var(--border-light, #cbd5e1); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.12); z-index:1000; max-height:220px; overflow-y:auto; padding:6px;">
+                        {{-- Dropdown Menu List Popover --}}
+                        <div class="fi-select-popover" id="ubah_mapel_menu"
+                             style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:100%; background:var(--bg-surface, #ffffff); border:1px solid var(--border-light, #cbd5e1); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.15); z-index:1050; max-height:220px; overflow-y:auto; padding:6px; scrollbar-width:thin;">
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc);">
+            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc); border-bottom-left-radius:14px; border-bottom-right-radius:14px; position:relative; z-index:1;">
                 <button type="button" class="btn btn-secondary" onclick="tutupModalUbahGuru()" style="padding:7px 14px; border-radius:8px; font-size:12.5px;">Batal</button>
                 <button type="submit" class="btn btn-primary" style="padding:7px 18px; border-radius:8px; font-size:12.5px; font-weight:700;">Simpan Perubahan</button>
             </div>
@@ -590,11 +620,11 @@
 {{-- ========================================================
      MODAL 3: TOLAK PENGAJUAN MAPEL
      ======================================================== --}}
-<div id="modalTolakPengajuan" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
-    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:460px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left;">
+<div id="modalTolakPengajuan" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:flex-start; justify-content:center; padding:32px 16px; overflow-y:auto; backdrop-filter:blur(3px); -webkit-overflow-scrolling:touch;">
+    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:460px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left; position:relative; margin:auto;">
         <form action="" method="POST" id="formTolakPengajuan" style="margin:0;">
             @csrf
-            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between;">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between; border-top-left-radius:14px; border-top-right-radius:14px; background:var(--bg-surface, #ffffff);">
                 <h3 style="margin:0; font-size:15px; font-weight:700; color:#dc2626;">Tolak Pengajuan Mapel</h3>
                 <button type="button" onclick="tutupModalTolak()" style="background:none; border:none; color:var(--text-muted, #94a3b8); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
             </div>
@@ -610,7 +640,7 @@
                 </div>
             </div>
 
-            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc);">
+            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc); border-bottom-left-radius:14px; border-bottom-right-radius:14px;">
                 <button type="button" class="btn btn-secondary" onclick="tutupModalTolak()" style="padding:7px 14px; border-radius:8px; font-size:12.5px;">Batal</button>
                 <button type="submit" class="btn" style="padding:7px 18px; border-radius:8px; font-size:12.5px; font-weight:700; background:#dc2626; border:none; color:#ffffff;">Tolak Pengajuan</button>
             </div>
@@ -621,9 +651,9 @@
 {{-- ========================================================
      MODAL 4: DETAIL GURU SEKOLAH
      ======================================================== --}}
-<div id="modalDetailGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
-    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:460px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left;">
-        <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between;">
+<div id="modalDetailGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:flex-start; justify-content:center; padding:32px 16px; overflow-y:auto; backdrop-filter:blur(3px); -webkit-overflow-scrolling:touch;">
+    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:460px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left; position:relative; margin:auto;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between; border-top-left-radius:14px; border-top-right-radius:14px; background:var(--bg-surface, #ffffff);">
             <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary, #0f172a);">Detail Guru Sekolah</h3>
             <button type="button" onclick="tutupModalDetail()" style="background:none; border:none; color:var(--text-muted, #94a3b8); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
         </div>
@@ -676,13 +706,28 @@ const mapelByLembaga = {
 // Toggle Dropdown Menu
 function toggleMapelDropdown(prefix, event) {
     if (event) event.stopPropagation();
+    const wrap = document.getElementById(prefix + '_mapel_wrap');
     const menu = document.getElementById(prefix + '_mapel_menu');
     const otherPrefix = prefix === 'tambah' ? 'ubah' : 'tambah';
+    const otherWrap = document.getElementById(otherPrefix + '_mapel_wrap');
     const otherMenu = document.getElementById(otherPrefix + '_mapel_menu');
+
+    // Close any other open fi-selects
+    document.querySelectorAll('.fi-select-wrap.is-open').forEach(function(w) {
+        if (w !== wrap) w.classList.remove('is-open');
+    });
     if (otherMenu) otherMenu.style.display = 'none';
+    if (otherWrap) otherWrap.classList.remove('is-open');
 
     if (menu) {
-        menu.style.display = (menu.style.display === 'none' || menu.style.display === '') ? 'block' : 'none';
+        const isCurrentlyOpen = menu.style.display === 'block';
+        if (isCurrentlyOpen) {
+            menu.style.display = 'none';
+            if (wrap) wrap.classList.remove('is-open');
+        } else {
+            menu.style.display = 'block';
+            if (wrap) wrap.classList.add('is-open');
+        }
     }
 }
 
@@ -694,14 +739,14 @@ function renderMapelDropdown(prefix, lembagaId, preselectedMapels = []) {
 
     if (!lembagaId) {
         menu.innerHTML = '<div style="font-size:12.5px; color:var(--text-muted, #94a3b8); padding:8px 10px;">Pilih lembaga sekolah terlebih dahulu.</div>';
-        display.innerHTML = '<span style="color:var(--text-muted, #94a3b8);">-- Pilih Lembaga Terlebih Dahulu --</span>';
+        display.innerHTML = '<span class="fi-select-placeholder" style="color:var(--text-muted, #94a3b8);">-- Pilih Lembaga Terlebih Dahulu --</span>';
         return;
     }
 
     const items = mapelByLembaga[lembagaId] || [];
     if (items.length === 0) {
         menu.innerHTML = '<div style="font-size:12.5px; color:#b45309; background:#fef3c7; border:1px solid #fde68a; padding:8px 12px; border-radius:6px; margin:4px;">Belum ada mata pelajaran untuk lembaga ini di menu Plotting Mapel.</div>';
-        display.innerHTML = '<span style="color:#b45309;">(Tidak ada mapel tersedia)</span>';
+        display.innerHTML = '<span class="fi-select-placeholder" style="color:#b45309;">(Tidak ada mapel tersedia)</span>';
         return;
     }
 
@@ -710,8 +755,8 @@ function renderMapelDropdown(prefix, lembagaId, preselectedMapels = []) {
         const isChecked = preselectedMapels.includes(item.nama);
         html += `
             <div class="mapel-option-item" onclick="toggleOptionItem(this, '${prefix}', event)"
-                 style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-primary); transition:background 0.12s; background:${isChecked ? 'rgba(2, 132, 199, 0.06)' : 'transparent'};"
-                 onmouseover="this.style.background='rgba(0,0,0,0.035)'" onmouseout="this.style.background='${isChecked ? 'rgba(2, 132, 199, 0.06)' : 'transparent'}'">
+                 style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-primary); transition:background 0.12s; background:${isChecked ? 'rgba(2, 132, 199, 0.08)' : 'transparent'};"
+                 onmouseover="this.style.background='rgba(0,0,0,0.04)'" onmouseout="this.style.background='${isChecked ? 'rgba(2, 132, 199, 0.08)' : 'transparent'}'">
                 <input type="checkbox" name="mata_pelajaran[]" value="${item.nama}" ${isChecked ? 'checked' : ''}
                        style="width:16px; height:16px; accent-color:#0284c7; cursor:pointer;"
                        onclick="event.stopPropagation(); syncMapelDisplay('${prefix}');">
@@ -731,7 +776,7 @@ function toggleOptionItem(rowEl, prefix, event) {
     const cb = rowEl.querySelector('input[type="checkbox"]');
     if (cb) {
         cb.checked = !cb.checked;
-        rowEl.style.background = cb.checked ? 'rgba(2, 132, 199, 0.06)' : 'transparent';
+        rowEl.style.background = cb.checked ? 'rgba(2, 132, 199, 0.08)' : 'transparent';
         syncMapelDisplay(prefix);
     }
 }
@@ -744,11 +789,11 @@ function syncMapelDisplay(prefix) {
 
     const checkedBoxes = menu.querySelectorAll('input[type="checkbox"]:checked');
     if (checkedBoxes.length === 0) {
-        display.innerHTML = '<span style="color:var(--text-muted, #94a3b8);">-- Pilih Mata Pelajaran --</span>';
+        display.innerHTML = '<span class="fi-select-placeholder" style="color:var(--text-muted, #94a3b8);">-- Pilih Mata Pelajaran --</span>';
     } else {
         let html = '';
         checkedBoxes.forEach(cb => {
-            html += `<span style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:6px; font-size:11.5px; font-weight:700; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">${cb.value}</span>`;
+            html += `<span class="fi-select-pill" style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:6px; font-size:11.5px; font-weight:700; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">${cb.value}</span>`;
         });
         display.innerHTML = html;
     }
@@ -759,6 +804,11 @@ function bukaModalTambahGuru() {
     const modal = document.getElementById('modalTambahGuru');
     if (modal) {
         modal.style.display = 'flex';
+        const wrap = document.getElementById('tambah_mapel_wrap');
+        const menu = document.getElementById('tambah_mapel_menu');
+        if (wrap) wrap.classList.remove('is-open');
+        if (menu) menu.style.display = 'none';
+
         const lembagaSelect = document.getElementById('tambah_lembaga_id');
         if (lembagaSelect && lembagaSelect.value) {
             renderMapelDropdown('tambah', lembagaSelect.value, []);
@@ -770,7 +820,9 @@ function bukaModalTambahGuru() {
 
 function tutupModalTambahGuru() {
     const modal = document.getElementById('modalTambahGuru');
+    const wrap = document.getElementById('tambah_mapel_wrap');
     const menu = document.getElementById('tambah_mapel_menu');
+    if (wrap) wrap.classList.remove('is-open');
     if (menu) menu.style.display = 'none';
     if (modal) modal.style.display = 'none';
 }
@@ -797,16 +849,32 @@ function bukaModalUbah(guruId, guruName, lembagaId, mapelStr) {
     if (lembagaSelect) {
         if (lembagaId) {
             lembagaSelect.value = lembagaId;
+            // Sinkronkan display jika enhanced oleh Filament Select
+            const wrap = lembagaSelect.nextElementSibling;
+            if (wrap && wrap.classList.contains('fi-select-wrap')) {
+                const labelWrap = wrap.querySelector('.fi-select-single-value, .fi-select-label-wrap');
+                const sel = lembagaSelect.options[lembagaSelect.selectedIndex];
+                if (labelWrap && sel) {
+                    labelWrap.textContent = sel.text;
+                }
+            }
         }
         renderMapelDropdown('ubah', lembagaSelect.value, currentUbahMapels);
     }
+
+    const wrap = document.getElementById('ubah_mapel_wrap');
+    const menu = document.getElementById('ubah_mapel_menu');
+    if (wrap) wrap.classList.remove('is-open');
+    if (menu) menu.style.display = 'none';
 
     modal.style.display = 'flex';
 }
 
 function tutupModalUbahGuru() {
     const modal = document.getElementById('modalUbahGuru');
+    const wrap = document.getElementById('ubah_mapel_wrap');
     const menu = document.getElementById('ubah_mapel_menu');
+    if (wrap) wrap.classList.remove('is-open');
     if (menu) menu.style.display = 'none';
     if (modal) modal.style.display = 'none';
 }
@@ -891,20 +959,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Global Click Listener: Tutup dropdown menu saat klik di luar
 document.addEventListener('click', function(e) {
-    const tambahTrigger = document.getElementById('tambah_mapel_dropdown_btn');
+    const tambahWrap = document.getElementById('tambah_mapel_wrap');
     const tambahMenu = document.getElementById('tambah_mapel_menu');
-    if (tambahMenu && tambahTrigger && !tambahTrigger.contains(e.target) && !tambahMenu.contains(e.target)) {
-        tambahMenu.style.display = 'none';
+    if (tambahWrap && !tambahWrap.contains(e.target)) {
+        if (tambahMenu) tambahMenu.style.display = 'none';
+        tambahWrap.classList.remove('is-open');
     }
 
-    const ubahTrigger = document.getElementById('ubah_mapel_dropdown_btn');
+    const ubahWrap = document.getElementById('ubah_mapel_wrap');
     const ubahMenu = document.getElementById('ubah_mapel_menu');
-    if (ubahMenu && ubahTrigger && !ubahTrigger.contains(e.target) && !ubahMenu.contains(e.target)) {
-        ubahMenu.style.display = 'none';
+    if (ubahWrap && !ubahWrap.contains(e.target)) {
+        if (ubahMenu) ubahMenu.style.display = 'none';
+        ubahWrap.classList.remove('is-open');
     }
 
     if (e.target && e.target.classList.contains('clean-modal-backdrop')) {
         e.target.style.display = 'none';
+        if (tambahWrap) {
+            tambahWrap.classList.remove('is-open');
+            if (tambahMenu) tambahMenu.style.display = 'none';
+        }
+        if (ubahWrap) {
+            ubahWrap.classList.remove('is-open');
+            if (ubahMenu) ubahMenu.style.display = 'none';
+        }
     }
 });
 </script>
