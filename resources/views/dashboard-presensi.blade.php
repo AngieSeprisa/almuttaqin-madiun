@@ -163,7 +163,7 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
 
             <!-- Toolbar Atas Kartu Tabel (Persis Toolbar Filament Tabel Siswa) -->
             <div class="px-4 py-3 border-b border-gray-200 flex flex-wrap items-center justify-between gap-3 bg-white">
-                <!-- Group Sisi Kiri: Tombol Aksi + Filter Status Filament -->
+                <!-- Group Sisi Kiri: Tombol Aksi Filament -->
                 <div class="flex items-center gap-2 flex-wrap">
                     <!-- Tombol Aksi Filament -->
                     <button type="button"
@@ -173,32 +173,9 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                         </svg>
                         <span>Aksi</span>
                     </button>
-
-                    <!-- Filter Status Presensi Cepat -->
-                    <select x-model="statusFilter"
-                            @change="currentPage = 1"
-                            class="px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 shadow-2xs outline-none focus:border-[#0052FF] focus:ring-1 focus:ring-[#0052FF] transition cursor-pointer">
-                        <option value="all">Semua Status</option>
-                        <option value="hadir">Sudah Hadir</option>
-                        <option value="belum">Belum Tap</option>
-                    </select>
-
-                    <!-- Tombol Reset Cepat (Tampil jika filter/search aktif) -->
-                    <button type="button"
-                            x-show="statusFilter !== 'all' || tableSearch.length > 0"
-                            x-cloak
-                            @click="statusFilter = 'all'; tableSearch = ''; currentPage = 1"
-                            class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-xs font-semibold text-rose-600 shadow-2xs transition"
-                            title="Reset Filter">
-                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                        <span>Reset</span>
-                    </button>
                 </div>
 
-                <!-- Group Sisi Kanan: Search Input + Funnel Popover + Columns Icon (Persis Tabel Siswa) -->
+                <!-- Group Sisi Kanan: Search Input + Funnel Popover + Columns Popover (Persis Tabel Siswa) -->
                 <div class="flex items-center gap-2 ml-auto w-full sm:w-auto">
                     <div class="relative flex-1 sm:w-64 sm:flex-none">
                         <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -221,10 +198,10 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                         </button>
                     </div>
 
-                    <!-- Funnel Filter Button with Badge Counter -->
+                    <!-- Funnel Filter Button with Badge Counter & Popover Menu -->
                     <div class="relative shrink-0" @click.outside="showFilterMenu = false">
                         <button type="button"
-                                @click="showFilterMenu = !showFilterMenu"
+                                @click="showFilterMenu = !showFilterMenu; showColumnMenu = false"
                                 :class="(showFilterMenu || activeFilterCount() > 0) ? 'border-[#0052FF] bg-[#EFF4FF]/60 text-[#0052FF]' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-800'"
                                 class="relative w-8 h-8 rounded-lg border flex items-center justify-center transition shadow-2xs"
                                 title="Filter">
@@ -249,7 +226,7 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                                 <div>
                                     <label class="block text-[11px] font-semibold text-gray-700 mb-1">Status Kehadiran</label>
                                     <select x-model="statusFilter" @change="currentPage = 1"
-                                            class="w-full px-2.5 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-medium text-gray-800 outline-none focus:border-[#0052FF] focus:ring-1 focus:ring-[#0052FF] transition">
+                                            class="w-full px-2.5 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-medium text-gray-800 outline-none focus:border-[#0052FF] focus:ring-1 focus:ring-[#0052FF] transition cursor-pointer">
                                         <option value="all">Semua Status</option>
                                         <option value="hadir">Sudah Hadir</option>
                                         <option value="belum">Belum Tap (Perlu Dicari)</option>
@@ -259,14 +236,48 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                         </div>
                     </div>
 
-                    <!-- Column Visibility Icon Button (Sesuai Gambar Tabel Siswa) -->
-                    <div class="w-8 h-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-700 shadow-2xs cursor-pointer transition"
-                         title="Sesuaikan Kolom">
-                        <svg class="w-3.5 h-3.5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                            <rect x="3" y="3" width="3.2" height="14" rx="1.6" />
-                            <rect x="8.4" y="3" width="3.2" height="14" rx="1.6" />
-                            <rect x="13.8" y="3" width="3.2" height="14" rx="1.6" />
-                        </svg>
+                    <!-- Column Visibility Popover Button (Tabel Kustom Bisa Diklik & Menampilkan/Menyembunyikan Kolom) -->
+                    <div class="relative shrink-0" @click.outside="showColumnMenu = false">
+                        <button type="button"
+                                @click="showColumnMenu = !showColumnMenu; showFilterMenu = false"
+                                :class="showColumnMenu ? 'border-[#0052FF] bg-[#EFF4FF]/60 text-[#0052FF]' : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-gray-800'"
+                                class="w-8 h-8 rounded-lg border flex items-center justify-center shadow-2xs transition"
+                                title="Sesuaikan Kolom">
+                            <svg class="w-3.5 h-3.5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                                <rect x="3" y="3" width="3.2" height="14" rx="1.6" />
+                                <rect x="8.4" y="3" width="3.2" height="14" rx="1.6" />
+                                <rect x="13.8" y="3" width="3.2" height="14" rx="1.6" />
+                            </svg>
+                        </button>
+
+                        <!-- Column Visibility Popover Menu -->
+                        <div x-show="showColumnMenu" x-cloak x-transition
+                             class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl z-40 overflow-hidden">
+                            <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                                <span class="text-xs font-bold text-gray-900">Kolom Tabel</span>
+                                <button type="button"
+                                        @click="columns.kamar = true; columns.status = true; columns.rfid = true; columns.waktu = true"
+                                        class="text-[11px] font-semibold text-blue-600 hover:underline">Reset</button>
+                            </div>
+                            <div class="p-3 space-y-2.5">
+                                <label class="flex items-center gap-2.5 text-xs text-gray-700 cursor-pointer select-none">
+                                    <input type="checkbox" x-model="columns.kamar" class="rounded border-gray-300 text-blue-600 focus:ring-0">
+                                    <span>Kamar / Unit</span>
+                                </label>
+                                <label class="flex items-center gap-2.5 text-xs text-gray-700 cursor-pointer select-none">
+                                    <input type="checkbox" x-model="columns.status" class="rounded border-gray-300 text-blue-600 focus:ring-0">
+                                    <span>Status</span>
+                                </label>
+                                <label class="flex items-center gap-2.5 text-xs text-gray-700 cursor-pointer select-none">
+                                    <input type="checkbox" x-model="columns.rfid" class="rounded border-gray-300 text-blue-600 focus:ring-0">
+                                    <span>Kartu RFID</span>
+                                </label>
+                                <label class="flex items-center gap-2.5 text-xs text-gray-700 cursor-pointer select-none">
+                                    <input type="checkbox" x-model="columns.waktu" class="rounded border-gray-300 text-blue-600 focus:ring-0">
+                                    <span>Waktu Tap</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -287,8 +298,8 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                                     </svg>
                                 </div>
                             </th>
-                            <th class="py-3 px-4">Kamar / Unit</th>
-                            <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" @click="toggleSort('status')">
+                            <th class="py-3 px-4" x-show="columns.kamar">Kamar / Unit</th>
+                            <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" x-show="columns.status" @click="toggleSort('status')">
                                 <div class="inline-flex items-center gap-1.5">
                                     <span>Status</span>
                                     <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -296,8 +307,8 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                                     </svg>
                                 </div>
                             </th>
-                            <th class="py-3 px-4">Kartu RFID</th>
-                            <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" @click="toggleSort('waktu')">
+                            <th class="py-3 px-4" x-show="columns.rfid">Kartu RFID</th>
+                            <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" x-show="columns.waktu" @click="toggleSort('waktu')">
                                 <div class="inline-flex items-center gap-1.5">
                                     <span>Waktu Tap</span>
                                     <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -340,10 +351,10 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                                 </td>
 
                                 <!-- Kamar / Unit -->
-                                <td class="py-3 px-4 text-gray-700 font-medium" x-text="item.sub || '-'"></td>
+                                <td class="py-3 px-4 text-gray-700 font-medium" x-show="columns.kamar" x-text="item.sub || '-'"></td>
 
                                 <!-- Status Badge (Aktif / Hadir vs Terlambat vs Belum Tap) -->
-                                <td class="py-3 px-4 whitespace-nowrap">
+                                <td class="py-3 px-4 whitespace-nowrap" x-show="columns.status">
                                     <template x-if="item.is_hadir && item.status_kehadiran !== 'terlambat'">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]">
                                             Aktif / Hadir
@@ -362,7 +373,7 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                                 </td>
 
                                 <!-- Kartu RFID (Persis Badge Siswa Hijau/Teal dengan SVG Card) -->
-                                <td class="py-3 px-4 whitespace-nowrap">
+                                <td class="py-3 px-4 whitespace-nowrap" x-show="columns.rfid">
                                     <template x-if="item.rfid_uid && item.rfid_uid !== '-' && item.rfid_uid !== 'Belum ada kartu'">
                                         <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
                                             <svg class="w-3 h-3 text-[#059669]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -379,6 +390,7 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
 
                                 <!-- Waktu Tap -->
                                 <td class="py-3 px-4 whitespace-nowrap font-mono text-xs"
+                                    x-show="columns.waktu"
                                     :class="item.waktu_tap ? 'text-gray-800 font-semibold' : 'text-gray-400'"
                                     x-text="item.waktu_tap ? (item.waktu_tap + ' WIB') : '—'">
                                 </td>
@@ -514,6 +526,13 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
             perPage: 10,
             currentPage: 1,
             showFilterMenu: false,
+            showColumnMenu: false,
+            columns: {
+                kamar: true,
+                status: true,
+                rfid: true,
+                waktu: true
+            },
             clock: '00:00:00',
             currentDate: '',
             sesiAktif: {},
