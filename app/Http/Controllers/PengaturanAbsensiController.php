@@ -11,23 +11,11 @@ class PengaturanAbsensiController extends Controller
 {
     /**
      * Tampilkan halaman Pengaturan Absensi.
+     * Dialihkan ke Pengaturan Sesi Presensi RFID karena presensi menggunakan mesin tap RFID.
      */
     public function index(Request $request)
     {
-        $user = auth()->user();
-        $lembagas = $user->accessibleLembagas();
-
-        // Tentukan lembaga aktif yang sedang diatur
-        $activeKode = $request->get('lembaga', session('active_lembaga'));
-        $currentLembaga = $lembagas->firstWhere('kode', $activeKode) ?: ($lembagas->first() ?: Lembaga::first());
-
-        if (!$currentLembaga) {
-            abort(404, 'Data lembaga tidak ditemukan.');
-        }
-
-        $pengaturan = $currentLembaga->getOrCreatePengaturanAbsensi();
-
-        return view('pengaturan-absensi.index', compact('lembagas', 'currentLembaga', 'pengaturan'));
+        return redirect()->route('pengaturan.sesi');
     }
 
     /**

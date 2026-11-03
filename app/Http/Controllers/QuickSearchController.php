@@ -155,14 +155,6 @@ class QuickSearchController extends Controller
                 'permission' => 'plotting_kamar',
             ],
             [
-                'title' => 'Pengaturan Absensi Guru',
-                'description' => 'Pengaturan radius GPS & jam kerja presensi',
-                'url' => route('pengaturan-absensi.index'),
-                'icon' => 'settings',
-                'keywords' => 'pengaturan absensi radius gps jam masuk batas',
-                'permission' => 'pengaturan_absensi',
-            ],
-            [
                 'title' => 'Pengaturan Sesi & Perangkat RFID',
                 'description' => 'Kelola jadwal sesi otomatis, mesin ESP32 & target partisipan',
                 'url' => route('pengaturan.sesi'),

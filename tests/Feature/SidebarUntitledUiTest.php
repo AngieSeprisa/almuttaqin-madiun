@@ -93,24 +93,24 @@ class SidebarUntitledUiTest extends TestCase
         $securityResponse->assertSee('Keamanan & Kata Sandi', false);
     }
 
-    public function test_sidebar_pengaturan_menu_has_absensi_submenu(): void
+    public function test_sidebar_pengaturan_menu_has_sesi_rfid_submenu_and_no_absensi_guru(): void
     {
         $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
 
-        // 1. Pada halaman beranda, menu grup Pengaturan dan submenu Absensi tampil
+        // 1. Pada halaman beranda, menu grup Pengaturan tampil, Sesi Presensi RFID tampil, dan Absensi Guru tidak tampil
         $response = $this->actingAs($yayasan)->get(route('beranda'));
         $response->assertStatus(200);
         $response->assertSee('navGroupPengaturan');
         $response->assertSee('togglePengaturan');
         $response->assertSee('Pengaturan');
-        $response->assertSee('Absensi');
-        $response->assertSee(route('pengaturan-absensi.index'));
+        $response->assertSee(route('pengaturan.sesi'));
+        $response->assertDontSee(route('pengaturan-absensi.index'));
 
-        // 2. Saat mengakses route pengaturan-absensi, grup Pengaturan berstatus 'open' dan submenu Absensi aktif
-        $absensiResponse = $this->actingAs($yayasan)->get(route('pengaturan-absensi.index'));
-        $absensiResponse->assertStatus(200);
-        $absensiResponse->assertSee('nav-group open', false);
-        $absensiResponse->assertSee('subnav-item active', false);
+        // 2. Saat mengakses route guru-sekolah, grup Pengaturan berstatus 'open' dan submenu Guru Sekolah aktif
+        $guruResponse = $this->actingAs($yayasan)->get(route('guru-sekolah.index'));
+        $guruResponse->assertStatus(200);
+        $guruResponse->assertSee('nav-group open', false);
+        $guruResponse->assertSee('subnav-item active', false);
     }
 }
 

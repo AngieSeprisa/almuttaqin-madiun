@@ -144,12 +144,10 @@ class PresensiDanAbsensiTest extends TestCase
         ]);
     }
 
-    public function test_halaman_pengaturan_absensi_dapat_diakses_dan_diupdate(): void
+    public function test_halaman_pengaturan_absensi_dialihkan_ke_pengaturan_sesi_rfid(): void
     {
         $response = $this->actingAs($this->yayasan)->get(route('pengaturan-absensi.index'));
-        $response->assertStatus(200);
-        $response->assertSee('Pengaturan Absensi');
-        $response->assertSee('Jam Masuk');
+        $response->assertRedirect(route('pengaturan.sesi'));
 
         $updateResponse = $this->actingAs($this->yayasan)->put(route('pengaturan-absensi.update'), [
             'lembaga_id'                => $this->lembagaSmp->id,

@@ -337,10 +337,6 @@
                     </button>
                     <div class="sidebar-subnav">
                         @if(!$authUser || $authUser->canDo('pengaturan_absensi', 'view'))
-                        <a href="{{ route('pengaturan-absensi.index') }}" class="subnav-item {{ request()->routeIs('pengaturan-absensi*') ? 'active' : '' }}" title="Absensi Guru">
-                            <span class="subnav-dot"></span>
-                            <span class="subnav-text">Absensi Guru</span>
-                        </a>
                         <a href="{{ route('pengaturan.sesi') }}" class="subnav-item {{ request()->routeIs('pengaturan.sesi*') ? 'active' : '' }}" title="Pengaturan Sesi & Perangkat Presensi RFID">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Sesi Presensi RFID</span>
