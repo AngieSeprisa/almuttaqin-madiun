@@ -65,7 +65,7 @@ class PerizinanHaidTest extends TestCase
 
         $response = $this->actingAs($this->admin)->get(route('perizinan.haid'));
         $response->assertStatus(200);
-        $response->assertSee('Perizinan Haid (Udzur Sholat)');
+        $response->assertSee('Perizinan Haid');
         $response->assertSee('Fatimah Az Zahra');
         $response->assertSee('Sedang Haid');
     }

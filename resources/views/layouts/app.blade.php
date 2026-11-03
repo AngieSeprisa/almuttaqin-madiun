@@ -197,9 +197,9 @@
                         @endif
 
                         @if(!$authUser || $authUser->canDo('perizinan_haid', 'view') || $authUser->canDo('perizinan_sakit', 'view') || $authUser->canDo('rekap_pondok', 'view'))
-                        <a href="{{ route('perizinan.haid') }}" class="subnav-item {{ request()->routeIs('perizinan.haid*') ? 'active' : '' }}" title="Perizinan Haid (Udzur Sholat Santriwati)">
+                        <a href="{{ route('perizinan.haid') }}" class="subnav-item {{ request()->routeIs('perizinan.haid*') ? 'active' : '' }}" title="Perizinan Haid">
                             <span class="subnav-dot" style="background:#ec4899;"></span>
-                            <span class="subnav-text">Haid (Udzur)</span>
+                            <span class="subnav-text">Haid</span>
                         </a>
                         @endif
                     </div>

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Perizinan Haid (Udzur Sholat)')
+@section('title', 'Perizinan Haid')
 
 @section('header-actions')
 @if(!auth()->check() || auth()->user()->canDo('perizinan_haid', 'create') || auth()->user()->canDo('rekap_pondok', 'edit'))
@@ -167,7 +167,6 @@
                         <th style="padding:12px 16px;">Estimasi Selesai</th>
                         <th style="padding:12px 16px;">Durasi</th>
                         <th style="padding:12px 16px;">Status</th>
-                        <th style="padding:12px 16px;">Keterangan</th>
                         <th style="padding:12px 16px; text-align:center; width:130px;">Aksi</th>
                     </tr>
                 </thead>
@@ -267,13 +266,6 @@
                                 @endif
                             </td>
 
-                            {{-- Keterangan --}}
-                            <td style="padding:12px 16px;">
-                                <div style="font-size:12px; color:var(--text-secondary, #64748b); max-width:180px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{{ $item->keterangan }}">
-                                    {{ $item->keterangan ?: '-' }}
-                                </div>
-                            </td>
-
                             {{-- Aksi (Filament Action Buttons) --}}
                             <td style="padding:12px 16px; text-align:center;">
                                 <div style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
@@ -343,11 +335,6 @@
                                                         <option value="sudah_suci" {{ $item->status === 'sudah_suci' ? 'selected' : '' }}>Sudah Suci</option>
                                                     </select>
                                                 </div>
-                                                <div>
-                                                    <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Keterangan</label>
-                                                    <textarea name="keterangan" rows="2" class="form-control"
-                                                              style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc);">{{ old('keterangan', $item->keterangan) }}</textarea>
-                                                </div>
                                             </div>
 
                                             <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc);">
@@ -361,7 +348,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" style="text-align:center; padding:42px 16px; color:var(--text-muted, #94a3b8);">
+                            <td colspan="8" style="text-align:center; padding:42px 16px; color:var(--text-muted, #94a3b8);">
                                 <div style="font-size:14px; font-weight:600; color:var(--text-secondary, #64748b);">Tidak ada data perizinan haid yang sesuai filter.</div>
                             </td>
                         </tr>

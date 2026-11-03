@@ -160,7 +160,7 @@ class PerizinanHaidController extends Controller
             'tanggal_mulai'   => $request->tanggal_mulai,
             'tanggal_selesai' => $request->tanggal_selesai,
             'status'          => $request->status,
-            'keterangan'      => $request->keterangan,
+            'keterangan'      => $request->filled('keterangan') ? $request->keterangan : ($haid->keterangan ?: 'Udzur syar\'i (haid)'),
         ]);
 
         return redirect()->route('perizinan.haid')

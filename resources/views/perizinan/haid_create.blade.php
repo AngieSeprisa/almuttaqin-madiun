@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Catat Santriwati Haid (Udzur Sholat)')
+@section('title', 'Catat Santriwati Haid')
 
 @section('header-actions')
 <a href="{{ route('perizinan.haid') }}" class="btn btn-secondary">
@@ -93,19 +93,13 @@
                 </div>
             </div>
 
-            {{-- Status & Keterangan --}}
-            <div style="display:grid; grid-template-columns: 200px 1fr; gap:18px; margin-bottom:22px;">
-                <div class="form-group">
-                    <label for="status" class="form-label">Status Awal</label>
-                    <select name="status" id="status" class="form-select">
-                        <option value="sedang_haid" selected>Sedang Haid</option>
-                        <option value="sudah_suci">Sudah Suci</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="keterangan" class="form-label">Keterangan (Opsional)</label>
-                    <input type="text" name="keterangan" id="keterangan" value="{{ old('keterangan', 'Udzur syar\'i (haid)') }}" class="form-control" placeholder="Contoh: Datang bulan hari pertama">
-                </div>
+            {{-- Status Awal --}}
+            <div class="form-group" style="max-width:280px; margin-bottom:24px;">
+                <label for="status" class="form-label">Status Awal</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="sedang_haid" selected>Sedang Haid</option>
+                    <option value="sudah_suci">Sudah Suci</option>
+                </select>
             </div>
 
             <div style="display:flex; justify-content:flex-end; gap:12px;">
