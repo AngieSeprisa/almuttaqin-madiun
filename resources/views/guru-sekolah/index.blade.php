@@ -491,11 +491,27 @@
                     </select>
                 </div>
 
-                {{-- Mata Pelajaran yang Diampu (Plotting Mapel Berdasarkan Lembaga) --}}
-                <div>
+                {{-- Mata Pelajaran yang Diampu (Dropdown Multi-Select) --}}
+                <div style="position:relative;">
                     <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Mata Pelajaran yang Diampu <span style="color:#ef4444;">*</span></label>
-                    <div id="tambah_mapel_container" style="border:1px solid var(--border-light, #cbd5e1); border-radius:8px; padding:10px 12px; min-height:60px; background:var(--bg-main, #f8fafc);">
-                        <div style="font-size:12.5px; color:var(--text-muted, #94a3b8); padding:8px 0;">Pilih lembaga sekolah terlebih dahulu.</div>
+                    
+                    {{-- Dropdown Trigger (Sama Persis Seperti Select Lembaga) --}}
+                    <div id="tambah_mapel_dropdown_btn" class="form-select" onclick="toggleMapelDropdown('tambah', event)"
+                         style="width:100%; min-height:38px; padding:6px 36px 6px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc); color:var(--text-primary); cursor:pointer; display:flex; align-items:center; position:relative; box-sizing:border-box; user-select:none;">
+                        <div id="tambah_mapel_display" style="display:flex; align-items:center; flex-wrap:wrap; gap:4px; width:100%;">
+                            <span style="color:var(--text-muted, #94a3b8);">-- Pilih Lembaga Terlebih Dahulu --</span>
+                        </div>
+                        <div style="position:absolute; right:12px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--text-muted, #94a3b8); display:flex; align-items:center;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+
+                    {{-- Dropdown Menu List --}}
+                    <div id="tambah_mapel_menu"
+                         style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:100%; background:var(--bg-surface, #ffffff); border:1px solid var(--border-light, #cbd5e1); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.12); z-index:1000; max-height:220px; overflow-y:auto; padding:6px;">
+                        <div style="font-size:12.5px; color:var(--text-muted, #94a3b8); padding:8px 10px;">Pilih lembaga sekolah terlebih dahulu.</div>
                     </div>
                 </div>
             </div>
@@ -539,10 +555,27 @@
                     </select>
                 </div>
 
-                {{-- Mata Pelajaran (Multi Mapel Didukung) --}}
-                <div>
+                {{-- Mata Pelajaran yang Diampu (Dropdown Multi-Select) --}}
+                <div style="position:relative;">
                     <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Mata Pelajaran yang Diampu <span style="color:#ef4444;">*</span></label>
-                    <div id="ubah_mapel_container" style="border:1px solid var(--border-light, #cbd5e1); border-radius:8px; padding:10px 12px; min-height:60px; background:var(--bg-main, #f8fafc);"></div>
+                    
+                    {{-- Dropdown Trigger (Sama Persis Seperti Select Lembaga) --}}
+                    <div id="ubah_mapel_dropdown_btn" class="form-select" onclick="toggleMapelDropdown('ubah', event)"
+                         style="width:100%; min-height:38px; padding:6px 36px 6px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc); color:var(--text-primary); cursor:pointer; display:flex; align-items:center; position:relative; box-sizing:border-box; user-select:none;">
+                        <div id="ubah_mapel_display" style="display:flex; align-items:center; flex-wrap:wrap; gap:4px; width:100%;">
+                            <span style="color:var(--text-muted, #94a3b8);">-- Pilih Mata Pelajaran --</span>
+                        </div>
+                        <div style="position:absolute; right:12px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--text-muted, #94a3b8); display:flex; align-items:center;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+
+                    {{-- Dropdown Menu List --}}
+                    <div id="ubah_mapel_menu"
+                         style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:100%; background:var(--bg-surface, #ffffff); border:1px solid var(--border-light, #cbd5e1); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.12); z-index:1000; max-height:220px; overflow-y:auto; padding:6px;">
+                    </div>
                 </div>
             </div>
 
@@ -640,47 +673,84 @@ const mapelByLembaga = {
 @endforeach
 };
 
-function renderMapelChips(lembagaId, containerId, preselectedMapels = []) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
+// Toggle Dropdown Menu
+function toggleMapelDropdown(prefix, event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById(prefix + '_mapel_menu');
+    const otherPrefix = prefix === 'tambah' ? 'ubah' : 'tambah';
+    const otherMenu = document.getElementById(otherPrefix + '_mapel_menu');
+    if (otherMenu) otherMenu.style.display = 'none';
+
+    if (menu) {
+        menu.style.display = (menu.style.display === 'none' || menu.style.display === '') ? 'block' : 'none';
+    }
+}
+
+// Render Dropdown List Items
+function renderMapelDropdown(prefix, lembagaId, preselectedMapels = []) {
+    const menu = document.getElementById(prefix + '_mapel_menu');
+    const display = document.getElementById(prefix + '_mapel_display');
+    if (!menu || !display) return;
 
     if (!lembagaId) {
-        container.innerHTML = '<div style="font-size:12.5px; color:var(--text-muted, #94a3b8); padding:8px 0;">Pilih lembaga sekolah terlebih dahulu.</div>';
+        menu.innerHTML = '<div style="font-size:12.5px; color:var(--text-muted, #94a3b8); padding:8px 10px;">Pilih lembaga sekolah terlebih dahulu.</div>';
+        display.innerHTML = '<span style="color:var(--text-muted, #94a3b8);">-- Pilih Lembaga Terlebih Dahulu --</span>';
         return;
     }
 
     const items = mapelByLembaga[lembagaId] || [];
     if (items.length === 0) {
-        container.innerHTML = '<div style="font-size:12.5px; color:#b45309; background:#fef3c7; border:1px solid #fde68a; padding:8px 12px; border-radius:8px;">Belum ada mata pelajaran untuk lembaga ini di menu Plotting Mapel.</div>';
+        menu.innerHTML = '<div style="font-size:12.5px; color:#b45309; background:#fef3c7; border:1px solid #fde68a; padding:8px 12px; border-radius:6px; margin:4px;">Belum ada mata pelajaran untuk lembaga ini di menu Plotting Mapel.</div>';
+        display.innerHTML = '<span style="color:#b45309;">(Tidak ada mapel tersedia)</span>';
         return;
     }
 
-    let html = '<div style="display:flex; flex-wrap:wrap; gap:8px; max-height:220px; overflow-y:auto; padding:4px 0;">';
+    let html = '';
     items.forEach(item => {
         const isChecked = preselectedMapels.includes(item.nama);
         html += `
-            <label style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; border:1px solid ${isChecked ? '#0284c7' : 'var(--border-light, #cbd5e1)'}; background:${isChecked ? 'rgba(2, 132, 199, 0.08)' : 'var(--bg-surface, #ffffff)'}; color:${isChecked ? '#0284c7' : 'inherit'}; font-size:12.5px; font-weight:600; cursor:pointer; user-select:none; transition:all 0.15s;">
-                <input type="checkbox" name="mata_pelajaran[]" value="${item.nama}" ${isChecked ? 'checked' : ''} style="accent-color:#0284c7; cursor:pointer;" onchange="updateChipState(this)">
-                <span>${item.nama}</span>
-                <span style="font-size:10.5px; color:var(--text-muted, #94a3b8); font-weight:500;">(${item.kode})</span>
-            </label>
+            <div class="mapel-option-item" onclick="toggleOptionItem(this, '${prefix}', event)"
+                 style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; color:var(--text-primary); transition:background 0.12s; background:${isChecked ? 'rgba(2, 132, 199, 0.06)' : 'transparent'};"
+                 onmouseover="this.style.background='rgba(0,0,0,0.035)'" onmouseout="this.style.background='${isChecked ? 'rgba(2, 132, 199, 0.06)' : 'transparent'}'">
+                <input type="checkbox" name="mata_pelajaran[]" value="${item.nama}" ${isChecked ? 'checked' : ''}
+                       style="width:16px; height:16px; accent-color:#0284c7; cursor:pointer;"
+                       onclick="event.stopPropagation(); syncMapelDisplay('${prefix}');">
+                <span style="flex:1;">${item.nama}</span>
+                <span style="font-size:11px; color:var(--text-muted, #94a3b8); font-weight:500;">(${item.kode})</span>
+            </div>
         `;
     });
-    html += '</div>';
-    container.innerHTML = html;
+    menu.innerHTML = html;
+
+    syncMapelDisplay(prefix);
 }
 
-function updateChipState(cb) {
-    const label = cb.closest('label');
-    if (!label) return;
-    if (cb.checked) {
-        label.style.borderColor = '#0284c7';
-        label.style.background = 'rgba(2, 132, 199, 0.08)';
-        label.style.color = '#0284c7';
+// Toggle option item when clicking the row
+function toggleOptionItem(rowEl, prefix, event) {
+    if (event) event.stopPropagation();
+    const cb = rowEl.querySelector('input[type="checkbox"]');
+    if (cb) {
+        cb.checked = !cb.checked;
+        rowEl.style.background = cb.checked ? 'rgba(2, 132, 199, 0.06)' : 'transparent';
+        syncMapelDisplay(prefix);
+    }
+}
+
+// Synchronize the display text / badges inside the trigger button
+function syncMapelDisplay(prefix) {
+    const menu = document.getElementById(prefix + '_mapel_menu');
+    const display = document.getElementById(prefix + '_mapel_display');
+    if (!menu || !display) return;
+
+    const checkedBoxes = menu.querySelectorAll('input[type="checkbox"]:checked');
+    if (checkedBoxes.length === 0) {
+        display.innerHTML = '<span style="color:var(--text-muted, #94a3b8);">-- Pilih Mata Pelajaran --</span>';
     } else {
-        label.style.borderColor = 'var(--border-light, #cbd5e1)';
-        label.style.background = 'var(--bg-surface, #ffffff)';
-        label.style.color = 'inherit';
+        let html = '';
+        checkedBoxes.forEach(cb => {
+            html += `<span style="display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:6px; font-size:11.5px; font-weight:700; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">${cb.value}</span>`;
+        });
+        display.innerHTML = html;
     }
 }
 
@@ -691,18 +761,22 @@ function bukaModalTambahGuru() {
         modal.style.display = 'flex';
         const lembagaSelect = document.getElementById('tambah_lembaga_id');
         if (lembagaSelect && lembagaSelect.value) {
-            renderMapelChips(lembagaSelect.value, 'tambah_mapel_container', []);
+            renderMapelDropdown('tambah', lembagaSelect.value, []);
+        } else {
+            renderMapelDropdown('tambah', '', []);
         }
     }
 }
 
 function tutupModalTambahGuru() {
     const modal = document.getElementById('modalTambahGuru');
+    const menu = document.getElementById('tambah_mapel_menu');
+    if (menu) menu.style.display = 'none';
     if (modal) modal.style.display = 'none';
 }
 
 function filterMapelTambah(lembagaId) {
-    renderMapelChips(lembagaId, 'tambah_mapel_container', []);
+    renderMapelDropdown('tambah', lembagaId, []);
 }
 
 // Modal Ubah Guru
@@ -724,7 +798,7 @@ function bukaModalUbah(guruId, guruName, lembagaId, mapelStr) {
         if (lembagaId) {
             lembagaSelect.value = lembagaId;
         }
-        renderMapelChips(lembagaSelect.value, 'ubah_mapel_container', currentUbahMapels);
+        renderMapelDropdown('ubah', lembagaSelect.value, currentUbahMapels);
     }
 
     modal.style.display = 'flex';
@@ -732,11 +806,13 @@ function bukaModalUbah(guruId, guruName, lembagaId, mapelStr) {
 
 function tutupModalUbahGuru() {
     const modal = document.getElementById('modalUbahGuru');
+    const menu = document.getElementById('ubah_mapel_menu');
+    if (menu) menu.style.display = 'none';
     if (modal) modal.style.display = 'none';
 }
 
 function filterMapelUbah(lembagaId) {
-    renderMapelChips(lembagaId, 'ubah_mapel_container', currentUbahMapels);
+    renderMapelDropdown('ubah', lembagaId, currentUbahMapels);
 }
 
 // Modal Tolak Pengajuan
@@ -786,8 +862,47 @@ function tutupModalDetail() {
     if (modal) modal.style.display = 'none';
 }
 
-// Close modal when clicking backdrop
+// Validasi Form Submit: pastikan minimal 1 mapel dipilih
+document.addEventListener('DOMContentLoaded', function() {
+    const formTambah = document.getElementById('formTambahGuru');
+    if (formTambah) {
+        formTambah.addEventListener('submit', function(e) {
+            const checked = this.querySelectorAll('input[name="mata_pelajaran[]"]:checked');
+            if (checked.length === 0) {
+                e.preventDefault();
+                alert('Pilih setidaknya satu mata pelajaran yang diampu.');
+                return false;
+            }
+        });
+    }
+
+    const formUbah = document.getElementById('formUbahGuru');
+    if (formUbah) {
+        formUbah.addEventListener('submit', function(e) {
+            const checked = this.querySelectorAll('input[name="mata_pelajaran[]"]:checked');
+            if (checked.length === 0) {
+                e.preventDefault();
+                alert('Pilih setidaknya satu mata pelajaran yang diampu.');
+                return false;
+            }
+        });
+    }
+});
+
+// Global Click Listener: Tutup dropdown menu saat klik di luar
 document.addEventListener('click', function(e) {
+    const tambahTrigger = document.getElementById('tambah_mapel_dropdown_btn');
+    const tambahMenu = document.getElementById('tambah_mapel_menu');
+    if (tambahMenu && tambahTrigger && !tambahTrigger.contains(e.target) && !tambahMenu.contains(e.target)) {
+        tambahMenu.style.display = 'none';
+    }
+
+    const ubahTrigger = document.getElementById('ubah_mapel_dropdown_btn');
+    const ubahMenu = document.getElementById('ubah_mapel_menu');
+    if (ubahMenu && ubahTrigger && !ubahTrigger.contains(e.target) && !ubahMenu.contains(e.target)) {
+        ubahMenu.style.display = 'none';
+    }
+
     if (e.target && e.target.classList.contains('clean-modal-backdrop')) {
         e.target.style.display = 'none';
     }
