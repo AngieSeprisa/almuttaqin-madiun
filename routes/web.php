@@ -281,6 +281,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [GuruSekolahController::class, 'index'])
             ->middleware('permission:guru_sekolah,view')
             ->name('index');
+        Route::post('/store', [GuruSekolahController::class, 'store'])
+            ->middleware('permission:guru_sekolah,create')
+            ->name('store');
         Route::post('/{user}/approve', [GuruSekolahController::class, 'approve'])
             ->middleware('permission:guru_sekolah,edit')
             ->name('approve');
@@ -293,6 +296,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/{user}/reset', [GuruSekolahController::class, 'reset'])
             ->middleware('permission:guru_sekolah,edit')
             ->name('reset');
+        Route::delete('/{user}', [GuruSekolahController::class, 'destroy'])
+            ->middleware('permission:guru_sekolah,delete')
+            ->name('destroy');
     });
 
     // Menu Pengaturan Sekolah: Plotting Mata Pelajaran

@@ -39,6 +39,7 @@ class User extends Authenticatable
         'telepon',
         'alamat',
         'primary_lembaga_id',
+        'is_guru_sekolah',
         'is_active',
         'must_change_password',
     ];
@@ -64,6 +65,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'is_guru_sekolah' => 'boolean',
             'must_change_password' => 'boolean',
             'mapel_diajukan_at' => 'datetime',
             'mapel_diverifikasi_at' => 'datetime',

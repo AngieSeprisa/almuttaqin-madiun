@@ -184,4 +184,91 @@ class GuruSekolahApprovalTest extends TestCase
         $response->assertRedirect(route('beranda'));
         $response->assertSessionHas('error');
     }
+
+    public function test_yayasan_can_add_guru_sekolah_from_registered_user(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+        $smp = \App\Models\Lembaga::where('kode', 'smp')->firstOrFail();
+
+        // Buat akun baru di sistem yang belum menjadi guru sekolah
+        $newUser = User::factory()->create([
+            'name'      => 'Ahmad Dahlan, S.Pd.',
+            'email'     => 'ahmad.dahlan@almuttaqin.id',
+            'role'      => 'pengguna',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($yayasan)->post(route('guru-sekolah.store'), [
+            'user_id'        => $newUser->id,
+            'lembaga_id'     => $smp->id,
+            'mata_pelajaran' => ['Matematika', 'Informatika'],
+        ]);
+
+        $response->assertRedirect(route('guru-sekolah.index'));
+        $response->assertSessionHas('success');
+
+        $newUser->refresh();
+        $this->assertTrue($newUser->is_guru_sekolah);
+        $this->assertEquals($smp->id, $newUser->primary_lembaga_id);
+        $this->assertEquals('Matematika, Informatika', $newUser->mata_pelajaran);
+        $this->assertEquals('disetujui', $newUser->mapel_status);
+
+        // Muncul di halaman Guru Sekolah
+        $indexResponse = $this->actingAs($yayasan)->get(route('guru-sekolah.index'));
+        $indexResponse->assertSee('Ahmad Dahlan, S.Pd.');
+        $indexResponse->assertSee('Matematika');
+    }
+
+    public function test_unregistered_account_is_not_listed_in_guru_sekolah(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        // Akun guru pondok biasa yang TIDAK didaftarkan sebagai guru sekolah
+        $pondokUser = User::factory()->create([
+            'name'            => 'Ustadzah Khadijah',
+            'email'           => 'khadijah@almuttaqin.id',
+            'role'            => 'guru',
+            'is_guru_sekolah' => false,
+            'mapel_status'    => 'belum_mengajukan',
+            'is_active'       => true,
+        ]);
+
+        $response = $this->actingAs($yayasan)->get(route('guru-sekolah.index'));
+        $response->assertStatus(200);
+
+        // Pastikan tidak ada di daftar tabel Guru Sekolah
+        $tableUsers = $response->viewData('users');
+        $this->assertFalse($tableUsers->contains('id', $pondokUser->id));
+    }
+
+    public function test_yayasan_can_remove_guru_from_guru_sekolah_list(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+        $smp = \App\Models\Lembaga::where('kode', 'smp')->firstOrFail();
+
+        $guru = User::factory()->create([
+            'name'               => 'Budi Santoso, M.Pd.',
+            'email'              => 'budi.santoso@almuttaqin.id',
+            'is_guru_sekolah'    => true,
+            'primary_lembaga_id' => $smp->id,
+            'mata_pelajaran'     => 'Fisika',
+            'mapel_status'       => 'disetujui',
+            'is_active'          => true,
+        ]);
+
+        $deleteResponse = $this->actingAs($yayasan)->delete(route('guru-sekolah.destroy', $guru->id));
+        $deleteResponse->assertRedirect(route('guru-sekolah.index'));
+        $deleteResponse->assertSessionHas('success');
+
+        $guru->refresh();
+        $this->assertFalse($guru->is_guru_sekolah);
+        $this->assertNull($guru->mata_pelajaran);
+
+        // Akun tetap ada di database, tetapi tidak terdaftar di tabel guru sekolah
+        $this->assertDatabaseHas('users', ['id' => $guru->id]);
+
+        $indexResponse = $this->actingAs($yayasan)->get(route('guru-sekolah.index'));
+        $tableUsers = $indexResponse->viewData('users');
+        $this->assertFalse($tableUsers->contains('id', $guru->id));
+    }
 }

@@ -4,12 +4,12 @@
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-    @if(isset($lembagas) && $lembagas->count() > 1)
+    @if(isset($sekolahLembagas) && $sekolahLembagas->count() > 1)
     <div style="display:flex; align-items:center; gap:8px;">
         <select class="form-select" onchange="window.location.href='{{ route('guru-sekolah.index') }}?lembaga_id=' + this.value"
-                style="padding:8px 14px; font-size:13px; font-weight:600; border-radius:10px; background:var(--bg-surface); color:var(--text-primary); border:1px solid var(--border-light);">
-            <option value="">Semua Lembaga</option>
-            @foreach($lembagas as $lem)
+                style="padding:8px 14px; font-size:13px; font-weight:600; border-radius:10px; background:var(--bg-surface); color:var(--text-primary); border:1px solid var(--border-light, #e2e8f0);">
+            <option value="">Semua Sekolah</option>
+            @foreach($sekolahLembagas as $lem)
             <option value="{{ $lem->id }}" {{ request('lembaga_id') == $lem->id ? 'selected' : '' }}>
                 {{ $lem->nama_singkat ?? $lem->singkatan }}
             </option>
@@ -18,17 +18,21 @@
     </div>
     @endif
 
-    <button type="button" class="btn btn-primary" onclick="bukaModalTetapkanMapel()" style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; font-size:13px; border-radius:10px; font-weight:600;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
-            <path d="M12 5v14M5 12h14"></path>
+    {{-- Tombol Tambah Guru (Filament Primary Button) --}}
+    @if(!auth()->check() || auth()->user()->isYayasan() || auth()->user()->canDo('guru_sekolah', 'create'))
+    <button type="button" class="btn btn-primary" onclick="bukaModalTambahGuru()" style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; font-size:13px; border-radius:10px; font-weight:600;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
-        <span>Tetapkan Mapel Guru</span>
+        <span>Tambah Guru</span>
     </button>
+    @endif
 </div>
 @endsection
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:20px; max-width:1300px; margin:0 auto;">
+<div style="display:flex; flex-direction:column; gap:18px; max-width:1300px; margin:0 auto;">
 
     {{-- Banner Notifikasi --}}
     @if(session('success'))
@@ -48,7 +52,7 @@
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
         <div style="font-size:13.5px;">
-            <div style="font-weight:700; margin-bottom:4px;">Gagal memproses tindakan:</div>
+            <div style="font-weight:700; margin-bottom:4px;">Gagal memproses data:</div>
             <ul style="margin:0; padding-left:18px;">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -59,7 +63,7 @@
     @endif
 
     {{-- Highlight Pengingat Persetujuan Yayasan (Filament Clean) --}}
-    @if($stats['menunggu'] > 0)
+    @if(isset($stats['menunggu']) && $stats['menunggu'] > 0)
     <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 18px; border-radius:12px; background:rgba(245, 158, 11, 0.08); border:1px solid rgba(245, 158, 11, 0.3); flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:12px;">
             <div style="width:34px; height:34px; border-radius:8px; background:#F59E0B; display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0;">
@@ -72,7 +76,7 @@
                 Terdapat {{ $stats['menunggu'] }} Pengajuan Mata Pelajaran Menunggu Persetujuan Yayasan
             </div>
         </div>
-        <a href="{{ route('guru-sekolah.index', ['status' => 'menunggu']) }}" class="btn btn-warning" style="padding:7px 14px; font-size:12.5px; font-weight:700; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:#F59E0B; color:#ffffff; border:none;">
+        <a href="{{ route('guru-sekolah.index', ['status' => 'menunggu']) }}" class="btn" style="padding:7px 14px; font-size:12.5px; font-weight:700; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:#F59E0B; color:#ffffff; border:none;">
             <span>Lihat Pengajuan</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
                 <polyline points="9 18 15 12 9 6"></polyline>
@@ -81,11 +85,11 @@
     </div>
     @endif
 
-    {{-- Kartu Statistik Metrik (Filament Style: Bersih Tanpa Deskripsi) --}}
+    {{-- Kartu Statistik Ringkas (Filament Style: Bersih Tanpa Deskripsi) --}}
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:14px;">
-        {{-- Total Guru --}}
-        <div style="background:var(--bg-surface); border:1px solid var(--border-light); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px;">
-            <div style="width:42px; height:42px; border-radius:10px; background:rgba(59, 130, 246, 0.1); display:flex; align-items:center; justify-content:center; color:#3B82F6; flex-shrink:0;">
+        {{-- Total Guru Sekolah --}}
+        <div style="background:var(--bg-surface); border:1px solid var(--border-light, #e2e8f0); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+            <div style="width:42px; height:42px; border-radius:10px; background:rgba(59, 130, 246, 0.08); display:flex; align-items:center; justify-content:center; color:#2563eb; flex-shrink:0; border:1px solid rgba(59, 130, 246, 0.15);">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
@@ -94,158 +98,206 @@
                 </svg>
             </div>
             <div>
-                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted);">Total Guru</div>
-                <div style="font-size:22px; font-weight:800; color:var(--text-primary); margin-top:2px; line-height:1.2;">{{ $stats['total_guru'] }}</div>
+                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted, #64748b);">Total Guru Sekolah</div>
+                <div style="font-size:24px; font-weight:800; color:var(--text-primary, #0f172a); margin-top:2px; line-height:1.2;">{{ $stats['total_guru'] }}</div>
             </div>
         </div>
 
-        {{-- Menunggu Approval --}}
-        <div style="background:var(--bg-surface); border:1px solid {{ $stats['menunggu'] > 0 ? 'rgba(245, 158, 11, 0.4)' : 'var(--border-light)' }}; border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px;">
-            <div style="width:42px; height:42px; border-radius:10px; background:rgba(245, 158, 11, 0.12); display:flex; align-items:center; justify-content:center; color:#F59E0B; flex-shrink:0;">
+        {{-- Guru SMP --}}
+        <div style="background:var(--bg-surface); border:1px solid var(--border-light, #e2e8f0); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+            <div style="width:42px; height:42px; border-radius:10px; background:rgba(2, 132, 199, 0.08); display:flex; align-items:center; justify-content:center; color:#0284c7; flex-shrink:0; border:1px solid rgba(2, 132, 199, 0.15);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted, #64748b);">Guru SMP</div>
+                <div style="font-size:24px; font-weight:800; color:#0284c7; margin-top:2px; line-height:1.2;">{{ $stats['smp'] }}</div>
+            </div>
+        </div>
+
+        {{-- Guru SMA --}}
+        <div style="background:var(--bg-surface); border:1px solid var(--border-light, #e2e8f0); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+            <div style="width:42px; height:42px; border-radius:10px; background:rgba(16, 185, 129, 0.08); display:flex; align-items:center; justify-content:center; color:#059669; flex-shrink:0; border:1px solid rgba(16, 185, 129, 0.15);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
+                    <circle cx="12" cy="8" r="7"></circle>
+                    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted, #64748b);">Guru SMA</div>
+                <div style="font-size:24px; font-weight:800; color:#059669; margin-top:2px; line-height:1.2;">{{ $stats['sma'] }}</div>
+            </div>
+        </div>
+
+        {{-- Menunggu Persetujuan --}}
+        <div style="background:var(--bg-surface); border:1px solid {{ $stats['menunggu'] > 0 ? 'rgba(245, 158, 11, 0.4)' : 'var(--border-light, #e2e8f0)' }}; border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+            <div style="width:42px; height:42px; border-radius:10px; background:rgba(245, 158, 11, 0.1); display:flex; align-items:center; justify-content:center; color:#d97706; flex-shrink:0; border:1px solid rgba(245, 158, 11, 0.2);">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
             </div>
             <div>
-                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#D97706;">Menunggu Persetujuan</div>
-                <div style="font-size:22px; font-weight:800; color:#D97706; margin-top:2px; line-height:1.2;">{{ $stats['menunggu'] }}</div>
-            </div>
-        </div>
-
-        {{-- Disetujui --}}
-        <div style="background:var(--bg-surface); border:1px solid var(--border-light); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px;">
-            <div style="width:42px; height:42px; border-radius:10px; background:rgba(16, 185, 129, 0.1); display:flex; align-items:center; justify-content:center; color:#10B981; flex-shrink:0;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-            </div>
-            <div>
-                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted);">Mapel Disetujui</div>
-                <div style="font-size:22px; font-weight:800; color:var(--text-primary); margin-top:2px; line-height:1.2;">{{ $stats['disetujui'] }}</div>
-            </div>
-        </div>
-
-        {{-- Belum Mengajukan --}}
-        <div style="background:var(--bg-surface); border:1px solid var(--border-light); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px;">
-            <div style="width:42px; height:42px; border-radius:10px; background:rgba(148, 163, 184, 0.15); display:flex; align-items:center; justify-content:center; color:#64748B; flex-shrink:0;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="16" x2="12" y2="12"></line>
-                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-            </div>
-            <div>
-                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted);">Belum Mengajukan</div>
-                <div style="font-size:22px; font-weight:800; color:var(--text-primary); margin-top:2px; line-height:1.2;">{{ $stats['belum_mengajukan'] }}</div>
+                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#d97706;">Menunggu Persetujuan</div>
+                <div style="font-size:24px; font-weight:800; color:#d97706; margin-top:2px; line-height:1.2;">{{ $stats['menunggu'] }}</div>
             </div>
         </div>
     </div>
 
-    {{-- Filter Navigasi Cepat & Pencarian --}}
-    <div style="background:var(--bg-surface); border:1px solid var(--border-light); border-radius:12px; padding:14px 18px; display:flex; flex-direction:column; gap:12px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
-            {{-- Tab Status Filter --}}
-            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                @php
-                    $curStatus = request('status', '');
-                @endphp
-                <a href="{{ route('guru-sekolah.index', array_merge(request()->except('status', 'page'), ['status' => ''])) }}"
-                   class="btn" style="padding:6px 12px; font-size:12.5px; font-weight:600; border-radius:8px; text-decoration:none; {{ $curStatus === '' ? 'background:var(--brand-primary, #0284c7); color:#fff;' : 'background:rgba(0,0,0,0.04); color:var(--text-secondary);' }}">
-                    Semua ({{ $stats['total_guru'] }})
-                </a>
-                <a href="{{ route('guru-sekolah.index', array_merge(request()->except('status', 'page'), ['status' => 'menunggu'])) }}"
-                   class="btn" style="padding:6px 12px; font-size:12.5px; font-weight:600; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:6px; {{ $curStatus === 'menunggu' ? 'background:#F59E0B; color:#fff;' : 'background:rgba(245, 158, 11, 0.12); color:#B45309;' }}">
-                    <span>Menunggu</span>
-                    @if($stats['menunggu'] > 0)
-                    <span style="background:{{ $curStatus === 'menunggu' ? '#fff' : '#EF4444' }}; color:{{ $curStatus === 'menunggu' ? '#B45309' : '#fff' }}; font-size:10px; font-weight:800; padding:1px 6px; border-radius:10px;">{{ $stats['menunggu'] }}</span>
-                    @endif
-                </a>
-                <a href="{{ route('guru-sekolah.index', array_merge(request()->except('status', 'page'), ['status' => 'disetujui'])) }}"
-                   class="btn" style="padding:6px 12px; font-size:12.5px; font-weight:600; border-radius:8px; text-decoration:none; {{ $curStatus === 'disetujui' ? 'background:#10B981; color:#fff;' : 'background:rgba(16, 185, 129, 0.1); color:#047857;' }}">
-                    Disetujui ({{ $stats['disetujui'] }})
-                </a>
-                <a href="{{ route('guru-sekolah.index', array_merge(request()->except('status', 'page'), ['status' => 'ditolak'])) }}"
-                   class="btn" style="padding:6px 12px; font-size:12.5px; font-weight:600; border-radius:8px; text-decoration:none; {{ $curStatus === 'ditolak' ? 'background:#EF4444; color:#fff;' : 'background:rgba(239, 68, 68, 0.08); color:#B91C1C;' }}">
-                    Ditolak ({{ $stats['ditolak'] }})
-                </a>
-                <a href="{{ route('guru-sekolah.index', array_merge(request()->except('status', 'page'), ['status' => 'belum_mengajukan'])) }}"
-                   class="btn" style="padding:6px 12px; font-size:12.5px; font-weight:600; border-radius:8px; text-decoration:none; {{ $curStatus === 'belum_mengajukan' ? 'background:#64748B; color:#fff;' : 'background:rgba(100, 116, 139, 0.08); color:#475569;' }}">
-                    Belum Mengajukan ({{ $stats['belum_mengajukan'] }})
-                </a>
-            </div>
+    {{-- Kontainer Tabel Filament PHP (Persis Gaya Menu Siswa) --}}
+    <div class="fi-ta-ctn" style="background:var(--bg-surface); border:1px solid var(--border-light, #e2e8f0); border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+        
+        {{-- Filament Table Toolbar (Search & Filter Sesuai Menu Siswa) --}}
+        <div style="padding:14px 18px; border-bottom:1px solid var(--border-subtle, #f1f5f9); background:var(--bg-surface);">
+            <form action="{{ route('guru-sekolah.index') }}" method="GET" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0;">
+                
+                {{-- Group Filter Sisi Kiri --}}
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    {{-- Tombol Aksi Dropdown Filament Style --}}
+                    <div style="position:relative; display:inline-block;">
+                        <button type="button" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:12.5px; font-weight:600; border-radius:8px; background:var(--bg-main, #f8fafc); border:1px solid var(--border-light, #cbd5e1); color:var(--text-secondary, #475569); cursor:default;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:var(--text-muted, #94a3b8);">
+                                <circle cx="12" cy="12" r="1"></circle>
+                                <circle cx="12" cy="5" r="1"></circle>
+                                <circle cx="12" cy="19" r="1"></circle>
+                            </svg>
+                            <span>Aksi</span>
+                        </button>
+                    </div>
 
-            {{-- Form Pencarian --}}
-            <form action="{{ route('guru-sekolah.index') }}" method="GET" style="display:flex; align-items:center; gap:8px; margin:0; flex-grow:1; max-width:320px;">
-                @if(request('status'))
-                    <input type="hidden" name="status" value="{{ request('status') }}">
-                @endif
-                @if(request('lembaga_id'))
-                    <input type="hidden" name="lembaga_id" value="{{ request('lembaga_id') }}">
-                @endif
-                <div style="position:relative; width:100%;">
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari guru, NIP, mapel..."
-                           style="width:100%; padding:7px 32px 7px 12px; border-radius:8px; font-size:13px; border:1px solid var(--border-light); background:var(--bg-main, #F8FAFC); color:var(--text-primary);">
-                    <button type="submit" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; padding:4px; color:var(--text-muted); cursor:pointer;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px; height:15px;">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    {{-- Filter Status Pengajuan --}}
+                    <div style="position:relative; display:inline-block;">
+                        <select name="status" class="form-select" onchange="this.form.submit()"
+                                style="padding:7px 28px 7px 12px; font-size:12.5px; font-weight:600; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-primary, #0f172a); cursor:pointer;">
+                            <option value="">Semua Status</option>
+                            <option value="disetujui" {{ request('status') === 'disetujui' ? 'selected' : '' }}>Disetujui</option>
+                            <option value="menunggu" {{ request('status') === 'menunggu' ? 'selected' : '' }}>Menunggu Persetujuan</option>
+                            <option value="ditolak" {{ request('status') === 'ditolak' ? 'selected' : '' }}>Ditolak</option>
+                        </select>
+                    </div>
+
+                    {{-- Filter Lembaga Sekolah --}}
+                    @if(isset($sekolahLembagas) && $sekolahLembagas->count() > 1)
+                    <div style="position:relative; display:inline-block;">
+                        <select name="lembaga_id" class="form-select" onchange="this.form.submit()"
+                                style="padding:7px 28px 7px 12px; font-size:12.5px; font-weight:600; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-primary, #0f172a); cursor:pointer;">
+                            <option value="">Semua Sekolah</option>
+                            @foreach($sekolahLembagas as $lem)
+                                <option value="{{ $lem->id }}" {{ request('lembaga_id') == $lem->id ? 'selected' : '' }}>
+                                    {{ $lem->nama_singkat ?? $lem->singkatan }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
+
+                    {{-- Tombol Reset --}}
+                    @if(request('status') || request('lembaga_id') || request('search'))
+                    <a href="{{ route('guru-sekolah.index') }}" class="btn btn-secondary" style="padding:7px 12px; font-size:12px; font-weight:600; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:4px;" title="Reset Filter">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
-                    </button>
+                        <span>Reset</span>
+                    </a>
+                    @endif
                 </div>
-                @if(request('search'))
-                <a href="{{ route('guru-sekolah.index', request()->except('search', 'page')) }}" class="btn btn-secondary" style="padding:7px 10px; font-size:12px; border-radius:8px;" title="Reset Pencarian">
-                    Reset
-                </a>
-                @endif
+
+                {{-- Kolom Pencarian & Icon Tools Sisi Kanan --}}
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="position:relative; width:100%; min-width:260px; max-width:320px;">
+                        <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Cari guru, NIP, mapel..." autocomplete="off"
+                               style="width:100%; padding:7px 32px 7px 34px; border-radius:8px; font-size:13px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-primary, #0f172a);">
+                        <div style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted, #94a3b8); pointer-events:none; display:flex; align-items:center;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                        </div>
+                        @if(request('search'))
+                        <a href="{{ route('guru-sekolah.index', request()->except('search')) }}" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); color:var(--text-muted, #94a3b8); text-decoration:none; font-size:16px;">&times;</a>
+                        @endif
+                    </div>
+
+                    {{-- Icon Filter Visual (Sesuai Tampilan Filament Siswa) --}}
+                    <div style="position:relative; display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-muted, #64748b);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                        @if(request('status') || request('lembaga_id'))
+                        <span style="position:absolute; top:-4px; right:-4px; width:14px; height:14px; background:#0284c7; color:#fff; border-radius:50%; font-size:9px; font-weight:800; display:flex; align-items:center; justify-content:center;">1</span>
+                        @endif
+                    </div>
+
+                    {{-- Icon Kolom Visual --}}
+                    <div style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-muted, #64748b);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                            <line x1="15" y1="3" x2="15" y2="21"></line>
+                        </svg>
+                    </div>
+                </div>
+
             </form>
         </div>
-    </div>
 
-    {{-- Tabel Utama Data Guru (Filament Table Style) --}}
-    <div class="table-card" style="background:var(--bg-surface); border:1px solid var(--border-light); border-radius:12px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+        {{-- Tabel Data Filament PHP --}}
         <div style="overflow-x:auto;">
-            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
+            <table class="fi-ta-table" style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
                 <thead>
-                    <tr style="background:var(--bg-main, #F8FAFC); border-bottom:1px solid var(--border-light); color:var(--text-secondary); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;">
+                    <tr style="background:var(--bg-main, #f8fafc); border-bottom:1px solid var(--border-light, #e2e8f0); color:var(--text-secondary, #64748b); font-size:11.5px; text-transform:uppercase; letter-spacing:0.5px;">
+                        <th style="padding:12px 14px; width:36px; text-align:center;">
+                            <input type="checkbox" disabled style="border-radius:4px; border:1px solid var(--border-light, #cbd5e1);">
+                        </th>
                         <th style="padding:12px 14px; width:45px; text-align:center;">#</th>
-                        <th style="padding:12px 14px;">Guru</th>
-                        <th style="padding:12px 14px;">Sekolah</th>
-                        <th style="padding:12px 14px;">Mata Pelajaran (Diampu)</th>
-                        <th style="padding:12px 14px;">Status Pengajuan</th>
-                        <th style="padding:12px 14px; text-align:center; width:200px;">Aksi</th>
+                        <th style="padding:12px 16px;">Guru</th>
+                        <th style="padding:12px 16px;">Sekolah</th>
+                        <th style="padding:12px 16px;">Mata Pelajaran (Diampu)</th>
+                        <th style="padding:12px 16px;">Status Pengajuan</th>
+                        <th style="padding:12px 16px; text-align:center; width:150px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($users as $index => $guru)
-                    <tr style="border-bottom:1px solid var(--border-subtle, #F1F5F9); transition:background 0.15s;" onmouseover="this.style.background='rgba(0,0,0,0.015)'" onmouseout="this.style.background='transparent'">
+                    @php
+                        $rowNum = method_exists($users, 'firstItem') ? ($users->firstItem() + $index) : ($index + 1);
+                        $mapels = $guru->daftar_mata_pelajaran;
+                    @endphp
+                    <tr style="border-bottom:1px solid var(--border-subtle, #f1f5f9); transition:background 0.15s;" onmouseover="this.style.background='rgba(0,0,0,0.012)'" onmouseout="this.style.background='transparent'">
+                        {{-- Checkbox --}}
+                        <td style="padding:12px 14px; text-align:center;">
+                            <input type="checkbox" style="border-radius:4px; border:1px solid var(--border-light, #cbd5e1); cursor:pointer;">
+                        </td>
+
                         {{-- No --}}
-                        <td style="padding:12px 14px; text-align:center; color:var(--text-muted); font-size:12px;">
-                            {{ $users->firstItem() + $index }}
+                        <td style="padding:12px 14px; text-align:center; color:var(--text-muted, #94a3b8); font-size:12px;">
+                            {{ $rowNum }}
                         </td>
 
                         {{-- Identitas Guru --}}
-                        <td style="padding:12px 14px;">
+                        <td style="padding:12px 16px;">
                             <div style="display:flex; align-items:center; gap:10px;">
                                 @if($guru->foto_url)
-                                    <img src="{{ $guru->foto_url }}" alt="{{ $guru->name }}" style="width:34px; height:34px; border-radius:8px; object-fit:cover; flex-shrink:0; border:1px solid var(--border-light);">
+                                    <img src="{{ $guru->foto_url }}" alt="{{ $guru->name }}" style="width:34px; height:34px; border-radius:8px; object-fit:cover; flex-shrink:0; border:1px solid var(--border-light, #e2e8f0);">
                                 @else
-                                    <div style="width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg, #3B82F6, #1D4ED8); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:13px; flex-shrink:0;">
+                                    <div style="width:34px; height:34px; border-radius:8px; background:linear-gradient(135deg, #0284c7, #0369a1); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:12.5px; flex-shrink:0;">
                                         {{ $guru->initials }}
                                     </div>
                                 @endif
                                 <div>
-                                    <div style="font-weight:700; color:var(--text-primary); font-size:13.5px; display:flex; align-items:center; gap:6px;">
+                                    <div style="font-weight:700; color:var(--text-primary, #0f172a); font-size:13.5px; display:flex; align-items:center; gap:6px;">
                                         <span>{{ $guru->name }}</span>
                                         @if($guru->mapel_status === 'disetujui')
-                                        <svg viewBox="0 0 24 24" fill="#10B981" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;" title="Terverifikasi Yayasan">
+                                        <svg viewBox="0 0 24 24" fill="#10B981" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;" title="Terverifikasi">
                                             <circle cx="12" cy="12" r="10"></circle>
                                             <polyline points="9 12 11 14 15 10"></polyline>
                                         </svg>
                                         @endif
                                     </div>
-                                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">
+                                    <div style="font-size:11.5px; color:var(--text-muted, #94a3b8); margin-top:1px;">
                                         @if($guru->nip)
                                             <span>NIP: {{ $guru->nip }}</span>
                                         @else
@@ -256,152 +308,125 @@
                             </div>
                         </td>
 
-                        {{-- Lembaga --}}
-                        <td style="padding:12px 14px;">
-                            @if($guru->primaryLembaga)
-                                <span class="badge-lembaga badge-lembaga-{{ $guru->primaryLembaga->kode }}" style="font-size:11px; padding:3px 8px; border-radius:6px;">
-                                    {{ $guru->primaryLembaga->singkatan }}
+                        {{-- Lembaga Sekolah --}}
+                        <td style="padding:12px 16px;">
+                            @php
+                                $lembagaKode = strtolower($guru->primaryLembaga?->kode ?? '');
+                                $lembagaSingkat = $guru->primaryLembaga?->singkatan ?? ($guru->lembagas->first()?->singkatan ?? '-');
+                            @endphp
+                            @if(in_array($lembagaKode, ['smp']) || strtoupper($lembagaSingkat) === 'SMP')
+                                <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:700; background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;">
+                                    SMP
                                 </span>
-                            @elseif($guru->lembagas->isNotEmpty())
-                                @foreach($guru->lembagas as $l)
-                                    <span class="badge-lembaga badge-lembaga-{{ $l->kode }}" style="font-size:11px; padding:3px 8px; border-radius:6px; margin-right:4px;">
-                                        {{ $l->singkatan }}
-                                    </span>
-                                @endforeach
+                            @elseif(in_array($lembagaKode, ['sma']) || strtoupper($lembagaSingkat) === 'SMA')
+                                <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:700; background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;">
+                                    SMA
+                                </span>
                             @else
-                                <span style="font-size:12px; color:var(--text-muted);">-</span>
+                                <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:600; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">
+                                    {{ $lembagaSingkat }}
+                                </span>
                             @endif
                         </td>
 
-                        {{-- Mata Pelajaran Aktif (Filament Pills: Mendukung 2 atau Lebih Mapel) --}}
-                        <td style="padding:12px 14px;">
-                            @php
-                                $mapels = $guru->daftar_mata_pelajaran;
-                            @endphp
+                        {{-- Mata Pelajaran (Diampu) - Multi Mapel Didukung --}}
+                        <td style="padding:12px 16px;">
                             @if(!empty($mapels))
                                 <div style="display:flex; flex-wrap:wrap; gap:5px;">
                                     @foreach($mapels as $m)
-                                        <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11.5px; font-weight:600; background:rgba(2, 132, 199, 0.08); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.2);">
+                                        <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:600; background:rgba(2, 132, 199, 0.08); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.2);">
                                             {{ $m }}
                                         </span>
                                     @endforeach
                                 </div>
                             @else
-                                <span style="font-size:12px; color:var(--text-muted);">-</span>
+                                <span style="color:var(--text-muted, #94a3b8); font-size:12px;">-</span>
                             @endif
                         </td>
 
-                        {{-- Status Pengajuan Mapel --}}
-                        <td style="padding:12px 14px;">
+                        {{-- Status Pengajuan (Filament Status Badge dengan Dot) --}}
+                        <td style="padding:12px 16px;">
                             @if($guru->mapel_status === 'menunggu')
                                 <div style="display:inline-flex; flex-direction:column; gap:4px;">
-                                    <span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">
-                                        <span style="width:6px; height:6px; border-radius:50%; background:#d97706;"></span>
+                                    <span style="display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:700; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">
+                                        <span style="width:6px; height:6px; border-radius:50%; background:#d97706; display:inline-block;"></span>
                                         <span>Menunggu Persetujuan</span>
                                     </span>
-                                    @php
-                                        $pendingMapels = $guru->daftar_mapel_diajukan;
-                                    @endphp
-                                    @if(!empty($pendingMapels))
-                                        <div style="display:flex; flex-wrap:wrap; gap:4px;">
-                                            @foreach($pendingMapels as $pm)
-                                                <span style="font-size:11px; font-weight:600; color:#92400e; background:rgba(245, 158, 11, 0.15); padding:1px 6px; border-radius:4px;">
-                                                    {{ $pm }}
-                                                </span>
-                                            @endforeach
+                                    @if(!empty($guru->daftar_mapel_diajukan))
+                                        <div style="font-size:11px; color:#92400e;">
+                                            Diajukan: {{ implode(', ', $guru->daftar_mapel_diajukan) }}
                                         </div>
                                     @endif
                                 </div>
                             @elseif($guru->mapel_status === 'disetujui')
-                                <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                <span style="display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:700; background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">
+                                    <span style="width:6px; height:6px; border-radius:50%; background:#10b981; display:inline-block;"></span>
                                     <span>Disetujui</span>
                                 </span>
                             @elseif($guru->mapel_status === 'ditolak')
-                                <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">
+                                <span style="display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:700; background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">
+                                    <span style="width:6px; height:6px; border-radius:50%; background:#ef4444; display:inline-block;"></span>
                                     <span>Ditolak</span>
                                 </span>
                             @else
-                                <span style="display:inline-flex; align-items:center; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:600; background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0;">
-                                    Belum Mengajukan
+                                <span style="display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:600; background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0;">
+                                    <span style="width:6px; height:6px; border-radius:50%; background:#94a3b8; display:inline-block;"></span>
+                                    <span>Belum Mengajukan</span>
                                 </span>
                             @endif
                         </td>
 
-                        {{-- Aksi Yayasan --}}
-                        <td style="padding:12px 14px; text-align:center;">
-                            <div style="display:inline-flex; align-items:center; gap:6px; justify-content:center;">
+                        {{-- Aksi (Filament Action Buttons) --}}
+                        <td style="padding:12px 16px; text-align:center;">
+                            <div style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
                                 @if($guru->mapel_status === 'menunggu')
-                                    <button type="button" class="btn"
-                                            data-guru-id="{{ $guru->id }}"
-                                            data-guru-name="{{ $guru->name }}"
-                                            data-guru-mapel="{{ $guru->mapel_diajukan }}"
-                                            data-guru-catatan="{{ $guru->mapel_catatan ?? '' }}"
-                                            onclick="bukaModalApproveBtn(this)"
-                                            style="background:#10B981; color:#fff; padding:5px 10px; font-size:12px; font-weight:700; border-radius:6px; border:none; display:inline-flex; align-items:center; gap:4px; cursor:pointer;"
-                                            title="Setujui">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px;">
-                                            <polyline points="20 6 9 17 4 12"></polyline>
-                                        </svg>
-                                        <span>Approve</span>
-                                    </button>
+                                    {{-- Tombol Approve --}}
+                                    <form action="{{ route('guru-sekolah.approve', $guru->id) }}" method="POST" style="display:inline; margin:0;">
+                                        @csrf
+                                        <button type="submit" class="btn" title="Setujui Pengajuan"
+                                                style="padding:4px 9px; font-size:11.5px; background:#10b981; border:none; color:#ffffff; font-weight:700; border-radius:6px; display:inline-flex; align-items:center; gap:3px; cursor:pointer;">
+                                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                            <span>Approve</span>
+                                        </button>
+                                    </form>
 
-                                    <button type="button" class="btn"
-                                            data-guru-id="{{ $guru->id }}"
-                                            data-guru-name="{{ $guru->name }}"
-                                            data-guru-mapel="{{ $guru->mapel_diajukan }}"
-                                            onclick="bukaModalTolakBtn(this)"
-                                            style="background:rgba(239, 68, 68, 0.1); color:#EF4444; border:1px solid rgba(239, 68, 68, 0.25); padding:5px 8px; font-size:12px; font-weight:600; border-radius:6px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;"
-                                            title="Tolak">
-                                        <span>Tolak</span>
+                                    {{-- Tombol Tolak --}}
+                                    <button type="button" class="btn" onclick="bukaModalTolak({{ $guru->id }}, '{{ addslashes($guru->name) }}')" title="Tolak Pengajuan"
+                                            style="padding:4px 8px; font-size:11.5px; background:rgba(239, 68, 68, 0.08); border:1px solid rgba(239, 68, 68, 0.2); color:#dc2626; font-weight:600; border-radius:6px; cursor:pointer;">
+                                        Tolak
                                     </button>
                                 @endif
 
-                                {{-- Tombol Tetapkan / Ubah Mapel --}}
-                                <button type="button" class="btn btn-secondary"
-                                        data-guru-id="{{ $guru->id }}"
-                                        data-guru-name="{{ $guru->name }}"
-                                        data-guru-mapel="{{ $guru->mata_pelajaran ?? '' }}"
-                                        data-guru-lembaga="{{ $guru->primary_lembaga_id }}"
-                                        onclick="bukaModalTetapkanMapelSpesifikBtn(this)"
-                                        style="padding:5px 9px; font-size:12px; border-radius:6px; display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px;">
-                                        <path d="M12 20h9"></path>
-                                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                                    </svg>
-                                    <span>{{ $guru->mata_pelajaran ? 'Ubah' : 'Tetapkan' }}</span>
+                                {{-- Tombol Ubah Guru --}}
+                                <button type="button" class="btn btn-secondary" title="Ubah Data Guru"
+                                        onclick="bukaModalUbah({{ $guru->id }}, '{{ addslashes($guru->name) }}', {{ $guru->primary_lembaga_id ?: 'null' }}, '{{ addslashes($guru->mata_pelajaran ?? '') }}')"
+                                        style="padding:5px 8px; border-radius:6px; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px;">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                    <span>Ubah</span>
                                 </button>
 
                                 {{-- Tombol Detail --}}
-                                <button type="button" class="btn btn-secondary"
-                                        data-guru="{{ htmlspecialchars(json_encode([
-                                            'id' => $guru->id,
-                                            'name' => $guru->name,
-                                            'jabatan' => $guru->jabatan,
-                                            'nip' => $guru->nip,
-                                            'jenis_kelamin' => $guru->jenis_kelamin,
-                                            'email' => $guru->email,
-                                            'telepon' => $guru->telepon,
-                                            'mata_pelajaran' => $guru->mata_pelajaran,
-                                            'alamat' => $guru->alamat,
-                                            'mapel_status' => $guru->mapel_status,
-                                            'mapel_diajukan' => $guru->mapel_diajukan,
-                                            'mapel_catatan' => $guru->mapel_catatan,
-                                        ]), ENT_QUOTES, 'UTF-8') }}"
-                                        onclick="bukaModalDetail(this)"
-                                        style="padding:5px 7px; font-size:12px; border-radius:6px; cursor:pointer;" title="Detail">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px;">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                        <circle cx="12" cy="12" r="3"></circle>
-                                    </svg>
+                                <button type="button" class="btn btn-secondary" onclick="bukaModalDetail({{ $guru->id }}, '{{ addslashes($guru->name) }}', '{{ addslashes($guru->email) }}', '{{ addslashes($guru->nip ?? '-') }}', '{{ addslashes($lembagaSingkat) }}', '{{ addslashes($guru->mata_pelajaran ?? '-') }}', '{{ $guru->mapel_status }}')" title="Detail"
+                                        style="padding:5px 7px; border-radius:6px; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                 </button>
+
+                                {{-- Tombol Hapus dari Guru Sekolah --}}
+                                <form action="{{ route('guru-sekolah.destroy', $guru->id) }}" method="POST" style="display:inline; margin:0;" onsubmit="return confirm('Hapus {{ $guru->name }} dari daftar Guru Sekolah?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn" title="Hapus dari Guru Sekolah"
+                                            style="padding:5px 7px; border-radius:6px; font-size:12px; background:rgba(239, 68, 68, 0.08); color:#dc2626; border:1px solid rgba(239, 68, 68, 0.2); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
+                                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" style="padding:36px 16px; text-align:center; color:var(--text-muted);">
-                            Tidak ada data guru yang sesuai filter.
+                        <td colspan="7" style="text-align:center; padding:48px 16px; color:var(--text-muted, #94a3b8);">
+                            <div style="font-size:14px; font-weight:600; color:var(--text-secondary, #64748b);">Tidak ada guru sekolah yang terdaftar.</div>
                         </td>
                     </tr>
                     @endforelse
@@ -409,10 +434,11 @@
             </table>
         </div>
 
+        {{-- Pagination Filament Style --}}
         @if($users->hasPages())
-        <div style="padding:14px 18px; border-top:1px solid var(--border-light); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-            <div style="font-size:12.5px; color:var(--text-muted);">
-                Menampilkan {{ $users->firstItem() }} - {{ $users->lastItem() }} dari {{ $users->total() }} guru
+        <div style="padding:12px 18px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="font-size:12.5px; color:var(--text-muted, #94a3b8);">
+                Menampilkan {{ $users->firstItem() }} sampai {{ $users->lastItem() }} dari {{ $users->total() }} hasil
             </div>
             <div>
                 {{ $users->links() }}
@@ -421,751 +447,350 @@
         @endif
     </div>
 
-    {{-- Card List untuk Tampilan Mobile (<= 768px) --}}
-    <div class="mobile-card-list">
-        @forelse($users as $index => $guru)
-        <div class="mobile-card-item">
-            <div class="mobile-card-info">
-                <div class="mobile-card-title">
-                    <span>{{ $guru->name }}</span>
-                    @if($guru->mapel_status === 'disetujui')
-                    <svg viewBox="0 0 24 24" fill="#10B981" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px; height:14px; vertical-align:middle; display:inline-block;">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="9 12 11 14 15 10"></polyline>
-                    </svg>
-                    @endif
-                </div>
-                <div class="mobile-card-subtitle">
-                    @if($guru->nip)
-                        <span>NIP: {{ $guru->nip }}</span>
-                    @else
-                        <span>{{ $guru->email }}</span>
-                    @endif
-                </div>
-
-                <div class="mobile-card-meta-grid">
-                    <div class="mobile-card-meta-item">
-                        <span class="mobile-card-meta-label">Lembaga</span>
-                        @if($guru->primaryLembaga)
-                            <span class="mobile-card-pill mobile-card-pill-blue">{{ $guru->primaryLembaga->singkatan }}</span>
-                        @elseif($guru->lembagas->isNotEmpty())
-                            <span class="mobile-card-pill mobile-card-pill-blue">{{ $guru->lembagas->first()->singkatan }}</span>
-                        @else
-                            <span class="mobile-card-pill mobile-card-pill-gray">-</span>
-                        @endif
-                    </div>
-                    <div class="mobile-card-meta-item">
-                        <span class="mobile-card-meta-label">Mapel</span>
-                        <div style="display:flex; flex-wrap:wrap; gap:3px;">
-                            @forelse($guru->daftar_mata_pelajaran as $m)
-                                <span class="mobile-card-pill mobile-card-pill-purple">{{ $m }}</span>
-                            @empty
-                                <span class="mobile-card-pill mobile-card-pill-gray">-</span>
-                            @endforelse
-                        </div>
-                    </div>
-                    <div class="mobile-card-meta-item">
-                        <span class="mobile-card-meta-label">Status</span>
-                        @if($guru->mapel_status === 'menunggu')
-                            <span class="status-pill status-pill-warning">Menunggu</span>
-                        @elseif($guru->mapel_status === 'disetujui')
-                            <span class="status-pill status-pill-active">Disetujui</span>
-                        @elseif($guru->mapel_status === 'ditolak')
-                            <span class="status-pill status-pill-inactive">Ditolak</span>
-                        @else
-                            <span class="status-pill" style="background:#f1f5f9; color:#64748b;">Belum Ajukan</span>
-                        @endif
-                    </div>
-                </div>
-            </div>
-
-            <div class="mobile-card-actions">
-                <span class="mobile-card-action-title">Aksi</span>
-                <div class="mobile-card-action-buttons">
-                    <button type="button" class="mobile-btn-pastel mobile-btn-view"
-                            data-guru="{{ htmlspecialchars(json_encode([
-                                'id' => $guru->id,
-                                'name' => $guru->name,
-                                'jabatan' => $guru->jabatan,
-                                'nip' => $guru->nip,
-                                'jenis_kelamin' => $guru->jenis_kelamin,
-                                'email' => $guru->email,
-                                'telepon' => $guru->telepon,
-                                'mata_pelajaran' => $guru->mata_pelajaran,
-                                'alamat' => $guru->alamat,
-                                'mapel_status' => $guru->mapel_status,
-                                'mapel_diajukan' => $guru->mapel_diajukan,
-                                'mapel_catatan' => $guru->mapel_catatan,
-                            ]), ENT_QUOTES, 'UTF-8') }}"
-                            onclick="bukaModalDetail(this)" title="Detail">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
-
-                    @if($guru->mapel_status === 'menunggu')
-                    <button type="button" class="mobile-btn-pastel mobile-btn-success"
-                            data-guru-id="{{ $guru->id }}"
-                            data-guru-name="{{ $guru->name }}"
-                            data-guru-mapel="{{ $guru->mapel_diajukan }}"
-                            data-guru-catatan="{{ $guru->mapel_catatan ?? '' }}"
-                            onclick="bukaModalApproveBtn(this)" title="Setujui">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                    </button>
-
-                    <button type="button" class="mobile-btn-pastel mobile-btn-delete"
-                            data-guru-id="{{ $guru->id }}"
-                            data-guru-name="{{ $guru->name }}"
-                            data-guru-mapel="{{ $guru->mapel_diajukan }}"
-                            onclick="bukaModalTolakBtn(this)" title="Tolak">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                    @endif
-
-                    <button type="button" class="mobile-btn-pastel mobile-btn-edit"
-                            data-guru-id="{{ $guru->id }}"
-                            data-guru-name="{{ $guru->name }}"
-                            data-guru-mapel="{{ $guru->mata_pelajaran ?? '' }}"
-                            data-guru-lembaga="{{ $guru->primary_lembaga_id }}"
-                            onclick="bukaModalTetapkanMapelSpesifikBtn(this)"
-                            title="Ubah Mapel">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 20h9"></path>
-                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-        @empty
-        <div style="background:#fff; border-radius:10px; padding:24px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
-            Tidak ada data guru yang sesuai filter.
-        </div>
-        @endforelse
-    </div>
-
 </div>
 
-{{-- ========================================================================= --}}
-{{-- MODAL 1: APPROVE PENGAJUAN MATA PELAJARAN (FILAMENT CLEAN) --}}
-{{-- ========================================================================= --}}
-<div id="modalApprove" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
-    <div style="background:var(--bg-surface); border-radius:14px; max-width:480px; width:100%; border:1px solid var(--border-light); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden;">
-        <form id="formApprove" method="POST" style="margin:0;">
+{{-- ========================================================
+     MODAL 1: TAMBAH GURU SEKOLAH
+     Pop up form tambah guru berisi:
+     - Nama (diambil dari akun yang terdaftar)
+     - Lembaga (SMP/SMA) isinya hanya SMP dan SMA
+     - Mapel (diambil dari mapel di menu plotting mapel sesuai lembaga)
+     - Bersih tanpa deskripsi
+     ======================================================== --}}
+<div id="modalTambahGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
+    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:520px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left;">
+        <form action="{{ route('guru-sekolah.store') }}" method="POST" id="formTambahGuru" style="margin:0;">
             @csrf
-            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:center; justify-content:space-between;">
-                <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary);">Persetujuan Mata Pelajaran</h3>
-                <button type="button" onclick="tutupModal('modalApprove')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between;">
+                <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary, #0f172a);">Tambah Guru</h3>
+                <button type="button" onclick="tutupModalTambahGuru()" style="background:none; border:none; color:var(--text-muted, #94a3b8); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
             </div>
 
             <div style="padding:20px; display:flex; flex-direction:column; gap:14px;">
-                <div style="background:var(--bg-main); border:1px solid var(--border-light); border-radius:10px; padding:12px 14px;">
-                    <div style="font-size:11.5px; color:var(--text-muted);">Nama Guru:</div>
-                    <div id="approveGuruNama" style="font-size:14px; font-weight:700; color:var(--text-primary); margin-top:2px;"></div>
-                    <div style="margin-top:8px; font-size:11.5px; color:var(--text-muted);">Mata Pelajaran Diajukan:</div>
-                    <div id="approveMapelNama" style="font-size:13.5px; font-weight:700; color:#047857; margin-top:2px;"></div>
-                    <div id="approveGuruCatatanWrap" style="margin-top:8px; font-size:11.5px; color:var(--text-secondary); display:none;">
-                        Catatan: <em id="approveGuruCatatan"></em>
-                    </div>
-                </div>
-
+                {{-- Nama Guru (Akun Terdaftar) --}}
                 <div>
-                    <label class="form-label" style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:block;">
-                        Mata Pelajaran yang Disetujui (Bisa Lebih Dari Satu) <span style="color:#EF4444;">*</span>
-                    </label>
-
-                    {{-- Tag Container --}}
-                    <div id="approveTagsContainer" style="display:flex; flex-wrap:wrap; gap:6px; min-height:38px; padding:6px 10px; border:1px solid var(--border-light); border-radius:8px; background:var(--bg-main); align-items:center;">
-                        <!-- Tag pills injected by JS -->
-                    </div>
-                    <input type="hidden" name="mata_pelajaran" id="approveMataPelajaranInput" required>
-
-                    {{-- Pilihan Mapel dari Plotting Mata Pelajaran --}}
-                    <div style="margin-top:8px;">
-                        <div style="display:flex; flex-wrap:wrap; gap:5px;" id="approveAvailablePills">
-                            @foreach($daftarMapel as $mapelItem)
-                            <button type="button" class="btn-toggle-mapel-approve"
-                                    data-mapel="{{ $mapelItem }}"
-                                    onclick="toggleMapelApprove('{{ addslashes($mapelItem) }}')"
-                                    style="padding:3px 9px; font-size:11.5px; font-weight:600; border-radius:6px; border:1px solid var(--border-light); background:var(--bg-surface); color:var(--text-secondary); cursor:pointer;">
-                                + {{ $mapelItem }}
-                            </button>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="approveCatatan" class="form-label" style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:block;">
-                        Catatan Yayasan (Opsional)
-                    </label>
-                    <textarea name="catatan" id="approveCatatan" rows="2" class="form-control"
-                              style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:13px; background:var(--bg-main);"></textarea>
-                </div>
-            </div>
-
-            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main);">
-                <button type="button" class="btn btn-secondary" onclick="tutupModal('modalApprove')" style="padding:7px 14px; border-radius:8px; font-size:12.5px;">Batal</button>
-                <button type="submit" class="btn btn-primary" style="padding:7px 18px; border-radius:8px; font-size:12.5px; background:#10B981; border:none; color:#fff; font-weight:700;">
-                    Setujui
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{{-- ========================================================================= --}}
-{{-- MODAL 2: TOLAK PENGAJUAN MATA PELAJARAN (FILAMENT CLEAN) --}}
-{{-- ========================================================================= --}}
-<div id="modalTolak" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
-    <div style="background:var(--bg-surface); border-radius:14px; max-width:460px; width:100%; border:1px solid var(--border-light); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden;">
-        <form id="formTolak" method="POST" style="margin:0;">
-            @csrf
-            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:center; justify-content:space-between;">
-                <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary);">Tolak Pengajuan Mapel</h3>
-                <button type="button" onclick="tutupModal('modalTolak')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
-            </div>
-
-            <div style="padding:20px; display:flex; flex-direction:column; gap:14px;">
-                <div style="background:var(--bg-main); border:1px solid var(--border-light); border-radius:10px; padding:12px 14px;">
-                    <div style="font-size:11.5px; color:var(--text-muted);">Nama Guru:</div>
-                    <div id="tolakGuruNama" style="font-size:14px; font-weight:700; color:var(--text-primary); margin-top:2px;"></div>
-                    <div style="margin-top:8px; font-size:11.5px; color:var(--text-muted);">Mata Pelajaran Diajukan:</div>
-                    <div id="tolakMapelNama" style="font-size:13.5px; font-weight:700; color:#B91C1C; margin-top:2px;"></div>
-                </div>
-
-                <div>
-                    <label for="tolakCatatan" class="form-label" style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:block;">
-                        Alasan Penolakan <span style="color:#EF4444;">*</span>
-                    </label>
-                    <textarea name="catatan" id="tolakCatatan" rows="3" class="form-control" required
-                              style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:13px; background:var(--bg-main);"></textarea>
-                </div>
-            </div>
-
-            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main);">
-                <button type="button" class="btn btn-secondary" onclick="tutupModal('modalTolak')" style="padding:7px 14px; border-radius:8px; font-size:12.5px;">Batal</button>
-                <button type="submit" class="btn btn-danger" style="padding:7px 18px; border-radius:8px; font-size:12.5px; background:#EF4444; border:none; color:#fff; font-weight:700;">
-                    Tolak Pengajuan
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-{{-- ========================================================================= --}}
-{{-- MODAL 3: TETAPKAN / UBAH MATA PELAJARAN (FILAMENT MULTI-SELECT CLEAN) --}}
-{{-- ========================================================================= --}}
-<div id="modalTetapkan" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
-    <div style="background:var(--bg-surface); border-radius:14px; max-width:500px; width:100%; border:1px solid var(--border-light); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden;">
-        <form id="formTetapkan" method="POST" style="margin:0;">
-            @csrf
-            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:center; justify-content:space-between;">
-                <h3 id="modalTetapkanJudul" style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary);">Tetapkan Mata Pelajaran</h3>
-                <button type="button" onclick="tutupModal('modalTetapkan')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
-            </div>
-
-            <div style="padding:20px; display:flex; flex-direction:column; gap:14px;">
-                {{-- Pilih Guru (jika modal dipanggil dari tombol header) --}}
-                <div id="tetapkanPilihGuruWrap">
-                    <label for="tetapkanPilihGuruSelect" class="form-label" style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:block;">
-                        Guru Sekolah <span style="color:#EF4444;">*</span>
-                    </label>
-                    <select id="tetapkanPilihGuruSelect" class="form-select" onchange="onGuruSelectedForAssign(this)"
-                            style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:13px; background:var(--bg-main);">
-                        <option value="">-- Pilih Guru --</option>
-                        @foreach($users as $g)
-                        <option value="{{ $g->id }}" data-mapel="{{ $g->mata_pelajaran }}" data-lembaga="{{ $g->primary_lembaga_id }}">
-                            {{ $g->name }} ({{ $g->primaryLembaga?->singkatan ?? 'Yayasan' }})
-                        </option>
+                    <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Nama Guru <span style="color:#ef4444;">*</span></label>
+                    <select name="user_id" id="tambah_user_id" class="form-select" required
+                            style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc);">
+                        <option value="">-- Pilih Akun Terdaftar --</option>
+                        @foreach($akunUsers as $akun)
+                            <option value="{{ $akun->id }}">{{ $akun->name }} ({{ $akun->nip ? 'NIP: ' . $akun->nip : $akun->email }})</option>
                         @endforeach
                     </select>
                 </div>
 
-                {{-- Guru terpilih display (jika dipanggil dari row) --}}
-                <div id="tetapkanGuruRowInfo" style="display:none; background:var(--bg-main); border:1px solid var(--border-light); border-radius:8px; padding:10px 12px;">
-                    <div style="font-size:11.5px; color:var(--text-muted);">Nama Guru:</div>
-                    <div id="tetapkanGuruRowNama" style="font-size:14px; font-weight:700; color:var(--text-primary); margin-top:2px;"></div>
-                </div>
-
-                {{-- Multi-Select Mata Pelajaran yang Diampu --}}
+                {{-- Lembaga (HANYA SMP dan SMA) --}}
                 <div>
-                    <label class="form-label" style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:block;">
-                        Mata Pelajaran yang Diampu (Bisa Lebih Dari Satu) <span style="color:#EF4444;">*</span>
-                    </label>
-
-                    {{-- Tag Container (Pills of Selected Subjects) --}}
-                    <div id="tetapkanTagsContainer" style="display:flex; flex-wrap:wrap; gap:6px; min-height:40px; padding:6px 10px; border:1px solid var(--border-light); border-radius:8px; background:var(--bg-main); align-items:center;">
-                        <!-- Tag pills injected by JS -->
-                    </div>
-                    <input type="hidden" name="mata_pelajaran" id="tetapkanMapelInput" required>
-
-                    {{-- Quick Select Dropdown & Clickable Badges (Strictly from Plotting Mata Pelajaran) --}}
-                    <div style="margin-top:8px;">
-                        <div style="display:flex; flex-wrap:wrap; gap:5px;" id="tetapkanAvailablePills">
-                            @foreach($daftarMapel as $mapelItem)
-                            <button type="button" class="btn-toggle-mapel-assign"
-                                    data-mapel="{{ $mapelItem }}"
-                                    onclick="toggleMapelAssign('{{ addslashes($mapelItem) }}')"
-                                    style="padding:3px 9px; font-size:11.5px; font-weight:600; border-radius:6px; border:1px solid var(--border-light); background:var(--bg-surface); color:var(--text-secondary); cursor:pointer;">
-                                + {{ $mapelItem }}
-                            </button>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Lembaga Penempatan (Opsional) --}}
-                @if(isset($lembagas) && $lembagas->isNotEmpty())
-                <div>
-                    <label for="tetapkanLembagaSelect" class="form-label" style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:block;">
-                        Unit Lembaga
-                    </label>
-                    <select name="primary_lembaga_id" id="tetapkanLembagaSelect" class="form-select"
-                            style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:13px; background:var(--bg-main);">
-                        <option value="">-- Tetap Sesuai Lembaga Saat Ini --</option>
-                        @foreach($lembagas as $lem)
-                        <option value="{{ $lem->id }}">{{ $lem->nama }} ({{ $lem->singkatan }})</option>
+                    <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Lembaga <span style="color:#ef4444;">*</span></label>
+                    <select name="lembaga_id" id="tambah_lembaga_id" class="form-select" required onchange="filterMapelTambah(this.value)"
+                            style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc);">
+                        <option value="">-- Pilih Lembaga (SMP / SMA) --</option>
+                        @foreach($sekolahLembagas as $lem)
+                            <option value="{{ $lem->id }}">{{ $lem->nama_singkat ?? $lem->singkatan }}</option>
                         @endforeach
                     </select>
                 </div>
-                @endif
 
-                {{-- Catatan Otoritas --}}
+                {{-- Mata Pelajaran yang Diampu (Plotting Mapel Berdasarkan Lembaga) --}}
                 <div>
-                    <label for="tetapkanCatatanInput" class="form-label" style="font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:6px; display:block;">
-                        Catatan (Opsional)
-                    </label>
-                    <textarea name="catatan" id="tetapkanCatatanInput" rows="2" class="form-control"
-                              style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light); font-size:13px; background:var(--bg-main);"></textarea>
+                    <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Mata Pelajaran yang Diampu <span style="color:#ef4444;">*</span></label>
+                    <div id="tambah_mapel_container" style="border:1px solid var(--border-light, #cbd5e1); border-radius:8px; padding:10px 12px; min-height:60px; background:var(--bg-main, #f8fafc);">
+                        <div style="font-size:12.5px; color:var(--text-muted, #94a3b8); padding:8px 0;">Pilih lembaga sekolah terlebih dahulu.</div>
+                    </div>
                 </div>
             </div>
 
-            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main);">
-                <button type="button" class="btn btn-secondary" onclick="tutupModal('modalTetapkan')" style="padding:7px 14px; border-radius:8px; font-size:12.5px;">Batal</button>
-                <button type="submit" class="btn btn-primary" style="padding:7px 18px; border-radius:8px; font-size:12.5px; font-weight:700;">
-                    Simpan &amp; Tetapkan
-                </button>
+            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc);">
+                <button type="button" class="btn btn-secondary" onclick="tutupModalTambahGuru()" style="padding:7px 14px; border-radius:8px; font-size:12.5px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:7px 18px; border-radius:8px; font-size:12.5px; font-weight:700;">Simpan Guru</button>
             </div>
         </form>
     </div>
 </div>
 
-{{-- ========================================================================= --}}
-{{-- MODAL 4: DETAIL LENGKAP PROFIL GURU (FILAMENT CLEAN) --}}
-{{-- ========================================================================= --}}
-<div id="modalDetail" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
-    <div style="background:var(--bg-surface); border-radius:14px; max-width:500px; width:100%; border:1px solid var(--border-light); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden;">
-        <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:center; justify-content:space-between;">
-            <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary);">Detail Guru</h3>
-            <button type="button" onclick="tutupModal('modalDetail')" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
+{{-- ========================================================
+     MODAL 2: UBAH GURU SEKOLAH
+     ======================================================== --}}
+<div id="modalUbahGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
+    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:520px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left;">
+        <form action="" method="POST" id="formUbahGuru" style="margin:0;">
+            @csrf
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between;">
+                <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary, #0f172a);">Ubah Data Guru</h3>
+                <button type="button" onclick="tutupModalUbahGuru()" style="background:none; border:none; color:var(--text-muted, #94a3b8); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
+            </div>
+
+            <div style="padding:20px; display:flex; flex-direction:column; gap:14px;">
+                {{-- Nama Guru (Static Display) --}}
+                <div>
+                    <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Nama Guru</label>
+                    <input type="text" id="ubah_nama_guru" class="form-control" readonly
+                           style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:#f1f5f9; color:var(--text-primary); font-weight:600;">
+                </div>
+
+                {{-- Lembaga (HANYA SMP dan SMA) --}}
+                <div>
+                    <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Lembaga <span style="color:#ef4444;">*</span></label>
+                    <select name="primary_lembaga_id" id="ubah_lembaga_id" class="form-select" required onchange="filterMapelUbah(this.value)"
+                            style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc);">
+                        @foreach($sekolahLembagas as $lem)
+                            <option value="{{ $lem->id }}">{{ $lem->nama_singkat ?? $lem->singkatan }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- Mata Pelajaran (Multi Mapel Didukung) --}}
+                <div>
+                    <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Mata Pelajaran yang Diampu <span style="color:#ef4444;">*</span></label>
+                    <div id="ubah_mapel_container" style="border:1px solid var(--border-light, #cbd5e1); border-radius:8px; padding:10px 12px; min-height:60px; background:var(--bg-main, #f8fafc);"></div>
+                </div>
+            </div>
+
+            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc);">
+                <button type="button" class="btn btn-secondary" onclick="tutupModalUbahGuru()" style="padding:7px 14px; border-radius:8px; font-size:12.5px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:7px 18px; border-radius:8px; font-size:12.5px; font-weight:700;">Simpan Perubahan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- ========================================================
+     MODAL 3: TOLAK PENGAJUAN MAPEL
+     ======================================================== --}}
+<div id="modalTolakPengajuan" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
+    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:460px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left;">
+        <form action="" method="POST" id="formTolakPengajuan" style="margin:0;">
+            @csrf
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between;">
+                <h3 style="margin:0; font-size:15px; font-weight:700; color:#dc2626;">Tolak Pengajuan Mapel</h3>
+                <button type="button" onclick="tutupModalTolak()" style="background:none; border:none; color:var(--text-muted, #94a3b8); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
+            </div>
+
+            <div style="padding:20px; display:flex; flex-direction:column; gap:12px;">
+                <div style="font-size:13px; color:var(--text-primary);">
+                    Tolak pengajuan mata pelajaran untuk guru <strong id="tolak_guru_nama"></strong>?
+                </div>
+                <div>
+                    <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Alasan Penolakan <span style="color:#ef4444;">*</span></label>
+                    <textarea name="catatan" id="tolak_catatan" rows="3" class="form-control" required placeholder="Tuliskan catatan perbaikan..."
+                              style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); font-size:13px; background:var(--bg-main, #f8fafc);"></textarea>
+                </div>
+            </div>
+
+            <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; gap:8px; background:var(--bg-main, #f8fafc);">
+                <button type="button" class="btn btn-secondary" onclick="tutupModalTolak()" style="padding:7px 14px; border-radius:8px; font-size:12.5px;">Batal</button>
+                <button type="submit" class="btn" style="padding:7px 18px; border-radius:8px; font-size:12.5px; font-weight:700; background:#dc2626; border:none; color:#ffffff;">Tolak Pengajuan</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- ========================================================
+     MODAL 4: DETAIL GURU SEKOLAH
+     ======================================================== --}}
+<div id="modalDetailGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
+    <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:460px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left;">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between;">
+            <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--text-primary, #0f172a);">Detail Guru Sekolah</h3>
+            <button type="button" onclick="tutupModalDetail()" style="background:none; border:none; color:var(--text-muted, #94a3b8); cursor:pointer; padding:4px; font-size:18px;">&times;</button>
         </div>
 
-        <div style="padding:20px; display:flex; flex-direction:column; gap:14px; max-height:75vh; overflow-y:auto;">
-            <div style="display:flex; align-items:center; gap:12px;">
-                <div id="detailAvatar" style="width:44px; height:44px; border-radius:10px; background:#3B82F6; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:800;"></div>
-                <div>
-                    <h4 id="detailNama" style="margin:0 0 2px 0; font-size:15px; font-weight:700; color:var(--text-primary);"></h4>
-                    <div id="detailJabatan" style="font-size:12px; color:var(--text-secondary);"></div>
-                </div>
+        <div style="padding:20px; display:flex; flex-direction:column; gap:12px; font-size:13px;">
+            <div style="display:flex; justify-content:space-between; padding-bottom:8px; border-bottom:1px solid var(--border-subtle, #f1f5f9);">
+                <span style="color:var(--text-muted, #64748b);">Nama</span>
+                <strong id="det_nama" style="color:var(--text-primary, #0f172a);"></strong>
             </div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; background:var(--bg-main); padding:12px; border-radius:10px; border:1px solid var(--border-light);">
-                <div>
-                    <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">NIP / NUPTK</div>
-                    <div id="detailNip" style="font-weight:700; font-size:12.5px; color:var(--text-primary); margin-top:2px;">-</div>
-                </div>
-                <div>
-                    <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Jenis Kelamin</div>
-                    <div id="detailGender" style="font-weight:700; font-size:12.5px; color:var(--text-primary); margin-top:2px;">-</div>
-                </div>
-                <div>
-                    <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Email</div>
-                    <div id="detailEmail" style="font-weight:600; font-size:12.5px; color:var(--text-primary); margin-top:2px; word-break:break-all;">-</div>
-                </div>
-                <div>
-                    <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Telepon / WA</div>
-                    <div id="detailTelepon" style="font-weight:600; font-size:12.5px; color:#10B981; margin-top:2px;">-</div>
-                </div>
+            <div style="display:flex; justify-content:space-between; padding-bottom:8px; border-bottom:1px solid var(--border-subtle, #f1f5f9);">
+                <span style="color:var(--text-muted, #64748b);">Email</span>
+                <span id="det_email" style="color:var(--text-primary, #0f172a);"></span>
             </div>
-
-            <div style="background:var(--bg-main); padding:12px; border-radius:10px; border:1px solid var(--border-light);">
-                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; margin-bottom:4px;">Mata Pelajaran Diampu</div>
-                <div id="detailMapelAktif" style="display:flex; flex-wrap:wrap; gap:5px;">-</div>
+            <div style="display:flex; justify-content:space-between; padding-bottom:8px; border-bottom:1px solid var(--border-subtle, #f1f5f9);">
+                <span style="color:var(--text-muted, #64748b);">NIP</span>
+                <span id="det_nip" style="color:var(--text-primary, #0f172a);"></span>
             </div>
-
-            <div id="detailPengajuanBox" style="background:rgba(245, 158, 11, 0.08); border:1px solid rgba(245, 158, 11, 0.25); padding:12px; border-radius:10px;">
-                <div style="font-size:11px; color:#B45309; text-transform:uppercase; font-weight:700;">Status Pengajuan</div>
-                <div id="detailPengajuanStatus" style="font-weight:700; font-size:13px; margin-top:2px;">-</div>
-                <div id="detailPengajuanCatatan" style="font-size:11.5px; color:var(--text-secondary); margin-top:3px;"></div>
+            <div style="display:flex; justify-content:space-between; padding-bottom:8px; border-bottom:1px solid var(--border-subtle, #f1f5f9);">
+                <span style="color:var(--text-muted, #64748b);">Sekolah</span>
+                <span id="det_sekolah" style="color:var(--text-primary, #0f172a); font-weight:700;"></span>
             </div>
-
-            <div style="background:var(--bg-main); padding:12px; border-radius:10px; border:1px solid var(--border-light);">
-                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Alamat</div>
-                <div id="detailAlamat" style="font-size:12.5px; color:var(--text-primary); margin-top:2px;">-</div>
+            <div style="display:flex; justify-content:space-between; padding-bottom:8px; border-bottom:1px solid var(--border-subtle, #f1f5f9);">
+                <span style="color:var(--text-muted, #64748b);">Mata Pelajaran</span>
+                <span id="det_mapel" style="color:#0284c7; font-weight:700;"></span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-muted, #64748b);">Status</span>
+                <span id="det_status"></span>
             </div>
         </div>
 
-        <div style="padding:12px 20px; border-top:1px solid var(--border-subtle); display:flex; justify-content:flex-end; background:var(--bg-main);">
-            <button type="button" class="btn btn-secondary" onclick="tutupModal('modalDetail')" style="padding:7px 16px; border-radius:8px; font-size:12.5px;">Tutup</button>
+        <div style="padding:14px 20px; border-top:1px solid var(--border-subtle, #f1f5f9); display:flex; justify-content:flex-end; background:var(--bg-main, #f8fafc);">
+            <button type="button" class="btn btn-secondary" onclick="tutupModalDetail()" style="padding:7px 16px; border-radius:8px; font-size:12.5px;">Tutup</button>
         </div>
     </div>
 </div>
 
 <script>
-    // State management for Multi-Select Mapel
-    let selectedAssignMapels = [];
-    let selectedApproveMapels = [];
+// Data Mapping Mapel per Lembaga dari tabel Plotting Mata Pelajaran
+const mapelByLembaga = {
+@foreach($sekolahLembagas as $lem)
+    "{{ $lem->id }}": [
+        @foreach($plottingMapels->where('lembaga_id', $lem->id) as $mp)
+            { id: {{ $mp->id }}, kode: "{{ $mp->kode }}", nama: "{{ addslashes($mp->mata_pelajaran) }}" },
+        @endforeach
+    ],
+@endforeach
+};
 
-    function tutupModal(modalId) {
-        const el = document.getElementById(modalId);
-        if (el) el.style.display = 'none';
+function renderMapelChips(lembagaId, containerId, preselectedMapels = []) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!lembagaId) {
+        container.innerHTML = '<div style="font-size:12.5px; color:var(--text-muted, #94a3b8); padding:8px 0;">Pilih lembaga sekolah terlebih dahulu.</div>';
+        return;
     }
 
-    // Helper: parse comma-separated string to clean array
-    function parseMapelString(str) {
-        if (!str) return [];
-        return str.split(/[,|;]/)
-            .map(s => s.trim())
-            .filter(s => s.length > 0);
+    const items = mapelByLembaga[lembagaId] || [];
+    if (items.length === 0) {
+        container.innerHTML = '<div style="font-size:12.5px; color:#b45309; background:#fef3c7; border:1px solid #fde68a; padding:8px 12px; border-radius:8px;">Belum ada mata pelajaran untuk lembaga ini di menu Plotting Mapel.</div>';
+        return;
     }
 
-    // Helper: update Assign Tags UI
-    function renderAssignTags() {
-        const container = document.getElementById('tetapkanTagsContainer');
-        const hiddenInput = document.getElementById('tetapkanMapelInput');
-        if (!container || !hiddenInput) return;
-
-        hiddenInput.value = selectedAssignMapels.join(', ');
-        container.innerHTML = '';
-
-        if (selectedAssignMapels.length === 0) {
-            container.innerHTML = '<span style="color:var(--text-muted); font-size:12px; font-style:italic;">Belum ada mata pelajaran dipilih</span>';
-        } else {
-            selectedAssignMapels.forEach((mapel, idx) => {
-                const tag = document.createElement('span');
-                tag.style.cssText = 'display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px; font-size:12px; font-weight:600; background:#f0f9ff; color:#0284c7; border:1px solid #bae6fd;';
-                tag.innerHTML = `<span>${mapel}</span><button type="button" onclick="removeAssignMapel(${idx})" style="background:none; border:none; color:#0284c7; cursor:pointer; padding:0; line-height:1; font-size:13px; font-weight:700;">&times;</button>`;
-                container.appendChild(tag);
-            });
-        }
-
-        // Update button states
-        document.querySelectorAll('#tetapkanAvailablePills .btn-toggle-mapel-assign').forEach(btn => {
-            const m = btn.getAttribute('data-mapel');
-            if (selectedAssignMapels.includes(m)) {
-                btn.style.background = '#0284c7';
-                btn.style.color = '#ffffff';
-                btn.style.borderColor = '#0284c7';
-                btn.innerHTML = `✓ ${m}`;
-            } else {
-                btn.style.background = 'var(--bg-surface)';
-                btn.style.color = 'var(--text-secondary)';
-                btn.style.borderColor = 'var(--border-light)';
-                btn.innerHTML = `+ ${m}`;
-            }
-        });
-    }
-
-    function toggleMapelAssign(mapel) {
-        const index = selectedAssignMapels.indexOf(mapel);
-        if (index > -1) {
-            selectedAssignMapels.splice(index, 1);
-        } else {
-            selectedAssignMapels.push(mapel);
-        }
-        renderAssignTags();
-    }
-
-    function removeAssignMapel(index) {
-        selectedAssignMapels.splice(index, 1);
-        renderAssignTags();
-    }
-
-    // Helper: update Approve Tags UI
-    function renderApproveTags() {
-        const container = document.getElementById('approveTagsContainer');
-        const hiddenInput = document.getElementById('approveMataPelajaranInput');
-        if (!container || !hiddenInput) return;
-
-        hiddenInput.value = selectedApproveMapels.join(', ');
-        container.innerHTML = '';
-
-        if (selectedApproveMapels.length === 0) {
-            container.innerHTML = '<span style="color:var(--text-muted); font-size:12px; font-style:italic;">Belum ada mata pelajaran dipilih</span>';
-        } else {
-            selectedApproveMapels.forEach((mapel, idx) => {
-                const tag = document.createElement('span');
-                tag.style.cssText = 'display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px; font-size:12px; font-weight:600; background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;';
-                tag.innerHTML = `<span>${mapel}</span><button type="button" onclick="removeApproveMapel(${idx})" style="background:none; border:none; color:#047857; cursor:pointer; padding:0; line-height:1; font-size:13px; font-weight:700;">&times;</button>`;
-                container.appendChild(tag);
-            });
-        }
-
-        // Update button states
-        document.querySelectorAll('#approveAvailablePills .btn-toggle-mapel-approve').forEach(btn => {
-            const m = btn.getAttribute('data-mapel');
-            if (selectedApproveMapels.includes(m)) {
-                btn.style.background = '#10B981';
-                btn.style.color = '#ffffff';
-                btn.style.borderColor = '#10B981';
-                btn.innerHTML = `✓ ${m}`;
-            } else {
-                btn.style.background = 'var(--bg-surface)';
-                btn.style.color = 'var(--text-secondary)';
-                btn.style.borderColor = 'var(--border-light)';
-                btn.innerHTML = `+ ${m}`;
-            }
-        });
-    }
-
-    function toggleMapelApprove(mapel) {
-        const index = selectedApproveMapels.indexOf(mapel);
-        if (index > -1) {
-            selectedApproveMapels.splice(index, 1);
-        } else {
-            selectedApproveMapels.push(mapel);
-        }
-        renderApproveTags();
-    }
-
-    function removeApproveMapel(index) {
-        selectedApproveMapels.splice(index, 1);
-        renderApproveTags();
-    }
-
-    // Modal Approve
-    function bukaModalApproveBtn(btn) {
-        const guruId = btn.getAttribute('data-guru-id');
-        const guruNama = btn.getAttribute('data-guru-name');
-        const mapelNama = btn.getAttribute('data-guru-mapel');
-        const catatanGuru = btn.getAttribute('data-guru-catatan') || '';
-        bukaModalApprove(guruId, guruNama, mapelNama, catatanGuru);
-    }
-
-    function bukaModalApprove(guruId, guruNama, mapelNama, catatanGuru) {
-        const form = document.getElementById('formApprove');
-        if (form) form.action = '{{ url("/guru-sekolah") }}/' + guruId + '/approve';
-        const namaEl = document.getElementById('approveGuruNama');
-        if (namaEl) namaEl.innerText = guruNama || '-';
-        const mapelEl = document.getElementById('approveMapelNama');
-        if (mapelEl) mapelEl.innerText = mapelNama || '-';
-
-        selectedApproveMapels = parseMapelString(mapelNama);
-        renderApproveTags();
-
-        const catatanWrap = document.getElementById('approveGuruCatatanWrap');
-        const catatanEl = document.getElementById('approveGuruCatatan');
-        if (catatanGuru && catatanGuru.trim() !== '') {
-            if (catatanEl) catatanEl.innerText = catatanGuru;
-            if (catatanWrap) catatanWrap.style.display = 'block';
-        } else {
-            if (catatanWrap) catatanWrap.style.display = 'none';
-        }
-
-        const catatanYayasan = document.getElementById('approveCatatan');
-        if (catatanYayasan) catatanYayasan.value = 'Disetujui oleh Yayasan';
-        const m = document.getElementById('modalApprove');
-        if (m) m.style.display = 'flex';
-    }
-
-    // Modal Tolak
-    function bukaModalTolakBtn(btn) {
-        const guruId = btn.getAttribute('data-guru-id');
-        const guruNama = btn.getAttribute('data-guru-name');
-        const mapelNama = btn.getAttribute('data-guru-mapel');
-        bukaModalTolak(guruId, guruNama, mapelNama);
-    }
-
-    function bukaModalTolak(guruId, guruNama, mapelNama) {
-        const form = document.getElementById('formTolak');
-        if (form) form.action = '{{ url("/guru-sekolah") }}/' + guruId + '/reject';
-        const namaEl = document.getElementById('tolakGuruNama');
-        if (namaEl) namaEl.innerText = guruNama || '-';
-        const mapelEl = document.getElementById('tolakMapelNama');
-        if (mapelEl) mapelEl.innerText = mapelNama || '-';
-        const catatanEl = document.getElementById('tolakCatatan');
-        if (catatanEl) catatanEl.value = '';
-        const m = document.getElementById('modalTolak');
-        if (m) m.style.display = 'flex';
-    }
-
-    // Modal Tetapkan Mapel (Umum / Header Button)
-    function bukaModalTetapkanMapel() {
-        const judul = document.getElementById('modalTetapkanJudul');
-        if (judul) judul.innerText = 'Tetapkan Mata Pelajaran Guru';
-        const wrapPilih = document.getElementById('tetapkanPilihGuruWrap');
-        if (wrapPilih) wrapPilih.style.display = 'block';
-        const rowInfo = document.getElementById('tetapkanGuruRowInfo');
-        if (rowInfo) rowInfo.style.display = 'none';
-        const selectGuru = document.getElementById('tetapkanPilihGuruSelect');
-        if (selectGuru) selectGuru.value = '';
-
-        selectedAssignMapels = [];
-        renderAssignTags();
-
-        const catatanInput = document.getElementById('tetapkanCatatanInput');
-        if (catatanInput) catatanInput.value = 'Ditetapkan langsung oleh Yayasan';
-        const form = document.getElementById('formTetapkan');
-        if (form) form.action = '{{ url("/guru-sekolah") }}/0/assign';
-        const m = document.getElementById('modalTetapkan');
-        if (m) m.style.display = 'flex';
-    }
-
-    function onGuruSelectedForAssign(selectEl) {
-        const guruId = selectEl.value;
-        if (!guruId) return;
-        const form = document.getElementById('formTetapkan');
-        if (form) form.action = '{{ url("/guru-sekolah") }}/' + guruId + '/assign';
-        const selectedOption = selectEl.options[selectEl.selectedIndex];
-        const existingMapel = selectedOption.dataset.mapel || '';
-        const existingLembaga = selectedOption.dataset.lembaga || '';
-
-        selectedAssignMapels = parseMapelString(existingMapel);
-        renderAssignTags();
-
-        const lemSelect = document.getElementById('tetapkanLembagaSelect');
-        if (lemSelect && existingLembaga) {
-            lemSelect.value = existingLembaga;
-        }
-    }
-
-    // Modal Tetapkan Mapel (Spesifik Row)
-    function bukaModalTetapkanMapelSpesifikBtn(btn) {
-        const guruId = btn.getAttribute('data-guru-id');
-        const guruNama = btn.getAttribute('data-guru-name');
-        const mapelSaatIni = btn.getAttribute('data-guru-mapel') || '';
-        const lembagaId = btn.getAttribute('data-guru-lembaga') || '';
-        bukaModalTetapkanMapelSpesifik(guruId, guruNama, mapelSaatIni, lembagaId);
-    }
-
-    function bukaModalTetapkanMapelSpesifik(guruId, guruNama, mapelSaatIni, lembagaId) {
-        const judul = document.getElementById('modalTetapkanJudul');
-        if (judul) judul.innerText = 'Ubah / Tetapkan Mata Pelajaran';
-        const wrapPilih = document.getElementById('tetapkanPilihGuruWrap');
-        if (wrapPilih) wrapPilih.style.display = 'none';
-        const rowInfo = document.getElementById('tetapkanGuruRowInfo');
-        if (rowInfo) rowInfo.style.display = 'block';
-        const rowNama = document.getElementById('tetapkanGuruRowNama');
-        if (rowNama) rowNama.innerText = guruNama || '-';
-
-        selectedAssignMapels = parseMapelString(mapelSaatIni);
-        renderAssignTags();
-
-        const lemSelect = document.getElementById('tetapkanLembagaSelect');
-        if (lemSelect && lembagaId) {
-            lemSelect.value = lembagaId;
-        }
-        const catatanInput = document.getElementById('tetapkanCatatanInput');
-        if (catatanInput) catatanInput.value = 'Ditetapkan langsung oleh Yayasan';
-        const form = document.getElementById('formTetapkan');
-        if (form) form.action = '{{ url("/guru-sekolah") }}/' + guruId + '/assign';
-        const m = document.getElementById('modalTetapkan');
-        if (m) m.style.display = 'flex';
-    }
-
-    // Modal Detail Profil Guru
-    function bukaModalDetail(target) {
-        let guru = target;
-        if (target && target instanceof HTMLElement) {
-            try {
-                guru = JSON.parse(target.getAttribute('data-guru'));
-            } catch (e) {
-                console.error('Error parsing data-guru', e);
-                return;
-            }
-        }
-        if (!guru) return;
-
-        const avatar = document.getElementById('detailAvatar');
-        if (avatar) avatar.innerText = (guru.name || 'G').substring(0, 1).toUpperCase();
-        const nama = document.getElementById('detailNama');
-        if (nama) nama.innerText = guru.name || '-';
-        const jabatan = document.getElementById('detailJabatan');
-        if (jabatan) jabatan.innerText = guru.jabatan || 'Guru Pengajar';
-        const nip = document.getElementById('detailNip');
-        if (nip) nip.innerText = guru.nip || '-';
-        const gender = document.getElementById('detailGender');
-        if (gender) gender.innerText = guru.jenis_kelamin || '-';
-        const email = document.getElementById('detailEmail');
-        if (email) email.innerText = guru.email || '-';
-        const telepon = document.getElementById('detailTelepon');
-        if (telepon) telepon.innerText = guru.telepon || '-';
-
-        // Render Mata Pelajaran Aktif sebagai pills
-        const mapelBox = document.getElementById('detailMapelAktif');
-        if (mapelBox) {
-            const list = parseMapelString(guru.mata_pelajaran);
-            if (list.length === 0) {
-                mapelBox.innerHTML = '<span style="color:var(--text-muted); font-size:12px;">-</span>';
-            } else {
-                mapelBox.innerHTML = list.map(m => `<span style="padding:3px 8px; border-radius:6px; font-size:11.5px; font-weight:600; background:rgba(2, 132, 199, 0.08); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.2);">${m}</span>`).join('');
-            }
-        }
-
-        const alamat = document.getElementById('detailAlamat');
-        if (alamat) alamat.innerText = guru.alamat || '-';
-
-        const statusBox = document.getElementById('detailPengajuanBox');
-        const statusText = document.getElementById('detailPengajuanStatus');
-        const catatanText = document.getElementById('detailPengajuanCatatan');
-
-        if (statusBox && statusText && catatanText) {
-            if (guru.mapel_status === 'menunggu') {
-                statusBox.style.background = 'rgba(245, 158, 11, 0.1)';
-                statusBox.style.borderColor = 'rgba(245, 158, 11, 0.3)';
-                statusText.style.color = '#B45309';
-                statusText.innerText = 'Menunggu: ' + (guru.mapel_diajukan || '-');
-                catatanText.innerText = guru.mapel_catatan ? 'Catatan: "' + guru.mapel_catatan + '"' : '';
-            } else if (guru.mapel_status === 'disetujui') {
-                statusBox.style.background = 'rgba(16, 185, 129, 0.1)';
-                statusBox.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-                statusText.style.color = '#047857';
-                statusText.innerText = 'Disetujui: ' + (guru.mata_pelajaran || '-');
-                catatanText.innerText = guru.mapel_catatan ? 'Catatan: "' + guru.mapel_catatan + '"' : '';
-            } else if (guru.mapel_status === 'ditolak') {
-                statusBox.style.background = 'rgba(239, 68, 68, 0.1)';
-                statusBox.style.borderColor = 'rgba(239, 68, 68, 0.3)';
-                statusText.style.color = '#B91C1C';
-                statusText.innerText = 'Ditolak: ' + (guru.mapel_diajukan || '-');
-                catatanText.innerText = guru.mapel_catatan ? 'Alasan: "' + guru.mapel_catatan + '"' : '';
-            } else {
-                statusBox.style.background = 'rgba(0,0,0,0.04)';
-                statusBox.style.borderColor = 'var(--border-light)';
-                statusText.style.color = 'var(--text-muted)';
-                statusText.innerText = 'Belum Ada Pengajuan';
-                catatanText.innerText = '';
-            }
-        }
-
-        const m = document.getElementById('modalDetail');
-        if (m) m.style.display = 'flex';
-    }
-
-    // Tutup modal jika klik backdrop atau tombol Escape
-    document.addEventListener('click', function(event) {
-        ['modalApprove', 'modalTolak', 'modalTetapkan', 'modalDetail'].forEach(id => {
-            const m = document.getElementById(id);
-            if (m && event.target === m) {
-                m.style.display = 'none';
-            }
-        });
+    let html = '<div style="display:flex; flex-wrap:wrap; gap:8px; max-height:220px; overflow-y:auto; padding:4px 0;">';
+    items.forEach(item => {
+        const isChecked = preselectedMapels.includes(item.nama);
+        html += `
+            <label style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; border:1px solid ${isChecked ? '#0284c7' : 'var(--border-light, #cbd5e1)'}; background:${isChecked ? 'rgba(2, 132, 199, 0.08)' : 'var(--bg-surface, #ffffff)'}; color:${isChecked ? '#0284c7' : 'inherit'}; font-size:12.5px; font-weight:600; cursor:pointer; user-select:none; transition:all 0.15s;">
+                <input type="checkbox" name="mata_pelajaran[]" value="${item.nama}" ${isChecked ? 'checked' : ''} style="accent-color:#0284c7; cursor:pointer;" onchange="updateChipState(this)">
+                <span>${item.nama}</span>
+                <span style="font-size:10.5px; color:var(--text-muted, #94a3b8); font-weight:500;">(${item.kode})</span>
+            </label>
+        `;
     });
+    html += '</div>';
+    container.innerHTML = html;
+}
 
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') {
-            ['modalApprove', 'modalTolak', 'modalTetapkan', 'modalDetail'].forEach(id => {
-                const m = document.getElementById(id);
-                if (m) m.style.display = 'none';
-            });
+function updateChipState(cb) {
+    const label = cb.closest('label');
+    if (!label) return;
+    if (cb.checked) {
+        label.style.borderColor = '#0284c7';
+        label.style.background = 'rgba(2, 132, 199, 0.08)';
+        label.style.color = '#0284c7';
+    } else {
+        label.style.borderColor = 'var(--border-light, #cbd5e1)';
+        label.style.background = 'var(--bg-surface, #ffffff)';
+        label.style.color = 'inherit';
+    }
+}
+
+// Modal Tambah Guru
+function bukaModalTambahGuru() {
+    const modal = document.getElementById('modalTambahGuru');
+    if (modal) {
+        modal.style.display = 'flex';
+        const lembagaSelect = document.getElementById('tambah_lembaga_id');
+        if (lembagaSelect && lembagaSelect.value) {
+            renderMapelChips(lembagaSelect.value, 'tambah_mapel_container', []);
         }
-    });
+    }
+}
+
+function tutupModalTambahGuru() {
+    const modal = document.getElementById('modalTambahGuru');
+    if (modal) modal.style.display = 'none';
+}
+
+function filterMapelTambah(lembagaId) {
+    renderMapelChips(lembagaId, 'tambah_mapel_container', []);
+}
+
+// Modal Ubah Guru
+let currentUbahMapels = [];
+function bukaModalUbah(guruId, guruName, lembagaId, mapelStr) {
+    const modal = document.getElementById('modalUbahGuru');
+    const form = document.getElementById('formUbahGuru');
+    const namaInput = document.getElementById('ubah_nama_guru');
+    const lembagaSelect = document.getElementById('ubah_lembaga_id');
+
+    if (!modal || !form) return;
+
+    form.action = '{{ url("guru-sekolah") }}/' + guruId + '/assign';
+    if (namaInput) namaInput.value = guruName;
+
+    currentUbahMapels = mapelStr ? mapelStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+    if (lembagaSelect) {
+        if (lembagaId) {
+            lembagaSelect.value = lembagaId;
+        }
+        renderMapelChips(lembagaSelect.value, 'ubah_mapel_container', currentUbahMapels);
+    }
+
+    modal.style.display = 'flex';
+}
+
+function tutupModalUbahGuru() {
+    const modal = document.getElementById('modalUbahGuru');
+    if (modal) modal.style.display = 'none';
+}
+
+function filterMapelUbah(lembagaId) {
+    renderMapelChips(lembagaId, 'ubah_mapel_container', currentUbahMapels);
+}
+
+// Modal Tolak Pengajuan
+function bukaModalTolak(guruId, guruName) {
+    const modal = document.getElementById('modalTolakPengajuan');
+    const form = document.getElementById('formTolakPengajuan');
+    const namaEl = document.getElementById('tolak_guru_nama');
+
+    if (!modal || !form) return;
+    form.action = '{{ url("guru-sekolah") }}/' + guruId + '/reject';
+    if (namaEl) namaEl.textContent = guruName;
+    modal.style.display = 'flex';
+}
+
+function tutupModalTolak() {
+    const modal = document.getElementById('modalTolakPengajuan');
+    if (modal) modal.style.display = 'none';
+}
+
+// Modal Detail Guru
+function bukaModalDetail(id, nama, email, nip, sekolah, mapel, status) {
+    const modal = document.getElementById('modalDetailGuru');
+    if (!modal) return;
+
+    document.getElementById('det_nama').textContent = nama;
+    document.getElementById('det_email').textContent = email;
+    document.getElementById('det_nip').textContent = nip;
+    document.getElementById('det_sekolah').textContent = sekolah;
+    document.getElementById('det_mapel').textContent = mapel;
+
+    const statusEl = document.getElementById('det_status');
+    if (status === 'disetujui') {
+        statusEl.innerHTML = '<span style="color:#047857; font-weight:700;">Disetujui</span>';
+    } else if (status === 'menunggu') {
+        statusEl.innerHTML = '<span style="color:#b45309; font-weight:700;">Menunggu Persetujuan</span>';
+    } else if (status === 'ditolak') {
+        statusEl.innerHTML = '<span style="color:#b91c1c; font-weight:700;">Ditolak</span>';
+    } else {
+        statusEl.innerHTML = '<span style="color:#64748b; font-weight:600;">Belum Mengajukan</span>';
+    }
+
+    modal.style.display = 'flex';
+}
+
+function tutupModalDetail() {
+    const modal = document.getElementById('modalDetailGuru');
+    if (modal) modal.style.display = 'none';
+}
+
+// Close modal when clicking backdrop
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList.contains('clean-modal-backdrop')) {
+        e.target.style.display = 'none';
+    }
+});
 </script>
-
 @endsection
