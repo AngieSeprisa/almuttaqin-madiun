@@ -279,18 +279,19 @@ class GuruSekolahApprovalTest extends TestCase
         $response = $this->actingAs($yayasan)->get(route('guru-sekolah.index'));
         $response->assertStatus(200);
 
-        // 1. Tombol filter popover dan controls di dalam popover
-        $response->assertSee('title="Filter Data Guru"', false);
-        $response->assertSee('Filter Guru Sekolah');
+        // 1. Filter form controls (didock otomatis ke Filament v4 Toolbar Popover oleh app.js)
+        $response->assertSee('filter-card');
+        $response->assertSee('name="status"', false);
         $response->assertSee('Status Pengajuan');
-        $response->assertSee('Terapkan Filter');
+        $response->assertSee('Cari guru, NIP, mapel...');
 
-        // 2. Tombol tabel custom dan controls visibilitas kolom
-        $response->assertSee('title="Tabel Kustom (Atur Kolom)"', false);
-        $response->assertSee('Kolom Tabel');
-        $response->assertSee('x-model="columns.sekolah"', false);
-        $response->assertSee('x-model="columns.mapel"', false);
-        $response->assertSee('x-model="columns.status"', false);
-        $response->assertSee('x-model="columns.aksi"', false);
+        // 2. Tabel modern yang ditingkatkan ke Universal Filament v4 (.table-card & .modern-table)
+        $response->assertSee('table-card');
+        $response->assertSee('modern-table');
+        $response->assertSee('Guru');
+        $response->assertSee('Sekolah');
+        $response->assertSee('Mata Pelajaran (Diampu)');
+        $response->assertSee('Status Pengajuan');
+        $response->assertSee('Aksi');
     }
 }
