@@ -115,14 +115,49 @@ class RekapAbsensiSekolahTest extends TestCase
         $response->assertSee('NISN: -');
         $response->assertSee('05');
         $response->assertSee('MTK');
+        $response->assertSee('mapel-code-pill');
 
         // Badge pill absensi H dan S
         $response->assertSee('pill-h');
         $response->assertSee('pill-s');
 
-        // Tombol Detail
+        // Tombol Detail & Modal Detail Siswa
         $response->assertSee('js-btn-detail');
         $response->assertSee('modalDetailSiswa');
+
+        // Tombol Laporan WA & Modal Laporan WA
+        $response->assertSee('Laporan WA');
+        $response->assertSee('openWaModal');
+        $response->assertSee('modalLaporanWA');
+        $response->assertSee('btn-wa');
+    }
+
+    public function test_format_kode_mapel_maps_curriculum_and_case_variants_correctly(): void
+    {
+        $this->assertEquals('MTK', \App\Http\Controllers\SekolahController::formatKodeMapel('Matematika'));
+        $this->assertEquals('MTK', \App\Http\Controllers\SekolahController::formatKodeMapel('matematika'));
+        $this->assertEquals('PP', \App\Http\Controllers\SekolahController::formatKodeMapel('PENDIDIKAN PANCASILA'));
+        $this->assertEquals('PP', \App\Http\Controllers\SekolahController::formatKodeMapel('Pendidikan Pancasila & Kewarganegaraan (PPKn)'));
+        $this->assertEquals('PJOK', \App\Http\Controllers\SekolahController::formatKodeMapel('Pendidikan Jasmani Olahraga dan Kesehatan'));
+        $this->assertEquals('PJOK', \App\Http\Controllers\SekolahController::formatKodeMapel('Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)'));
+        $this->assertEquals('TIK', \App\Http\Controllers\SekolahController::formatKodeMapel('Informatika'));
+        $this->assertEquals('TIK', \App\Http\Controllers\SekolahController::formatKodeMapel('Teknologi Informasi & Komunikasi'));
+        $this->assertEquals('BIN', \App\Http\Controllers\SekolahController::formatKodeMapel('Bahasa Indonesia'));
+        $this->assertEquals('BIG', \App\Http\Controllers\SekolahController::formatKodeMapel('Bahasa Inggris'));
+        $this->assertEquals('IPS', \App\Http\Controllers\SekolahController::formatKodeMapel('Ilmu Pengetahuan Sosial'));
+        $this->assertEquals('IPA', \App\Http\Controllers\SekolahController::formatKodeMapel('Ilmu Pengetahuan Alam (IPA)'));
+        $this->assertEquals('IPA', \App\Http\Controllers\SekolahController::formatKodeMapel('IPA'));
+        $this->assertEquals('SBDP', \App\Http\Controllers\SekolahController::formatKodeMapel('Seni Budaya'));
+        $this->assertEquals('PAI', \App\Http\Controllers\SekolahController::formatKodeMapel('Pendidikan Agama Islam'));
+        $this->assertEquals('ARB', \App\Http\Controllers\SekolahController::formatKodeMapel('Bahasa Arab'));
+        $this->assertEquals('FIS', \App\Http\Controllers\SekolahController::formatKodeMapel('Fisika'));
+        $this->assertEquals('KIM', \App\Http\Controllers\SekolahController::formatKodeMapel('Kimia'));
+        $this->assertEquals('BIO', \App\Http\Controllers\SekolahController::formatKodeMapel('Biologi'));
+        $this->assertEquals('EKO', \App\Http\Controllers\SekolahController::formatKodeMapel('Ekonomi'));
+        $this->assertEquals('SOS', \App\Http\Controllers\SekolahController::formatKodeMapel('Sosiologi'));
+        $this->assertEquals('SEJ', \App\Http\Controllers\SekolahController::formatKodeMapel('Sejarah'));
+        $this->assertEquals('-', \App\Http\Controllers\SekolahController::formatKodeMapel(null));
+        $this->assertEquals('-', \App\Http\Controllers\SekolahController::formatKodeMapel(''));
     }
 
     public function test_backward_compatibility_sekolah_rekap_absensi_route(): void

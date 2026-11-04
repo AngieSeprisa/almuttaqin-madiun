@@ -3,13 +3,21 @@
 @section('title', 'Rekap Absensi Siswa')
 
 @section('header-actions')
-<a href="{{ route('sekolah.jurnal') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
-    </svg>
-    <span>Input Jurnal</span>
-</a>
+<div style="display:flex; align-items:center; gap:8px;">
+    <button type="button" class="btn-wa" onclick="openWaModal()" title="Buka &amp; Salin Format Laporan WhatsApp">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.41 1.56 1.56 2.41 3.63 2.41 5.83s-.85 4.27-2.41 5.83c-1.55 1.55-3.62 2.41-5.82 2.41-1.5 0-2.97-.39-4.27-1.13l-.3-.17-3.17.83.85-3.09-.2-.31c-.81-1.33-1.25-2.88-1.25-4.47 0-2.2 0.86-4.27 2.42-5.83 1.56-1.55 3.63-2.41 5.82-2.41m-2.64 5.34c-.16 0-.39.06-.6.28-.2.22-.79.77-.79 1.88s.81 2.18.92 2.33c.12.16 1.57 2.4 3.82 3.37.53.23.95.37 1.28.47.54.17 1.03.15 1.42.09.43-.06 1.33-.54 1.52-1.07.19-.52.19-.97.13-1.07-.06-.09-.22-.16-.47-.28-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.65.81-.8 1-.15.19-.3.21-.55.09-.25-.12-1.07-.39-2.04-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.28.37-.42.12-.15.16-.25.25-.42.08-.16.04-.31-.02-.43s-.56-1.36-.77-1.86c-.2-.48-.41-.42-.56-.43h-.48z"/>
+        </svg>
+        <span>Laporan WA</span>
+    </button>
+    <a href="{{ route('sekolah.jurnal') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        <span>Input Jurnal</span>
+    </a>
+</div>
 @endsection
 
 @section('content')
@@ -105,16 +113,26 @@
                 @endif
             </div>
 
-            {{-- Filter Pencarian Nama Siswa --}}
-            <div class="filter-search-wrap">
-                <input type="text" name="search" value="{{ request('search') }}"
-                       class="form-control filter-search-input"
-                       placeholder="Cari nama siswa...">
-                <button type="submit" class="btn btn-primary filter-search-btn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            {{-- Filter Pencarian Nama Siswa & Action Laporan WA --}}
+            <div style="display:flex; align-items:center; gap:8px;">
+                <div class="filter-search-wrap">
+                    <input type="text" name="search" value="{{ request('search') }}"
+                           class="form-control filter-search-input"
+                           placeholder="Cari nama siswa...">
+                    <button type="submit" class="btn btn-primary filter-search-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Tombol Laporan WA --}}
+                <button type="button" class="btn-wa" onclick="openWaModal()" title="Buka &amp; Salin Format Laporan WhatsApp">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.41 1.56 1.56 2.41 3.63 2.41 5.83s-.85 4.27-2.41 5.83c-1.55 1.55-3.62 2.41-5.82 2.41-1.5 0-2.97-.39-4.27-1.13l-.3-.17-3.17.83.85-3.09-.2-.31c-.81-1.33-1.25-2.88-1.25-4.47 0-2.2 0.86-4.27 2.42-5.83 1.56-1.55 3.63-2.41 5.82-2.41m-2.64 5.34c-.16 0-.39.06-.6.28-.2.22-.79.77-.79 1.88s.81 2.18.92 2.33c.12.16 1.57 2.4 3.82 3.37.53.23.95.37 1.28.47.54.17 1.03.15 1.42.09.43-.06 1.33-.54 1.52-1.07.19-.52.19-.97.13-1.07-.06-.09-.22-.16-.47-.28-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.65.81-.8 1-.15.19-.3.21-.55.09-.25-.12-1.07-.39-2.04-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.28.37-.42.12-.15.16-.25.25-.42.08-.16.04-.31-.02-.43s-.56-1.36-.77-1.86c-.2-.48-.41-.42-.56-.43h-.48z"/>
                     </svg>
+                    <span>Laporan WA</span>
                 </button>
             </div>
         </form>
@@ -200,7 +218,7 @@
                     <tr>
                         @foreach($jurnals as $jurnal)
                             <th class="th-mapel-code" title="{{ $jurnal->mata_pelajaran }} ({{ $jurnal->jam_ke }}) - Guru: {{ $jurnal->nama_guru }}">
-                                <span class="mapel-code">{{ $jurnal->kode_mapel }}</span>
+                                <span class="mapel-code mapel-code-pill">{{ $jurnal->kode_mapel }}</span>
                             </th>
                         @endforeach
                     </tr>
@@ -313,7 +331,7 @@
                     </div>
                     <div>
                         <h3 class="modal-title-text" id="modalNamaSiswa">Nama Siswa</h3>
-                        <p class="modal-subtitle-text" id="modalSubInfo">NISN: - â€¢ Kelas -</p>
+                        <p class="modal-subtitle-text" id="modalSubInfo">NISN: - • Kelas -</p>
                     </div>
                 </div>
                 <button type="button" class="modal-close-btn" id="modalCloseBtn" aria-label="Tutup Modal">&times;</button>
@@ -388,6 +406,93 @@
             {{-- Modal Footer --}}
             <div class="modal-footer-custom">
                 <button type="button" class="btn btn-secondary" id="modalCloseFooterBtn">Tutup</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{{-- Modal Laporan WhatsApp --}}
+<div class="modal-backdrop-custom" id="modalLaporanWA" style="display:none;">
+    <div class="modal-dialog-custom" style="max-width: 680px;">
+        <div class="modal-content-custom">
+            
+            {{-- Modal Header --}}
+            <div class="modal-header-custom" style="background:#f8fafc;">
+                <div class="modal-title-wrap">
+                    <div class="modal-avatar-icon" style="background:#dcfce7; color:#16a34a;">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                            <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.41 1.56 1.56 2.41 3.63 2.41 5.83s-.85 4.27-2.41 5.83c-1.55 1.55-3.62 2.41-5.82 2.41-1.5 0-2.97-.39-4.27-1.13l-.3-.17-3.17.83.85-3.09-.2-.31c-.81-1.33-1.25-2.88-1.25-4.47 0-2.2 0.86-4.27 2.42-5.83 1.56-1.55 3.63-2.41 5.82-2.41m-2.64 5.34c-.16 0-.39.06-.6.28-.2.22-.79.77-.79 1.88s.81 2.18.92 2.33c.12.16 1.57 2.4 3.82 3.37.53.23.95.37 1.28.47.54.17 1.03.15 1.42.09.43-.06 1.33-.54 1.52-1.07.19-.52.19-.97.13-1.07-.06-.09-.22-.16-.47-.28-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.65.81-.8 1-.15.19-.3.21-.55.09-.25-.12-1.07-.39-2.04-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.28.37-.42.12-.15.16-.25.25-.42.08-.16.04-.31-.02-.43s-.56-1.36-.77-1.86c-.2-.48-.41-.42-.56-.43h-.48z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="modal-title-text" style="font-size:16px;">Laporan WhatsApp Absensi Sekolah</h3>
+                        <p class="modal-subtitle-text">
+                            Kelas {{ \App\Http\Controllers\PlottingKelasController::toRomanDisplay($selectedKelas ?? '-') }} &bull; {{ $bulan ? ($bulanList[$bulan] ?? 'Bulan ' . $bulan) : 'Semua Bulan' }} {{ $tahun }}
+                        </p>
+                    </div>
+                </div>
+                <button type="button" class="modal-close-btn" onclick="closeWaModal()" aria-label="Tutup Modal">&times;</button>
+            </div>
+
+            {{-- Modal Body --}}
+            <div class="modal-body-custom" style="padding:18px 24px; gap:14px;">
+                {{-- Controls Filter Mode --}}
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+                    <div>
+                        <label style="display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:5px;">PILIH FORMAT LAPORAN</label>
+                        <select id="waModeSelect" class="form-select" style="font-size:12.5px; height:38px;" onchange="handleWaModeChange()">
+                            <option value="rekap">Rekap Keseluruhan (Bulan/Periode)</option>
+                            <option value="sesi">Per Sesi Pertemuan / Tanggal</option>
+                        </select>
+                    </div>
+                    <div id="waSesiWrap" style="display:none;">
+                        <label style="display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:5px;">PILIH SESI PERTEMUAN</label>
+                        <select id="waSesiSelect" class="form-select" style="font-size:12.5px; height:38px;" onchange="renderSekolahWaPreview()">
+                            @foreach($jurnals as $j)
+                                <option value="{{ $j->id }}">
+                                    {{ $j->tgl_full }} - {{ $j->kode_mapel }} ({{ $j->jam_ke }}) - {{ $j->nama_guru }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                {{-- Textarea Preview --}}
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:5px;">TEKS PESAN WHATSAPP</label>
+                    <textarea id="waTextarea" spellcheck="false" style="width:100%; height:270px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; line-height:1.6; padding:12px; border:1px solid #cbd5e1; border-radius:10px; resize:vertical; background:#f8fafc; color:#0f172a; box-sizing:border-box;"></textarea>
+                </div>
+
+                <div id="copyNotif" style="display:none; padding:8px 12px; background:#dcfce7; color:#15803d; font-size:12px; font-weight:600; border-radius:6px; text-align:center;">
+                    Format WhatsApp berhasil disalin ke clipboard!
+                </div>
+            </div>
+
+            {{-- Modal Footer --}}
+            <div class="modal-footer-custom" style="display:flex; align-items:center; justify-content:space-between; padding:14px 24px; background:#f8fafc;">
+                <div style="font-size:11.5px; color:#64748b;">
+                    Gunakan tombol salin atau buka langsung via WhatsApp Web.
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeWaModal()" style="height:38px; padding:0 16px; font-size:13px; font-weight:600;">
+                        Tutup
+                    </button>
+                    <button type="button" class="btn-wa" onclick="copyWaText()" id="btnSalinWa" style="height:38px; padding:0 18px; font-size:13px; font-weight:600;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        <span id="btnSalinWaText">Salin Teks</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="openWaWeb()" title="Buka WhatsApp Web" style="height:38px; padding:0 12px; color:#16a34a; border-color:#86efac; background:#f0fdf4;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -566,56 +671,129 @@
     padding-left: 16px !important;
     border-right: 1px solid #E2E8F0 !important;
 }
+/* Tombol Laporan WA */
+.btn-wa {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background-color: #00875a;
+    color: #ffffff !important;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.2s, transform 0.1s;
+    height: 38px;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+.btn-wa:hover {
+    background-color: #006644;
+    color: #ffffff !important;
+}
+.btn-wa:active {
+    transform: scale(0.98);
+}
+
 .th-date-group {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 700;
     color: #1E293B !important;
-    padding: 7px 6px;
-    border-bottom: 1px solid #E2E8F0;
-    background: #F1F5F9 !important;
+    padding: 6px 4px !important;
+    height: 32px;
+    line-height: 20px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #CBD5E1 !important;
+    background: #EDF2F7 !important;
 }
 .dark-mode .th-date-group {
     background: #0F172A !important;
     color: #F8FAFC !important;
-    border-bottom: 1px solid #334155;
+    border-bottom: 1px solid #334155 !important;
 }
 .th-mapel-code {
-    font-size: 10.5px;
-    font-weight: 600;
-    color: #64748B;
-    padding: 6px 2px;
-    min-width: 34px;
-    width: 34px;
-    vertical-align: bottom;
-    background: #FBFCFE !important;
-}
-.th-mapel-code .mapel-code {
-    display: block;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 11px;
     font-weight: 700;
-    color: #475569;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
+    color: #1E293B;
+    padding: 4px 2px !important;
+    min-width: 48px;
+    width: 48px;
+    height: 32px;
+    box-sizing: border-box;
+    text-align: center;
+    vertical-align: middle;
+    background: #F8FAFC !important;
+    border-bottom: 2px solid #CBD5E1 !important;
 }
-.dark-mode .th-mapel-code { background: #172033 !important; }
-.dark-mode .th-mapel-code .mapel-code { color: #E2E8F0; }
+.th-mapel-code .mapel-code,
+.th-mapel-code .mapel-code-pill {
+    display: inline-block;
+    padding: 2px 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 800;
+    color: #0F172A;
+    background: #E2E8F0;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    text-align: center;
+}
+.dark-mode .th-mapel-code {
+    background: #172033 !important;
+    border-bottom: 2px solid #334155 !important;
+}
+.dark-mode .th-mapel-code .mapel-code,
+.dark-mode .th-mapel-code .mapel-code-pill {
+    color: #F8FAFC;
+    background: #1E293B;
+    border-color: #334155;
+}
 
 /* Gaya buku absensi: kolom No & Nama menempel saat digeser, header menempel saat scroll */
 .rekap-scroll-wrap { max-height: 78vh; overflow: auto; }
-.rekap-matrix-table thead tr:first-child th { position: sticky; top: 0; z-index: 3; }
-.rekap-matrix-table thead tr:nth-child(2) th { position: sticky; top: 33px; z-index: 3; }
+.rekap-matrix-table thead tr:first-child th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+.rekap-matrix-table thead tr:nth-child(2) th {
+    position: sticky;
+    top: 32px;
+    z-index: 4;
+}
 .rekap-matrix-table .th-col-no,
-.rekap-matrix-table .td-col-no { position: sticky; left: 0; z-index: 4; background: #fff; min-width: 40px; width: 40px; }
+.rekap-matrix-table .td-col-no {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    background: #fff;
+    min-width: 44px;
+    width: 44px;
+}
 .rekap-matrix-table .th-col-nama,
-.rekap-matrix-table .td-col-nama { position: sticky; left: 40px; z-index: 4; background: #fff; box-shadow: 2px 0 4px -2px rgba(15, 23, 42, 0.12); }
+.rekap-matrix-table .td-col-nama {
+    position: sticky;
+    left: 44px;
+    z-index: 4;
+    background: #fff;
+    box-shadow: 2px 0 4px -2px rgba(15, 23, 42, 0.12);
+}
 .rekap-matrix-table thead .th-col-no,
-.rekap-matrix-table thead .th-col-nama { z-index: 6; background: #F8FAFC; }
+.rekap-matrix-table thead .th-col-nama {
+    z-index: 8;
+    background: #F8FAFC;
+}
 .dark-mode .rekap-matrix-table .td-col-no,
 .dark-mode .rekap-matrix-table .td-col-nama { background: #0F172A; }
 .dark-mode .rekap-matrix-table thead .th-col-no,
 .dark-mode .rekap-matrix-table thead .th-col-nama { background: #1E293B; }
-.rekap-matrix-table .td-matrix-cell { border-right: 1px solid #E2E8F0; }
+.rekap-matrix-table .td-matrix-cell { border-right: 1px solid #E2E8F0; text-align: center; }
 
 @media (max-width: 768px) {
     .rekap-matrix-card { display: block !important; }
@@ -1105,6 +1283,252 @@
 </style>
 
 <script>
+    // Data JSON untuk generator teks laporan WhatsApp
+    window.SEKOLAH_REKAP_DATA = {
+        lembaga: {!! json_encode(strtoupper($activeRoom ?? 'SMP AL MUTTAQIN')) !!},
+        kelas: {!! json_encode(\App\Http\Controllers\PlottingKelasController::toRomanDisplay($selectedKelas ?? '-')) !!},
+        bulanText: {!! json_encode($bulan ? ($bulanList[$bulan] ?? 'Bulan ' . $bulan) : 'Semua Bulan') !!},
+        tahun: {!! json_encode($tahun) !!},
+        totalPertemuan: {{ (int) $totalPertemuan }},
+        totalSemuaHadir: {{ (int) $totalSemuaHadir }},
+        totalSemuaSakit: {{ (int) $totalSemuaSakit }},
+        totalSemuaIzin: {{ (int) $totalSemuaIzin }},
+        totalSemuaAlpa: {{ (int) $totalSemuaAlpa }},
+        jurnals: {!! json_encode($jurnals->map(function($j) {
+            return [
+                'id' => $j->id,
+                'tanggal' => $j->tgl_full,
+                'mapel' => $j->mata_pelajaran,
+                'kode_mapel' => $j->kode_mapel,
+                'guru' => $j->nama_guru,
+                'jam_ke' => $j->jam_ke,
+                'materi' => $j->materi,
+            ];
+        })) !!},
+        siswas: {!! json_encode(collect($rekapSiswa)->map(function($item) {
+            return [
+                'nama' => $item->siswa->nama_lengkap,
+                'nisn' => $item->nisn,
+                'hadir' => $item->hadir,
+                'sakit' => $item->sakit,
+                'izin' => $item->izin,
+                'alpa' => $item->alpa,
+                'persentase' => $item->persentase,
+                'absensi' => $item->pertemuan_absensi,
+            ];
+        })) !!}
+    };
+
+    function setupWaModalDom() {
+        var modal = document.getElementById('modalLaporanWA');
+        if (modal && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+    }
+
+    function openWaModal() {
+        setupWaModalDom();
+        var modal = document.getElementById('modalLaporanWA');
+        if (modal) {
+            modal.style.setProperty('display', 'flex', 'important');
+            document.body.style.overflow = 'hidden';
+            renderSekolahWaPreview();
+        }
+    }
+
+    function closeWaModal() {
+        var modal = document.getElementById('modalLaporanWA');
+        if (modal) {
+            modal.style.setProperty('display', 'none', 'important');
+            document.body.style.overflow = '';
+        }
+    }
+
+    function handleWaModeChange() {
+        var modeSelect = document.getElementById('waModeSelect');
+        var mode = modeSelect ? modeSelect.value : 'rekap';
+        var sesiWrap = document.getElementById('waSesiWrap');
+        if (sesiWrap) {
+            sesiWrap.style.display = mode === 'sesi' ? 'block' : 'none';
+        }
+        renderSekolahWaPreview();
+    }
+
+    function renderSekolahWaPreview() {
+        var d = window.SEKOLAH_REKAP_DATA;
+        if (!d) return;
+
+        var textarea = document.getElementById('waTextarea');
+        if (!textarea) return;
+
+        var mode = document.getElementById('waModeSelect') ? document.getElementById('waModeSelect').value : 'rekap';
+
+        var namaLembaga = d.lembaga || 'SMP/SMA AL MUTTAQIN';
+        if (!namaLembaga.includes('AL MUTTAQIN')) {
+            namaLembaga = namaLembaga + ' AL MUTTAQIN';
+        }
+
+        if (mode === 'sesi') {
+            var sesiSelect = document.getElementById('waSesiSelect');
+            var selectedJurnalId = sesiSelect ? parseInt(sesiSelect.value) : null;
+            var jurnal = null;
+            if (d.jurnals && d.jurnals.length > 0) {
+                jurnal = d.jurnals.find(function(j) { return j.id === selectedJurnalId; }) || d.jurnals[0];
+            }
+
+            if (!jurnal) {
+                textarea.value = "Belum ada data sesi pertemuan pada kelas dan periode ini.";
+                return;
+            }
+
+            var hadirList = [];
+            var sakitList = [];
+            var izinList = [];
+            var alpaList = [];
+
+            (d.siswas || []).forEach(function(s) {
+                var st = s.absensi ? s.absensi[jurnal.id] : null;
+                if (st === 'hadir') {
+                    hadirList.push(s.nama);
+                } else if (st === 'sakit') {
+                    sakitList.push(s.nama);
+                } else if (st === 'izin') {
+                    izinList.push(s.nama);
+                } else if (st === 'alpa') {
+                    alpaList.push(s.nama);
+                }
+            });
+
+            var lines = [];
+            lines.push("*LAPORAN PRESENSI KELAS*");
+            lines.push("*" + namaLembaga + "*");
+            lines.push("========================================");
+            lines.push("📚 *Kelas*        : Kelas " + d.kelas);
+            lines.push("📅 *Tanggal*      : " + jurnal.tanggal);
+            lines.push("📖 *Mata Pelajaran*: " + jurnal.mapel + " (" + jurnal.kode_mapel + ")");
+            lines.push("⏰ *Jam Pelajaran*: " + (jurnal.jam_ke || '-'));
+            lines.push("👨‍🏫 *Guru Pengajar*: " + jurnal.guru);
+            if (jurnal.materi) {
+                lines.push("📝 *Materi*       : " + jurnal.materi);
+            }
+            lines.push("========================================");
+            lines.push("*Ringkasan Kehadiran:*");
+            lines.push("👥 Total Siswa : " + (d.siswas ? d.siswas.length : 0) + " Siswa");
+            lines.push("✅ Hadir       : " + hadirList.length + " Siswa");
+            lines.push("🤒 Sakit       : " + sakitList.length + " Siswa");
+            lines.push("📩 Izin        : " + izinList.length + " Siswa");
+            lines.push("❌ Alpa        : " + alpaList.length + " Siswa");
+            lines.push("----------------------------------------");
+
+            if (sakitList.length > 0 || izinList.length > 0 || alpaList.length > 0) {
+                lines.push("*Keterangan Siswa Tidak Hadir:*");
+                if (sakitList.length > 0) lines.push("• *Sakit*: " + sakitList.join(', '));
+                if (izinList.length > 0) lines.push("• *Izin*: " + izinList.join(', '));
+                if (alpaList.length > 0) lines.push("• *Alpa*: " + alpaList.join(', '));
+                lines.push("----------------------------------------");
+            }
+
+            lines.push("*Daftar Absensi Siswa:*");
+            (d.siswas || []).forEach(function(s, idx) {
+                var st = s.absensi ? s.absensi[jurnal.id] : null;
+                var mark = '➖ Belum ada data';
+                if (st === 'hadir') mark = '✅ Hadir';
+                else if (st === 'sakit') mark = '🤒 Sakit';
+                else if (st === 'izin') mark = '📩 Izin';
+                else if (st === 'alpa') mark = '❌ Alpa';
+                lines.push((idx + 1) + ". " + s.nama + " : " + mark);
+            });
+
+            lines.push("========================================");
+            lines.push("_Laporan otomatis dari Sistem Presensi Al Muttaqin_");
+
+            textarea.value = lines.join("\n");
+        } else {
+            // Mode Rekap Keseluruhan
+            var lines = [];
+            lines.push("*REKAPITULASI ABSENSI SISWA*");
+            lines.push("*" + namaLembaga + "*");
+            lines.push("========================================");
+            lines.push("📚 *Kelas*          : Kelas " + d.kelas);
+            lines.push("📅 *Periode*        : " + d.bulanText + " " + d.tahun);
+            lines.push("👥 *Total Siswa*    : " + (d.siswas ? d.siswas.length : 0) + " Siswa");
+            lines.push("📊 *Total Pertemuan*: " + d.totalPertemuan + " Sesi");
+            lines.push("========================================");
+            lines.push("*Akumulasi Kehadiran Kelas:*");
+            lines.push("✅ Total Hadir : " + d.totalSemuaHadir);
+            lines.push("🤒 Total Sakit : " + d.totalSemuaSakit);
+            lines.push("📩 Total Izin  : " + d.totalSemuaIzin);
+            lines.push("❌ Total Alpa  : " + d.totalSemuaAlpa);
+            lines.push("----------------------------------------");
+
+            var butuhPerhatian = (d.siswas || []).filter(function(s) {
+                return (s.alpa > 0 || s.sakit > 0 || s.izin > 0);
+            });
+
+            if (butuhPerhatian.length > 0) {
+                lines.push("*Catatan Siswa (Perlu Perhatian):*");
+                butuhPerhatian.forEach(function(s, idx) {
+                    var notes = [];
+                    if (s.sakit > 0) notes.push(s.sakit + "S");
+                    if (s.izin > 0) notes.push(s.izin + "I");
+                    if (s.alpa > 0) notes.push(s.alpa + "A");
+                    lines.push((idx + 1) + ". " + s.nama + " (" + notes.join(', ') + ")");
+                });
+                lines.push("----------------------------------------");
+            }
+
+            lines.push("*Daftar Kehadiran Siswa:*");
+            (d.siswas || []).forEach(function(s, idx) {
+                lines.push((idx + 1) + ". " + s.nama + " - H:" + s.hadir + " S:" + s.sakit + " I:" + s.izin + " A:" + s.alpa + " (" + s.persentase + "%)");
+            });
+
+            lines.push("========================================");
+            lines.push("_Laporan otomatis dari Sistem Presensi Al Muttaqin_");
+
+            textarea.value = lines.join("\n");
+        }
+    }
+
+    function copyWaText() {
+        var textarea = document.getElementById('waTextarea');
+        if (!textarea) return;
+        textarea.select();
+        textarea.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(textarea.value).then(function() {
+            var btnText = document.getElementById('btnSalinWaText');
+            if (btnText) btnText.textContent = 'Tersalin!';
+            var notif = document.getElementById('copyNotif');
+            if (notif) {
+                notif.style.display = 'block';
+                setTimeout(function() {
+                    notif.style.display = 'none';
+                    if (btnText) btnText.textContent = 'Salin Teks';
+                }, 3000);
+            }
+        });
+    }
+
+    function openWaWeb() {
+        var textarea = document.getElementById('waTextarea');
+        if (!textarea) return;
+        var encoded = encodeURIComponent(textarea.value);
+        window.open('https://web.whatsapp.com/send?text=' + encoded, '_blank');
+    }
+
+    window.openWaModal = openWaModal;
+    window.closeWaModal = closeWaModal;
+    window.copyWaText = copyWaText;
+    window.openWaWeb = openWaWeb;
+    window.handleWaModeChange = handleWaModeChange;
+    window.renderSekolahWaPreview = renderSekolahWaPreview;
+
+    document.addEventListener('click', function(e) {
+        var waModal = document.getElementById('modalLaporanWA');
+        if (waModal && e.target === waModal) {
+            closeWaModal();
+        }
+    });
+
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('modalDetailSiswa');
     const closeBtn = document.getElementById('modalCloseBtn');
@@ -1153,7 +1577,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Set Header
             document.getElementById('modalNamaSiswa').textContent = dataNama;
-            document.getElementById('modalSubInfo').textContent = `NISN: ${dataNisn} â€¢ Kelas ${dataKelas}${dataJenjang ? ' â€¢ ' + dataJenjang : ''}`;
+            document.getElementById('modalSubInfo').textContent = `NISN: ${dataNisn} • Kelas ${dataKelas}${dataJenjang ? ' • ' + dataJenjang : ''}`;
 
             // Set Stats Box
             document.getElementById('modalTotalSesi').textContent = dataPertemuan;
@@ -1229,6 +1653,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
             closeModal();
+            closeWaModal();
         }
     });
 });

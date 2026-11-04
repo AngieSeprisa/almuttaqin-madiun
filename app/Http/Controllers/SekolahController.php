@@ -536,99 +536,207 @@ class SekolahController extends Controller
             return '-';
         }
 
-        $nama = trim($mataPelajaran);
-
-        $customMap = [
-            'Matematika'                                      => 'MTK',
-            'MTK'                                             => 'MTK',
-            'Bahasa Indonesia'                                => 'BIN',
-            'BIN'                                             => 'BIN',
-            'Bahasa Inggris'                                  => 'BIG',
-            'BIG'                                             => 'BIG',
-            'Ilmu Pengetahuan Alam'                           => 'IPA',
-            'Ilmu Pengetahuan Alam (IPA)'                     => 'IPA',
-            'IPA'                                             => 'IPA',
-            'Ilmu Pengetahuan Sosial'                         => 'IPS',
-            'Ilmu Pengetahuan Sosial (IPS)'                   => 'IPS',
-            'IPS'                                             => 'IPS',
-            'Pendidikan Pancasila'                            => 'PP',
-            'Pendidikan Pancasila & Kewarganegaraan'          => 'PP',
-            'Pendidikan Pancasila & Kewarganegaraan (PPKn)'   => 'PP',
-            'Pendidikan Pancasila dan Kewarganegaraan'        => 'PP',
-            'PPKN'                                            => 'PP',
-            'PP'                                              => 'PP',
-            'Seni Budaya'                                     => 'SBDP',
-            'Seni Budaya dan Prakarya'                        => 'SBDP',
-            'SBDP'                                            => 'SBDP',
-            'Informatika'                                     => 'TIK',
-            'Teknologi Informasi & Komunikasi'                => 'TIK',
-            'TIK'                                             => 'TIK',
-            'Pendidikan Agama Islam'                          => 'PAI',
-            'Pendidikan Agama Islam (PAI)'                    => 'PAI',
-            'PAI'                                             => 'PAI',
-            'Pendidikan Jasmani'                              => 'PJOK',
-            'Pendidikan Jasmani, Olahraga & Kesehatan'        => 'PJOK',
-            'Pendidikan Jasmani, Olahraga & Kesehatan (PJOK)' => 'PJOK',
-            'PJOK'                                            => 'PJOK',
-            'Bahasa Arab'                                     => 'ARB',
-            'ARB'                                             => 'ARB',
-            'Fisika'                                          => 'FIS',
-            'Kimia'                                           => 'KIM',
-            'Biologi'                                         => 'BIO',
-            'Ekonomi'                                         => 'EKO',
-            'Ekonomi & Akuntansi'                             => 'EKO',
-            'Sosiologi'                                       => 'SOS',
-            'Sejarah'                                         => 'SEJ',
-            'Sejarah Indonesia'                               => 'SEJ',
-            'Asad'                                            => 'ASAD',
-            'ASAD'                                            => 'ASAD',
-        ];
-
-        if (isset($customMap[$nama])) {
-            return $customMap[$nama];
+        $raw = trim($mataPelajaran);
+        if ($raw === '') {
+            return '-';
         }
 
-        // Cek jika nama ada di tabel mata_pelajarans
-        $mp = MataPelajaran::where('mata_pelajaran', $nama)->first();
+        // Cek jika terdapat singkatan dalam tanda kurung, misal "Ilmu Pengetahuan Alam (IPA)" -> IPA
+        if (preg_match('/\(([^)]+)\)/', $raw, $m)) {
+            $val = strtoupper(trim($m[1]));
+            if ($val === 'PPKN') return 'PP';
+            if ($val === 'PJOK') return 'PJOK';
+            if (strlen($val) >= 2 && strlen($val) <= 5) {
+                return $val;
+            }
+        }
+
+        // Normalisasi teks untuk pencarian case-insensitive dan variasi penulisan (& / dan / tanda baca)
+        $normalized = strtolower($raw);
+        $normalized = str_replace(['&', '/', '+'], ' dan ', $normalized);
+        $normalized = preg_replace('/[.,\-_()]+/', ' ', $normalized);
+        $normalized = trim(preg_replace('/\s+/', ' ', $normalized));
+
+        $lookupMap = [
+            // Matematika
+            'matematika'                                     => 'MTK',
+            'matematika wajib'                              => 'MTK',
+            'matematika peminatan'                          => 'MTKP',
+            'mtk'                                            => 'MTK',
+            'mat'                                            => 'MTK',
+
+            // Bahasa Indonesia
+            'bahasa indonesia'                               => 'BIN',
+            'bahasa indonesia wajib'                         => 'BIN',
+            'bahasa indonesia peminatan'                     => 'BIN',
+            'bin'                                            => 'BIN',
+            'ind'                                            => 'BIN',
+
+            // Bahasa Inggris
+            'bahasa inggris'                                 => 'BIG',
+            'bahasa inggris lanjut'                          => 'BIG',
+            'bahasa inggris wajib'                           => 'BIG',
+            'big'                                            => 'BIG',
+            'ing'                                            => 'BIG',
+
+            // IPA & Cabang
+            'ilmu pengetahuan alam'                          => 'IPA',
+            'ipa'                                            => 'IPA',
+            'fisika'                                         => 'FIS',
+            'fis'                                            => 'FIS',
+            'kimia'                                          => 'KIM',
+            'kim'                                            => 'KIM',
+            'biologi'                                        => 'BIO',
+            'bio'                                            => 'BIO',
+
+            // IPS & Cabang
+            'ilmu pengetahuan sosial'                        => 'IPS',
+            'ips'                                            => 'IPS',
+            'ekonomi'                                        => 'EKO',
+            'ekonomi dan akuntansi'                          => 'EKO',
+            'eko'                                            => 'EKO',
+            'sosiologi'                                      => 'SOS',
+            'sos'                                            => 'SOS',
+            'geografi'                                       => 'GEO',
+            'geo'                                            => 'GEO',
+            'sejarah'                                        => 'SEJ',
+            'sejarah indonesia'                              => 'SEJ',
+            'sej'                                            => 'SEJ',
+
+            // Pendidikan Pancasila / PKn
+            'pendidikan pancasila'                           => 'PP',
+            'pendidikan pancasila dan kewarganegaraan'       => 'PP',
+            'pendidikan kewarganegaraan'                     => 'PP',
+            'pkn'                                            => 'PP',
+            'ppkn'                                           => 'PP',
+            'pp'                                             => 'PP',
+
+            // PJOK
+            'pendidikan jasmani olahraga dan kesehatan'      => 'PJOK',
+            'pendidikan jasmani olahraga kesehatan'          => 'PJOK',
+            'pendidikan jasmani dan kesehatan'               => 'PJOK',
+            'pendidikan jasmani'                             => 'PJOK',
+            'penjasorkes'                                    => 'PJOK',
+            'penjas'                                         => 'PJOK',
+            'pjok'                                           => 'PJOK',
+            'pjk'                                            => 'PJOK',
+
+            // Seni Budaya & Prakarya
+            'seni budaya'                                    => 'SBDP',
+            'seni budaya dan prakarya'                       => 'SBDP',
+            'seni budaya dan keterampilan'                   => 'SBDP',
+            'sbdp'                                           => 'SBDP',
+            'snb'                                            => 'SBDP',
+            'seni musik'                                     => 'SM',
+            'seni rupa'                                      => 'SR',
+            'seni tari'                                      => 'ST',
+            'prakarya'                                       => 'PKY',
+            'prakarya dan kewirausahaan'                     => 'PKWU',
+            'pkwu'                                           => 'PKWU',
+
+            // Informatika / TIK
+            'informatika'                                    => 'TIK',
+            'teknologi informasi dan komunikasi'             => 'TIK',
+            'tik'                                            => 'TIK',
+            'inf'                                            => 'TIK',
+
+            // Agama & Bahasa Keagamaan
+            'pendidikan agama islam'                         => 'PAI',
+            'pendidikan agama islam dan budi pekerti'        => 'PAI',
+            'pendidikan agama dan budi pekerti'              => 'PAI',
+            'pendidikan agama'                               => 'PAI',
+            'pai'                                            => 'PAI',
+            'bahasa arab'                                    => 'ARB',
+            'arab'                                           => 'ARB',
+            'arb'                                            => 'ARB',
+            'bahasa jawa'                                    => 'JAWA',
+            'jawa'                                           => 'JAWA',
+            'bimbingan konseling'                            => 'BK',
+            'bimbingan dan konseling'                        => 'BK',
+            'bk'                                             => 'BK',
+            'asad'                                           => 'ASAD',
+            'al quran'                                       => 'QUR',
+            'al quran hadist'                                => 'QUR',
+            'fiqih'                                          => 'FIQ',
+            'akidah akhlak'                                  => 'AKI',
+            'sejarah kebudayaan islam'                       => 'SKI',
+            'ski'                                            => 'SKI',
+        ];
+
+        if (isset($lookupMap[$normalized])) {
+            return $lookupMap[$normalized];
+        }
+
+        // Cek pencarian substring untuk frasa yang sangat spesifik
+        if (str_contains($normalized, 'jasmani') || str_contains($normalized, 'olahraga')) {
+            return 'PJOK';
+        }
+        if (str_contains($normalized, 'pancasila') || str_contains($normalized, 'kewarganegaraan')) {
+            return 'PP';
+        }
+        if (str_contains($normalized, 'seni budaya')) {
+            return 'SBDP';
+        }
+        if (str_contains($normalized, 'informatika')) {
+            return 'TIK';
+        }
+        if (str_contains($normalized, 'bahasa indonesia')) {
+            return 'BIN';
+        }
+        if (str_contains($normalized, 'bahasa inggris')) {
+            return 'BIG';
+        }
+        if (str_contains($normalized, 'agama islam')) {
+            return 'PAI';
+        }
+        if (str_contains($normalized, 'pengetahuan alam')) {
+            return 'IPA';
+        }
+        if (str_contains($normalized, 'pengetahuan sosial')) {
+            return 'IPS';
+        }
+        if (str_contains($normalized, 'matematika')) {
+            return 'MTK';
+        }
+
+        // Cek database MataPelajaran (baik nama maupun kode)
+        $mp = MataPelajaran::whereRaw('LOWER(mata_pelajaran) = ?', [$normalized])
+            ->orWhereRaw('LOWER(kode) = ?', [$normalized])
+            ->orWhere('mata_pelajaran', 'like', "%{$raw}%")
+            ->first();
+
         if ($mp && !empty($mp->kode)) {
             $kode = strtoupper($mp->kode);
             if (str_contains($kode, '-')) {
                 $parts = explode('-', $kode);
-                $clean = end($parts);
-                if (isset($customMap[$clean])) return $customMap[$clean];
-                if ($clean === 'IND') return 'BIN';
-                if ($clean === 'ING') return 'BIG';
-                if ($clean === 'PKN') return 'PP';
-                if ($clean === 'SNB') return 'SBDP';
-                if ($clean === 'INF') return 'TIK';
-                return $clean;
+                $clean = strtolower(end($parts));
+                if (isset($lookupMap[$clean])) return $lookupMap[$clean];
+                return strtoupper($clean);
             }
             return $kode;
         }
 
-        // Cek jika terdapat singkatan dalam tanda kurung, misal (IPA) -> IPA
-        if (preg_match('/\(([^)]+)\)/', $nama, $m)) {
-            $val = strtoupper($m[1]);
-            if ($val === 'PPKN') return 'PP';
-            return $val;
+        // Jika string pendek (misal: "BK", "TIK", "IPA")
+        if (strlen($raw) <= 4 && !str_contains($raw, ' ')) {
+            return strtoupper($raw);
         }
 
-        // Jika string pendek
-        if (strlen($nama) <= 4) {
-            return strtoupper($nama);
-        }
-
-        // Inisial dari kata-kata
-        $words = preg_split('/\s+/', $nama);
-        if (count($words) >= 2) {
-            $initials = '';
-            foreach ($words as $w) {
-                $initials .= substr($w, 0, 1);
+        // Inisial dari kata-kata penting (abaikan kata hubung)
+        $words = preg_split('/\s+/', $raw);
+        $stopWords = ['dan', '&', 'di', 'ke', 'dari', 'yang', 'untuk', 'pada', 'tentang'];
+        $initials = '';
+        foreach ($words as $w) {
+            $wClean = strtolower(trim($w));
+            if (!in_array($wClean, $stopWords) && !empty($wClean)) {
+                $initials .= substr($wClean, 0, 1);
             }
+        }
+
+        if (strlen($initials) >= 2) {
             return strtoupper(substr($initials, 0, 4));
         }
 
-        return strtoupper(substr($nama, 0, 3));
+        return strtoupper(substr($raw, 0, 3));
     }
 
     /**
