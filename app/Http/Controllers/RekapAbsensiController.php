@@ -46,7 +46,7 @@ class RekapAbsensiController extends Controller
         // Sinkronisasi otomatis data tap RFID multi-lokasi ke presensi guru
         $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
 
-        // Query Presensi Terpadu
+        // Query Presensi Terpadu yang Disesuaikan Ketat Berdasarkan Lembaga Terdaftar Guru
         $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, $status, $search);
 
         // Summary Statistik (sebelum paginate)
@@ -217,37 +217,30 @@ class RekapAbsensiController extends Controller
     }
 
     /**
-     * Query builder presensi guru terpadu yang fleksibel terhadap multi-lembaga,
-     * memastikan guru yang berafiliasi dengan lembaga sekolah (misal SMP / SMA) tetap tampil
-     * meskipun akun guru terdaftar secara sentral di Yayasan.
+     * Query builder presensi guru yang disesuaikan ketat berdasarkan lembaga tempat guru terdaftar:
+     * - Walaupun akun berstatus yayasan, jika terdaftarnya sebagai guru SMP (primary_lembaga_id SMP),
+     *   maka absensinya HANYA terlihat saat memilih lembaga SMP.
+     * - Tidak akan bocor ke SMA atau lembaga lainnya.
+     * - Opsi "Semua Lembaga" tetap menampilkan seluruh guru.
      */
     protected function buildPresensiQuery(?int $lembagaId, ?string $tanggal, int $bulan, int $tahun, ?string $status = null, ?string $search = null)
     {
         $query = PresensiGuru::with(['user', 'lembaga']);
 
         if ($lembagaId) {
-            $selectedLembaga = Lembaga::find($lembagaId);
-            $kodeLembaga = strtolower($selectedLembaga?->kode ?? '');
-            $isYayasan = $kodeLembaga === 'yayasan' || str_contains(strtolower($selectedLembaga?->nama ?? ''), 'yayasan');
-
-            // Jika lembaga yang dipilih BUKAN Yayasan (misal SMP atau SMA):
-            // Batasi query ke guru yang berkaitan dengan unit/sekolah tersebut.
-            // Jika Yayasan yang dipilih, Yayasan adalah induk seluruh lembaga sehingga seluruh guru ditampilkan.
-            if (!$isYayasan) {
-                $query->where(function ($q) use ($lembagaId, $selectedLembaga) {
-                    $q->where('lembaga_id', $lembagaId)
-                      ->orWhereHas('user', function ($uq) use ($lembagaId, $selectedLembaga) {
-                          $uq->where('primary_lembaga_id', $lembagaId)
-                             ->orWhereHas('lembagas', fn($lq) => $lq->where('lembagas.id', $lembagaId));
-
-                          if ($selectedLembaga) {
-                              $singkatan = $selectedLembaga->singkatan ?? $selectedLembaga->kode;
-                              $uq->orWhere('jabatan', 'like', "%{$singkatan}%")
-                                 ->orWhere('jabatan', 'like', "%{$selectedLembaga->kode}%");
-                          }
-                      });
+            $query->where(function ($q) use ($lembagaId) {
+                // Tampilkan presensi jika guru/staf memang terdaftar pada lembaga ini (primary_lembaga_id)
+                $q->whereHas('user', function ($uq) use ($lembagaId) {
+                    $uq->where('primary_lembaga_id', $lembagaId);
+                })
+                // ATAU jika record presensi dicatat di lembaga ini dan akun guru belum memiliki primary_lembaga_id
+                ->orWhere(function ($sub) use ($lembagaId) {
+                    $sub->where('lembaga_id', $lembagaId)
+                        ->whereHas('user', function ($uq) {
+                            $uq->whereNull('primary_lembaga_id');
+                        });
                 });
-            }
+            });
         }
 
         if ($tanggal) {
@@ -272,7 +265,8 @@ class RekapAbsensiController extends Controller
 
     /**
      * Sinkronisasi data tap RFID guru/pegawai dari tabel presensis ke presensi_gurus.
-     * Memastikan tap yang tercatat di dashboard RFID multi-lokasi otomatis masuk ke rekap absensi guru.
+     * Memastikan tap yang tercatat di dashboard RFID multi-lokasi otomatis masuk ke rekap absensi guru
+     * dan dipetakan ke lembaga tempat guru tersebut terdaftar.
      */
     protected function syncRfidTapsToPresensiGuru(?string $tanggal = null, ?int $bulan = null, ?int $tahun = null): void
     {
@@ -319,24 +313,26 @@ class RekapAbsensiController extends Controller
                 default     => 'hadir',
             };
 
-            // Tentukan lembaga_id target
-            $targetLembagaId = $user->primary_lembaga_id;
-            if (!$targetLembagaId) {
-                $targetLembagaId = $user->lembagas()->first()?->id ?: 1;
+            // Lembaga terdaftar guru (prioritaskan primary_lembaga_id guru)
+            $registeredLembagaId = $user->primary_lembaga_id;
+            if (!$registeredLembagaId) {
+                // Deteksi dari serial device jika ada indikasi khusus
+                $devId = strtolower((string) $firstTap->device_id);
+                if (str_contains($devId, 'smp')) {
+                    $smp = Lembaga::where(fn($q) => $q->where('kode', 'smp')->orWhere('singkatan', 'SMP'))->first();
+                    if ($smp) {
+                        $registeredLembagaId = $smp->id;
+                    }
+                } elseif (str_contains($devId, 'sma')) {
+                    $sma = Lembaga::where(fn($q) => $q->where('kode', 'sma')->orWhere('singkatan', 'SMA'))->first();
+                    if ($sma) {
+                        $registeredLembagaId = $sma->id;
+                    }
+                }
             }
 
-            // Jika serial device tap mengindikasikan lembaga spesifik (misal 'kantor smp')
-            $devId = strtolower((string) $firstTap->device_id);
-            if (str_contains($devId, 'smp')) {
-                $smp = Lembaga::where(fn($q) => $q->where('kode', 'smp')->orWhere('singkatan', 'SMP'))->first();
-                if ($smp) {
-                    $targetLembagaId = $smp->id;
-                }
-            } elseif (str_contains($devId, 'sma')) {
-                $sma = Lembaga::where(fn($q) => $q->where('kode', 'sma')->orWhere('singkatan', 'SMA'))->first();
-                if ($sma) {
-                    $targetLembagaId = $sma->id;
-                }
+            if (!$registeredLembagaId) {
+                $registeredLembagaId = $user->lembagas()->first()?->id ?: 1;
             }
 
             // Cek apakah presensi guru untuk user ini di tanggal ini sudah ada
@@ -357,7 +353,7 @@ class RekapAbsensiController extends Controller
 
                 PresensiGuru::create([
                     'user_id'       => $userId,
-                    'lembaga_id'    => $targetLembagaId,
+                    'lembaga_id'    => $registeredLembagaId,
                     'tanggal'       => $tapDate,
                     'jam_masuk'     => $jamMasuk,
                     'jam_pulang'    => $jamPulang,
@@ -367,6 +363,12 @@ class RekapAbsensiController extends Controller
                 ]);
             } else {
                 $updated = false;
+
+                // Pastikan lembaga_id presensi guru selalu sesuai dengan lembaga tempat guru terdaftar
+                if ($presensi->lembaga_id != $registeredLembagaId) {
+                    $presensi->lembaga_id = $registeredLembagaId;
+                    $updated = true;
+                }
 
                 // Update jam_masuk jika belum terisi
                 if (empty($presensi->jam_masuk)) {

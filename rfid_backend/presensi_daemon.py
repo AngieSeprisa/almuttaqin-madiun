@@ -841,34 +841,33 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "", all_candidates:
         sesi_name = sesi["nama_sesi"] if sesi else "Presensi Pegawai"
 
         try:
-            dev_id_lower = str(device_id).lower()
-            lembaga_id = None
-
-            # 1. Deteksi lembaga dari Device ID jika perangkat ditempatkan di unit khusus (misal 'kantor smp')
-            if "smp" in dev_id_lower:
-                try:
-                    cursor.execute("SELECT id FROM lembagas WHERE LOWER(kode) = 'smp' OR UPPER(singkatan) = 'SMP' LIMIT 1")
-                    l_smp = cursor.fetchone()
-                    if l_smp:
-                        lembaga_id = l_smp["id"]
-                except Exception:
-                    pass
-            elif "sma" in dev_id_lower:
-                try:
-                    cursor.execute("SELECT id FROM lembagas WHERE LOWER(kode) = 'sma' OR UPPER(singkatan) = 'SMA' LIMIT 1")
-                    l_sma = cursor.fetchone()
-                    if l_sma:
-                        lembaga_id = l_sma["id"]
-                except Exception:
-                    pass
-
-            # 2. Jika belum terdeteksi dari perangkat, cek dari user
-            if not lembaga_id:
-                lembaga_id = entity.get("primary_lembaga_id")
+            lembaga_id = entity.get("primary_lembaga_id")
             if not lembaga_id:
                 cursor.execute("SELECT primary_lembaga_id FROM users WHERE id = %s", (entity_id,))
                 u_row = cursor.fetchone()
                 lembaga_id = u_row["primary_lembaga_id"] if u_row and u_row.get("primary_lembaga_id") else None
+
+            # Jika belum ada primary_lembaga_id pada akun, deteksi dari Device ID
+            if not lembaga_id:
+                dev_id_lower = str(device_id).lower()
+                if "smp" in dev_id_lower:
+                    try:
+                        cursor.execute("SELECT id FROM lembagas WHERE LOWER(kode) = 'smp' OR UPPER(singkatan) = 'SMP' LIMIT 1")
+                        l_smp = cursor.fetchone()
+                        if l_smp:
+                            lembaga_id = l_smp["id"]
+                    except Exception:
+                        pass
+                elif "sma" in dev_id_lower:
+                    try:
+                        cursor.execute("SELECT id FROM lembagas WHERE LOWER(kode) = 'sma' OR UPPER(singkatan) = 'SMA' LIMIT 1")
+                        l_sma = cursor.fetchone()
+                        if l_sma:
+                            lembaga_id = l_sma["id"]
+                    except Exception:
+                        pass
+
+            # Fallback ke user_lembagas atau default (1)
             if not lembaga_id:
                 cursor.execute("SELECT lembaga_id FROM user_lembagas WHERE user_id = %s LIMIT 1", (entity_id,))
                 ul_row = cursor.fetchone()

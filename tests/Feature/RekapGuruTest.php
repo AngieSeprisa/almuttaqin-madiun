@@ -19,6 +19,7 @@ class RekapGuruTest extends TestCase
     protected User $admin;
     protected Lembaga $lembaga;
     protected Lembaga $yayasan;
+    protected Lembaga $sma;
 
     protected function setUp(): void
     {
@@ -32,6 +33,11 @@ class RekapGuruTest extends TestCase
         $this->lembaga = Lembaga::firstOrCreate(
             ['kode' => 'SMP'],
             ['nama' => 'SMP Al Muttaqin', 'singkatan' => 'SMP', 'kategori' => 'sekolah']
+        );
+
+        $this->sma = Lembaga::firstOrCreate(
+            ['kode' => 'SMA'],
+            ['nama' => 'SMA Al Muttaqin', 'singkatan' => 'SMA', 'kategori' => 'sekolah']
         );
 
         $this->admin = User::factory()->create([
@@ -61,7 +67,8 @@ class RekapGuruTest extends TestCase
         ]);
 
         $response = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
-            'tanggal' => $today->toDateString(),
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => $today->toDateString(),
         ]));
 
         $response->assertStatus(200);
@@ -88,13 +95,13 @@ class RekapGuruTest extends TestCase
     {
         $today = Carbon::today();
 
-        // Buat guru/pegawai yang tap pada alat RFID
+        // Buat guru/pegawai yang terdaftar di SMP yang melakukan tap pada alat RFID
         $guru = User::factory()->create([
             'name'               => 'Angie Seprisa Pamungkas',
             'email'              => 'angie.test@almuttaqin.id',
             'rfid_uid'           => '2819653521',
             'jabatan'            => 'Operator SMP',
-            'primary_lembaga_id' => $this->yayasan->id,
+            'primary_lembaga_id' => $this->lembaga->id,
         ]);
 
         $device = MasterDevice::create([
@@ -113,7 +120,7 @@ class RekapGuruTest extends TestCase
             'device_id_target' => $device->device_id,
         ]);
 
-        // Simulasikan tap di tabel presensis (seperti yang dicatat oleh ESP32 / dashboard presensi)
+        // Simulasikan tap di tabel presensis
         Presensi::create([
             'device_id'        => 'kantor smp',
             'sesi_id'          => $sesi->id,
@@ -124,9 +131,10 @@ class RekapGuruTest extends TestCase
             'status_kehadiran' => 'terlambat',
         ]);
 
-        // Akses halaman rekap presensi guru
+        // Akses halaman rekap presensi guru SMP
         $response = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
-            'tanggal' => $today->toDateString(),
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => $today->toDateString(),
         ]));
 
         $response->assertStatus(200);
@@ -143,35 +151,62 @@ class RekapGuruTest extends TestCase
         $response->assertSee('Terlambat');
     }
 
-    public function test_guru_yayasan_yang_mengajar_di_smp_tampil_pada_rekap_smp(): void
+    public function test_guru_terdaftar_di_smp_hanya_tampil_di_smp_dan_tidak_tampil_di_sma(): void
     {
         $today = Carbon::today();
 
-        // Guru dengan primary lembaga Yayasan tapi memiliki peran/jabatan di SMP
-        $guru = User::factory()->create([
-            'name'               => 'Guru Afiliasi SMP',
-            'email'              => 'guru.afiliasi@almuttaqin.id',
-            'jabatan'            => 'Guru Informatika SMP',
-            'primary_lembaga_id' => $this->yayasan->id,
+        // Guru terdaftar di SMP walaupun memiliki akun/akses yayasan
+        $guruSmp = User::factory()->create([
+            'name'               => 'Angie Seprisa Pamungkas',
+            'email'              => 'angie.smp@almuttaqin.id',
+            'role'               => 'yayasan',
+            'is_guru_sekolah'    => true,
+            'primary_lembaga_id' => $this->lembaga->id,
         ]);
 
-        // Presensi tercatat dengan ID Yayasan
+        // Guru terdaftar di SMA
+        $guruSma = User::factory()->create([
+            'name'               => 'Budi SMA Pengajar',
+            'email'              => 'budi.sma@almuttaqin.id',
+            'role'               => 'guru',
+            'is_guru_sekolah'    => true,
+            'primary_lembaga_id' => $this->sma->id,
+        ]);
+
+        // Presensi kedua guru
         PresensiGuru::create([
-            'user_id'    => $guru->id,
-            'lembaga_id' => $this->yayasan->id,
+            'user_id'    => $guruSmp->id,
+            'lembaga_id' => $this->lembaga->id,
             'tanggal'    => $today->toDateString(),
             'jam_masuk'  => '07:15:00',
             'status'     => 'hadir',
         ]);
 
-        // Admin mengakses rekap presensi khusus lembaga SMP
-        $response = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
+        PresensiGuru::create([
+            'user_id'    => $guruSma->id,
+            'lembaga_id' => $this->sma->id,
+            'tanggal'    => $today->toDateString(),
+            'jam_masuk'  => '07:20:00',
+            'status'     => 'hadir',
+        ]);
+
+        // 1. Saat rekap SMP dibuka -> Guru SMP tampil, Guru SMA TIDAK tampil
+        $responseSmp = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
             'lembaga_id' => $this->lembaga->id,
             'tanggal'    => $today->toDateString(),
         ]));
+        $responseSmp->assertStatus(200);
+        $responseSmp->assertSee('Angie Seprisa Pamungkas');
+        $responseSmp->assertDontSee('Budi SMA Pengajar');
 
-        $response->assertStatus(200);
-        $response->assertSee('Guru Afiliasi SMP');
+        // 2. Saat rekap SMA dibuka -> Guru SMA tampil, Guru SMP TIDAK tampil
+        $responseSma = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
+            'lembaga_id' => $this->sma->id,
+            'tanggal'    => $today->toDateString(),
+        ]));
+        $responseSma->assertStatus(200);
+        $responseSma->assertSee('Budi SMA Pengajar');
+        $responseSma->assertDontSee('Angie Seprisa Pamungkas');
     }
 
     public function test_pilihan_semua_lembaga_menampilkan_seluruh_presensi(): void
