@@ -209,24 +209,75 @@ class SekolahController extends Controller
     public function jurnal(Request $request)
     {
         $activeRoom = session('active_lembaga');
+        if ($request->filled('lembaga')) {
+            $activeRoom = $request->get('lembaga');
+        } elseif (!$activeRoom && auth()->check()) {
+            $activeRoom = auth()->user()->currentLembaga()?->kode;
+        }
+
+        $activeKode = strtolower((string) $activeRoom);
         $periode = self::hitungPeriodeAkademik();
         $kelasList = self::daftarKelas($activeRoom);
 
-        // Ambil daftar guru sesuai lembaga aktif
-        $guruQuery = User::where('is_active', true)
-            ->where(function ($q) {
-                $q->where('role', 'guru')
-                  ->orWhere('role', 'admin_lembaga')
-                  ->orWhereNotNull('mata_pelajaran');
-            });
+        // Ambil data lembaga resmi sekolah (SMP & SMA)
+        $sekolahLembagas = Lembaga::where(function ($q) {
+            $q->whereIn('kode', ['smp', 'sma'])
+              ->orWhere(function ($sub) {
+                  $sub->where('kategori', 'formal')->whereIn('kode', ['smp', 'sma']);
+              })
+              ->orWhere('singkatan', 'SMP')
+              ->orWhere('singkatan', 'SMA');
+        })->where('is_active', true)->orderBy('urutan')->get();
 
-        if ($activeRoom && !in_array($activeRoom, ['yayasan', 'pondok'])) {
-            $guruQuery->where(function ($q) use ($activeRoom) {
-                $q->whereHas('lembagas', function ($l) use ($activeRoom) {
-                    $l->where('kode', $activeRoom);
-                })->orWhereHas('primaryLembaga', function ($l) use ($activeRoom) {
-                    $l->where('kode', $activeRoom);
-                });
+        if ($sekolahLembagas->isEmpty()) {
+            $sekolahLembagas = Lembaga::where('singkatan', 'like', '%SMP%')
+                ->orWhere('singkatan', 'like', '%SMA%')
+                ->get();
+        }
+
+        $smpLembaga = $sekolahLembagas->first(fn($l) => strtolower($l->kode) === 'smp' || strtoupper($l->singkatan) === 'SMP');
+        $smaLembaga = $sekolahLembagas->first(fn($l) => strtolower($l->kode) === 'sma' || strtoupper($l->singkatan) === 'SMA');
+
+        // Tentukan lembaga sekolah target berdasarkan activeRoom atau context user
+        $targetLembaga = null;
+        if (str_contains($activeKode, 'sma')) {
+            $targetLembaga = $smaLembaga;
+        } elseif (str_contains($activeKode, 'smp')) {
+            $targetLembaga = $smpLembaga;
+        } else {
+            $userLembagaId = auth()->user()?->primary_lembaga_id;
+            if ($smaLembaga && $userLembagaId === $smaLembaga->id) {
+                $targetLembaga = $smaLembaga;
+            } elseif ($smpLembaga && $userLembagaId === $smpLembaga->id) {
+                $targetLembaga = $smpLembaga;
+            }
+        }
+
+        // Ambil daftar guru resmi yang terdaftar di menu Guru Sekolah masing-masing lembaga
+        $guruQuery = User::with(['primaryLembaga', 'lembagas'])
+            ->where(function ($q) {
+                $q->whereNull('is_active')->orWhere('is_active', true);
+            })
+            ->where(function ($q) {
+                $q->where('is_guru_sekolah', true)
+                  ->orWhere('mapel_status', 'disetujui');
+            })
+            ->where('mapel_status', '!=', 'ditolak');
+
+        if ($targetLembaga) {
+            $guruQuery->where(function ($q) use ($targetLembaga) {
+                $q->where('primary_lembaga_id', $targetLembaga->id)
+                  ->orWhereHas('lembagas', function ($l) use ($targetLembaga) {
+                      $l->where('lembagas.id', $targetLembaga->id);
+                  });
+            });
+        } elseif ($activeKode === 'yayasan' && ($smpLembaga || $smaLembaga)) {
+            $sekolahIds = array_filter([$smpLembaga?->id, $smaLembaga?->id]);
+            $guruQuery->where(function ($q) use ($sekolahIds) {
+                $q->whereIn('primary_lembaga_id', $sekolahIds)
+                  ->orWhereHas('lembagas', function ($l) use ($sekolahIds) {
+                      $l->whereIn('lembagas.id', $sekolahIds);
+                  });
             });
         }
 
@@ -330,6 +381,14 @@ class SekolahController extends Controller
         if ($activeRoom && $activeRoom !== 'yayasan') {
             $lembaga = Lembaga::where('kode', $activeRoom)->first();
             $lembagaId = $lembaga?->id;
+        }
+        if (!$lembagaId && !empty($validated['kelas'])) {
+            $kelasClean = strtoupper(trim($validated['kelas']));
+            if (str_contains($kelasClean, 'X') || str_contains($kelasClean, 'XI') || str_contains($kelasClean, 'XII') || preg_match('/\b(10|11|12)\b/', $kelasClean)) {
+                $lembagaId = Lembaga::where(fn($q) => $q->where('kode', 'sma')->orWhere('singkatan', 'SMA'))->value('id');
+            } elseif (str_contains($kelasClean, 'VII') || str_contains($kelasClean, 'VIII') || str_contains($kelasClean, 'IX') || preg_match('/\b(7|8|9)\b/', $kelasClean)) {
+                $lembagaId = Lembaga::where(fn($q) => $q->where('kode', 'smp')->orWhere('singkatan', 'SMP'))->value('id');
+            }
         }
         if (!$lembagaId) {
             $lembagaId = $guru->primary_lembaga_id ?? $guru->lembagas()->first()?->id;

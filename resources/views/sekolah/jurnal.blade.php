@@ -142,8 +142,19 @@
                         @foreach($gurus as $guru)
                             @php
                                 $isSelected = old('guru_id') == $guru->id || (!old('guru_id') && auth()->id() == $guru->id);
+                                $guruMapel = $guru->mata_pelajaran ?? '';
+                                $guruMapels = !empty($guru->daftar_mata_pelajaran) ? implode('|', $guru->daftar_mata_pelajaran) : $guruMapel;
+                                $primaryKode = strtolower($guru->primaryLembaga?->kode ?? '');
+                                $pivotKodes = $guru->lembagas ? $guru->lembagas->pluck('kode')->map(fn($k) => strtolower((string)$k))->toArray() : [];
+                                $isSmp = in_array('smp', array_merge([$primaryKode], $pivotKodes));
+                                $isSma = in_array('sma', array_merge([$primaryKode], $pivotKodes));
+                                $guruJenjang = ($isSmp && $isSma) ? 'both' : ($isSmp ? 'smp' : ($isSma ? 'sma' : 'all'));
                             @endphp
-                            <option value="{{ $guru->id }}" data-mapel="{{ $guru->mata_pelajaran }}" {{ $isSelected ? 'selected' : '' }}>
+                            <option value="{{ $guru->id }}"
+                                    data-mapel="{{ $guruMapel }}"
+                                    data-mapels="{{ $guruMapels }}"
+                                    data-jenjang="{{ $guruJenjang }}"
+                                    {{ $isSelected ? 'selected' : '' }}>
                                 {{ $guru->name }}
                             </option>
                         @endforeach
@@ -154,7 +165,12 @@
                 <div class="form-group" style="grid-column: span 1;">
                     <label for="mata_pelajaran" class="form-label">Mata Pelajaran <span class="required-mark">*</span></label>
                     <input type="text" name="mata_pelajaran" id="mata_pelajaran" class="form-control"
-                           value="{{ old('mata_pelajaran') }}" placeholder="Mata pelajaran guru" required>
+                           value="{{ old('mata_pelajaran') }}" placeholder="Mata pelajaran guru (otomatis terisi)" required list="list_mata_pelajaran" autocomplete="off">
+                    <datalist id="list_mata_pelajaran"></datalist>
+                    <div id="mapel_pills_wrap" style="display:none; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;">
+                        <span style="font-size:11.5px; color:#64748b; font-weight:600;">Pilihan Mapel:</span>
+                        <div id="mapel_pills_container" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+                    </div>
                 </div>
 
             </div>
@@ -504,11 +520,118 @@
 
     // 6. Update Mata Pelajaran Otomatis saat Guru dipilih
     function updateMataPelajaran(selectElem) {
-        const selectedOption = selectElem.options[selectElem.selectedIndex];
-        const mapel = selectedOption ? selectedOption.getAttribute('data-mapel') : '';
+        if (!selectElem) return;
+        const selectedOption = selectElem.selectedIndex >= 0 ? selectElem.options[selectElem.selectedIndex] : null;
         const mapelInput = document.getElementById('mata_pelajaran');
-        if (mapel) {
-            mapelInput.value = mapel;
+        if (!mapelInput) return;
+
+        const datalist = document.getElementById('list_mata_pelajaran');
+        if (datalist) datalist.innerHTML = '';
+
+        const pillsWrap = document.getElementById('mapel_pills_wrap');
+        const pillsContainer = document.getElementById('mapel_pills_container');
+        if (pillsContainer) pillsContainer.innerHTML = '';
+
+        if (selectedOption && selectedOption.value) {
+            const mapel = selectedOption.getAttribute('data-mapel') || '';
+            const rawMapels = selectedOption.getAttribute('data-mapels') || mapel;
+            const mapelList = rawMapels
+                ? rawMapels.split(/[|,]/).map(s => s.trim()).filter(Boolean)
+                : (mapel ? [mapel.trim()] : []);
+
+            if (mapelList.length > 0) {
+                // Isi otomatis dengan mapel utama guru
+                mapelInput.value = mapelList[0];
+
+                // Daftarkan ke datalist
+                if (datalist) {
+                    mapelList.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        datalist.appendChild(opt);
+                    });
+                }
+
+                // Jika guru memiliki lebih dari 1 mapel pengampu, tampilkan pills pilihan cepat
+                if (mapelList.length > 1 && pillsWrap && pillsContainer) {
+                    pillsWrap.style.display = 'flex';
+                    mapelList.forEach((m, idx) => {
+                        const pill = document.createElement('button');
+                        pill.type = 'button';
+                        const isFirst = (idx === 0);
+                        pill.style.cssText = 'padding:3px 10px; font-size:11.5px; border-radius:6px; font-weight:600; cursor:pointer; transition:all 0.15s; border:1px solid ' +
+                            (isFirst ? '#2563eb; background:#2563eb; color:#ffffff;' : '#bfdbfe; background:#eff6ff; color:#1d4ed8;');
+                        pill.textContent = m;
+                        pill.onclick = function(e) {
+                            e.preventDefault();
+                            mapelInput.value = m;
+                            Array.from(pillsContainer.children).forEach(p => {
+                                p.style.background = '#eff6ff';
+                                p.style.color = '#1d4ed8';
+                                p.style.borderColor = '#bfdbfe';
+                            });
+                            pill.style.background = '#2563eb';
+                            pill.style.color = '#ffffff';
+                            pill.style.borderColor = '#2563eb';
+                        };
+                        pillsContainer.appendChild(pill);
+                    });
+                } else if (pillsWrap) {
+                    pillsWrap.style.display = 'none';
+                }
+            } else if (mapel) {
+                mapelInput.value = mapel;
+                if (pillsWrap) pillsWrap.style.display = 'none';
+            } else {
+                mapelInput.value = '';
+                if (pillsWrap) pillsWrap.style.display = 'none';
+            }
+        } else {
+            mapelInput.value = '';
+            if (pillsWrap) pillsWrap.style.display = 'none';
+        }
+    }
+
+    // Filter daftar guru jika berada pada mode Yayasan (lintas jenjang SMP & SMA)
+    function filterGurusByKelas(kelasName) {
+        const guruSelect = document.getElementById('guru_id');
+        if (!guruSelect || !kelasName) return;
+
+        const kUpper = kelasName.trim().toUpperCase();
+        let targetJenjang = null;
+        if (kUpper.includes('VII') || kUpper.includes('VIII') || kUpper.includes('IX') || /^[789]\b/.test(kUpper)) {
+            targetJenjang = 'smp';
+        } else if (kUpper.includes('X') || kUpper.includes('XI') || kUpper.includes('XII') || /^(10|11|12)\b/.test(kUpper)) {
+            targetJenjang = 'sma';
+        }
+
+        if (!targetJenjang) return;
+
+        let hasSpecific = false;
+        Array.from(guruSelect.options).forEach(opt => {
+            const j = opt.getAttribute('data-jenjang');
+            if (j && j !== 'both' && j !== 'all') {
+                hasSpecific = true;
+            }
+        });
+
+        if (!hasSpecific) return;
+
+        let currentValid = false;
+        Array.from(guruSelect.options).forEach(opt => {
+            if (!opt.value) return;
+            const j = opt.getAttribute('data-jenjang');
+            const match = !j || j === 'all' || j === 'both' || j === targetJenjang;
+            opt.disabled = !match;
+            opt.hidden = !match;
+            if (opt.selected && match) {
+                currentValid = true;
+            }
+        });
+
+        if (!currentValid && guruSelect.value) {
+            guruSelect.value = '';
+            guruSelect.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
 
@@ -524,12 +647,22 @@
         const kelasSelect = document.getElementById('select_kelas');
         if (kelasSelect) {
             renderSiswaByKelas(kelasSelect.value);
+            filterGurusByKelas(kelasSelect.value);
+            kelasSelect.addEventListener('change', function() {
+                filterGurusByKelas(this.value);
+            });
         }
 
         const guruSelect = document.getElementById('guru_id');
         const mapelInput = document.getElementById('mata_pelajaran');
-        if (guruSelect && !mapelInput.value) {
-            updateMataPelajaran(guruSelect);
+        if (guruSelect) {
+            guruSelect.addEventListener('change', function() {
+                updateMataPelajaran(this);
+            });
+            // Jalankan update awal jika sudah ada guru terpilih atau jika mapel masih kosong
+            if (guruSelect.value && (!mapelInput || !mapelInput.value)) {
+                updateMataPelajaran(guruSelect);
+            }
         }
     });
 </script>
