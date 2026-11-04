@@ -342,9 +342,9 @@
 
     {{-- 1. HEADER PRESENSI HARIAN (PERSIS GAMBAR 3) --}}
     @php
-        $selectedLembaga = $lembagas->firstWhere('id', $lembagaId) ?: ($lembagas->first() ?? null);
-        $lembagaText = $selectedLembaga ? ($selectedLembaga->nama_singkat ?? $selectedLembaga->nama) : 'SMP Al Muttaqin';
-        $subHeader = $lembagaText . ' • Yayasan Muttaqin Kota Madiun';
+        $selectedLembaga = $lembagaId ? $lembagas->firstWhere('id', $lembagaId) : null;
+        $lembagaText = $selectedLembaga ? ($selectedLembaga->nama_singkat ?? $selectedLembaga->nama) : 'Seluruh Lembaga';
+        $subHeader = $selectedLembaga ? ($lembagaText . ' • Yayasan Muttaqin Kota Madiun') : 'Seluruh Lembaga • Yayasan Muttaqin Kota Madiun';
         $displayDate = $tanggal ? \Carbon\Carbon::parse($tanggal) : \Carbon\Carbon::now();
         $dateFormatted = $displayDate->translatedFormat('l, d M Y');
     @endphp
@@ -385,10 +385,10 @@
             {{-- Filter Lembaga --}}
             @if($lembagas->count() > 1)
             <select name="lembaga_id" class="guru-filter-select" onchange="this.form.submit()">
-                <option value="">Semua Lembaga</option>
+                <option value="" {{ empty($lembagaId) ? 'selected' : '' }}>Semua Lembaga</option>
                 @foreach($lembagas as $lem)
-                <option value="{{ $lem->id }}" {{ $lembagaId == $lem->id ? 'selected' : '' }}>
-                    {{ $lem->nama_singkat }}
+                <option value="{{ $lem->id }}" {{ (string)$lembagaId === (string)$lem->id ? 'selected' : '' }}>
+                    {{ $lem->nama_singkat ?? $lem->nama }}
                 </option>
                 @endforeach
             </select>

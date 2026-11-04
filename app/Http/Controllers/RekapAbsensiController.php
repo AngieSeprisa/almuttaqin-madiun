@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lembaga;
+use App\Models\Presensi;
 use App\Models\PresensiGuru;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class RekapAbsensiController extends Controller
 {
@@ -18,9 +20,18 @@ class RekapAbsensiController extends Controller
         $user = auth()->user();
         $lembagas = $user->accessibleLembagas();
 
-        // Filter Lembaga
-        $lembagaId = $request->get('lembaga_id');
-        if (!$lembagaId) {
+        // Filter Lembaga (Dukung "Semua Lembaga" jika lembaga_id dikirim kosong/all)
+        $isSemuaLembaga = $request->exists('lembaga_id') && (
+            $request->get('lembaga_id') === '' || 
+            $request->get('lembaga_id') === 'all' || 
+            is_null($request->get('lembaga_id'))
+        );
+
+        if ($isSemuaLembaga) {
+            $lembagaId = null;
+        } elseif ($request->filled('lembaga_id')) {
+            $lembagaId = (int) $request->get('lembaga_id');
+        } else {
             $currentLembaga = $user->currentLembaga() ?: $lembagas->first();
             $lembagaId = $currentLembaga ? $currentLembaga->id : null;
         }
@@ -32,29 +43,11 @@ class RekapAbsensiController extends Controller
         $status = $request->get('status');
         $search = $request->get('search');
 
-        // Query Presensi
-        $query = PresensiGuru::with(['user', 'lembaga']);
+        // Sinkronisasi otomatis data tap RFID multi-lokasi ke presensi guru
+        $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
 
-        if ($lembagaId) {
-            $query->where('lembaga_id', $lembagaId);
-        }
-
-        if ($tanggal) {
-            $query->whereDate('tanggal', $tanggal);
-        } else {
-            $query->whereMonth('tanggal', $bulan)->whereYear('tanggal', $tahun);
-        }
-
-        if ($status && in_array($status, ['hadir', 'terlambat', 'izin', 'sakit', 'alpa'])) {
-            $query->where('status', $status);
-        }
-
-        if ($search) {
-            $query->whereHas('user', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('nip', 'like', "%{$search}%");
-            });
-        }
+        // Query Presensi Terpadu
+        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, $status, $search);
 
         // Summary Statistik (sebelum paginate)
         $summaryQuery = clone $query;
@@ -99,7 +92,7 @@ class RekapAbsensiController extends Controller
             'status'     => 'required|in:hadir,terlambat,izin,sakit,alpa',
             'jam_masuk'  => 'nullable|date_format:H:i',
             'jam_pulang' => 'nullable|date_format:H:i',
-            'keterangan' => 'nullable|string|max:500',
+            'keterangan' => 'nullable|string|max:255',
         ]);
 
         $presensi = PresensiGuru::findOrFail($id);
@@ -119,18 +112,28 @@ class RekapAbsensiController extends Controller
      */
     public function export(Request $request)
     {
-        $lembagaId = $request->get('lembaga_id');
-        $bulan = (int) $request->get('bulan', Carbon::now()->month);
-        $tahun = (int) $request->get('tahun', Carbon::now()->year);
+        $isSemuaLembaga = $request->exists('lembaga_id') && (
+            $request->get('lembaga_id') === '' || 
+            $request->get('lembaga_id') === 'all' || 
+            is_null($request->get('lembaga_id'))
+        );
 
-        $query = PresensiGuru::with(['user', 'lembaga'])
-            ->whereMonth('tanggal', $bulan)
-            ->whereYear('tanggal', $tahun);
-
-        if ($lembagaId) {
-            $query->where('lembaga_id', $lembagaId);
+        if ($isSemuaLembaga) {
+            $lembagaId = null;
+        } elseif ($request->filled('lembaga_id')) {
+            $lembagaId = (int) $request->get('lembaga_id');
+        } else {
+            $user = auth()->user();
+            $lembagaId = $user->currentLembaga()?->id ?: $user->accessibleLembagas()->first()?->id;
         }
 
+        $bulan = (int) $request->get('bulan', Carbon::now()->month);
+        $tahun = (int) $request->get('tahun', Carbon::now()->year);
+        $tanggal = $request->get('tanggal');
+
+        $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
+
+        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun);
         $records = $query->orderBy('tanggal', 'asc')->orderBy('jam_masuk', 'asc')->get();
 
         $fileName = 'rekap_absensi_guru_' . $tahun . '_' . str_pad($bulan, 2, '0', STR_PAD_LEFT) . '.csv';
@@ -178,20 +181,30 @@ class RekapAbsensiController extends Controller
      */
     public function cetak(Request $request)
     {
-        $lembagaId = $request->get('lembaga_id');
-        $bulan = (int) $request->get('bulan', Carbon::now()->month);
-        $tahun = (int) $request->get('tahun', Carbon::now()->year);
+        $isSemuaLembaga = $request->exists('lembaga_id') && (
+            $request->get('lembaga_id') === '' || 
+            $request->get('lembaga_id') === 'all' || 
+            is_null($request->get('lembaga_id'))
+        );
 
-        $lembaga = Lembaga::find($lembagaId) ?: (auth()->user()->currentLembaga() ?: Lembaga::first());
-
-        $query = PresensiGuru::with('user')
-            ->whereMonth('tanggal', $bulan)
-            ->whereYear('tanggal', $tahun);
-
-        if ($lembaga) {
-            $query->where('lembaga_id', $lembaga->id);
+        if ($isSemuaLembaga) {
+            $lembagaId = null;
+        } elseif ($request->filled('lembaga_id')) {
+            $lembagaId = (int) $request->get('lembaga_id');
+        } else {
+            $user = auth()->user();
+            $lembagaId = $user->currentLembaga()?->id ?: $user->accessibleLembagas()->first()?->id;
         }
 
+        $bulan = (int) $request->get('bulan', Carbon::now()->month);
+        $tahun = (int) $request->get('tahun', Carbon::now()->year);
+        $tanggal = $request->get('tanggal');
+
+        $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
+
+        $lembaga = $lembagaId ? Lembaga::find($lembagaId) : (auth()->user()->currentLembaga() ?: Lembaga::first());
+
+        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun);
         $records = $query->orderBy('tanggal', 'asc')->orderBy('jam_masuk', 'asc')->get();
 
         $namaBulan = [
@@ -201,5 +214,188 @@ class RekapAbsensiController extends Controller
         ][$bulan] ?? '';
 
         return view('rekap-absensi.cetak', compact('records', 'lembaga', 'bulan', 'tahun', 'namaBulan'));
+    }
+
+    /**
+     * Query builder presensi guru terpadu yang fleksibel terhadap multi-lembaga,
+     * memastikan guru yang berafiliasi dengan lembaga sekolah (misal SMP / SMA) tetap tampil
+     * meskipun akun guru terdaftar secara sentral di Yayasan.
+     */
+    protected function buildPresensiQuery(?int $lembagaId, ?string $tanggal, int $bulan, int $tahun, ?string $status = null, ?string $search = null)
+    {
+        $query = PresensiGuru::with(['user', 'lembaga']);
+
+        if ($lembagaId) {
+            $selectedLembaga = Lembaga::find($lembagaId);
+            $kodeLembaga = strtolower($selectedLembaga?->kode ?? '');
+            $isYayasan = $kodeLembaga === 'yayasan' || str_contains(strtolower($selectedLembaga?->nama ?? ''), 'yayasan');
+
+            // Jika lembaga yang dipilih BUKAN Yayasan (misal SMP atau SMA):
+            // Batasi query ke guru yang berkaitan dengan unit/sekolah tersebut.
+            // Jika Yayasan yang dipilih, Yayasan adalah induk seluruh lembaga sehingga seluruh guru ditampilkan.
+            if (!$isYayasan) {
+                $query->where(function ($q) use ($lembagaId, $selectedLembaga) {
+                    $q->where('lembaga_id', $lembagaId)
+                      ->orWhereHas('user', function ($uq) use ($lembagaId, $selectedLembaga) {
+                          $uq->where('primary_lembaga_id', $lembagaId)
+                             ->orWhereHas('lembagas', fn($lq) => $lq->where('lembagas.id', $lembagaId));
+
+                          if ($selectedLembaga) {
+                              $singkatan = $selectedLembaga->singkatan ?? $selectedLembaga->kode;
+                              $uq->orWhere('jabatan', 'like', "%{$singkatan}%")
+                                 ->orWhere('jabatan', 'like', "%{$selectedLembaga->kode}%");
+                          }
+                      });
+                });
+            }
+        }
+
+        if ($tanggal) {
+            $query->whereDate('tanggal', $tanggal);
+        } else {
+            $query->whereMonth('tanggal', $bulan)->whereYear('tanggal', $tahun);
+        }
+
+        if ($status && in_array($status, ['hadir', 'terlambat', 'izin', 'sakit', 'alpa'])) {
+            $query->where('status', $status);
+        }
+
+        if ($search) {
+            $query->whereHas('user', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('nip', 'like', "%{$search}%");
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Sinkronisasi data tap RFID guru/pegawai dari tabel presensis ke presensi_gurus.
+     * Memastikan tap yang tercatat di dashboard RFID multi-lokasi otomatis masuk ke rekap absensi guru.
+     */
+    protected function syncRfidTapsToPresensiGuru(?string $tanggal = null, ?int $bulan = null, ?int $tahun = null): void
+    {
+        if (!Schema::hasTable('presensis') || !Schema::hasTable('presensi_gurus')) {
+            return;
+        }
+
+        $tapsQuery = Presensi::where('tipe_entitas', 'guru_pegawai');
+
+        if ($tanggal) {
+            $tapsQuery->whereDate('waktu_tap', $tanggal);
+        } elseif ($bulan && $tahun) {
+            $tapsQuery->whereMonth('waktu_tap', $bulan)->whereYear('waktu_tap', $tahun);
+        } else {
+            $tapsQuery->whereDate('waktu_tap', Carbon::today());
+        }
+
+        $taps = $tapsQuery->orderBy('waktu_tap', 'asc')->get();
+
+        if ($taps->isEmpty()) {
+            return;
+        }
+
+        // Kelompokkan berdasarkan entitas_id (user_id) dan tanggal tap
+        $grouped = $taps->groupBy(function ($tap) {
+            $date = Carbon::parse($tap->waktu_tap)->toDateString();
+            return "{$tap->entitas_id}_{$date}";
+        });
+
+        foreach ($grouped as $key => $tapList) {
+            $firstTap = $tapList->first();
+            $userId = (int) $firstTap->entitas_id;
+            $user = User::find($userId);
+            if (!$user) {
+                continue;
+            }
+
+            $tapDate = Carbon::parse($firstTap->waktu_tap)->toDateString();
+            $jamMasuk = Carbon::parse($firstTap->waktu_tap)->format('H:i:s');
+
+            // Tentukan status masuk dari status_kehadiran log tap
+            $statusMasuk = match ($firstTap->status_kehadiran) {
+                'terlambat' => 'terlambat',
+                default     => 'hadir',
+            };
+
+            // Tentukan lembaga_id target
+            $targetLembagaId = $user->primary_lembaga_id;
+            if (!$targetLembagaId) {
+                $targetLembagaId = $user->lembagas()->first()?->id ?: 1;
+            }
+
+            // Jika serial device tap mengindikasikan lembaga spesifik (misal 'kantor smp')
+            $devId = strtolower((string) $firstTap->device_id);
+            if (str_contains($devId, 'smp')) {
+                $smp = Lembaga::where(fn($q) => $q->where('kode', 'smp')->orWhere('singkatan', 'SMP'))->first();
+                if ($smp) {
+                    $targetLembagaId = $smp->id;
+                }
+            } elseif (str_contains($devId, 'sma')) {
+                $sma = Lembaga::where(fn($q) => $q->where('kode', 'sma')->orWhere('singkatan', 'SMA'))->first();
+                if ($sma) {
+                    $targetLembagaId = $sma->id;
+                }
+            }
+
+            // Cek apakah presensi guru untuk user ini di tanggal ini sudah ada
+            $presensi = PresensiGuru::where('user_id', $userId)
+                ->whereDate('tanggal', $tapDate)
+                ->first();
+
+            if (!$presensi) {
+                // Jam pulang jika ada tap berikutnya yang berselisih waktu >= 3 menit
+                $jamPulang = null;
+                if ($tapList->count() > 1) {
+                    $lastTap = $tapList->last();
+                    $diffSec = Carbon::parse($lastTap->waktu_tap)->diffInSeconds(Carbon::parse($firstTap->waktu_tap));
+                    if ($diffSec >= 180) { // Debounce 3 menit
+                        $jamPulang = Carbon::parse($lastTap->waktu_tap)->format('H:i:s');
+                    }
+                }
+
+                PresensiGuru::create([
+                    'user_id'       => $userId,
+                    'lembaga_id'    => $targetLembagaId,
+                    'tanggal'       => $tapDate,
+                    'jam_masuk'     => $jamMasuk,
+                    'jam_pulang'    => $jamPulang,
+                    'status'        => $statusMasuk,
+                    'metode_masuk'  => 'rfid_tap',
+                    'metode_pulang' => $jamPulang ? 'rfid_tap' : null,
+                ]);
+            } else {
+                $updated = false;
+
+                // Update jam_masuk jika belum terisi
+                if (empty($presensi->jam_masuk)) {
+                    $presensi->jam_masuk = $jamMasuk;
+                    $presensi->status = $statusMasuk;
+                    $presensi->metode_masuk = 'rfid_tap';
+                    $updated = true;
+                }
+
+                // Cek pembaruan jam pulang dari tap terakhir
+                if ($tapList->count() > 1) {
+                    $lastTap = $tapList->last();
+                    $baseTime = $presensi->jam_masuk ? "{$tapDate} {$presensi->jam_masuk}" : $firstTap->waktu_tap;
+                    $diffSec = Carbon::parse($lastTap->waktu_tap)->diffInSeconds(Carbon::parse($baseTime));
+
+                    if ($diffSec >= 180) {
+                        $newJamPulang = Carbon::parse($lastTap->waktu_tap)->format('H:i:s');
+                        if (empty($presensi->jam_pulang) || $newJamPulang > $presensi->jam_pulang) {
+                            $presensi->jam_pulang = $newJamPulang;
+                            $presensi->metode_pulang = 'rfid_tap';
+                            $updated = true;
+                        }
+                    }
+                }
+
+                if ($updated) {
+                    $presensi->save();
+                }
+            }
+        }
     }
 }
