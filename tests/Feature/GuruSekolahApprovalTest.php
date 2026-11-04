@@ -271,4 +271,26 @@ class GuruSekolahApprovalTest extends TestCase
         $tableUsers = $indexResponse->viewData('users');
         $this->assertFalse($tableUsers->contains('id', $guru->id));
     }
+
+    public function test_table_custom_columns_and_filter_popover_rendered_correctly(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        $response = $this->actingAs($yayasan)->get(route('guru-sekolah.index'));
+        $response->assertStatus(200);
+
+        // 1. Tombol filter popover dan controls di dalam popover
+        $response->assertSee('title="Filter Data Guru"', false);
+        $response->assertSee('Filter Guru Sekolah');
+        $response->assertSee('Status Pengajuan');
+        $response->assertSee('Terapkan Filter');
+
+        // 2. Tombol tabel custom dan controls visibilitas kolom
+        $response->assertSee('title="Tabel Kustom (Atur Kolom)"', false);
+        $response->assertSee('Kolom Tabel');
+        $response->assertSee('x-model="columns.sekolah"', false);
+        $response->assertSee('x-model="columns.mapel"', false);
+        $response->assertSee('x-model="columns.status"', false);
+        $response->assertSee('x-model="columns.aksi"', false);
+    }
 }

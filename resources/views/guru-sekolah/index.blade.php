@@ -147,13 +147,42 @@
     </div>
 
     {{-- Kontainer Tabel Filament PHP (Persis Gaya Menu Siswa) --}}
-    <div class="fi-ta-ctn" style="background:var(--bg-surface); border:1px solid var(--border-light, #e2e8f0); border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+    <div class="fi-ta-ctn" 
+         x-data="{
+             showFilterMenu: false,
+             showColumnMenu: false,
+             columns: {
+                 no: true,
+                 sekolah: true,
+                 mapel: true,
+                 status: true,
+                 aksi: true
+             },
+             init() {
+                 try {
+                     const saved = localStorage.getItem('guru_sekolah_columns');
+                     if (saved) {
+                         this.columns = Object.assign(this.columns, JSON.parse(saved));
+                     }
+                 } catch(e) {}
+             },
+             saveColumns() {
+                 try {
+                     localStorage.setItem('guru_sekolah_columns', JSON.stringify(this.columns));
+                 } catch(e) {}
+             },
+             resetColumns() {
+                 this.columns = { no: true, sekolah: true, mapel: true, status: true, aksi: true };
+                 this.saveColumns();
+             }
+         }"
+         style="background:var(--bg-surface); border:1px solid var(--border-light, #e2e8f0); border-radius:14px; overflow:visible; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
         
         {{-- Filament Table Toolbar (Search & Filter Sesuai Menu Siswa) --}}
-        <div style="padding:14px 18px; border-bottom:1px solid var(--border-subtle, #f1f5f9); background:var(--bg-surface);">
+        <div style="padding:14px 18px; border-bottom:1px solid var(--border-subtle, #f1f5f9); background:var(--bg-surface); border-top-left-radius:14px; border-top-right-radius:14px;">
             <form action="{{ route('guru-sekolah.index') }}" method="GET" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0;">
                 
-                {{-- Group Filter Sisi Kiri --}}
+                {{-- Group Sisi Kiri: Tombol Aksi & Reset Link --}}
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     {{-- Tombol Aksi Dropdown Filament Style --}}
                     <div style="position:relative; display:inline-block;">
@@ -167,47 +196,28 @@
                         </button>
                     </div>
 
-                    {{-- Filter Status Pengajuan --}}
-                    <div style="position:relative; display:inline-block;">
-                        <select name="status" class="form-select" onchange="this.form.submit()"
-                                style="padding:7px 28px 7px 12px; font-size:12.5px; font-weight:600; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-primary, #0f172a); cursor:pointer;">
-                            <option value="">Semua Status</option>
-                            <option value="disetujui" {{ request('status') === 'disetujui' ? 'selected' : '' }}>Disetujui</option>
-                            <option value="menunggu" {{ request('status') === 'menunggu' ? 'selected' : '' }}>Menunggu Persetujuan</option>
-                            <option value="ditolak" {{ request('status') === 'ditolak' ? 'selected' : '' }}>Ditolak</option>
-                        </select>
-                    </div>
-
-                    {{-- Filter Lembaga Sekolah --}}
-                    @if(isset($sekolahLembagas) && $sekolahLembagas->count() > 1)
-                    <div style="position:relative; display:inline-block;">
-                        <select name="lembaga_id" class="form-select" onchange="this.form.submit()"
-                                style="padding:7px 28px 7px 12px; font-size:12.5px; font-weight:600; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-primary, #0f172a); cursor:pointer;">
-                            <option value="">Semua Sekolah</option>
-                            @foreach($sekolahLembagas as $lem)
-                                <option value="{{ $lem->id }}" {{ request('lembaga_id') == $lem->id ? 'selected' : '' }}>
-                                    {{ $lem->nama_singkat ?? $lem->singkatan }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @endif
-
-                    {{-- Tombol Reset --}}
-                    @if(request('status') || request('lembaga_id') || request('search'))
-                    <a href="{{ route('guru-sekolah.index') }}" class="btn btn-secondary" style="padding:7px 12px; font-size:12px; font-weight:600; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:4px;" title="Reset Filter">
+                    {{-- Indikator & Link Reset Filter Jika Ada Filter / Pencarian Aktif --}}
+                    @php
+                        $activeFilterCount = (request('status') ? 1 : 0) + (request('lembaga_id') ? 1 : 0);
+                    @endphp
+                    @if($activeFilterCount > 0 || request('search'))
+                    <a href="{{ route('guru-sekolah.index') }}" class="btn btn-secondary" style="padding:7px 12px; font-size:12px; font-weight:600; border-radius:8px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; color:#ef4444; border-color:#fecaca; background:#fef2f2;" title="Reset Filter">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
-                        <span>Reset</span>
+                        <span>Reset Filter</span>
+                        @if($activeFilterCount > 0)
+                        <span style="display:inline-flex; align-items:center; justify-content:center; padding:1px 6px; border-radius:9999px; font-size:10px; background:#ef4444; color:#fff; font-weight:700;">{{ $activeFilterCount }}</span>
+                        @endif
                     </a>
                     @endif
                 </div>
 
-                {{-- Kolom Pencarian & Icon Tools Sisi Kanan --}}
+                {{-- Kolom Pencarian, Tombol Filter Funnel & Tombol Tabel Custom Sisi Kanan --}}
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <div style="position:relative; width:100%; min-width:260px; max-width:320px;">
+                    {{-- Search Box --}}
+                    <div style="position:relative; width:100%; min-width:240px; max-width:320px;">
                         <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Cari guru, NIP, mapel..." autocomplete="off"
                                style="width:100%; padding:7px 32px 7px 34px; border-radius:8px; font-size:13px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-primary, #0f172a);">
                         <div style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-muted, #94a3b8); pointer-events:none; display:flex; align-items:center;">
@@ -221,23 +231,133 @@
                         @endif
                     </div>
 
-                    {{-- Icon Filter Visual (Sesuai Tampilan Filament Siswa) --}}
-                    <div style="position:relative; display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-muted, #64748b);">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                        </svg>
-                        @if(request('status') || request('lembaga_id'))
-                        <span style="position:absolute; top:-4px; right:-4px; width:14px; height:14px; background:#0284c7; color:#fff; border-radius:50%; font-size:9px; font-weight:800; display:flex; align-items:center; justify-content:center;">1</span>
-                        @endif
+                    {{-- 1. Tombol Filter Funnel Popover (Berisi Filter Status & Lembaga) --}}
+                    <div style="position:relative;" @click.outside="showFilterMenu = false">
+                        <button type="button" 
+                                @click="showFilterMenu = !showFilterMenu; showColumnMenu = false"
+                                :style="(showFilterMenu || {{ $activeFilterCount }} > 0) ? 'border-color:#0284c7; background:rgba(2, 132, 199, 0.08); color:#0284c7;' : 'border-color:var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-muted, #64748b);'"
+                                style="position:relative; display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); cursor:pointer; transition:all 0.15s;"
+                                title="Filter Data Guru">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                            </svg>
+                            @if($activeFilterCount > 0)
+                            <span style="position:absolute; top:-5px; right:-5px; width:16px; height:16px; background:#0284c7; color:#fff; border-radius:50%; font-size:10px; font-weight:800; display:flex; align-items:center; justify-content:center; border:2px solid var(--bg-surface, #fff);">
+                                {{ $activeFilterCount }}
+                            </span>
+                            @endif
+                        </button>
+
+                        <!-- Filter Popover Menu Dropdown -->
+                        <div x-show="showFilterMenu" x-cloak x-transition
+                             style="position:absolute; right:0; top:calc(100% + 8px); width:300px; background:var(--bg-surface, #ffffff); border:1px solid var(--border-light, #cbd5e1); border-radius:12px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); z-index:100; overflow:hidden;">
+                            
+                            {{-- Header Filter Popover --}}
+                            <div style="padding:12px 16px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between; background:var(--bg-main, #f8fafc);">
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#0284c7;">
+                                        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                                    </svg>
+                                    <span style="font-size:12.5px; font-weight:700; color:var(--text-primary, #0f172a);">Filter Guru Sekolah</span>
+                                </div>
+                                @if($activeFilterCount > 0)
+                                <a href="{{ route('guru-sekolah.index', request()->only('search')) }}" style="font-size:11.5px; font-weight:600; color:#ef4444; text-decoration:none;">Reset</a>
+                                @endif
+                            </div>
+
+                            {{-- Form Fields Di Dalam Popover Filter --}}
+                            <div style="padding:16px; display:flex; flex-direction:column; gap:14px; background:var(--bg-surface, #ffffff);">
+                                {{-- Filter 1: Status Pengajuan --}}
+                                <div>
+                                    <label style="display:block; font-size:11.5px; font-weight:600; color:var(--text-secondary, #475569); margin-bottom:6px;">Status Pengajuan</label>
+                                    <select name="status" class="form-select no-fi-select"
+                                            style="width:100%; padding:8px 12px; font-size:12.5px; font-weight:500; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-primary, #0f172a); cursor:pointer;">
+                                        <option value="">Semua Status</option>
+                                        <option value="disetujui" {{ request('status') === 'disetujui' ? 'selected' : '' }}>Disetujui</option>
+                                        <option value="menunggu" {{ request('status') === 'menunggu' ? 'selected' : '' }}>Menunggu Persetujuan</option>
+                                        <option value="ditolak" {{ request('status') === 'ditolak' ? 'selected' : '' }}>Ditolak</option>
+                                    </select>
+                                </div>
+
+                                {{-- Filter 2: Lembaga Sekolah --}}
+                                @if(isset($sekolahLembagas) && $sekolahLembagas->count() > 1)
+                                <div>
+                                    <label style="display:block; font-size:11.5px; font-weight:600; color:var(--text-secondary, #475569); margin-bottom:6px;">Lembaga Sekolah</label>
+                                    <select name="lembaga_id" class="form-select no-fi-select"
+                                            style="width:100%; padding:8px 12px; font-size:12.5px; font-weight:500; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-primary, #0f172a); cursor:pointer;">
+                                        <option value="">Semua Sekolah</option>
+                                        @foreach($sekolahLembagas as $lem)
+                                            <option value="{{ $lem->id }}" {{ request('lembaga_id') == $lem->id ? 'selected' : '' }}>
+                                                {{ $lem->nama_singkat ?? $lem->singkatan }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                @endif
+
+                                {{-- Action Button: Terapkan Filter --}}
+                                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
+                                    <button type="submit" class="btn btn-primary" style="padding:7px 16px; font-size:12px; font-weight:700; border-radius:8px; background:#0284c7; color:#fff; border:none; cursor:pointer;">
+                                        Terapkan Filter
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    {{-- Icon Kolom Visual --}}
-                    <div style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-muted, #64748b);">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="9" y1="3" x2="9" y2="21"></line>
-                            <line x1="15" y1="3" x2="15" y2="21"></line>
-                        </svg>
+                    {{-- 2. Tombol Tabel Custom Popover (Bisa Diklik & Mengatur Kolom yang Ditampilkan) --}}
+                    <div style="position:relative;" @click.outside="showColumnMenu = false">
+                        <button type="button" 
+                                @click="showColumnMenu = !showColumnMenu; showFilterMenu = false"
+                                :style="showColumnMenu ? 'border-color:#0284c7; background:rgba(2, 132, 199, 0.08); color:#0284c7;' : 'border-color:var(--border-light, #cbd5e1); background:var(--bg-main, #f8fafc); color:var(--text-muted, #64748b);'"
+                                style="display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:8px; border:1px solid var(--border-light, #cbd5e1); cursor:pointer; transition:all 0.15s;"
+                                title="Tabel Kustom (Atur Kolom)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="9" y1="3" x2="9" y2="21"></line>
+                                <line x1="15" y1="3" x2="15" y2="21"></line>
+                            </svg>
+                        </button>
+
+                        <!-- Popover Menu Tabel Kustom -->
+                        <div x-show="showColumnMenu" x-cloak x-transition
+                             style="position:absolute; right:0; top:calc(100% + 8px); width:250px; background:var(--bg-surface, #ffffff); border:1px solid var(--border-light, #cbd5e1); border-radius:12px; box-shadow:0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); z-index:100; overflow:hidden;">
+                            
+                            <div style="padding:12px 16px; border-bottom:1px solid var(--border-subtle, #f1f5f9); display:flex; align-items:center; justify-content:space-between; background:var(--bg-main, #f8fafc);">
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;color:#0284c7;">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                                        <line x1="15" y1="3" x2="15" y2="21"></line>
+                                    </svg>
+                                    <span style="font-size:12.5px; font-weight:700; color:var(--text-primary, #0f172a);">Kolom Tabel</span>
+                                </div>
+                                <button type="button" @click="resetColumns()" style="font-size:11.5px; font-weight:600; color:#0284c7; background:none; border:none; cursor:pointer; padding:0;">Reset</button>
+                            </div>
+
+                            <div style="padding:14px 16px; display:flex; flex-direction:column; gap:10px; background:var(--bg-surface, #ffffff);">
+                                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:500; color:var(--text-primary, #0f172a); cursor:pointer; user-select:none;">
+                                    <input type="checkbox" x-model="columns.no" @change="saveColumns()" style="width:15px; height:15px; border-radius:4px; accent-color:#0284c7; cursor:pointer;">
+                                    <span># (Nomor)</span>
+                                </label>
+                                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:500; color:var(--text-primary, #0f172a); cursor:pointer; user-select:none;">
+                                    <input type="checkbox" x-model="columns.sekolah" @change="saveColumns()" style="width:15px; height:15px; border-radius:4px; accent-color:#0284c7; cursor:pointer;">
+                                    <span>Sekolah</span>
+                                </label>
+                                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:500; color:var(--text-primary, #0f172a); cursor:pointer; user-select:none;">
+                                    <input type="checkbox" x-model="columns.mapel" @change="saveColumns()" style="width:15px; height:15px; border-radius:4px; accent-color:#0284c7; cursor:pointer;">
+                                    <span>Mata Pelajaran (Diampu)</span>
+                                </label>
+                                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:500; color:var(--text-primary, #0f172a); cursor:pointer; user-select:none;">
+                                    <input type="checkbox" x-model="columns.status" @change="saveColumns()" style="width:15px; height:15px; border-radius:4px; accent-color:#0284c7; cursor:pointer;">
+                                    <span>Status Pengajuan</span>
+                                </label>
+                                <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:500; color:var(--text-primary, #0f172a); cursor:pointer; user-select:none;">
+                                    <input type="checkbox" x-model="columns.aksi" @change="saveColumns()" style="width:15px; height:15px; border-radius:4px; accent-color:#0284c7; cursor:pointer;">
+                                    <span>Aksi</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -252,12 +372,12 @@
                         <th style="padding:12px 14px; width:36px; text-align:center;">
                             <input type="checkbox" disabled style="border-radius:4px; border:1px solid var(--border-light, #cbd5e1);">
                         </th>
-                        <th style="padding:12px 14px; width:45px; text-align:center;">#</th>
+                        <th x-show="columns.no" style="padding:12px 14px; width:45px; text-align:center;">#</th>
                         <th style="padding:12px 16px;">Guru</th>
-                        <th style="padding:12px 16px;">Sekolah</th>
-                        <th style="padding:12px 16px;">Mata Pelajaran (Diampu)</th>
-                        <th style="padding:12px 16px;">Status Pengajuan</th>
-                        <th style="padding:12px 16px; text-align:center; width:150px;">Aksi</th>
+                        <th x-show="columns.sekolah" style="padding:12px 16px;">Sekolah</th>
+                        <th x-show="columns.mapel" style="padding:12px 16px;">Mata Pelajaran (Diampu)</th>
+                        <th x-show="columns.status" style="padding:12px 16px;">Status Pengajuan</th>
+                        <th x-show="columns.aksi" style="padding:12px 16px; text-align:center; width:150px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -273,7 +393,7 @@
                         </td>
 
                         {{-- No --}}
-                        <td style="padding:12px 14px; text-align:center; color:var(--text-muted, #94a3b8); font-size:12px;">
+                        <td x-show="columns.no" style="padding:12px 14px; text-align:center; color:var(--text-muted, #94a3b8); font-size:12px;">
                             {{ $rowNum }}
                         </td>
 
@@ -309,7 +429,7 @@
                         </td>
 
                         {{-- Lembaga Sekolah --}}
-                        <td style="padding:12px 16px;">
+                        <td x-show="columns.sekolah" style="padding:12px 16px;">
                             @php
                                 $lembagaKode = strtolower($guru->primaryLembaga?->kode ?? '');
                                 $lembagaSingkat = $guru->primaryLembaga?->singkatan ?? ($guru->lembagas->first()?->singkatan ?? '-');
@@ -330,11 +450,11 @@
                         </td>
 
                         {{-- Mata Pelajaran (Diampu) - Multi Mapel Didukung --}}
-                        <td style="padding:12px 16px;">
+                        <td x-show="columns.mapel" style="padding:12px 16px;">
                             @if(!empty($mapels))
                                 <div style="display:flex; flex-wrap:wrap; gap:5px;">
                                     @foreach($mapels as $m)
-                                        <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:600; background:rgba(2, 132, 199, 0.08); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.2);">
+                                         <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:600; background:rgba(2, 132, 199, 0.08); color:#0284c7; border:1px solid rgba(2, 132, 199, 0.2);">
                                             {{ $m }}
                                         </span>
                                     @endforeach
@@ -345,7 +465,7 @@
                         </td>
 
                         {{-- Status Pengajuan (Filament Status Badge dengan Dot) --}}
-                        <td style="padding:12px 16px;">
+                        <td x-show="columns.status" style="padding:12px 16px;">
                             @if($guru->mapel_status === 'menunggu')
                                 <div style="display:inline-flex; flex-direction:column; gap:4px;">
                                     <span style="display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px; font-size:11.5px; font-weight:700; background:#fef3c7; color:#b45309; border:1px solid #fde68a;">
@@ -377,7 +497,7 @@
                         </td>
 
                         {{-- Aksi (Filament Action Buttons) --}}
-                        <td style="padding:12px 16px; text-align:center;">
+                        <td x-show="columns.aksi" style="padding:12px 16px; text-align:center;">
                             <div style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
                                 @if($guru->mapel_status === 'menunggu')
                                     {{-- Tombol Approve --}}
@@ -425,7 +545,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" style="text-align:center; padding:48px 16px; color:var(--text-muted, #94a3b8);">
+                        <td :colspan="1 + (columns.no ? 1 : 0) + 1 + (columns.sekolah ? 1 : 0) + (columns.mapel ? 1 : 0) + (columns.status ? 1 : 0) + (columns.aksi ? 1 : 0)" style="text-align:center; padding:48px 16px; color:var(--text-muted, #94a3b8);">
                             <div style="font-size:14px; font-weight:600; color:var(--text-secondary, #64748b);">Tidak ada guru sekolah yang terdaftar.</div>
                         </td>
                     </tr>
