@@ -226,14 +226,15 @@
                                        onclick="toggleMasterCheck('ekskul', this.checked)">
                             </th>
                             <th class="fi-ta-th fi-ta-th-sortable" onclick="sortTable('ekskul', 1)">
-                                <span>Ekstrakurikuler</span>
+                                <span>Nama Ekskul</span>
                                 <span class="fi-ta-sort-icon">↕</span>
                             </th>
-                            <th class="fi-ta-th">
-                                <span>Pembina Ekstrakurikuler</span>
+                            <th class="fi-ta-th fi-ta-th-sortable" onclick="sortTable('ekskul', 2)">
+                                <span>Pembina</span>
+                                <span class="fi-ta-sort-icon">↕</span>
                             </th>
                             <th class="fi-ta-th fi-ta-th-center fi-ta-th-sortable" onclick="sortTable('ekskul', 3)">
-                                <span>Anggota</span>
+                                <span>Peserta</span>
                                 <span class="fi-ta-sort-icon">↕</span>
                             </th>
                             <th class="fi-ta-th fi-ta-th-right" style="width: 140px;">
@@ -280,23 +281,21 @@
                                 <button type="button"
                                         class="pk-badge-count-btn"
                                         onclick="openAnggotaModal({{ $item->id }}, '{{ addslashes($item->nama_ekskul) }}')"
-                                        title="Klik untuk melihat dan kelola siswa anggota">
+                                        title="Lihat {{ $item->anggota_count }} Peserta">
                                     <span class="pk-badge-count-num">{{ $item->anggota_count }}</span>
-                                    <span class="pk-badge-count-label">Siswa</span>
+                                    <span class="pk-badge-count-label">Peserta</span>
                                 </button>
                             </td>
                             <td class="fi-ta-td fi-ta-td-right">
                                 <div class="pk-row-actions">
-                                    {{-- Lihat/Kelola Anggota --}}
+                                    {{-- Lihat Peserta --}}
                                     <button type="button"
                                             class="pk-action-btn is-view"
                                             onclick="openAnggotaModal({{ $item->id }}, '{{ addslashes($item->nama_ekskul) }}')"
-                                            title="Kelola Anggota">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                            <circle cx="9" cy="7" r="4"></circle>
-                                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                            title="Lihat Peserta">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px; height:15px;">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                            <circle cx="12" cy="12" r="3"></circle>
                                         </svg>
                                     </button>
 
@@ -308,8 +307,8 @@
                                                 nama_ekskul: '{{ addslashes($item->nama_ekskul) }}',
                                                 pembina_id: '{{ $item->pembina_id ?? '' }}'
                                             })"
-                                            title="Edit Ekstrakurikuler">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            title="Edit Ekskul">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px; height:15px;">
                                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                         </svg>
@@ -319,8 +318,8 @@
                                     <button type="button"
                                             class="pk-action-btn is-delete"
                                             onclick="confirmDeleteSingleEkskul({{ $item->id }}, '{{ addslashes($item->nama_ekskul) }}')"
-                                            title="Hapus Ekstrakurikuler">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            title="Hapus Ekskul">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px; height:15px;">
                                             <polyline points="3 6 5 6 21 6"></polyline>
                                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                         </svg>
@@ -663,8 +662,8 @@
 
             <div class="pk-modal-header">
                 <div>
-                    <h3 class="pk-modal-title" id="modalAnggotaTitle">Anggota Ekstrakurikuler</h3>
-                    <span class="pk-modal-subtitle" id="modalAnggotaSubtitle">Daftar siswa terdaftar</span>
+                    <h3 class="pk-modal-title" id="modalAnggotaTitle">Daftar Peserta Ekstrakurikuler</h3>
+                    <span class="pk-modal-subtitle" id="modalAnggotaSubtitle">Daftar nama siswa peserta ekstrakurikuler</span>
                 </div>
                 <button type="button" class="pk-modal-close" onclick="closeAnggotaModal()">&times;</button>
             </div>
@@ -837,7 +836,7 @@
 
                 <div class="pk-modal-body">
                     <div class="pk-form-group">
-                        <label for="inputNamaEkskul" class="pk-form-label">Nama Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
+                        <label for="inputNamaEkskul" class="pk-form-label">Nama Ekskul <span style="color:#EF4444;">*</span></label>
                         <input type="text"
                                name="nama_ekskul"
                                id="inputNamaEkskul"
@@ -848,7 +847,7 @@
                     </div>
 
                     <div class="pk-form-group">
-                        <label for="selectPembina" class="pk-form-label">Pembina Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
+                        <label for="selectPembina" class="pk-form-label">Nama Pembina <span style="color:#EF4444;">*</span></label>
                         <select name="pembina_id" id="selectPembina" class="pk-form-select" required>
                             <option value="">-- Pilih Guru Pembina ({{ $jenjang }}) --</option>
                             @foreach($gurus as $g)
@@ -856,7 +855,7 @@
                             @endforeach
                         </select>
                         <span style="font-size:11.5px; color:#6B7280; margin-top:2px;">
-                            Guru yang terdaftar di Guru Sekolah {{ $jenjang }}.
+                            Diambil dari nama guru yang terdaftar di Guru Sekolah {{ $jenjang }}.
                         </span>
                     </div>
                 </div>
@@ -892,7 +891,7 @@
 
                 <div class="pk-modal-body">
                     <div class="pk-form-group">
-                        <label for="editNamaEkskul" class="pk-form-label">Nama Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
+                        <label for="editNamaEkskul" class="pk-form-label">Nama Ekskul <span style="color:#EF4444;">*</span></label>
                         <input type="text"
                                name="nama_ekskul"
                                id="editNamaEkskul"
@@ -902,7 +901,7 @@
                     </div>
 
                     <div class="pk-form-group">
-                        <label for="editPembina" class="pk-form-label">Pembina Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
+                        <label for="editPembina" class="pk-form-label">Nama Pembina <span style="color:#EF4444;">*</span></label>
                         <select name="pembina_id" id="editPembina" class="pk-form-select" required>
                             <option value="">-- Pilih Guru Pembina ({{ $jenjang }}) --</option>
                             @foreach($gurus as $g)
@@ -910,7 +909,7 @@
                             @endforeach
                         </select>
                         <span style="font-size:11.5px; color:#6B7280; margin-top:2px;">
-                            Guru yang terdaftar di Guru Sekolah {{ $jenjang }}.
+                            Diambil dari nama guru yang terdaftar di Guru Sekolah {{ $jenjang }}.
                         </span>
                     </div>
                 </div>
@@ -1748,10 +1747,147 @@ function escapeJs(str) {
     return (str || '').replace(/'/g, "\\'");
 }
 
+// Sorting Kolom
+let sortDirections = {};
+function sortTable(key, colIdx) {
+    const tableId = key === 'ekskul' ? 'tableEkskul' : 'tableBelum';
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.querySelectorAll(key === 'ekskul' ? '.js-row-ekskul' : '.js-row-belum'));
+    
+    const sortId = `${key}_${colIdx}`;
+    sortDirections[sortId] = !sortDirections[sortId];
+    const isAsc = sortDirections[sortId];
+
+    rows.sort((a, b) => {
+        let valA = (a.cells[colIdx]?.textContent || '').trim().toLowerCase();
+        let valB = (b.cells[colIdx]?.textContent || '').trim().toLowerCase();
+        
+        const numA = parseInt(valA, 10);
+        const numB = parseInt(valB, 10);
+        if (!isNaN(numA) && !isNaN(numB) && String(numA) === valA.split(' ')[0]) {
+            return isAsc ? numA - numB : numB - numA;
+        }
+        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+}
+
+// Kustomisasi Visibilitas Kolom
+function getColumnStorageKey(key) {
+    return 'fi_cols_ekskul_' + key;
+}
+
+function initColumnCustomizer(key) {
+    const tableId = key === 'ekskul' ? 'tableEkskul' : 'tableBelum';
+    const listId = key === 'ekskul' ? 'colListEkskul' : 'colListBelum';
+    const btnId = key === 'ekskul' ? 'btnColsEkskul' : 'btnColsBelum';
+
+    const table = document.getElementById(tableId);
+    const listEl = document.getElementById(listId);
+    const btnEl = document.getElementById(btnId);
+    if (!table || !listEl) return;
+
+    const headRow = table.tHead.rows[0];
+    const storageKey = getColumnStorageKey(key);
+    let savedCols = {};
+    try {
+        savedCols = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    } catch(e) { savedCols = {}; }
+
+    listEl.innerHTML = '';
+    let hasHidden = false;
+
+    Array.from(headRow.cells).forEach((th, idx) => {
+        if (th.classList.contains('fi-ta-th-check')) return;
+        const colTitle = (th.querySelector('span')?.textContent || th.textContent || '').trim() || `Kolom ${idx}`;
+        const isVisible = savedCols[idx] !== undefined ? !!savedCols[idx] : true;
+        if (!isVisible) hasHidden = true;
+
+        applyColumnVisibility(table, idx, isVisible);
+
+        const labelEl = document.createElement('label');
+        labelEl.className = 'fi-ta-col-item';
+        labelEl.innerHTML = `
+            <input type="checkbox" class="fi-ta-checkbox fi-ta-col-check" data-col-idx="${idx}" ${isVisible ? 'checked' : ''}>
+            <span class="fi-ta-col-item-text">${colTitle}</span>
+        `;
+        const cb = labelEl.querySelector('input');
+        cb.addEventListener('change', function() {
+            toggleColumn(key, idx, this.checked);
+        });
+        listEl.appendChild(labelEl);
+    });
+
+    if (btnEl) btnEl.classList.toggle('has-hidden-cols', hasHidden);
+}
+
+function applyColumnVisibility(table, colIdx, isVisible) {
+    const headRow = table.tHead.rows[0];
+    if (headRow && headRow.cells[colIdx]) {
+        headRow.cells[colIdx].style.display = isVisible ? '' : 'none';
+    }
+    const tbody = table.tBodies[0];
+    if (tbody) {
+        Array.from(tbody.rows).forEach(tr => {
+            if (tr.id?.startsWith('emptyFilterRow') || tr.classList.contains('js-empty-initial')) return;
+            if (tr.cells[colIdx]) {
+                tr.cells[colIdx].style.display = isVisible ? '' : 'none';
+            }
+        });
+    }
+}
+
+function toggleColumn(key, colIdx, isVisible) {
+    const tableId = key === 'ekskul' ? 'tableEkskul' : 'tableBelum';
+    const btnId = key === 'ekskul' ? 'btnColsEkskul' : 'btnColsBelum';
+    const table = document.getElementById(tableId);
+    if (!table) return;
+
+    applyColumnVisibility(table, colIdx, isVisible);
+
+    const storageKey = getColumnStorageKey(key);
+    let savedCols = {};
+    try {
+        savedCols = JSON.parse(localStorage.getItem(storageKey) || '{}');
+    } catch(e) { savedCols = {}; }
+    savedCols[colIdx] = isVisible;
+    localStorage.setItem(storageKey, JSON.stringify(savedCols));
+
+    const hasHidden = Object.values(savedCols).some(v => v === false);
+    const btnEl = document.getElementById(btnId);
+    if (btnEl) btnEl.classList.toggle('has-hidden-cols', hasHidden);
+}
+
+function resetColumns(key) {
+    const tableId = key === 'ekskul' ? 'tableEkskul' : 'tableBelum';
+    const listId = key === 'ekskul' ? 'colListEkskul' : 'colListBelum';
+    const btnId = key === 'ekskul' ? 'btnColsEkskul' : 'btnColsBelum';
+    const table = document.getElementById(tableId);
+    const listEl = document.getElementById(listId);
+    const btnEl = document.getElementById(btnId);
+    if (!table) return;
+
+    const headRow = table.tHead.rows[0];
+    Array.from(headRow.cells).forEach((th, idx) => {
+        applyColumnVisibility(table, idx, true);
+    });
+
+    if (listEl) {
+        listEl.querySelectorAll('.fi-ta-col-check').forEach(cb => cb.checked = true);
+    }
+    localStorage.removeItem(getColumnStorageKey(key));
+    if (btnEl) btnEl.classList.remove('has-hidden-cols');
+}
+
 // Init client filter on page load
 document.addEventListener('DOMContentLoaded', function() {
     applyClientFilter('ekskul');
     applyClientFilter('belum');
+    initColumnCustomizer('ekskul');
+    initColumnCustomizer('belum');
 });
 </script>
 @endsection

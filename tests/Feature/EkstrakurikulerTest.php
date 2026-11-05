@@ -36,6 +36,19 @@ class EkstrakurikulerTest extends TestCase
         $response->assertSee('Daftar Ekstrakurikuler');
         $response->assertSee('Belum Ikut Ekskul');
 
+        // Kolom tabel sesuai permintaan: Nama Ekskul, Pembina, Peserta, Aksi
+        $response->assertSee('Nama Ekskul');
+        $response->assertSee('Pembina');
+        $response->assertSee('Peserta');
+        $response->assertSee('Aksi');
+        $response->assertDontSee('JADWAL & TEMPAT');
+
+        // Form hanya nama ekskul dan pembina
+        $response->assertSee('Nama Pembina');
+        $response->assertDontSee('Hari Latihan');
+        $response->assertDontSee('Jam Mulai');
+        $response->assertDontSee('Tempat / Lokasi Latihan');
+
         // 2. Tambah Ekskul Baru (Hanya berisi nama ekskul dan pembina ekskul)
         $storeResponse = $this->actingAs($admin)
             ->withSession(['active_lembaga' => 'smp'])

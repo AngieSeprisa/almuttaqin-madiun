@@ -131,7 +131,9 @@ class PlottingEkskulController extends Controller
                 $q->where('primary_lembaga_id', $selectedLembaga->id)
                   ->orWhereHas('lembagas', function ($l) use ($selectedLembaga) {
                       $l->where('lembagas.id', $selectedLembaga->id);
-                  });
+                  })
+                  ->orWhere('jabatan', 'like', "%{$selectedLembaga->singkatan}%")
+                  ->orWhere('jabatan', 'like', "%{$selectedLembaga->kode}%");
             })
             ->orderBy('name')
             ->get();
