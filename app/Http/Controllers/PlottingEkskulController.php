@@ -158,34 +158,22 @@ class PlottingEkskulController extends Controller
             $activeTab = 'ekskul';
         }
 
-        // Daftar kelas lengkap per jenjang: SMP (Kelas 7, 8, dan 9), SMA (Kelas 10, 11, dan 12)
-        $standardKelas = ($jenjang === 'SMA')
-            ? ['10A', '10B', '11A', '11B', '12A', '12B']
-            : ['7A', '7B', '8A', '8B', '9A', '9B'];
+        // Ambil daftar ruang kelas persis seperti yang ada di menu Plotting Kelas
+        $dbClassrooms = Classroom::where('lembaga_id', $selectedLembaga->id)
+            ->orderBy('urutan')
+            ->orderBy('nama_kelas')
+            ->get();
 
-        $siswaKelas = $allSiswa->pluck('kelas')->filter(fn($k) => !empty($k) && $k !== '-')->unique()->values()->all();
+        if ($dbClassrooms->isEmpty()) {
+            PlottingKelasController::seedStandar($selectedLembaga);
+            $dbClassrooms = Classroom::where('lembaga_id', $selectedLembaga->id)
+                ->orderBy('urutan')
+                ->orderBy('nama_kelas')
+                ->get();
+        }
 
-        $classroomKelas = Classroom::where(function ($q) use ($selectedLembaga, $jenjang) {
-                $q->where('lembaga_id', $selectedLembaga->id)
-                  ->orWhere('jenjang', $jenjang);
-            })
-            ->pluck('nama_kelas')
-            ->map(function ($k) {
-                $c = trim(str_ireplace('kelas', '', $k));
-                $map = ['VIII' => '8', 'VII' => '7', 'XII' => '12', 'XI' => '11', 'IX' => '9', 'X' => '10'];
-                return preg_replace_callback('/(VIII|VII|XII|XI|IX|X)/i', fn($m) => $map[strtoupper($m[1])] ?? $m[1], $c);
-            })
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        $daftarKelas = collect(array_merge($standardKelas, $classroomKelas, $siswaKelas))
-            ->map(fn($k) => trim($k))
-            ->filter()
-            ->unique()
-            ->sort(fn($a, $b) => strnatcasecmp($a, $b))
-            ->values();
+        $classrooms = $dbClassrooms;
+        $daftarKelas = $classrooms->pluck('nama_kelas')->all();
 
         return view('plotting-ekskul.index', compact(
             'isYayasan',
@@ -198,6 +186,7 @@ class PlottingEkskulController extends Controller
             'belumTerdaftar',
             'gurus',
             'activeTab',
+            'classrooms',
             'daftarKelas'
         ));
     }

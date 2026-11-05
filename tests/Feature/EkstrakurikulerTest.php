@@ -36,10 +36,15 @@ class EkstrakurikulerTest extends TestCase
         $response->assertSee('Daftar Ekstrakurikuler');
         $response->assertSee('Belum Ikut Ekskul');
 
-        // Filter kelas mencakup kelas 7, 8, sampai kelas 9
-        $response->assertSee('Kelas 9A');
-        $response->assertSee('Kelas 9B');
-        $response->assertSee('Semua Kelas 9');
+        // Filter kelas disesuaikan dengan nama kelas yang ada di plotting kelas (VII A, VII B, VIII A, VIII B, IX A, IX B)
+        $response->assertSee('Kelas VII A');
+        $response->assertSee('Kelas VIII A');
+        $response->assertSee('Kelas IX A');
+        $response->assertSee('Kelas IX B');
+
+        // Form mutasi dan modal lihat anggota tidak memuat peran
+        $response->assertDontSee('Peran dalam Ekskul');
+        $response->assertDontSee('<th class="fi-ta-th">Peran</th>', false);
 
         // Kolom tabel sesuai permintaan: Nama Ekskul, Pembina, Peserta, Aksi
         $response->assertSee('Nama Ekskul');

@@ -492,43 +492,13 @@
                                     <label for="fltBelumKelas" class="fi-ta-filter-label">Filter Kelas Formal</label>
                                     <select id="fltBelumKelas" class="fi-ta-filter-select">
                                         <option value="">Semua Kelas</option>
-                                        @if($jenjang === 'SMP')
-                                            <option value="tingkat:7">Semua Kelas 7 (VII)</option>
-                                            <option value="7A">Kelas 7A</option>
-                                            <option value="7B">Kelas 7B</option>
-                                            <option value="tingkat:8">Semua Kelas 8 (VIII)</option>
-                                            <option value="8A">Kelas 8A</option>
-                                            <option value="8B">Kelas 8B</option>
-                                            <option value="tingkat:9">Semua Kelas 9 (IX)</option>
-                                            <option value="9A">Kelas 9A</option>
-                                            <option value="9B">Kelas 9B</option>
-                                            @foreach($daftarKelas ?? [] as $dk)
-                                                @php
-                                                    $cleanDk = strtoupper(str_replace(' ', '', $dk));
-                                                @endphp
-                                                @if(!in_array($cleanDk, ['7A', '7B', '8A', '8B', '9A', '9B', 'VIIA', 'VIIB', 'VIIIA', 'VIIIB', 'IXA', 'IXB']))
-                                                    <option value="{{ $dk }}">Kelas {{ $dk }}</option>
-                                                @endif
-                                            @endforeach
-                                        @else
-                                            <option value="tingkat:10">Semua Kelas 10 (X)</option>
-                                            <option value="10A">Kelas 10A</option>
-                                            <option value="10B">Kelas 10B</option>
-                                            <option value="tingkat:11">Semua Kelas 11 (XI)</option>
-                                            <option value="11A">Kelas 11A</option>
-                                            <option value="11B">Kelas 11B</option>
-                                            <option value="tingkat:12">Semua Kelas 12 (XII)</option>
-                                            <option value="12A">Kelas 12A</option>
-                                            <option value="12B">Kelas 12B</option>
-                                            @foreach($daftarKelas ?? [] as $dk)
-                                                @php
-                                                    $cleanDk = strtoupper(str_replace(' ', '', $dk));
-                                                @endphp
-                                                @if(!in_array($cleanDk, ['10A', '10B', '11A', '11B', '12A', '12B', 'XA', 'XB', 'XIA', 'XIB', 'XIIA', 'XIIB']))
-                                                    <option value="{{ $dk }}">Kelas {{ $dk }}</option>
-                                                @endif
-                                            @endforeach
-                                        @endif
+                                        @foreach($classrooms ?? [] as $c)
+                                            @php
+                                                $cName = is_object($c) ? $c->nama_kelas : $c;
+                                                $cLabel = stripos($cName, 'kelas') !== false ? $cName : 'Kelas ' . $cName;
+                                            @endphp
+                                            <option value="{{ $cName }}">{{ $cLabel }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                             </div>
@@ -637,9 +607,13 @@
                                 </div>
                             </td>
                             <td class="fi-ta-td">
-                                <span class="pk-badge-jenjang {{ strtolower($jenjang) }}">
-                                    Kelas {{ $siswa->kelas ?: '-' }} ({{ $jenjang }})
-                                </span>
+                                @if(!empty($siswa->kelas) && $siswa->kelas !== '-')
+                                    <span class="pk-badge-jenjang {{ strtolower($jenjang) }}">
+                                        {{ stripos($siswa->kelas, 'kelas') !== false ? $siswa->kelas : 'Kelas ' . $siswa->kelas }}
+                                    </span>
+                                @else
+                                    <span style="color: #94A3B8; font-size: 13px;">-</span>
+                                @endif
                             </td>
                             <td class="fi-ta-td fi-ta-td-center">
                                 @php
@@ -852,13 +826,12 @@
                                     </th>
                                     <th class="fi-ta-th">Nama Siswa</th>
                                     <th class="fi-ta-th">Kelas</th>
-                                    <th class="fi-ta-th">Peran</th>
                                     <th class="fi-ta-th fi-ta-th-right" style="width: 80px;">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="tbodyModalAnggota">
                                 <tr>
-                                    <td colspan="5" style="padding: 32px 16px; text-align: center; color: #6B7280;">
+                                    <td colspan="4" style="padding: 32px 16px; text-align: center; color: #6B7280;">
                                         Memuat data siswa...
                                     </td>
                                 </tr>
@@ -910,16 +883,7 @@
                         </select>
                     </div>
 
-                    <div class="pk-form-group">
-                        <label for="selectPeranSiswa" class="pk-form-label">Peran dalam Ekskul</label>
-                        <select name="peran" id="selectPeranSiswa" class="pk-form-select">
-                            <option value="anggota" selected>Anggota</option>
-                            <option value="ketua">Ketua</option>
-                            <option value="wakil">Wakil Ketua</option>
-                            <option value="sekretaris">Sekretaris</option>
-                            <option value="bendahara">Bendahara</option>
-                        </select>
-                    </div>
+                    <input type="hidden" name="peran" value="anggota">
                 </div>
 
                 <div class="pk-modal-footer">
@@ -1069,16 +1033,7 @@
                         </select>
                     </div>
 
-                    <div class="pk-form-group">
-                        <label for="directSelectPeran" class="pk-form-label">Peran</label>
-                        <select name="peran" id="directSelectPeran" class="pk-form-select">
-                            <option value="anggota" selected>Anggota</option>
-                            <option value="ketua">Ketua</option>
-                            <option value="wakil">Wakil Ketua</option>
-                            <option value="sekretaris">Sekretaris</option>
-                            <option value="bendahara">Bendahara</option>
-                        </select>
-                    </div>
+                    <input type="hidden" name="peran" value="anggota">
                 </div>
 
                 <div class="pk-modal-footer">
@@ -1870,7 +1825,7 @@ function closeAnggotaModal() {
 function renderModalAnggotaTable(list) {
     const tbody = document.getElementById('tbodyModalAnggota');
     if (!list || list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:28px; text-align:center; color:#6B7280;">Belum ada anggota di ekstrakurikuler ini.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="padding:28px; text-align:center; color:#6B7280;">Belum ada anggota di ekstrakurikuler ini.</td></tr>`;
         document.getElementById('footerInfoModal').textContent = `Total 0 anggota`;
         return;
     }
@@ -1888,11 +1843,6 @@ function renderModalAnggotaTable(list) {
                 </td>
                 <td class="fi-ta-td">
                     <span class="pk-badge-jenjang">${a.kelas || '-'}</span>
-                </td>
-                <td class="fi-ta-td">
-                    <span style="font-size:11.5px; font-weight:700; text-transform:capitalize; padding:2px 8px; border-radius:12px; background:#F1F5F9; color:#475569;">
-                        ${a.peran || 'anggota'}
-                    </span>
                 </td>
                 <td class="fi-ta-td fi-ta-td-right">
                     <button type="button" class="pk-action-btn is-delete" onclick="keluarkanSingleModal(${a.siswa_id}, '${escapeJs(a.nama_lengkap)}')" title="Keluarkan dari ekskul">
