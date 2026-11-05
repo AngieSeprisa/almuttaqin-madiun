@@ -68,5 +68,18 @@ class SiswaMobileTest extends TestCase
         $response->assertSee('btn-edit');
         $response->assertSee('btn-delete');
         $response->assertSee('placeholder="Cari nama santri/kamar..."', false);
+
+        // Memastikan elemen Bottom Sheet mobile sesuai screenshot referensi ada
+        $response->assertSee('id="mobileActionSheet"', false);
+        $response->assertSee('id="mobileActionSheetBackdrop"', false);
+        $response->assertSee('sheet-drag-handle');
+        $response->assertSee('sheet-btn-close');
+        $response->assertSee('Tutup');
+        $response->assertSee('id="sheetActionView"', false);
+        $response->assertSee('id="sheetActionEdit"', false);
+        $response->assertSee('id="sheetActionPrint"', false);
+        $response->assertSee('id="sheetActionRfid"', false);
+        $response->assertSee('id="sheetActionDelete"', false);
+        $response->assertSee('data-col-idx="3"', false);
     }
 }

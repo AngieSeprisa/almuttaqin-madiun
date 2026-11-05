@@ -209,31 +209,54 @@
     display: none;
 }
 
+/* Sembunyikan bottom sheet di desktop */
+.mobile-sheet-backdrop,
+.mobile-bottom-sheet {
+    display: none;
+}
+
 @media (max-width: 768px) {
-    /* Sembunyikan tabel desktop di mobile */
-    .table-card {
+    /* Sembunyikan hanya tabel baris desktop di mobile, container card & toolbar tetap tampil */
+    .table-wrapper,
+    .fi-ta-table-wrap {
         display: none !important;
+    }
+
+    /* Hilangkan border & padding kaku table-card di mobile agar card list mengalir rapi */
+    .table-card {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
     }
 
     /* Tampilkan daftar card mobile */
     .mobile-siswa-list {
         display: flex !important;
         flex-direction: column;
-        gap: 12px;
+        gap: 10px;
+        padding: 0 0 16px 0;
     }
 
-    /* Container Card Siswa Mobile Sesuai Gambar */
+    /* Container Card Siswa Mobile Sesuai Gambar Referensi */
     .mobile-siswa-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 14px;
-        padding: 13px 15px;
+        padding: 13px 16px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: space-between;
         gap: 12px;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        cursor: pointer;
+        transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+    }
+
+    .mobile-siswa-card:active {
+        transform: scale(0.99);
+        background-color: #f8fafc;
     }
 
     .dark-mode .mobile-siswa-card {
@@ -242,15 +265,19 @@
         box-shadow: none;
     }
 
-    /* Highlight merah tipis (opacity 90%) untuk santri data belum lengkap */
+    .dark-mode .mobile-siswa-card:active {
+        background-color: #27354a;
+    }
+
+    /* Highlight merah tipis untuk santri data belum lengkap */
     .mobile-siswa-card.row-incomplete {
-        background-color: rgba(239, 68, 68, 0.08) !important;
+        background-color: rgba(239, 68, 68, 0.06) !important;
         border-color: rgba(239, 68, 68, 0.3) !important;
         border-left: 4px solid #ef4444 !important;
     }
 
     .dark-mode .mobile-siswa-card.row-incomplete {
-        background-color: rgba(239, 68, 68, 0.14) !important;
+        background-color: rgba(239, 68, 68, 0.12) !important;
         border-color: rgba(239, 68, 68, 0.45) !important;
     }
 
@@ -282,38 +309,61 @@
         color: #f8fafc;
     }
 
-    /* Grid Label & Badges di bawah Nama Sesuai Gambar */
-    .mobile-siswa-meta-grid {
+    /* Subtitle (Kamar / Kolom Kustom) */
+    .mobile-siswa-subtitles {
         display: flex;
-        align-items: flex-end;
-        gap: 8px;
-        margin-top: 4px;
+        align-items: center;
+        gap: 6px;
         flex-wrap: wrap;
-    }
-
-    .mobile-meta-item {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .mobile-meta-label {
-        font-size: 11px;
-        font-weight: 500;
+        font-size: 12.5px;
         color: #64748b;
-        line-height: 1;
+        line-height: 1.3;
     }
 
-    .dark-mode .mobile-meta-label {
+    .dark-mode .mobile-siswa-subtitles {
         color: #94a3b8;
+    }
+
+    .mobile-sub-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+    }
+
+    .mobile-sub-item .sub-label {
+        color: #94a3b8;
+        font-size: 11.5px;
+    }
+
+    .dark-mode .mobile-sub-item .sub-label {
+        color: #64748b;
+    }
+
+    /* Sisi Kanan: Status Badge & Chevron */
+    .mobile-siswa-status-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .mobile-card-chevron {
+        width: 16px;
+        height: 16px;
+        color: #94a3b8;
+        opacity: 0.7;
+    }
+
+    .dark-mode .mobile-card-chevron {
+        color: #64748b;
     }
 
     .mobile-badge-pill {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 3px 9px;
-        border-radius: 6px;
+        padding: 4px 10px;
+        border-radius: 8px;
         font-size: 11.5px;
         font-weight: 600;
         background-color: #f1f5f9;
@@ -335,11 +385,21 @@
         color: #15803d;
         border: 1px solid #bbf7d0;
     }
+    .dark-mode .mobile-badge-pill.status-aktif {
+        background-color: rgba(34, 197, 94, 0.18);
+        color: #4ade80;
+        border-color: rgba(34, 197, 94, 0.35);
+    }
 
     .mobile-badge-pill.status-pulang {
         background-color: #fef3c7;
         color: #b45309;
         border: 1px solid #fde68a;
+    }
+    .dark-mode .mobile-badge-pill.status-pulang {
+        background-color: rgba(245, 158, 11, 0.18);
+        color: #fbbf24;
+        border-color: rgba(245, 158, 11, 0.35);
     }
 
     .mobile-badge-pill.status-sakit {
@@ -347,176 +407,317 @@
         color: #b91c1c;
         border: 1px solid #fecaca;
     }
-
-    .dark-mode .mobile-badge-pill.status-aktif {
-        background-color: rgba(34, 197, 94, 0.18);
-        color: #4ade80;
-        border-color: rgba(34, 197, 94, 0.35);
+    .dark-mode .mobile-badge-pill.status-sakit {
+        background-color: rgba(239, 68, 68, 0.18);
+        color: #f87171;
+        border-color: rgba(239, 68, 68, 0.35);
     }
 
-    /* Sisi Kanan: Aksi Sesuai Gambar */
-    .mobile-siswa-action-col {
+    /* ========================================================
+       BOTTOM SHEET STYLING (Sesuai Gambar Referensi)
+       ======================================================== */
+    .mobile-sheet-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 9998;
+        opacity: 0;
+        transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        pointer-events: none;
+    }
+    .mobile-sheet-backdrop.is-active {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .mobile-bottom-sheet {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-width: 540px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-top-left-radius: 24px;
+        border-top-right-radius: 24px;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
+        z-index: 9999;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         display: flex;
         flex-direction: column;
-        align-items: flex-end;
-        gap: 6px;
-        flex-shrink: 0;
+        max-height: 85vh;
+        overflow: hidden;
     }
 
-    .mobile-action-title {
-        font-size: 11.5px;
-        font-weight: 600;
-        color: #475569;
-        line-height: 1;
-        text-align: right;
-        padding-right: 2px;
+    .dark-mode .mobile-bottom-sheet {
+        background: #1e293b;
+        border-top: 1px solid #334155;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
     }
 
-    .dark-mode .mobile-action-title {
-        color: #94a3b8;
+    .mobile-bottom-sheet.is-open {
+        transform: translateY(0);
     }
 
-    .mobile-action-buttons {
+    .sheet-handle-bar {
+        width: 100%;
+        padding: 12px 0 8px;
+        display: flex;
+        justify-content: center;
+        cursor: grab;
+    }
+
+    .sheet-drag-handle {
+        width: 48px;
+        height: 5px;
+        border-radius: 999px;
+        background: #cbd5e1;
+    }
+
+    .dark-mode .sheet-drag-handle {
+        background: #475569;
+    }
+
+    .sheet-header {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 14px;
+        padding: 6px 20px 14px;
+        border-bottom: 1px solid #f1f5f9;
     }
 
-    .mobile-action-btn {
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
-        min-height: 32px;
-        border-radius: 8px;
-        display: inline-flex;
+    .dark-mode .sheet-header {
+        border-bottom-color: #334155;
+    }
+
+    .sheet-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: #ffffff;
+        font-size: 16px;
+        font-weight: 700;
+        display: flex;
         align-items: center;
         justify-content: center;
-        border: none;
-        cursor: pointer;
-        text-decoration: none;
-        padding: 0;
-        transition: transform 0.1s ease, filter 0.15s ease;
-    }
-
-    .mobile-action-btn:active {
-        transform: scale(0.92);
-    }
-
-    .mobile-action-btn svg {
-        width: 15px;
-        height: 15px;
-    }
-
-    /* Tombol Lihat (Mata - Biru) */
-    .mobile-action-btn.btn-view {
-        background-color: #dbeafe;
-        color: #2563eb;
-    }
-    .dark-mode .mobile-action-btn.btn-view {
-        background-color: rgba(37, 99, 235, 0.22);
-        color: #60a5fa;
-    }
-
-    /* Tombol Edit (Pensil - Kuning) */
-    .mobile-action-btn.btn-edit {
-        background-color: #fef3c7;
-        color: #d97706;
-    }
-    .dark-mode .mobile-action-btn.btn-edit {
-        background-color: rgba(217, 119, 6, 0.22);
-        color: #fbbf24;
-    }
-
-    /* Tombol Hapus (Sampah - Merah) */
-    .mobile-action-btn.btn-delete {
-        background-color: #fee2e2;
-        color: #ef4444;
-    }
-    .dark-mode .mobile-action-btn.btn-delete {
-        background-color: rgba(239, 68, 68, 0.22);
-        color: #f87171;
-    }
-
-    /* ---- Penyempurnaan tampilan card mobile ---- */
-    .mobile-siswa-list { gap: 14px; }
-
-    .mobile-siswa-card {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0;
-        padding: 0;
-        overflow: hidden;
-        border-radius: 16px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-    }
-
-    .mobile-siswa-info {
-        padding: 14px 16px 12px;
-        gap: 8px;
-    }
-
-    .mobile-siswa-nama { font-size: 16px; letter-spacing: -0.01em; }
-
-    .mobile-siswa-meta-grid {
-        display: grid;
-        grid-template-columns: repeat(3, auto);
-        justify-content: start;
-        gap: 6px 14px;
-        margin-top: 2px;
-    }
-
-    .mobile-meta-label {
-        font-size: 10.5px;
+        flex-shrink: 0;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+    }
+
+    .sheet-title-wrap {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .sheet-siswa-nama {
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .dark-mode .sheet-siswa-nama {
+        color: #f8fafc;
+    }
+
+    .sheet-siswa-meta {
+        font-size: 12.5px;
+        color: #64748b;
+        margin-top: 3px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .dark-mode .sheet-siswa-meta {
         color: #94a3b8;
     }
 
-    .mobile-badge-pill { padding: 4px 10px; font-size: 12px; border-radius: 8px; }
+    .sheet-actions-list {
+        padding: 10px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 
-    .mobile-siswa-action-col {
-        flex-direction: row;
+    .sheet-action-item {
+        display: flex;
         align-items: center;
-        justify-content: flex-end;
-        border-top: 1px solid #f1f5f9;
+        gap: 14px;
+        padding: 12px 14px;
+        border-radius: 14px;
         background: transparent;
-        padding: 6px 10px;
+        border: none;
+        text-decoration: none;
+        color: #1e293b;
+        cursor: pointer;
+        transition: background 0.15s ease, transform 0.1s ease;
         width: 100%;
+        text-align: left;
         box-sizing: border-box;
     }
 
-    .dark-mode .mobile-siswa-action-col {
-        border-top-color: var(--border-light, #334155);
+    .dark-mode .sheet-action-item {
+        color: #f1f5f9;
     }
 
-    .mobile-action-title { display: none; }
-
-    .mobile-action-buttons {
-        width: auto;
-        gap: 4px;
+    .sheet-action-item:active,
+    .sheet-action-item:hover {
+        background: #f8fafc;
     }
 
-    .mobile-action-buttons form { display: flex !important; margin: 0; }
-
-    .mobile-action-btn {
-        flex: none;
-        width: 30px;
-        height: 30px;
-        min-width: 30px;
-        min-height: 30px;
-        border-radius: 8px;
-        background: transparent !important;
-        opacity: 0.75;
+    .dark-mode .sheet-action-item:active,
+    .dark-mode .sheet-action-item:hover {
+        background: #334155;
     }
 
-    .mobile-action-btn:active,
-    .mobile-action-btn:hover { opacity: 1; background: #f1f5f9 !important; }
+    .sheet-action-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
 
-    .mobile-action-btn svg { width: 15px; height: 15px; }
-    .mobile-action-btn.btn-view { color: #64748b; }
-    .mobile-action-btn.btn-print { color: #0284c7; }
-    .mobile-action-btn.btn-edit { color: #64748b; }
-    .mobile-action-btn.btn-delete { color: #ef4444; }
+    .sheet-action-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .sheet-action-icon.icon-view {
+        background: #eff6ff;
+        color: #2563eb;
+    }
+    .dark-mode .sheet-action-icon.icon-view {
+        background: rgba(37, 99, 235, 0.2);
+        color: #60a5fa;
+    }
+
+    .sheet-action-icon.icon-edit {
+        background: #fefce8;
+        color: #ca8a04;
+    }
+    .dark-mode .sheet-action-icon.icon-edit {
+        background: rgba(202, 138, 4, 0.2);
+        color: #facc15;
+    }
+
+    .sheet-action-icon.icon-print {
+        background: #f0fdf4;
+        color: #16a34a;
+    }
+    .dark-mode .sheet-action-icon.icon-print {
+        background: rgba(22, 163, 74, 0.2);
+        color: #4ade80;
+    }
+
+    .sheet-action-icon.icon-rfid {
+        background: #f5f3ff;
+        color: #7c3aed;
+    }
+    .dark-mode .sheet-action-icon.icon-rfid {
+        background: rgba(124, 58, 237, 0.2);
+        color: #a78bfa;
+    }
+
+    .sheet-action-icon.icon-delete {
+        background: #fef2f2;
+        color: #ef4444;
+    }
+    .dark-mode .sheet-action-icon.icon-delete {
+        background: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+    }
+
+    .sheet-action-text {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .sheet-action-title {
+        font-size: 14.5px;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+
+    .sheet-action-desc {
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 1px;
+    }
+
+    .dark-mode .sheet-action-desc {
+        color: #94a3b8;
+    }
+
+    .sheet-action-item.is-danger .sheet-action-title {
+        color: #ef4444;
+    }
+    .dark-mode .sheet-action-item.is-danger .sheet-action-title {
+        color: #f87171;
+    }
+
+    .sheet-chevron {
+        width: 16px;
+        height: 16px;
+        color: #cbd5e1;
+        flex-shrink: 0;
+    }
+    .dark-mode .sheet-chevron {
+        color: #64748b;
+    }
+
+    .sheet-footer {
+        padding: 12px 18px 20px;
+        border-top: 1px solid #f1f5f9;
+    }
+    .dark-mode .sheet-footer {
+        border-top-color: #334155;
+    }
+
+    .sheet-btn-close {
+        width: 100%;
+        height: 48px;
+        border-radius: 14px;
+        background: #234e38; /* Sage/forest green sesuai gambar contoh */
+        color: #ffffff;
+        font-size: 15px;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.15s ease, transform 0.1s ease;
+    }
+
+    .sheet-btn-close:active {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+
+    .dark-mode .sheet-btn-close {
+        background: #2d5a44;
+    }
+}
 
     /* Filter Card & Search Bar Mobile Responsive Sesuai Gambar */
     .filter-card {
@@ -1122,7 +1323,7 @@
         </div>
     </div>
 
-    {{-- Tampilan Mobile Card List (Khusus Tampilan Layar HP Sesuai Gambar) --}}
+    {{-- Tampilan Mobile Card List (Khusus Tampilan Layar HP Sesuai Gambar Referensi) --}}
     <div class="mobile-siswa-list">
         @forelse($siswa as $item)
         @php
@@ -1137,10 +1338,21 @@
             $statusKey = strtolower($item->status ?? 'aktif');
         @endphp
         <div class="mobile-siswa-card {{ !$isLengkap ? 'row-incomplete' : '' }}"
+             data-id="{{ $item->id }}"
+             data-nama="{{ $item->nama_lengkap }}"
+             data-kamar="{{ $kamarText }}"
+             data-jenjang="{{ $jenjangText }}"
+             data-status="{{ $statusKey }}"
+             data-status-text="{{ $statusText }}"
+             data-rfid="{{ $item->rfid_uid ?? '' }}"
              data-view-url="{{ $targetViewUrl }}"
              data-edit-url="{{ $targetEditUrl }}"
-             data-cetak-url="{{ $targetCetakUrl }}">
-            {{-- Sisi Kiri: Nama & Kolom Jenjang, Kamar, Status --}}
+             data-cetak-url="{{ $targetCetakUrl }}"
+             data-delete-url="{{ route('siswa.destroy', $item->id) }}"
+             data-can-edit="{{ (!auth()->check() || auth()->user()->canDo('siswa', 'edit')) ? '1' : '0' }}"
+             data-can-delete="{{ (!auth()->check() || auth()->user()->canDo('siswa', 'delete')) ? '1' : '0' }}">
+            
+            {{-- Sisi Kiri: Nama Lengkap & Subtitle (Kamar / Kolom Kustom) --}}
             <div class="mobile-siswa-info">
                 <div class="mobile-siswa-nama-wrap">
                     <span class="mobile-siswa-nama">{{ $item->nama_lengkap }}</span>
@@ -1157,103 +1369,31 @@
                 </div>
 
                 @if(!$isLengkap && count($missingFields) > 0)
-                    <div class="text-missing-fields" style="margin-bottom: 4px;" title="Field yang belum diisi: {{ implode(', ', $missingFields) }}">
+                    <div class="text-missing-fields" style="margin-bottom: 2px;" title="Field yang belum diisi: {{ implode(', ', $missingFields) }}">
                         <span class="missing-label">Kurang:</span> {{ implode(', ', array_slice($missingFields, 0, 3)) }}{{ count($missingFields) > 3 ? ', +' . (count($missingFields) - 3) . ' lainnya' : '' }}
                     </div>
                 @endif
 
-                <div class="mobile-siswa-meta-grid">
-                    <div class="mobile-meta-item">
-                        <span class="mobile-meta-label">Jenjang</span>
-                        <span class="mobile-badge-pill">{{ $jenjangText }}</span>
-                    </div>
-                    <div class="mobile-meta-item">
-                        <span class="mobile-meta-label">Kamar</span>
-                        <span class="mobile-badge-pill">{{ $kamarText }}</span>
-                    </div>
-                    <div class="mobile-meta-item">
-                        <span class="mobile-meta-label">RFID</span>
-                        <span class="mobile-badge-pill" style="font-family: monospace; font-size: 11px;">{{ $item->rfid_uid ?? '-' }}</span>
-                    </div>
-                    <div class="mobile-meta-item mobile-meta-status">
-                        <span class="mobile-meta-label">&nbsp;</span>
-                        <span class="mobile-badge-pill status-{{ $statusKey }}">{{ $statusText }}</span>
-                    </div>
+                {{-- Default: Kamar. Custom columns (Jenjang, RFID) synced via data-col-idx --}}
+                <div class="mobile-siswa-subtitles">
+                    <span class="mobile-sub-item" data-col-idx="3">
+                        <span class="sub-label">Kamar:</span> {{ $kamarText }}
+                    </span>
+                    <span class="mobile-sub-item" data-col-idx="2" style="display:none;">
+                        • <span class="sub-label">Jenjang:</span> {{ $jenjangText }}
+                    </span>
+                    <span class="mobile-sub-item" data-col-idx="5" style="display:none;">
+                        • <span class="sub-label">RFID:</span> {{ $item->rfid_uid ?? '-' }}
+                    </span>
                 </div>
             </div>
 
-            {{-- Sisi Kanan: Kolom Aksi dengan Tombol Lihat, Edit, Hapus, RFID --}}
-            <div class="mobile-siswa-action-col">
-                <span class="mobile-action-title">Aksi</span>
-                <div class="mobile-action-buttons">
-                    {{-- Tombol Pairing RFID (Mobile) --}}
-                    @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
-                    <button type="button" class="mobile-action-btn btn-rfid-pair"
-                       data-id="{{ $item->id }}" 
-                       data-nama="{{ $item->nama_lengkap }}" 
-                       data-uid="{{ $item->rfid_uid ?? '' }}"
-                       title="Pairing Kartu RFID Santri"
-                       style="color: #2563eb;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="5" width="20" height="14" rx="2"></rect>
-                            <line x1="2" y1="10" x2="22" y2="10"></line>
-                        </svg>
-                    </button>
-                    @endif
-
-                    {{-- Tombol Lihat (Halaman View Penuh) --}}
-                    <a href="{{ $targetViewUrl }}" class="mobile-action-btn btn-view" title="Lihat Formulir Siswa" aria-label="Lihat Formulir {{ $item->nama_lengkap }}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </a>
-
-                    {{-- Tombol Cetak (Format Formulir Cetak A4) --}}
-                    <a href="{{ $targetCetakUrl }}" target="_blank" class="mobile-action-btn btn-print" title="Cetak Formulir / Biodata" aria-label="Cetak Formulir {{ $item->nama_lengkap }}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                            <rect x="6" y="14" width="12" height="8"></rect>
-                        </svg>
-                    </a>
-
-                    {{-- Tombol Edit / Koreksi (Halaman Edit Penuh) --}}
-                    @if(!auth()->check() || auth()->user()->canDo('siswa', 'edit'))
-                    <a href="{{ $targetEditUrl }}"
-                       class="mobile-action-btn btn-edit {{ !$isLengkap ? 'is-koreksi' : '' }}"
-                       title="{{ !$isLengkap ? 'Edit & Koreksi Kelengkapan Data Santri (' . implode(', ', $missingFields) . ')' : 'Edit Formulir Pendaftaran Siswa' }}"
-                       aria-label="{{ !$isLengkap ? 'Edit & Koreksi Data ' . $item->nama_lengkap : 'Edit Formulir ' . $item->nama_lengkap }}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                        </svg>
-                    </a>
-                    @endif
-
-                    {{-- Tombol Hapus (Sampah - Merah) --}}
-                    @if(!auth()->check() || auth()->user()->canDo('siswa', 'delete'))
-                    <form action="{{ route('siswa.destroy', $item->id) }}" method="POST" style="display:inline; margin:0;">
-                        @csrf
-                        @method('DELETE')
-                        <button type="button" class="mobile-action-btn btn-delete js-swal-confirm"
-                            data-title="Konfirmasi Hapus Siswa?"
-                            data-html="Apakah Anda yakin ingin menghapus data santri <strong>{{ $item->nama_lengkap }}</strong>?<br><div style='padding:12px 14px; background:var(--nav-hover-bg); border-radius:10px; border:1px solid var(--border-light); margin-top:12px; font-size:13px; text-align:left; line-height:1.6;'><div>Kamar: <strong>{{ $item->kamar }}</strong></div><div>Status: <strong>{{ ucfirst($item->status ?? 'aktif') }}</strong></div></div><div style='margin-top:10px; font-size:12.5px; color:#DC2626; font-weight:600;'>⚠️ Data yang sudah dihapus tidak dapat dipulihkan kembali.</div>"
-                            data-icon="warning"
-                            data-confirm-text="Ya, Hapus Data"
-                            data-confirm-color="#DC2626"
-                            data-cancel-text="Batal"
-                            title="Hapus Data Siswa" aria-label="Hapus Data {{ $item->nama_lengkap }}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                <line x1="14" y1="11" x2="14" y2="17"></line>
-                            </svg>
-                        </button>
-                    </form>
-                    @endif
-                </div>
+            {{-- Sisi Kanan: Status Badge & Chevron --}}
+            <div class="mobile-siswa-status-wrap">
+                <span class="mobile-badge-pill status-{{ $statusKey }}">{{ $statusText }}</span>
+                <svg class="mobile-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
             </div>
         </div>
         @empty
@@ -1266,6 +1406,123 @@
         </div>
         @endforelse
     </div>
+
+    {{-- Bottom Sheet Aksi Santri (Mobile Action Sheet sesuai contoh gambar) --}}
+    <div id="mobileActionSheetBackdrop" class="mobile-sheet-backdrop" style="display:none;"></div>
+    <div id="mobileActionSheet" class="mobile-bottom-sheet" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sheetSiswaNama">
+        <div class="sheet-handle-bar">
+            <span class="sheet-drag-handle"></span>
+        </div>
+        
+        <div class="sheet-header">
+            <div class="sheet-avatar" id="sheetSiswaAvatar">ST</div>
+            <div class="sheet-title-wrap">
+                <h3 class="sheet-siswa-nama" id="sheetSiswaNama">Nama Santri</h3>
+                <div class="sheet-siswa-meta">
+                    <span id="sheetSiswaKamar">Kamar -</span>
+                    <span>•</span>
+                    <span id="sheetSiswaJenjang">Reguler</span>
+                    <span>•</span>
+                    <span class="mobile-badge-pill status-aktif" id="sheetSiswaStatus">Aktif</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sheet-actions-list">
+            <span class="sheet-section-title" style="display:none;">Aksi</span>
+
+            {{-- Opsi 1: Lihat Formulir Siswa --}}
+            <a href="#" id="sheetActionView" class="sheet-action-item btn-view" title="Lihat Formulir Siswa">
+                <div class="sheet-action-icon icon-view">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </div>
+                <div class="sheet-action-text">
+                    <span class="sheet-action-title">Lihat Formulir Siswa</span>
+                    <span class="sheet-action-desc">Buka biodata lengkap santri</span>
+                </div>
+                <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            {{-- Opsi 2: Edit & Koreksi Data Siswa --}}
+            <a href="#" id="sheetActionEdit" class="sheet-action-item btn-edit" title="Edit Formulir Siswa">
+                <div class="sheet-action-icon icon-edit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </div>
+                <div class="sheet-action-text">
+                    <span class="sheet-action-title">Edit Data Siswa</span>
+                    <span class="sheet-action-desc">Ubah data identitas & kelengkapan</span>
+                </div>
+                <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            {{-- Opsi 3: Cetak Formulir A4 --}}
+            <a href="#" id="sheetActionPrint" target="_blank" class="sheet-action-item btn-print" title="Cetak Formulir A4">
+                <div class="sheet-action-icon icon-print">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                        <rect x="6" y="14" width="12" height="8"></rect>
+                    </svg>
+                </div>
+                <div class="sheet-action-text">
+                    <span class="sheet-action-title">Cetak Formulir A4</span>
+                    <span class="sheet-action-desc">Cetak format kertas resmi santri</span>
+                </div>
+                <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </a>
+
+            {{-- Opsi 4: Pairing Kartu RFID --}}
+            <button type="button" id="sheetActionRfid" class="sheet-action-item btn-rfid-pair" title="Pairing Kartu RFID">
+                <div class="sheet-action-icon icon-rfid">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                        <line x1="2" y1="10" x2="22" y2="10"></line>
+                    </svg>
+                </div>
+                <div class="sheet-action-text">
+                    <span class="sheet-action-title">Pairing Kartu RFID</span>
+                    <span class="sheet-action-desc" id="sheetRfidDesc">Hubungkan kartu fisik santri</span>
+                </div>
+                <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+
+            {{-- Opsi 5: Hapus Data Siswa --}}
+            <button type="button" id="sheetActionDelete" class="sheet-action-item is-danger btn-delete" title="Hapus Data Siswa">
+                <div class="sheet-action-icon icon-delete">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="sheet-action-text">
+                    <span class="sheet-action-title">Hapus Data Siswa</span>
+                    <span class="sheet-action-desc">Hapus data santri dari aplikasi</span>
+                </div>
+                <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+        </div>
+
+        {{-- Footer: Tombol Tutup Sesuai Gambar Referensi --}}
+        <div class="sheet-footer">
+            <button type="button" class="sheet-btn-close" id="sheetBtnClose">
+                Tutup
+            </button>
+        </div>
+    </div>
+
+    {{-- Hidden form untuk eksekusi hapus siswa dari bottom sheet --}}
+    <form id="sheetDeleteForm" action="" method="POST" style="display:none;">
+        @csrf
+        @method('DELETE')
+    </form>
 </div>
 
 
@@ -1346,118 +1603,291 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Handler Pairing Kartu RFID Santri
+    // Handler Pairing Kartu RFID Santri (Reusable)
+    function triggerRfidPairing(siswaId, nama, currentUid) {
+        currentUid = currentUid || '';
+        if (typeof Swal === 'undefined') {
+            var manualUid = prompt('Masukkan UID Kartu RFID untuk santri ' + nama + ':', currentUid);
+            if (manualUid !== null) {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/siswa/' + siswaId + '/rfid';
+                var csrf = document.createElement('input');
+                csrf.type = 'hidden';
+                csrf.name = '_token';
+                csrf.value = '{{ csrf_token() }}';
+                form.appendChild(csrf);
+                var inputUid = document.createElement('input');
+                inputUid.type = 'hidden';
+                inputUid.name = 'rfid_uid';
+                inputUid.value = manualUid.trim().toUpperCase();
+                form.appendChild(inputUid);
+                document.body.appendChild(form);
+                form.submit();
+            }
+            return;
+        }
+
+        Swal.fire({
+            title: 'Pairing Kartu RFID',
+            html: `
+                <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text-main);">
+                    <p style="margin-bottom:10px;">Santri: <strong>${nama}</strong></p>
+                    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">UID Kartu RFID (Hexadecimal):</label>
+                    <div style="display:flex; gap:8px;">
+                        <input id="swal_rfid_uid" class="swal2-input" style="margin:0; flex:1; text-transform:uppercase; font-family:monospace; font-size:14px; font-weight:600;" placeholder="Contoh: C1F8EFA7" value="${currentUid}">
+                        <button type="button" id="btn_detect_rfid" class="btn btn-secondary" style="font-size:12px; padding:0 12px; white-space:nowrap; border-radius:8px;" title="Ambil tap kartu terakhir di alat">
+                            📡 Cek Tap Terakhir
+                        </button>
+                    </div>
+                    <div id="detect_rfid_status" style="font-size:11.5px; color:#64748b; margin-top:8px;">
+                        💡 <em>Tip: Tap kartu baru di sensor RFID alat ESP32, lalu klik tombol "Cek Tap Terakhir".</em>
+                    </div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Simpan Kartu',
+            confirmButtonColor: '#2563eb',
+            cancelButtonText: 'Batal',
+            focusConfirm: false,
+            didOpen: () => {
+                const detectBtn = document.getElementById('btn_detect_rfid');
+                const uidInput = document.getElementById('swal_rfid_uid');
+                const statusText = document.getElementById('detect_rfid_status');
+                
+                detectBtn.addEventListener('click', function() {
+                    statusText.innerHTML = '<span style="color:#2563eb;">⏳ Memeriksa data tap kartu terakhir...</span>';
+                    fetch('{{ route("siswa.lastRfidTap") }}')
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data && data.uid) {
+                                uidInput.value = data.uid.toUpperCase();
+                                statusText.innerHTML = `<span style="color:#059669; font-weight:600;">✓ Terdeteksi UID: ${data.uid} (${data.timestamp || 'Baru saja'})</span>`;
+                            } else {
+                                statusText.innerHTML = '<span style="color:#dc2626;">⚠️ Belum ada kartu baru yang di-tap di alat. Silakan tap kartu di sensor RFID terlebih dahulu.</span>';
+                            }
+                        })
+                        .catch(err => {
+                            statusText.innerHTML = '<span style="color:#dc2626;">Gagal menghubungi server: ' + err.message + '</span>';
+                        });
+                });
+            },
+            preConfirm: () => {
+                const uid = document.getElementById('swal_rfid_uid').value.trim().toUpperCase();
+                return fetch(`/siswa/${siswaId}/rfid`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ rfid_uid: uid })
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.json().then(errData => {
+                            throw new Error(errData.message || (errData.errors && errData.errors.rfid_uid ? errData.errors.rfid_uid[0] : 'Gagal menyimpan pairing kartu'));
+                        });
+                    }
+                    return res.json();
+                })
+                .catch(error => {
+                    Swal.showValidationMessage(error.message);
+                });
+            }
+        }).then((result) => {
+            if (result.isConfirmed && result.value) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil Dipasangkan!',
+                    text: result.value.message || 'Kartu RFID berhasil disimpan.',
+                    timer: 1600,
+                    showConfirmButton: false
+                }).then(() => {
+                    location.reload();
+                });
+            }
+        });
+    }
+    window.triggerRfidPairing = triggerRfidPairing;
+
     document.querySelectorAll('.btn-rfid-pair').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
             e.preventDefault();
             var siswaId = this.getAttribute('data-id');
             var nama = this.getAttribute('data-nama');
             var currentUid = this.getAttribute('data-uid') || '';
-
-            if (typeof Swal === 'undefined') {
-                var manualUid = prompt('Masukkan UID Kartu RFID untuk santri ' + nama + ':', currentUid);
-                if (manualUid !== null) {
-                    var form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = '/siswa/' + siswaId + '/rfid';
-                    var csrf = document.createElement('input');
-                    csrf.type = 'hidden';
-                    csrf.name = '_token';
-                    csrf.value = '{{ csrf_token() }}';
-                    form.appendChild(csrf);
-                    var inputUid = document.createElement('input');
-                    inputUid.type = 'hidden';
-                    inputUid.name = 'rfid_uid';
-                    inputUid.value = manualUid.trim().toUpperCase();
-                    form.appendChild(inputUid);
-                    document.body.appendChild(form);
-                    form.submit();
-                }
-                return;
-            }
-
-            Swal.fire({
-                title: 'Pairing Kartu RFID',
-                html: `
-                    <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text-main);">
-                        <p style="margin-bottom:10px;">Santri: <strong>${nama}</strong></p>
-                        <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">UID Kartu RFID (Hexadecimal):</label>
-                        <div style="display:flex; gap:8px;">
-                            <input id="swal_rfid_uid" class="swal2-input" style="margin:0; flex:1; text-transform:uppercase; font-family:monospace; font-size:14px; font-weight:600;" placeholder="Contoh: C1F8EFA7" value="${currentUid}">
-                            <button type="button" id="btn_detect_rfid" class="btn btn-secondary" style="font-size:12px; padding:0 12px; white-space:nowrap; border-radius:8px;" title="Ambil tap kartu terakhir di alat">
-                                📡 Cek Tap Terakhir
-                            </button>
-                        </div>
-                        <div id="detect_rfid_status" style="font-size:11.5px; color:#64748b; margin-top:8px;">
-                            💡 <em>Tip: Tap kartu baru di sensor RFID alat ESP32, lalu klik tombol "Cek Tap Terakhir".</em>
-                        </div>
-                    </div>
-                `,
-                showCancelButton: true,
-                confirmButtonText: 'Simpan Kartu',
-                confirmButtonColor: '#2563eb',
-                cancelButtonText: 'Batal',
-                focusConfirm: false,
-                didOpen: () => {
-                    const detectBtn = document.getElementById('btn_detect_rfid');
-                    const uidInput = document.getElementById('swal_rfid_uid');
-                    const statusText = document.getElementById('detect_rfid_status');
-                    
-                    detectBtn.addEventListener('click', function() {
-                        statusText.innerHTML = '<span style="color:#2563eb;">⏳ Memeriksa data tap kartu terakhir...</span>';
-                        fetch('{{ route("siswa.lastRfidTap") }}')
-                            .then(res => res.json())
-                            .then(data => {
-                                if (data && data.uid) {
-                                    uidInput.value = data.uid.toUpperCase();
-                                    statusText.innerHTML = `<span style="color:#059669; font-weight:600;">✓ Terdeteksi UID: ${data.uid} (${data.timestamp || 'Baru saja'})</span>`;
-                                } else {
-                                    statusText.innerHTML = '<span style="color:#dc2626;">⚠️ Belum ada kartu baru yang di-tap di alat. Silakan tap kartu di sensor RFID terlebih dahulu.</span>';
-                                }
-                            })
-                            .catch(err => {
-                                statusText.innerHTML = '<span style="color:#dc2626;">Gagal menghubungi server: ' + err.message + '</span>';
-                            });
-                    });
-                },
-                preConfirm: () => {
-                    const uid = document.getElementById('swal_rfid_uid').value.trim().toUpperCase();
-                    return fetch(`/siswa/${siswaId}/rfid`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({ rfid_uid: uid })
-                    })
-                    .then(res => {
-                        if (!res.ok) {
-                            return res.json().then(errData => {
-                                throw new Error(errData.message || (errData.errors && errData.errors.rfid_uid ? errData.errors.rfid_uid[0] : 'Gagal menyimpan pairing kartu'));
-                            });
-                        }
-                        return res.json();
-                    })
-                    .catch(error => {
-                        Swal.showValidationMessage(error.message);
-                    });
-                }
-            }).then((result) => {
-                if (result.isConfirmed && result.value) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Berhasil Dipasangkan!',
-                        text: result.value.message || 'Kartu RFID berhasil disimpan.',
-                        timer: 1600,
-                        showConfirmButton: false
-                    }).then(() => {
-                        location.reload();
-                    });
-                }
-            });
+            triggerRfidPairing(siswaId, nama, currentUid);
         });
     });
+
+    // ========================================================
+    // LOGIKA ACTION BOTTOM SHEET (MOBILE)
+    // ========================================================
+    var sheet = document.getElementById('mobileActionSheet');
+    var backdrop = document.getElementById('mobileActionSheetBackdrop');
+    var closeBtn = document.getElementById('sheetBtnClose');
+    var currentCardData = null;
+
+    function openActionSheet(card) {
+        if (!sheet || !backdrop) return;
+        currentCardData = {
+            id: card.getAttribute('data-id'),
+            nama: card.getAttribute('data-nama'),
+            kamar: card.getAttribute('data-kamar'),
+            jenjang: card.getAttribute('data-jenjang'),
+            status: card.getAttribute('data-status'),
+            statusText: card.getAttribute('data-status-text'),
+            rfid: card.getAttribute('data-rfid'),
+            viewUrl: card.getAttribute('data-view-url'),
+            editUrl: card.getAttribute('data-edit-url'),
+            cetakUrl: card.getAttribute('data-cetak-url'),
+            deleteUrl: card.getAttribute('data-delete-url'),
+            canEdit: card.getAttribute('data-can-edit') === '1',
+            canDelete: card.getAttribute('data-can-delete') === '1'
+        };
+
+        // Populate Header Info
+        var elNama = document.getElementById('sheetSiswaNama');
+        var elAvatar = document.getElementById('sheetSiswaAvatar');
+        var elKamar = document.getElementById('sheetSiswaKamar');
+        var elJenjang = document.getElementById('sheetSiswaJenjang');
+        var elStatus = document.getElementById('sheetSiswaStatus');
+        var elRfidDesc = document.getElementById('sheetRfidDesc');
+
+        if (elNama) elNama.textContent = currentCardData.nama || 'Santri';
+        if (elAvatar) {
+            var words = (currentCardData.nama || 'S').trim().split(/\s+/);
+            var initials = words.slice(0, 2).map(function(w){ return w.charAt(0); }).join('').toUpperCase();
+            elAvatar.textContent = initials || 'ST';
+        }
+        if (elKamar) elKamar.textContent = currentCardData.kamar ? ('Kamar: ' + currentCardData.kamar) : 'Kamar: -';
+        if (elJenjang) elJenjang.textContent = currentCardData.jenjang || 'Reguler';
+        if (elStatus) {
+            elStatus.textContent = currentCardData.statusText || 'Aktif';
+            elStatus.className = 'mobile-badge-pill status-' + (currentCardData.status || 'aktif');
+        }
+        if (elRfidDesc) {
+            elRfidDesc.textContent = currentCardData.rfid ? ('UID Terpasang: ' + currentCardData.rfid) : 'Belum dipairing dengan kartu RFID';
+        }
+
+        // Action URLs & Visibility
+        var btnView = document.getElementById('sheetActionView');
+        var btnEdit = document.getElementById('sheetActionEdit');
+        var btnPrint = document.getElementById('sheetActionPrint');
+        var btnRfid = document.getElementById('sheetActionRfid');
+        var btnDelete = document.getElementById('sheetActionDelete');
+
+        if (btnView) btnView.href = currentCardData.viewUrl || '#';
+        if (btnPrint) btnPrint.href = currentCardData.cetakUrl || '#';
+        if (btnEdit) {
+            btnEdit.href = currentCardData.editUrl || '#';
+            btnEdit.style.display = currentCardData.canEdit ? 'flex' : 'none';
+        }
+        if (btnRfid) {
+            btnRfid.style.display = currentCardData.canEdit ? 'flex' : 'none';
+        }
+        if (btnDelete) {
+            btnDelete.style.display = currentCardData.canDelete ? 'flex' : 'none';
+        }
+
+        // Animate in
+        backdrop.style.display = 'block';
+        sheet.style.display = 'flex';
+        void sheet.offsetHeight; // trigger reflow
+        backdrop.classList.add('is-active');
+        sheet.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeActionSheet() {
+        if (!sheet || !backdrop) return;
+        backdrop.classList.remove('is-active');
+        sheet.classList.remove('is-open');
+        document.body.style.overflow = '';
+        setTimeout(function () {
+            backdrop.style.display = 'none';
+            sheet.style.display = 'none';
+            currentCardData = null;
+        }, 280);
+    }
+
+    // Klik pada kartu santri mobile untuk membuka bottom sheet
+    document.addEventListener('click', function (e) {
+        var card = e.target.closest('.mobile-siswa-card');
+        if (!card) return;
+        // Jangan buka bottom sheet jika klik checkbox, link, atau form
+        if (e.target.closest('.fi-ta-checkbox, input[type="checkbox"], a, button, form')) return;
+        e.preventDefault();
+        openActionSheet(card);
+    });
+
+    if (closeBtn) closeBtn.addEventListener('click', closeActionSheet);
+    if (backdrop) backdrop.addEventListener('click', closeActionSheet);
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && sheet && sheet.classList.contains('is-open')) {
+            closeActionSheet();
+        }
+    });
+
+    // Action RFID dari Bottom Sheet
+    var sheetRfidBtn = document.getElementById('sheetActionRfid');
+    if (sheetRfidBtn) {
+        sheetRfidBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (!currentCardData) return;
+            var sid = currentCardData.id;
+            var snama = currentCardData.nama;
+            var suid = currentCardData.rfid;
+            closeActionSheet();
+            setTimeout(function () {
+                triggerRfidPairing(sid, snama, suid);
+            }, 300);
+        });
+    }
+
+    // Action Hapus dari Bottom Sheet
+    var sheetDeleteBtn = document.getElementById('sheetActionDelete');
+    if (sheetDeleteBtn) {
+        sheetDeleteBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (!currentCardData || !currentCardData.deleteUrl) return;
+            var delUrl = currentCardData.deleteUrl;
+            var delNama = currentCardData.nama;
+            var delKamar = currentCardData.kamar;
+            var delStatus = currentCardData.statusText;
+            var delForm = document.getElementById('sheetDeleteForm');
+            if (!delForm) return;
+            delForm.action = delUrl;
+
+            closeActionSheet();
+
+            setTimeout(function() {
+                if (typeof Swal === 'undefined') {
+                    if (confirm('Konfirmasi Hapus Siswa?\nApakah Anda yakin ingin menghapus data santri ' + delNama + '? Tindakan ini tidak dapat dibatalkan.')) {
+                        delForm.submit();
+                    }
+                    return;
+                }
+
+                Swal.fire({
+                    title: 'Konfirmasi Hapus Siswa?',
+                    html: `Apakah Anda yakin ingin menghapus data santri <strong>${delNama}</strong>?<br><div style='padding:12px 14px; background:var(--nav-hover-bg, #f1f5f9); border-radius:10px; border:1px solid var(--border-light, #e2e8f0); margin-top:12px; font-size:13px; text-align:left; line-height:1.6;'><div>Kamar: <strong>${delKamar}</strong></div><div>Status: <strong>${delStatus}</strong></div></div><div style='margin-top:10px; font-size:12.5px; color:#DC2626; font-weight:600;'>⚠️ Data yang sudah dihapus tidak dapat dipulihkan kembali.</div>`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Hapus Data',
+                    confirmButtonColor: '#DC2626',
+                    cancelButtonText: 'Batal',
+                    cancelButtonColor: '#64748b'
+                }).then(function (result) {
+                    if (result.isConfirmed) {
+                        delForm.submit();
+                    }
+                });
+            }, 250);
+        });
+    }
 });
 </script>
 @endsection

@@ -7765,18 +7765,26 @@ html.dark-mode .fi-confirm-btn-cancel {
   .fi-ta-header-toolbar {
     padding: 10px 12px;
     gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .fi-ta-toolbar-left:has(.fi-ta-bulk-btn.is-disabled) {
+    display: none;
   }
 
   .fi-ta-toolbar-right {
-    flex: 1 1 auto;
+    flex: 1 1 100%;
     min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     justify-content: flex-end;
   }
 
   .fi-ta-search-wrap {
     flex: 1 1 auto;
     width: auto;
-    min-width: 120px;
+    min-width: 0;
   }
 
   .fi-ta-filter-popover {

@@ -557,6 +557,9 @@ document.addEventListener('DOMContentLoaded', function () {
           mCb.type = 'checkbox';
           mCb.className = 'fi-ta-checkbox';
           mCb.setAttribute('aria-label', 'Pilih item ' + (idx + 1));
+          mCb.addEventListener('click', function (e) {
+            e.stopPropagation();
+          });
           var titleWrap = mCard.querySelector('.mobile-siswa-nama-wrap, .mobile-card-title-wrap');
           if (titleWrap) {
             titleWrap.insertBefore(mCb, titleWrap.firstChild);
@@ -927,6 +930,11 @@ document.addEventListener('DOMContentLoaded', function () {
             tr.cells[colIdx].style.display = isVisible ? '' : 'none';
           }
         });
+        if (mobileList) {
+          mobileList.querySelectorAll('[data-col-idx="' + colIdx + '"]').forEach(function (el) {
+            el.style.display = isVisible ? '' : 'none';
+          });
+        }
         updateColspans();
       }
 
