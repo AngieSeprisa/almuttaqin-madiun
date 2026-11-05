@@ -449,15 +449,15 @@
                         <td>
                             <div style="display:flex; align-items:center; gap:12px;">
                                 <div class="guru-avatar-circle">
-                                    {{ strtoupper(substr($row->user->name ?? 'G', 0, 1)) }}
+                                    {{ strtoupper(substr($row->user?->name ?? 'G', 0, 1)) }}
                                 </div>
                                 <div>
-                                    <span class="guru-name-text">{{ $row->user->name ?? '-' }}</span>
+                                    <span class="guru-name-text">{{ $row->user?->name ?? '-' }}</span>
                                 </div>
                             </div>
                         </td>
                         <td>
-                            {{ $row->tanggal ? $row->tanggal->translatedFormat('l, d M Y') : '-' }}
+                            {{ $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal->translatedFormat('l, d M Y') : \Carbon\Carbon::parse($row->tanggal)->translatedFormat('l, d M Y')) : '-' }}
                         </td>
                         <td>
                             @if($row->jam_masuk)
@@ -512,8 +512,8 @@
                         <td style="text-align:center;">
                             <button type="button" class="guru-action-eye-btn btn-koreksi"
                                     data-id="{{ $row->id }}"
-                                    data-nama="{{ $row->user->name ?? '-' }}"
-                                    data-tanggal="{{ $row->tanggal ? $row->tanggal->format('d/m/Y') : '' }}"
+                                    data-nama="{{ $row->user?->name ?? '-' }}"
+                                    data-tanggal="{{ $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal->format('d/m/Y') : \Carbon\Carbon::parse($row->tanggal)->format('d/m/Y')) : '' }}"
                                     data-status="{{ $row->status }}"
                                     data-masuk="{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '' }}"
                                     data-pulang="{{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '' }}"

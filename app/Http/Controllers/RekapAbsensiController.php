@@ -44,7 +44,11 @@ class RekapAbsensiController extends Controller
         $search = $request->get('search');
 
         // Sinkronisasi otomatis data tap RFID multi-lokasi ke presensi guru
-        $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
+        try {
+            $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Gagal sinkronisasi RFID tap ke presensi guru: ' . $e->getMessage());
+        }
 
         // Query Presensi Terpadu yang Disesuaikan Ketat Berdasarkan Lembaga Terdaftar Guru
         $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, $status, $search);
@@ -158,10 +162,10 @@ class RekapAbsensiController extends Controller
             foreach ($records as $row) {
                 fputcsv($handle, [
                     $no++,
-                    $row->tanggal ? $row->tanggal->format('d/m/Y') : '-',
-                    $row->user->nip ?? '-',
-                    $row->user->name ?? '-',
-                    $row->lembaga->nama ?? '-',
+                    $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal->format('d/m/Y') : \Carbon\Carbon::parse($row->tanggal)->format('d/m/Y')) : '-',
+                    $row->user?->nip ?? '-',
+                    $row->user?->name ?? '-',
+                    $row->lembaga?->nama ?? '-',
                     $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '-',
                     $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '-',
                     $row->status_label,
@@ -258,124 +262,136 @@ class RekapAbsensiController extends Controller
      */
     protected function syncRfidTapsToPresensiGuru(?string $tanggal = null, ?int $bulan = null, ?int $tahun = null): void
     {
-        if (!Schema::hasTable('presensis') || !Schema::hasTable('presensi_gurus')) {
-            return;
-        }
-
-        $tapsQuery = Presensi::where('tipe_entitas', 'guru_pegawai');
-
-        if ($tanggal) {
-            $tapsQuery->whereDate('waktu_tap', $tanggal);
-        } elseif ($bulan && $tahun) {
-            $tapsQuery->whereMonth('waktu_tap', $bulan)->whereYear('waktu_tap', $tahun);
-        } else {
-            $tapsQuery->whereDate('waktu_tap', Carbon::today());
-        }
-
-        $taps = $tapsQuery->orderBy('waktu_tap', 'asc')->get();
-
-        if ($taps->isEmpty()) {
-            return;
-        }
-
-        // Kelompokkan berdasarkan entitas_id (user_id) dan tanggal tap
-        $grouped = $taps->groupBy(function ($tap) {
-            $date = Carbon::parse($tap->waktu_tap)->toDateString();
-            return "{$tap->entitas_id}_{$date}";
-        });
-
-        foreach ($grouped as $key => $tapList) {
-            $firstTap = $tapList->first();
-            $userId = (int) $firstTap->entitas_id;
-            $user = User::find($userId);
-            if (!$user) {
-                continue;
+        try {
+            if (!Schema::hasTable('presensis') || !Schema::hasTable('presensi_gurus')) {
+                return;
             }
 
-            $tapDate = Carbon::parse($firstTap->waktu_tap)->toDateString();
-            $jamMasuk = Carbon::parse($firstTap->waktu_tap)->format('H:i:s');
+            $tapsQuery = Presensi::where('tipe_entitas', 'guru_pegawai');
 
-            // Tentukan status masuk dari status_kehadiran log tap
-            $statusMasuk = match ($firstTap->status_kehadiran) {
-                'terlambat' => 'terlambat',
-                default     => 'hadir',
-            };
-
-            // Resolusi lembaga terdaftar guru secara cerdas (prioritaskan mapel, jabatan, dan relasi sekolah)
-            $schoolLembaga = $user->resolveSchoolLembaga($firstTap->device_id);
-            $registeredLembagaId = $schoolLembaga ? $schoolLembaga->id : ($user->primary_lembaga_id ?: ($user->lembagas()->first()?->id ?: 1));
-
-            // Jika guru sekolah teridentifikasi sebagai SMP/SMA dan primary_lembaga_id belum sesuai, selaraskan
-            if ($schoolLembaga && in_array(strtolower($schoolLembaga->kode ?? ''), ['smp', 'sma'])) {
-                if ($user->primary_lembaga_id !== $schoolLembaga->id && !$user->isYayasan()) {
-                    $user->primary_lembaga_id = $schoolLembaga->id;
-                    $user->save();
-                }
-            }
-
-            // Cek apakah presensi guru untuk user ini di tanggal ini sudah ada
-            $presensi = PresensiGuru::where('user_id', $userId)
-                ->whereDate('tanggal', $tapDate)
-                ->first();
-
-            if (!$presensi) {
-                // Jam pulang jika ada tap berikutnya yang berselisih waktu >= 3 menit
-                $jamPulang = null;
-                if ($tapList->count() > 1) {
-                    $lastTap = $tapList->last();
-                    $diffSec = Carbon::parse($lastTap->waktu_tap)->diffInSeconds(Carbon::parse($firstTap->waktu_tap));
-                    if ($diffSec >= 180) { // Debounce 3 menit
-                        $jamPulang = Carbon::parse($lastTap->waktu_tap)->format('H:i:s');
-                    }
-                }
-
-                PresensiGuru::create([
-                    'user_id'       => $userId,
-                    'lembaga_id'    => $registeredLembagaId,
-                    'tanggal'       => $tapDate,
-                    'jam_masuk'     => $jamMasuk,
-                    'jam_pulang'    => $jamPulang,
-                    'status'        => $statusMasuk,
-                    'metode_masuk'  => 'rfid_tap',
-                    'metode_pulang' => $jamPulang ? 'rfid_tap' : null,
-                ]);
+            if ($tanggal) {
+                $tapsQuery->whereDate('waktu_tap', $tanggal);
             } else {
-                $updated = false;
+                // Batasi sinkronisasi ke hari ini agar performa tetap ringan dan cepat
+                $tapsQuery->whereDate('waktu_tap', Carbon::today());
+            }
 
-                // Pastikan lembaga_id presensi guru selalu sesuai dengan lembaga tempat guru terdaftar
-                if ($presensi->lembaga_id != $registeredLembagaId) {
-                    $presensi->lembaga_id = $registeredLembagaId;
-                    $updated = true;
-                }
+            $taps = $tapsQuery->orderBy('waktu_tap', 'asc')->get();
 
-                // Update jam_masuk jika belum terisi
-                if (empty($presensi->jam_masuk)) {
-                    $presensi->jam_masuk = $jamMasuk;
-                    $presensi->status = $statusMasuk;
-                    $presensi->metode_masuk = 'rfid_tap';
-                    $updated = true;
-                }
+            if ($taps->isEmpty()) {
+                return;
+            }
 
-                // Cek pembaruan jam pulang dari tap terakhir
-                if ($tapList->count() > 1) {
-                    $lastTap = $tapList->last();
-                    $baseTime = $presensi->jam_masuk ? "{$tapDate} {$presensi->jam_masuk}" : $firstTap->waktu_tap;
-                    $diffSec = Carbon::parse($lastTap->waktu_tap)->diffInSeconds(Carbon::parse($baseTime));
+            // Kelompokkan berdasarkan entitas_id (user_id) dan tanggal tap
+            $grouped = $taps->groupBy(function ($tap) {
+                $date = Carbon::parse($tap->waktu_tap)->toDateString();
+                return "{$tap->entitas_id}_{$date}";
+            });
 
-                    if ($diffSec >= 180) {
-                        $newJamPulang = Carbon::parse($lastTap->waktu_tap)->format('H:i:s');
-                        if (empty($presensi->jam_pulang) || $newJamPulang > $presensi->jam_pulang) {
-                            $presensi->jam_pulang = $newJamPulang;
-                            $presensi->metode_pulang = 'rfid_tap';
-                            $updated = true;
+            $fallbackLembaga = Lembaga::whereIn('kode', ['smp', 'sma'])->first() ?: Lembaga::first();
+
+            foreach ($grouped as $key => $tapList) {
+                try {
+                    $firstTap = $tapList->first();
+                    $userId = (int) $firstTap->entitas_id;
+                    $user = User::find($userId);
+                    if (!$user) {
+                        continue;
+                    }
+
+                    $tapDate = Carbon::parse($firstTap->waktu_tap)->toDateString();
+                    $jamMasuk = Carbon::parse($firstTap->waktu_tap)->format('H:i:s');
+
+                    // Tentukan status masuk dari status_kehadiran log tap
+                    $statusMasuk = match ($firstTap->status_kehadiran) {
+                        'terlambat' => 'terlambat',
+                        default     => 'hadir',
+                    };
+
+                    // Resolusi lembaga terdaftar guru secara cerdas (prioritaskan mapel, jabatan, dan relasi sekolah)
+                    $schoolLembaga = $user->resolveSchoolLembaga($firstTap->device_id);
+                    $registeredLembagaId = $schoolLembaga ? $schoolLembaga->id : ($user->primary_lembaga_id ?: ($user->lembagas()->first()?->id ?: ($fallbackLembaga?->id ?? 1)));
+
+                    // Validasi lembaga_id ada di database untuk mencegah error foreign key
+                    if (!Lembaga::where('id', $registeredLembagaId)->exists()) {
+                        $registeredLembagaId = $fallbackLembaga?->id;
+                    }
+                    if (!$registeredLembagaId) {
+                        continue;
+                    }
+
+                    // Jika guru sekolah teridentifikasi sebagai SMP/SMA dan primary_lembaga_id belum sesuai, selaraskan
+                    if ($schoolLembaga && in_array(strtolower($schoolLembaga->kode ?? ''), ['smp', 'sma'])) {
+                        if ($user->primary_lembaga_id !== $schoolLembaga->id && !$user->isYayasan()) {
+                            $user->primary_lembaga_id = $schoolLembaga->id;
+                            $user->save();
                         }
                     }
-                }
 
-                if ($updated) {
-                    $presensi->save();
+                    // Jam pulang jika ada tap berikutnya yang berselisih waktu >= 3 menit
+                    $jamPulang = null;
+                    if ($tapList->count() > 1) {
+                        $lastTap = $tapList->last();
+                        $diffSec = Carbon::parse($lastTap->waktu_tap)->diffInSeconds(Carbon::parse($firstTap->waktu_tap));
+                        if ($diffSec >= 180) { // Debounce 3 menit
+                            $jamPulang = Carbon::parse($lastTap->waktu_tap)->format('H:i:s');
+                        }
+                    }
+
+                    // Cek apakah presensi guru untuk user ini di tanggal ini sudah ada
+                    $presensi = PresensiGuru::where('user_id', $userId)
+                        ->whereDate('tanggal', $tapDate)
+                        ->first();
+
+                    if (!$presensi) {
+                        PresensiGuru::create([
+                            'user_id'       => $userId,
+                            'lembaga_id'    => $registeredLembagaId,
+                            'tanggal'       => $tapDate,
+                            'jam_masuk'     => $jamMasuk,
+                            'jam_pulang'    => $jamPulang,
+                            'status'        => $statusMasuk,
+                            'metode_masuk'  => 'rfid_tap',
+                            'metode_pulang' => $jamPulang ? 'rfid_tap' : null,
+                        ]);
+                    } else {
+                        $updates = [];
+
+                        // Pastikan lembaga_id presensi guru selalu sesuai dengan lembaga tempat guru terdaftar
+                        if ($presensi->lembaga_id != $registeredLembagaId) {
+                            $duplicateExists = PresensiGuru::where('user_id', $userId)
+                                ->whereDate('tanggal', $tapDate)
+                                ->where('lembaga_id', $registeredLembagaId)
+                                ->where('id', '!=', $presensi->id)
+                                ->exists();
+                            if (!$duplicateExists) {
+                                $updates['lembaga_id'] = $registeredLembagaId;
+                            }
+                        }
+
+                        // Update jam_masuk jika belum terisi
+                        if (empty($presensi->jam_masuk)) {
+                            $updates['jam_masuk'] = $jamMasuk;
+                            $updates['status'] = $statusMasuk;
+                            $updates['metode_masuk'] = 'rfid_tap';
+                        }
+
+                        // Cek pembaruan jam pulang dari tap terakhir
+                        if ($jamPulang && (empty($presensi->jam_pulang) || $jamPulang > $presensi->jam_pulang)) {
+                            $updates['jam_pulang'] = $jamPulang;
+                            $updates['metode_pulang'] = 'rfid_tap';
+                        }
+
+                        if (!empty($updates)) {
+                            $presensi->update($updates);
+                        }
+                    }
+                } catch (\Throwable $rowEx) {
+                    \Illuminate\Support\Facades\Log::warning("Gagal memproses tap RFID untuk key {$key}: " . $rowEx->getMessage());
                 }
             }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Error syncRfidTapsToPresensiGuru: ' . $e->getMessage());
         }
     }
 }

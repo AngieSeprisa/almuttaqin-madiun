@@ -381,4 +381,57 @@ class RekapGuruTest extends TestCase
         $responseSma->assertStatus(200);
         $responseSma->assertDontSee('Angie Seprisa Pamungkas');
     }
+
+    public function test_akses_rekap_guru_tanpa_parameter_dan_dengan_data_anomali_tetap_berhasil(): void
+    {
+        $today = Carbon::today();
+
+        $device = MasterDevice::create([
+            'device_id'     => 'device_anomali',
+            'nama_lokasi'   => 'Kantor Guru Anomali',
+            'kategori_area' => 'sekolah',
+            'status_aktif'  => true,
+        ]);
+
+        $sesi = MasterSesi::create([
+            'kode_sesi'        => 'SESI_ANOMALI',
+            'nama_sesi'        => 'Presensi Anomali',
+            'jam_mulai'        => '06:00:00',
+            'jam_selesai'      => '23:00:00',
+            'kategori'         => 'pegawai',
+            'device_id_target' => $device->device_id,
+        ]);
+
+        // 1. Simulasikan tap RFID anomali di tabel presensis (user tidak ditemukan)
+        Presensi::create([
+            'device_id'        => $device->device_id,
+            'sesi_id'          => $sesi->id,
+            'tipe_entitas'     => 'guru_pegawai',
+            'entitas_id'       => 999999, // user tidak ada
+            'rfid_uid'         => '9999999999',
+            'waktu_tap'        => $today->copy()->setTime(8, 0, 0),
+            'status_kehadiran' => 'hadir',
+        ]);
+
+        // 2. Simulasikan presensi guru yang user-nya sudah dihapus
+        $dummyUser = User::factory()->create([
+            'primary_lembaga_id' => $this->lembaga->id,
+        ]);
+        $presensi = PresensiGuru::create([
+            'user_id'    => $dummyUser->id,
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => $today->toDateString(),
+            'jam_masuk'  => '07:00:00',
+            'status'     => 'hadir',
+        ]);
+        // Hapus paksa user dari tabel users agar menjadi orphaned record
+        \DB::table('users')->where('id', $dummyUser->id)->delete();
+
+        // 3. Buka halaman rekap guru persis seperti di browser (tanpa query string apapun)
+        $response = $this->actingAs($this->admin)->get(route('rekap-absensi.guru'));
+
+        $response->assertStatus(200);
+        $response->assertSee('HEADER PRESENSI HARIAN');
+        $response->assertSee('Menampilkan');
+    }
 }

@@ -119,9 +119,9 @@
             @forelse($records as $index => $row)
             <tr>
                 <td class="text-center">{{ $index + 1 }}</td>
-                <td class="text-center">{{ $row->tanggal ? $row->tanggal->format('d/m/Y') : '-' }}</td>
+                <td class="text-center">{{ $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal->format('d/m/Y') : \Carbon\Carbon::parse($row->tanggal)->format('d/m/Y')) : '-' }}</td>
                 <td>
-                    <strong>{{ $row->user->name ?? '-' }}</strong>
+                    <strong>{{ $row->user?->name ?? '-' }}</strong>
                     @if($row->user && $row->user->nip)
                     <br><span style="font-size:8.5pt; color:#555;">NIP: {{ $row->user->nip }}</span>
                     @endif

@@ -305,8 +305,8 @@ class User extends Authenticatable
                 $mapelRecord = \App\Models\MataPelajaran::with('lembaga')
                     ->whereIn('mata_pelajaran', $mapelList)
                     ->whereHas('lembaga', function ($q) {
-                        $q->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), ['smp', 'sma'])
-                          ->orWhereIn(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), ['SMP', 'SMA']);
+                        $q->whereRaw('LOWER(kode) IN (?, ?)', ['smp', 'sma'])
+                          ->orWhereRaw('UPPER(singkatan) IN (?, ?)', ['SMP', 'SMA']);
                     })
                     ->first();
                 if ($mapelRecord && $mapelRecord->lembaga) {
@@ -314,26 +314,34 @@ class User extends Authenticatable
                 }
             }
 
-            // Cek relasi langsung mataPelajaranPengampu
-            $mapelPengampu = \App\Models\MataPelajaran::with('lembaga')
-                ->where('guru_id', $this->id)
-                ->whereHas('lembaga', function ($q) {
-                    $q->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), ['smp', 'sma'])
-                      ->orWhereIn(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), ['SMP', 'SMA']);
-                })
-                ->first();
-            if ($mapelPengampu && $mapelPengampu->lembaga) {
-                return $mapelPengampu->lembaga;
+            // Cek relasi langsung mataPelajaranPengampu jika kolom guru_id tersedia di tabel
+            if (\Illuminate\Support\Facades\Schema::hasColumn('mata_pelajarans', 'guru_id')) {
+                $mapelPengampu = \App\Models\MataPelajaran::with('lembaga')
+                    ->where('guru_id', $this->id)
+                    ->whereHas('lembaga', function ($q) {
+                        $q->whereRaw('LOWER(kode) IN (?, ?)', ['smp', 'sma'])
+                          ->orWhereRaw('UPPER(singkatan) IN (?, ?)', ['SMP', 'SMA']);
+                    })
+                    ->first();
+                if ($mapelPengampu && $mapelPengampu->lembaga) {
+                    return $mapelPengampu->lembaga;
+                }
             }
         }
 
         // 2. Cek dari Jabatan (misal "Operator SMP", "Guru Bahasa SMP", "Kepala Sekolah SMA", dll)
         $jabatan = strtolower((string) ($this->jabatan ?? ''));
         if (str_contains($jabatan, 'smp')) {
-            $smp = Lembaga::where(fn($q) => $q->where(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), 'smp')->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), 'SMP'))->first();
+            $smp = Lembaga::where(function ($q) {
+                $q->whereRaw('LOWER(kode) = ?', ['smp'])
+                  ->orWhereRaw('UPPER(singkatan) = ?', ['SMP']);
+            })->first();
             if ($smp) return $smp;
         } elseif (str_contains($jabatan, 'sma')) {
-            $sma = Lembaga::where(fn($q) => $q->where(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), 'sma')->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), 'SMA'))->first();
+            $sma = Lembaga::where(function ($q) {
+                $q->whereRaw('LOWER(kode) = ?', ['sma'])
+                  ->orWhereRaw('UPPER(singkatan) = ?', ['SMA']);
+            })->first();
             if ($sma) return $sma;
         }
 
@@ -349,8 +357,8 @@ class User extends Authenticatable
         // 4. Cek relasi lembagas yang tergolong sekolah (SMP/SMA)
         $sekolahLembagas = $this->lembagas()
             ->where(function ($q) {
-                $q->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), ['smp', 'sma'])
-                  ->orWhereIn(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), ['SMP', 'SMA']);
+                $q->whereRaw('LOWER(kode) IN (?, ?)', ['smp', 'sma'])
+                  ->orWhereRaw('UPPER(singkatan) IN (?, ?)', ['SMP', 'SMA']);
             })
             ->get();
 
