@@ -277,6 +277,33 @@ class ImportSiswaController extends Controller
     }
 
     /**
+     * Otomatis infer jenjang SMP atau SMA berdasarkan teks ruang kelas dan kamar jika jenjang di Excel kosong.
+     */
+    protected function inferJenjang(?string $kelas, ?string $kamar): ?string
+    {
+        $text = trim(($kelas ?? '').' '.($kamar ?? ''));
+        if ($text === '') {
+            return null;
+        }
+
+        // Cek jenjang SMP (7, 8, 9 atau VII, VIII, IX)
+        if (preg_match('/\b(kelas\s*)?(7|8|9|vii|viii|ix)\b/i', $text) ||
+            preg_match('/kelas\s*[789]/i', $text) ||
+            preg_match('/kamar\s*kelas\s*[789]/i', $text)) {
+            return 'SMP';
+        }
+
+        // Cek jenjang SMA (10, 11, 12 atau X, XI, XII)
+        if (preg_match('/\b(kelas\s*)?(10|11|12|x|xi|xii)\b/i', $text) ||
+            preg_match('/kelas\s*(10|11|12)/i', $text) ||
+            preg_match('/kamar\s*kelas\s*(10|11|12)/i', $text)) {
+            return 'SMA';
+        }
+
+        return null;
+    }
+
+    /**
      * Memproses file Excel upload untuk import data siswa.
      */
     public function import(Request $request)
@@ -381,14 +408,24 @@ class ImportSiswaController extends Controller
                     continue;
                 }
 
-                // Normalisasi khusus
-                $jenjangRaw = strtoupper($data['jenjang'] ?? '');
-                $data['jenjang'] = in_array($jenjangRaw, ['SMP', 'SMA']) ? $jenjangRaw : 'Reguler';
+                // Cek jenjang eksplisit dari Excel (hanya jika kolom diisi dan tidak kosong)
+                $explicitJenjang = null;
+                if (isset($data['jenjang']) && $data['jenjang'] !== null && trim((string) $data['jenjang']) !== '') {
+                    $jenjangRaw = strtoupper(trim((string) $data['jenjang']));
+                    $explicitJenjang = in_array($jenjangRaw, ['SMP', 'SMA']) ? $jenjangRaw : 'Reguler';
+                }
 
-                $statusRaw = strtolower($data['status'] ?? '');
-                $status = in_array($statusRaw, ['aktif', 'pulang', 'sakit']) ? $statusRaw : 'aktif';
-                $kelas = $data['kelas'] ?? null;
-                $kamar = $data['kamar'] ?? null;
+                // Cek status eksplisit dari Excel (hanya jika kolom diisi dan tidak kosong)
+                $explicitStatus = null;
+                if (isset($data['status']) && $data['status'] !== null && trim((string) $data['status']) !== '') {
+                    $statusRaw = strtolower(trim((string) $data['status']));
+                    if (in_array($statusRaw, ['aktif', 'pulang', 'sakit'])) {
+                        $explicitStatus = $statusRaw;
+                    }
+                }
+
+                $kelas = (isset($data['kelas']) && trim((string) $data['kelas']) !== '') ? trim((string) $data['kelas']) : null;
+                $kamar = (isset($data['kamar']) && trim((string) $data['kamar']) !== '') ? trim((string) $data['kamar']) : null;
 
                 if (! empty($data['nik'])) {
                     $data['nik'] = substr(preg_replace('/\s+/', '', $data['nik']), 0, 16);
@@ -397,10 +434,10 @@ class ImportSiswaController extends Controller
                     $data['nisn'] = substr($data['nisn'], 0, 20);
                 }
 
-                // Data pendaftaran = semua field selain milik tabel siswa
-                $pendaftaranData = array_diff_key($data, array_flip(array_diff($siswaFields, ['nama_lengkap'])));
-                // buang nilai null agar tidak menimpa data lama
-                $pendaftaranData = array_filter($pendaftaranData, fn ($v) => $v !== null);
+                // Data pendaftaran = semua field selain kelas, kamar, status milik tabel siswa
+                $pendaftaranData = array_diff_key($data, array_flip(['kelas', 'kamar', 'status']));
+                // Buang nilai null dan string kosong agar data lama yang tidak diisi di Excel tidak terhapus/tertimpa
+                $pendaftaranData = array_filter($pendaftaranData, fn ($v) => $v !== null && $v !== '');
 
                 $siswa = Siswa::where('nama_lengkap', $nama)->first();
 
@@ -422,35 +459,72 @@ class ImportSiswaController extends Controller
                     }
                 }
 
-                if ($pendaftaran) {
-                    if (! empty($pendaftaranData)) {
-                        $pendaftaran->update($pendaftaranData);
+                if ($siswa) {
+                    // Update Pendaftaran eksisting: hanya ubah jenjang jika diisi secara eksplisit di file Excel
+                    if ($explicitJenjang !== null) {
+                        $pendaftaranData['jenjang'] = $explicitJenjang;
+                    } else {
+                        unset($pendaftaranData['jenjang']);
                     }
+
+                    if ($pendaftaran) {
+                        if (! empty($pendaftaranData)) {
+                            $pendaftaran->update($pendaftaranData);
+                        }
+                    } else {
+                        $tahun = date('Y');
+                        $urut = str_pad(Pendaftaran::whereYear('created_at', $tahun)->count() + 1, 4, '0', STR_PAD_LEFT);
+                        $pendaftaranData['no_induk'] = "PSB-{$tahun}-{$urut}";
+                        $pendaftaranData['nama_panggilan'] = $pendaftaranData['nama_panggilan'] ?? (explode(' ', $nama)[0] ?? 'Santri');
+                        $pendaftaranData['status_pendaftaran'] = 'Diterima';
+                        $pendaftaranData['jenjang'] = $explicitJenjang ?? $siswa->jenjang ?: ($this->inferJenjang($kelas ?? $siswa->kelas, $kamar ?? $siswa->kamar) ?? 'Reguler');
+                        $pendaftaran = Pendaftaran::create($pendaftaranData);
+                    }
+
+                    // Update Siswa eksisting: jangan menimpa data yang ada jika kolom di Excel dikosongkan
+                    $siswaUpdate = [
+                        'pendaftaran_id' => $pendaftaran->id,
+                    ];
+                    if ($kelas !== null) {
+                        $siswaUpdate['kelas'] = $kelas;
+                    }
+                    if ($kamar !== null) {
+                        $siswaUpdate['kamar'] = $kamar;
+                    }
+                    if ($explicitJenjang !== null) {
+                        $siswaUpdate['jenjang'] = $explicitJenjang;
+                    }
+                    if ($explicitStatus !== null) {
+                        $siswaUpdate['status'] = $explicitStatus;
+                    }
+
+                    $siswa->update($siswaUpdate);
+                    $updatedCount++;
                 } else {
+                    // Data Siswa baru
+                    $activeRoom = session('active_lembaga');
+                    $sessionJenjang = match ($activeRoom) {
+                        'smp' => 'SMP',
+                        'sma' => 'SMA',
+                        default => 'Reguler',
+                    };
+                    $finalJenjang = $explicitJenjang ?? $this->inferJenjang($kelas, $kamar) ?? $sessionJenjang;
+                    $finalStatus = $explicitStatus ?? 'aktif';
+
                     $tahun = date('Y');
                     $urut = str_pad(Pendaftaran::whereYear('created_at', $tahun)->count() + 1, 4, '0', STR_PAD_LEFT);
                     $pendaftaranData['no_induk'] = "PSB-{$tahun}-{$urut}";
                     $pendaftaranData['nama_panggilan'] = $pendaftaranData['nama_panggilan'] ?? (explode(' ', $nama)[0] ?? 'Santri');
                     $pendaftaranData['status_pendaftaran'] = 'Diterima';
+                    $pendaftaranData['jenjang'] = $finalJenjang;
                     $pendaftaran = Pendaftaran::create($pendaftaranData);
-                }
 
-                if ($siswa) {
-                    $siswa->update([
-                        'jenjang' => $data['jenjang'],
-                        'kelas' => $kelas ?? $siswa->kelas,
-                        'kamar' => $kamar ?? $siswa->kamar,
-                        'status' => isset($headerMap['status']) ? $status : $siswa->status,
-                        'pendaftaran_id' => $pendaftaran->id,
-                    ]);
-                    $updatedCount++;
-                } else {
                     Siswa::create([
                         'nama_lengkap' => $nama,
-                        'jenjang' => $data['jenjang'],
+                        'jenjang' => $finalJenjang,
                         'kelas' => $kelas,
                         'kamar' => $kamar ?? 'Reguler',
-                        'status' => $status,
+                        'status' => $finalStatus,
                         'pendaftaran_id' => $pendaftaran->id,
                     ]);
                     $insertedCount++;

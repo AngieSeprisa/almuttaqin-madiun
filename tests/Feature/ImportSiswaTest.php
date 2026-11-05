@@ -129,6 +129,136 @@ class ImportSiswaTest extends TestCase
     }
 
     /**
+     * Test import ulang tanpa mengisi kolom jenjang TIDAK menimpa jenjang lama dengan Reguler.
+     */
+    public function test_import_excel_tidak_menimpa_jenjang_lama_jika_kolom_jenjang_kosong_saat_update()
+    {
+        // Buat siswa awal jenjang SMP
+        $p = Pendaftaran::create([
+            'nama_lengkap' => 'Zaki Kelas Sembilan',
+            'jenjang' => 'SMP',
+            'no_induk' => 'PSB-2026-9999',
+            'status_pendaftaran' => 'Diterima',
+        ]);
+        $s = Siswa::create([
+            'nama_lengkap' => 'Zaki Kelas Sembilan',
+            'jenjang' => 'SMP',
+            'kamar' => 'Kamar Kelas 9 Putra',
+            'kelas' => '9A',
+            'status' => 'aktif',
+            'pendaftaran_id' => $p->id,
+        ]);
+
+        // Import ulang file Excel yang hanya memuat nama dan nama ayah (kolom jenjang tidak diisi/dikosongkan)
+        $header = ['nama_lengkap', 'ayah_nama', 'jenjang'];
+        $row = ['Zaki Kelas Sembilan', 'Ayah Zaki', '']; // jenjang sengaja kosong
+
+        $this->actingAs($this->admin)->post(route('master.import-siswa.store'), [
+            'file_siswa' => $this->makeXlsx([$header, $row]),
+            'update_existing' => 1,
+        ])->assertRedirect(route('siswa'));
+
+        // Pastikan nama ayah terupdate
+        $this->assertDatabaseHas('pendaftarans', [
+            'nama_lengkap' => 'Zaki Kelas Sembilan',
+            'ayah_nama' => 'Ayah Zaki',
+        ]);
+
+        // Pastikan jenjang TETAP SMP, tidak berubah menjadi Reguler!
+        $this->assertDatabaseHas('siswas', [
+            'nama_lengkap' => 'Zaki Kelas Sembilan',
+            'jenjang' => 'SMP',
+        ]);
+        $this->assertDatabaseHas('pendaftarans', [
+            'nama_lengkap' => 'Zaki Kelas Sembilan',
+            'jenjang' => 'SMP',
+        ]);
+    }
+
+    /**
+     * Test import siswa baru tanpa jenjang otomatis meng-infer SMP dari kamar kelas 9 atau kelas 9.
+     */
+    public function test_import_excel_siswa_baru_tanpa_jenjang_menginfer_smp_dari_kamar_kelas_9()
+    {
+        $header = ['nama_lengkap', 'kamar', 'kelas'];
+        $rows = [
+            ['Santri Baru 9 Putra', 'Kamar Kelas 9 Putra', '9A'],
+            ['Santri Baru 9 Putri', 'Kamar Kelas 9 Putri', '9B'],
+        ];
+
+        $this->actingAs($this->admin)->post(route('master.import-siswa.store'), [
+            'file_siswa' => $this->makeXlsx(array_merge([$header], $rows)),
+            'update_existing' => 1,
+        ])->assertRedirect(route('siswa'));
+
+        $this->assertDatabaseHas('siswas', [
+            'nama_lengkap' => 'Santri Baru 9 Putra',
+            'jenjang' => 'SMP',
+            'kamar' => 'Kamar Kelas 9 Putra',
+        ]);
+        $this->assertDatabaseHas('pendaftarans', [
+            'nama_lengkap' => 'Santri Baru 9 Putra',
+            'jenjang' => 'SMP',
+        ]);
+
+        $this->assertDatabaseHas('siswas', [
+            'nama_lengkap' => 'Santri Baru 9 Putri',
+            'jenjang' => 'SMP',
+            'kamar' => 'Kamar Kelas 9 Putri',
+        ]);
+        $this->assertDatabaseHas('pendaftarans', [
+            'nama_lengkap' => 'Santri Baru 9 Putri',
+            'jenjang' => 'SMP',
+        ]);
+    }
+
+    /**
+     * Test migrasi repair data mengubah santri kelas 9 putra & putri yang berjenjang Reguler menjadi SMP.
+     */
+    public function test_migrasi_repair_jenjang_kelas_9_mengubah_reguler_menjadi_smp()
+    {
+        $p1 = Pendaftaran::create([
+            'nama_lengkap' => 'Zakiyan Arsya Nasrulloh',
+            'jenjang' => 'Reguler',
+            'no_induk' => 'PSB-2026-7001',
+            'status_pendaftaran' => 'Diterima',
+        ]);
+        $s1 = Siswa::create([
+            'nama_lengkap' => 'Zakiyan Arsya Nasrulloh',
+            'jenjang' => 'Reguler',
+            'kamar' => 'Kamar Kelas 9 Putra',
+            'kelas' => '9A',
+            'status' => 'aktif',
+            'pendaftaran_id' => $p1->id,
+        ]);
+
+        $p2 = Pendaftaran::create([
+            'nama_lengkap' => 'Santriwati Kelas 9 Putri',
+            'jenjang' => 'Reguler',
+            'no_induk' => 'PSB-2026-7002',
+            'status_pendaftaran' => 'Diterima',
+        ]);
+        $s2 = Siswa::create([
+            'nama_lengkap' => 'Santriwati Kelas 9 Putri',
+            'jenjang' => 'Reguler',
+            'kamar' => 'Kamar Kelas 9 Putri',
+            'kelas' => '9B',
+            'status' => 'aktif',
+            'pendaftaran_id' => $p2->id,
+        ]);
+
+        // Jalankan migrasi repair
+        $migration = require database_path('migrations/2026_11_05_183000_repair_kelas_9_jenjang_to_smp.php');
+        $migration->up();
+
+        $this->assertEquals('SMP', $s1->fresh()->jenjang);
+        $this->assertEquals('SMP', $p1->fresh()->jenjang);
+
+        $this->assertEquals('SMP', $s2->fresh()->jenjang);
+        $this->assertEquals('SMP', $p2->fresh()->jenjang);
+    }
+
+    /**
      * Test identifikasi dan penandaan baris siswa yang data dirinya belum lengkap (warna merah tipis).
      */
     public function test_tabel_siswa_menandai_baris_kurang_lengkap_dengan_merah_tipis()
