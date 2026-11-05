@@ -204,8 +204,8 @@ class User extends Authenticatable
             return $this->canDo('siswa', $action);
         }
 
-        // Admin Lembaga & Guru memiliki akses default ke modul sekolah & jadwal pelajaran
-        if (in_array($this->role, ['admin_lembaga', 'guru']) && in_array($menuCode, ['sekolah', 'jadwal_pelajaran'])) {
+        // Admin Lembaga & Guru memiliki akses default ke modul sekolah, jadwal pelajaran & ekstrakurikuler
+        if (in_array($this->role, ['admin_lembaga', 'guru']) && in_array($menuCode, ['sekolah', 'jadwal_pelajaran', 'ekskul', 'jurnal_ekskul', 'plotting_ekskul', 'rekap_ekskul'])) {
             return true;
         }
 
@@ -222,7 +222,7 @@ class User extends Authenticatable
         // Admin Lembaga memiliki akses default ke modul absensi, guru sekolah, plotting & master data
         if ($this->role === 'admin_lembaga' && in_array($menuCode, [
             'presensi', 'rekap_absensi', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'pengaturan_absensi', 'guru_sekolah', 
-            'plotting_mapel', 'plotting_kelas', 'jadwal_pelajaran',
+            'plotting_mapel', 'plotting_kelas', 'plotting_ekskul', 'ekskul', 'jurnal_ekskul', 'rekap_ekskul', 'jadwal_pelajaran',
             'data_master', 'master_kelas', 'master_jam', 'master_lembaga', 'master_import_siswa', 'perizinan_haid'
         ])) {
             return true;

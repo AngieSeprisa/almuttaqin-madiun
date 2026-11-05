@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\ClassroomController;
+use App\Http\Controllers\EkskulJurnalController;
 use App\Http\Controllers\GuruSekolahController;
 use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\JadwalPelajaranController;
@@ -19,10 +20,12 @@ use App\Http\Controllers\PlottingKelasPengajianController;
 use App\Http\Controllers\PlottingMapelController;
 use App\Http\Controllers\PerizinanController;
 use App\Http\Controllers\PerizinanHaidController;
+use App\Http\Controllers\PlottingEkskulController;
 use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuickSearchController;
 use App\Http\Controllers\RekapAbsensiController;
+use App\Http\Controllers\RekapEkskulController;
 use App\Http\Controllers\RekapPondokController;
 use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\SiswaController;
@@ -231,6 +234,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/guru', [RekapAbsensiController::class, 'guru'])
             ->middleware('permission:rekap_absensi,view')
             ->name('guru');
+        Route::get('/ekskul', [RekapEkskulController::class, 'index'])
+            ->middleware('permission:rekap_ekskul|rekap_absensi|sekolah,view')
+            ->name('ekskul');
         Route::put('/koreksi/{id}', [RekapAbsensiController::class, 'koreksi'])
             ->middleware('permission:rekap_absensi,edit')
             ->name('koreksi');
@@ -250,6 +256,16 @@ Route::middleware('auth')->group(function () {
         Route::delete('/rekap-jurnal/{jurnal}', [SekolahController::class, 'destroyJurnal'])->name('jurnal.destroy');
         Route::get('/rekap-absensi', [SekolahController::class, 'rekapAbsensi'])->name('rekap-absensi');
         Route::get('/kelas-anggota/{kelas}', [SekolahController::class, 'getAnggotaKelas'])->name('kelas-anggota');
+
+        // Submenu Ekstrakurikuler (Input Jurnal, Rekap Jurnal, Siswa Dynamic List)
+        Route::prefix('ekskul')->name('ekskul.')->group(function () {
+            Route::get('/', [EkskulJurnalController::class, 'index'])->name('index');
+            Route::post('/', [EkskulJurnalController::class, 'store'])->name('store');
+            Route::get('/rekap-jurnal', [EkskulJurnalController::class, 'rekapJurnal'])->name('rekap-jurnal');
+            Route::get('/jurnal/{jurnalEkskul}', [EkskulJurnalController::class, 'show'])->name('jurnal.show');
+            Route::delete('/jurnal/{jurnalEkskul}', [EkskulJurnalController::class, 'destroy'])->name('jurnal.destroy');
+            Route::get('/siswa/{ekstrakurikuler}', [EkskulJurnalController::class, 'siswaByEkskul'])->name('siswa-by-ekskul');
+        });
     });
 
     // Menu Jadwal Pelajaran Multi-Jenjang (SMP & SMA)
@@ -352,6 +368,34 @@ Route::middleware('auth')->group(function () {
         Route::get('/anggota/{kelas}', [PlottingKelasController::class, 'anggota'])
             ->middleware('permission:plotting_kelas,view')
             ->name('anggota');
+    });
+
+    // Menu Pengaturan Sekolah: Plotting Ekstrakurikuler & Kelola Ekstrakurikuler
+    Route::prefix('plotting-ekskul')->name('plotting-ekskul.')->group(function () {
+        Route::get('/', [PlottingEkskulController::class, 'index'])
+            ->middleware('permission:plotting_ekskul|sekolah,view')
+            ->name('index');
+        Route::post('/ekskul', [PlottingEkskulController::class, 'storeEkskul'])
+            ->middleware('permission:plotting_ekskul|sekolah,create')
+            ->name('store-ekskul');
+        Route::put('/ekskul/{ekstrakurikuler}', [PlottingEkskulController::class, 'updateEkskul'])
+            ->middleware('permission:plotting_ekskul|sekolah,edit')
+            ->name('update-ekskul');
+        Route::delete('/ekskul/{ekstrakurikuler}', [PlottingEkskulController::class, 'destroyEkskul'])
+            ->middleware('permission:plotting_ekskul|sekolah,delete')
+            ->name('destroy-ekskul');
+        Route::post('/ekskul-bulk-delete', [PlottingEkskulController::class, 'destroyBulkEkskul'])
+            ->middleware('permission:plotting_ekskul|sekolah,delete')
+            ->name('destroy-bulk-ekskul');
+        Route::get('/anggota/{ekstrakurikuler}', [PlottingEkskulController::class, 'anggota'])
+            ->middleware('permission:plotting_ekskul|sekolah,view')
+            ->name('anggota');
+        Route::post('/tambah-anggota', [PlottingEkskulController::class, 'tambahAnggota'])
+            ->middleware('permission:plotting_ekskul|sekolah,edit')
+            ->name('tambah-anggota');
+        Route::post('/hapus-anggota', [PlottingEkskulController::class, 'hapusAnggota'])
+            ->middleware('permission:plotting_ekskul|sekolah,edit')
+            ->name('hapus-anggota');
     });
 
     // Menu Pengaturan Pondok: Plotting Kamar & Kelola Kamar Asrama

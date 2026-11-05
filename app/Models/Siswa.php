@@ -90,6 +90,16 @@ class Siswa extends Model
     }
 
     /**
+     * Relasi ke data ekstrakurikuler yang diikuti
+     */
+    public function ekstrakurikulers()
+    {
+        return $this->belongsToMany(Ekstrakurikuler::class, 'ekstrakurikuler_siswas', 'siswa_id', 'ekstrakurikuler_id')
+            ->withPivot(['id', 'peran', 'tanggal_bergabung', 'is_active'])
+            ->withTimestamps();
+    }
+
+    /**
      * Scope filter santri berdasarkan room/lembaga yang aktif.
      * Karena seluruh santri mukim di pondok, room 'pondok' & 'yayasan' menampilkan semua santri,
      * sedangkan room 'smp' atau 'sma' hanya menyaring santri dari jenjang tersebut.

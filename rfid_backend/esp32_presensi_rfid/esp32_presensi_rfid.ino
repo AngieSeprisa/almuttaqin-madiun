@@ -45,8 +45,8 @@
 const char* DEVICE_ID = "kantor smp";
 
 // ================= KONFIGURASI WIFI & VPS MQTT =================
-const char* WIFI_SSID     = "Kota_pintar_kls_LT.1";
-const char* WIFI_PASSWORD = "12345678";
+const char* WIFI_SSID     = "KANTOR SMP L2";
+const char* WIFI_PASSWORD = "";
 
 const char* MQTT_SERVER   = "202.155.17.96";
 const int   MQTT_PORT     = 1883;

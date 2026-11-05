@@ -75,6 +75,22 @@ class QuickSearchController extends Controller
                 'permission' => 'sekolah',
             ],
             [
+                'title' => 'Jurnal Ekstrakurikuler',
+                'description' => 'Input jurnal kegiatan & absensi ekstrakurikuler siswa',
+                'url' => route('sekolah.ekskul.index'),
+                'icon' => 'activity',
+                'keywords' => 'ekskul ekstrakurikuler jurnal presensi latihan pembina kegiatan',
+                'permission' => 'sekolah',
+            ],
+            [
+                'title' => 'Rekap Ekstrakurikuler',
+                'description' => 'Rekapitulasi presensi ekstrakurikuler & laporan WA',
+                'url' => route('rekap-absensi.ekskul'),
+                'icon' => 'calendar',
+                'keywords' => 'rekap ekskul ekstrakurikuler absensi laporan wa',
+                'permission' => 'rekap_absensi',
+            ],
+            [
                 'title' => 'Rekap Absensi Sekolah',
                 'description' => 'Rekap absensi siswa per jenjang & kelas',
                 'url' => route('rekap-absensi.sekolah'),
@@ -145,6 +161,14 @@ class QuickSearchController extends Controller
                 'icon' => 'layers',
                 'keywords' => 'plotting kelas pembagian kelas mutasi',
                 'permission' => 'plotting_kelas',
+            ],
+            [
+                'title' => 'Plotting Ekstrakurikuler',
+                'description' => 'Kelola ekstrakurikuler & plotting anggota siswa',
+                'url' => route('plotting-ekskul.index'),
+                'icon' => 'users',
+                'keywords' => 'plotting ekskul ekstrakurikuler kelola anggota pembina pembagian',
+                'permission' => 'plotting_ekskul',
             ],
             [
                 'title' => 'Plotting Kamar',

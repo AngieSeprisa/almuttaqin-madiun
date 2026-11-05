@@ -127,9 +127,9 @@
                 @endif
 
                 {{-- Menu Sekolah dengan Submenu Jurnal, Rekap Jurnal, Jadwal Pelajaran & Jadwal Mengajar Saya --}}
-                @if(!$authUser || $authUser->canDo('sekolah', 'view') || $authUser->canDo('jadwal_pelajaran', 'view'))
-                <div class="nav-group {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') ? 'open' : '' }}" id="navGroupSekolah">
-                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') ? 'active' : '' }}" id="toggleSekolah" title="Sekolah">
+                @if(!$authUser || $authUser->canDo('sekolah', 'view') || $authUser->canDo('jadwal_pelajaran', 'view') || $authUser->canDo('ekskul', 'view'))
+                <div class="nav-group {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') || request()->routeIs('sekolah.ekskul.*') ? 'open' : '' }}" id="navGroupSekolah">
+                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') || request()->routeIs('sekolah.ekskul.*') ? 'active' : '' }}" id="toggleSekolah" title="Sekolah">
                         <span class="nav-item-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
@@ -151,6 +151,10 @@
                         <a href="{{ route('sekolah.rekap-jurnal') }}" class="subnav-item {{ request()->routeIs('sekolah.rekap-jurnal*') ? 'active' : '' }}" title="Rekap Jurnal Pembelajaran">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Rekap Jurnal</span>
+                        </a>
+                        <a href="{{ route('sekolah.ekskul.index') }}" class="subnav-item {{ request()->routeIs('sekolah.ekskul.*') ? 'active' : '' }}" title="Jurnal Ekstrakurikuler">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Ekstrakurikuler</span>
                         </a>
                         <a href="{{ route('jadwal-pelajaran.index') }}" class="subnav-item {{ request()->routeIs('jadwal-pelajaran.index') || request()->routeIs('jadwal-pelajaran.cetak') ? 'active' : '' }}" title="Master Jadwal Pelajaran (SMP & SMA)">
                             <span class="subnav-dot"></span>
@@ -272,6 +276,13 @@
                             <span class="subnav-text">Guru</span>
                         </a>
                         @endif
+
+                        @if(!$authUser || $authUser->canDo('rekap_ekskul', 'view') || $authUser->canDo('rekap_absensi', 'view') || $authUser->canDo('sekolah', 'view'))
+                        <a href="{{ route('rekap-absensi.ekskul') }}" class="subnav-item {{ request()->routeIs('rekap-absensi.ekskul*') ? 'active' : '' }}" title="Rekap Absensi Ekstrakurikuler">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Ekstrakurikuler</span>
+                        </a>
+                        @endif
                     </div>
                 </div>
                 @endif
@@ -320,9 +331,9 @@
                 @endif
 
                 {{-- Menu Pengaturan Sekolah dengan Submenu Absensi Guru, Guru Sekolah, Plotting Mata Pelajaran & Plotting Kelas --}}
-                @if(!$authUser || $authUser->canDo('pengaturan_absensi', 'view') || $authUser->canDo('guru_sekolah', 'view') || $authUser->canDo('plotting_mapel', 'view') || $authUser->canDo('plotting_kelas', 'view'))
-                <div class="nav-group {{ request()->routeIs('pengaturan-absensi.*') || request()->routeIs('guru-sekolah.*') || request()->routeIs('plotting-mapel.*') || request()->routeIs('plotting-kelas.*') || request()->routeIs('pengaturan.*') ? 'open' : '' }}" id="navGroupPengaturan">
-                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('pengaturan-absensi.*') || request()->routeIs('guru-sekolah.*') || request()->routeIs('plotting-mapel.*') || request()->routeIs('plotting-kelas.*') || request()->routeIs('pengaturan.*') ? 'active' : '' }}" id="togglePengaturan" title="Pengaturan Sekolah">
+                @if(!$authUser || $authUser->canDo('pengaturan_absensi', 'view') || $authUser->canDo('guru_sekolah', 'view') || $authUser->canDo('plotting_mapel', 'view') || $authUser->canDo('plotting_kelas', 'view') || $authUser->canDo('plotting_ekskul', 'view'))
+                <div class="nav-group {{ request()->routeIs('pengaturan-absensi.*') || request()->routeIs('guru-sekolah.*') || request()->routeIs('plotting-mapel.*') || request()->routeIs('plotting-kelas.*') || request()->routeIs('plotting-ekskul.*') || request()->routeIs('pengaturan.*') ? 'open' : '' }}" id="navGroupPengaturan">
+                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('pengaturan-absensi.*') || request()->routeIs('guru-sekolah.*') || request()->routeIs('plotting-mapel.*') || request()->routeIs('plotting-kelas.*') || request()->routeIs('plotting-ekskul.*') || request()->routeIs('pengaturan.*') ? 'active' : '' }}" id="togglePengaturan" title="Pengaturan Sekolah">
                         <span class="nav-item-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="3"></circle>
@@ -372,6 +383,13 @@
                         <a href="{{ route('plotting-kelas.index') }}" class="subnav-item {{ request()->routeIs('plotting-kelas*') ? 'active' : '' }}" title="Plotting Kelas">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Plotting Kelas</span>
+                        </a>
+                        @endif
+
+                        @if(!$authUser || $authUser->canDo('plotting_ekskul', 'view') || $authUser->canDo('plotting_kelas', 'view') || $authUser->canDo('sekolah', 'view'))
+                        <a href="{{ route('plotting-ekskul.index') }}" class="subnav-item {{ request()->routeIs('plotting-ekskul*') ? 'active' : '' }}" title="Plotting Ekstrakurikuler">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Ekstrakurikuler</span>
                         </a>
                         @endif
                     </div>
