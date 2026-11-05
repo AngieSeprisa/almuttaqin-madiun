@@ -4,6 +4,18 @@
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px;">
+    {{-- Switcher Jenjang untuk Yayasan --}}
+    @if(!empty($isYayasan) && isset($sekolahLembagas) && $sekolahLembagas->count() > 1)
+    <div class="yayasan-switch-wrap">
+        @foreach($sekolahLembagas as $lem)
+            <a href="{{ route('rekap-absensi.ekskul', ['lembaga' => strtolower($lem->kode)]) }}"
+               class="yayasan-tab-btn {{ ($kodeLembaga ?? '') === strtolower($lem->kode) ? 'active' : '' }}">
+                {{ strtoupper($lem->singkatan ?: $lem->kode) }}
+            </a>
+        @endforeach
+    </div>
+    @endif
+
     @if($selectedEkskul && $matriksSiswa->isNotEmpty())
     <button type="button" class="btn-wa" onclick="openWaModal()" title="Buka &amp; Salin Format Laporan WhatsApp">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -12,7 +24,7 @@
         <span>Laporan WA</span>
     </button>
     @endif
-    <a href="{{ route('sekolah.ekskul.index') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+    <a href="{{ route('sekolah.ekskul.index', !empty($isYayasan) ? ['lembaga' => $kodeLembaga] : []) }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -28,6 +40,9 @@
     {{-- Filter Bar Card --}}
     <div class="form-section-card filter-card">
         <form action="{{ route('rekap-absensi.ekskul') }}" method="GET" class="filter-form">
+            @if(!empty($isYayasan))
+            <input type="hidden" name="lembaga" value="{{ $kodeLembaga }}">
+            @endif
             <div class="filter-group-left">
                 {{-- Filter Ekstrakurikuler --}}
                 <div class="filter-select-wrap">
@@ -228,7 +243,7 @@
                                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                                 </svg>
                                 <span style="font-size:13.5px; font-weight:500;">Belum ada anggota terdaftar di ekstrakurikuler ini.</span>
-                                <a href="{{ route('plotting-ekskul.index') }}" class="btn btn-sm btn-outline-primary" style="margin-top:4px;">
+                                <a href="{{ route('plotting-ekskul.index', !empty($isYayasan) ? ['lembaga' => $kodeLembaga] : []) }}" class="btn btn-sm btn-outline-primary" style="margin-top:4px;">
                                     Buka Plotting Ekstrakurikuler &rarr;
                                 </a>
                             </div>
@@ -298,6 +313,16 @@
 @endif
 
 <style>
+.yayasan-switch-wrap {
+    display: inline-flex; background: #F3F4F6; border-radius: 8px; padding: 3px; border: 1px solid #E5E7EB;
+}
+.dark-mode .yayasan-switch-wrap { background: #1E293B; border-color: #334155; }
+.yayasan-tab-btn {
+    padding: 5px 13px; font-size: 12px; font-weight: 700; color: #6B7280;
+    text-decoration: none; border-radius: 6px; transition: all 0.15s ease;
+}
+.yayasan-tab-btn.active { background: #0052FF; color: #FFFFFF; }
+
 .rekap-sekolah-container { display: flex; flex-direction: column; gap: 18px; width: 100%; }
 .stat-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
 .stat-summary-card { padding: 16px 20px; }

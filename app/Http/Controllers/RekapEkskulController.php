@@ -26,16 +26,44 @@ class RekapEkskulController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membuka Rekap Ekstrakurikuler.');
         }
 
-        $activeLembagaKode = session('active_lembaga');
-        if ($authUser->isYayasan()) {
-            $reqKode = strtolower($request->get('lembaga', ''));
-            $activeLembagaKode = in_array($reqKode, ['smp', 'sma']) ? $reqKode : ($activeLembagaKode ?: 'smp');
-        } else {
-            $activeLembagaKode = in_array(strtolower((string)$activeLembagaKode), ['smp', 'sma']) ? strtolower((string)$activeLembagaKode) : 'smp';
+        // Lembaga sekolah formal: SMP & SMA
+        $sekolahLembagas = $authUser->accessibleLembagas()->filter(function ($l) {
+            return in_array(strtolower($l->kode), ['smp', 'sma']) || $l->kategori === 'formal';
+        })->values();
+
+        if ($sekolahLembagas->isEmpty()) {
+            $sekolahLembagas = Lembaga::whereIn('kode', ['smp', 'sma'])->get();
         }
 
-        $selectedLembaga = Lembaga::where('kode', $activeLembagaKode)->first() ?: Lembaga::where('kode', 'smp')->first();
-        $jenjang = strtoupper($activeLembagaKode);
+        $isYayasan = $authUser->isYayasan();
+        $selectedLembaga = null;
+
+        if ($isYayasan) {
+            $reqKode = strtolower($request->get('lembaga', ''));
+            if ($reqKode && in_array($reqKode, ['smp', 'sma'])) {
+                $selectedLembaga = $sekolahLembagas->firstWhere('kode', $reqKode);
+            }
+            if (!$selectedLembaga) {
+                $activeKode = strtolower((string) session('active_lembaga'));
+                if (in_array($activeKode, ['smp', 'sma'])) {
+                    $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode);
+                }
+            }
+            if (!$selectedLembaga) {
+                $selectedLembaga = $sekolahLembagas->firstWhere('kode', 'smp') ?: $sekolahLembagas->first();
+            }
+        } else {
+            $activeKode = strtolower((string) session('active_lembaga'));
+            $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode)
+                ?: ($sekolahLembagas->firstWhere('id', $authUser->primary_lembaga_id) ?: $sekolahLembagas->first());
+        }
+
+        if (!$selectedLembaga) {
+            $selectedLembaga = Lembaga::where('kode', 'smp')->first() ?: Lembaga::first();
+        }
+
+        $kodeLembaga = strtolower($selectedLembaga->kode);
+        $jenjang = strtoupper($kodeLembaga); // 'SMP' atau 'SMA'
 
         // Ambil daftar ekskul
         $ekskuls = Ekstrakurikuler::where(function ($q) use ($selectedLembaga, $jenjang) {
@@ -43,8 +71,30 @@ class RekapEkskulController extends Controller
                   ->orWhere('jenjang', $jenjang)
                   ->orWhere('jenjang', 'ALL');
             })
+            ->where(function ($q) {
+                $q->whereNull('is_active')->orWhere('is_active', true);
+            })
             ->orderBy('nama_ekskul')
             ->get();
+
+        if ($ekskuls->isEmpty() && !$request->filled('lembaga')) {
+            $fallbackEkskuls = Ekstrakurikuler::where(function ($q) {
+                    $q->whereNull('is_active')->orWhere('is_active', true);
+                })
+                ->orderBy('nama_ekskul')
+                ->get();
+            if ($fallbackEkskuls->isNotEmpty()) {
+                $firstMatch = $fallbackEkskuls->first(fn($e) => $e->lembaga_id && $sekolahLembagas->contains('id', $e->lembaga_id));
+                if ($firstMatch) {
+                    $selectedLembaga = $sekolahLembagas->firstWhere('id', $firstMatch->lembaga_id);
+                    $kodeLembaga = strtolower($selectedLembaga->kode);
+                    $jenjang = strtoupper($kodeLembaga);
+                    $ekskuls = $fallbackEkskuls->filter(fn($e) => $e->lembaga_id == $selectedLembaga->id || $e->jenjang === $jenjang || $e->jenjang === 'ALL')->values();
+                } else {
+                    $ekskuls = $fallbackEkskuls;
+                }
+            }
+        }
 
         $selectedEkskulId = $request->get('ekskul_id');
         $selectedEkskul = null;
@@ -144,6 +194,9 @@ class RekapEkskulController extends Controller
 
         return view('rekap-absensi.ekskul', compact(
             'selectedLembaga',
+            'kodeLembaga',
+            'isYayasan',
+            'sekolahLembagas',
             'jenjang',
             'ekskuls',
             'selectedEkskul',

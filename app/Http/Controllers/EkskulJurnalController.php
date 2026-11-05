@@ -52,16 +52,44 @@ class EkskulJurnalController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membuka Jurnal Ekstrakurikuler.');
         }
 
-        $activeLembagaKode = session('active_lembaga');
-        if ($authUser->isYayasan()) {
-            $reqKode = strtolower($request->get('lembaga', ''));
-            $activeLembagaKode = in_array($reqKode, ['smp', 'sma']) ? $reqKode : ($activeLembagaKode ?: 'smp');
-        } else {
-            $activeLembagaKode = in_array(strtolower((string)$activeLembagaKode), ['smp', 'sma']) ? strtolower((string)$activeLembagaKode) : 'smp';
+        // Lembaga sekolah formal: SMP & SMA
+        $sekolahLembagas = $authUser->accessibleLembagas()->filter(function ($l) {
+            return in_array(strtolower($l->kode), ['smp', 'sma']) || $l->kategori === 'formal';
+        })->values();
+
+        if ($sekolahLembagas->isEmpty()) {
+            $sekolahLembagas = Lembaga::whereIn('kode', ['smp', 'sma'])->get();
         }
 
-        $selectedLembaga = Lembaga::where('kode', $activeLembagaKode)->first() ?: Lembaga::where('kode', 'smp')->first();
-        $jenjang = strtoupper($activeLembagaKode);
+        $isYayasan = $authUser->isYayasan();
+        $selectedLembaga = null;
+
+        if ($isYayasan) {
+            $reqKode = strtolower($request->get('lembaga', ''));
+            if ($reqKode && in_array($reqKode, ['smp', 'sma'])) {
+                $selectedLembaga = $sekolahLembagas->firstWhere('kode', $reqKode);
+            }
+            if (!$selectedLembaga) {
+                $activeKode = strtolower((string) session('active_lembaga'));
+                if (in_array($activeKode, ['smp', 'sma'])) {
+                    $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode);
+                }
+            }
+            if (!$selectedLembaga) {
+                $selectedLembaga = $sekolahLembagas->firstWhere('kode', 'smp') ?: $sekolahLembagas->first();
+            }
+        } else {
+            $activeKode = strtolower((string) session('active_lembaga'));
+            $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode)
+                ?: ($sekolahLembagas->firstWhere('id', $authUser->primary_lembaga_id) ?: $sekolahLembagas->first());
+        }
+
+        if (!$selectedLembaga) {
+            $selectedLembaga = Lembaga::where('kode', 'smp')->first() ?: Lembaga::first();
+        }
+
+        $kodeLembaga = strtolower($selectedLembaga->kode);
+        $jenjang = strtoupper($kodeLembaga); // 'SMP' atau 'SMA'
 
         // Ambil daftar ekskul aktif
         $ekskuls = Ekstrakurikuler::where(function ($q) use ($selectedLembaga, $jenjang) {
@@ -69,10 +97,34 @@ class EkskulJurnalController extends Controller
                   ->orWhere('jenjang', $jenjang)
                   ->orWhere('jenjang', 'ALL');
             })
-            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->whereNull('is_active')->orWhere('is_active', true);
+            })
             ->with(['pembina', 'siswas'])
             ->orderBy('nama_ekskul')
             ->get();
+
+        // Safety fallback jika belum ada ekskul di lembaga ini tapi ada di sekolah lainnya
+        if ($ekskuls->isEmpty() && !$request->filled('lembaga')) {
+            $fallbackEkskuls = Ekstrakurikuler::where(function ($q) {
+                    $q->whereNull('is_active')->orWhere('is_active', true);
+                })
+                ->with(['pembina', 'siswas'])
+                ->orderBy('nama_ekskul')
+                ->get();
+
+            if ($fallbackEkskuls->isNotEmpty()) {
+                $firstMatch = $fallbackEkskuls->first(fn($e) => $e->lembaga_id && $sekolahLembagas->contains('id', $e->lembaga_id));
+                if ($firstMatch) {
+                    $selectedLembaga = $sekolahLembagas->firstWhere('id', $firstMatch->lembaga_id);
+                    $kodeLembaga = strtolower($selectedLembaga->kode);
+                    $jenjang = strtoupper($kodeLembaga);
+                    $ekskuls = $fallbackEkskuls->filter(fn($e) => $e->lembaga_id == $selectedLembaga->id || $e->jenjang === $jenjang || $e->jenjang === 'ALL')->values();
+                } else {
+                    $ekskuls = $fallbackEkskuls;
+                }
+            }
+        }
 
         // Tentukan ekskul terpilih
         $selectedEkskulId = $request->get('ekskul_id');
@@ -130,10 +182,18 @@ class EkskulJurnalController extends Controller
                 ->get();
         }
 
+        // Pastikan pembina ekskul terpilih masuk dalam dropdown bila belum ada
+        if ($selectedEkskul && $selectedEkskul->pembina && !$gurus->contains('id', $selectedEkskul->pembina_id)) {
+            $gurus->prepend($selectedEkskul->pembina);
+        }
+
         $periode = self::hitungPeriodeOtomatis($request->get('tanggal'));
 
         return view('sekolah.ekskul.jurnal', compact(
             'selectedLembaga',
+            'kodeLembaga',
+            'isYayasan',
+            'sekolahLembagas',
             'jenjang',
             'ekskuls',
             'selectedEkskul',
@@ -285,24 +345,74 @@ class EkskulJurnalController extends Controller
         /** @var User $authUser */
         $authUser = Auth::user();
 
-        $activeLembagaKode = session('active_lembaga');
-        if ($authUser->isYayasan()) {
-            $reqKode = strtolower($request->get('lembaga', ''));
-            $activeLembagaKode = in_array($reqKode, ['smp', 'sma']) ? $reqKode : ($activeLembagaKode ?: 'smp');
-        } else {
-            $activeLembagaKode = in_array(strtolower((string)$activeLembagaKode), ['smp', 'sma']) ? strtolower((string)$activeLembagaKode) : 'smp';
+        // Lembaga sekolah formal: SMP & SMA
+        $sekolahLembagas = $authUser->accessibleLembagas()->filter(function ($l) {
+            return in_array(strtolower($l->kode), ['smp', 'sma']) || $l->kategori === 'formal';
+        })->values();
+
+        if ($sekolahLembagas->isEmpty()) {
+            $sekolahLembagas = Lembaga::whereIn('kode', ['smp', 'sma'])->get();
         }
 
-        $selectedLembaga = Lembaga::where('kode', $activeLembagaKode)->first() ?: Lembaga::where('kode', 'smp')->first();
-        $jenjang = strtoupper($activeLembagaKode);
+        $isYayasan = $authUser->isYayasan();
+        $selectedLembaga = null;
+
+        if ($isYayasan) {
+            $reqKode = strtolower($request->get('lembaga', ''));
+            if ($reqKode && in_array($reqKode, ['smp', 'sma'])) {
+                $selectedLembaga = $sekolahLembagas->firstWhere('kode', $reqKode);
+            }
+            if (!$selectedLembaga) {
+                $activeKode = strtolower((string) session('active_lembaga'));
+                if (in_array($activeKode, ['smp', 'sma'])) {
+                    $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode);
+                }
+            }
+            if (!$selectedLembaga) {
+                $selectedLembaga = $sekolahLembagas->firstWhere('kode', 'smp') ?: $sekolahLembagas->first();
+            }
+        } else {
+            $activeKode = strtolower((string) session('active_lembaga'));
+            $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode)
+                ?: ($sekolahLembagas->firstWhere('id', $authUser->primary_lembaga_id) ?: $sekolahLembagas->first());
+        }
+
+        if (!$selectedLembaga) {
+            $selectedLembaga = Lembaga::where('kode', 'smp')->first() ?: Lembaga::first();
+        }
+
+        $kodeLembaga = strtolower($selectedLembaga->kode);
+        $jenjang = strtoupper($kodeLembaga); // 'SMP' atau 'SMA'
 
         $ekskuls = Ekstrakurikuler::where(function ($q) use ($selectedLembaga, $jenjang) {
                 $q->where('lembaga_id', $selectedLembaga->id)
                   ->orWhere('jenjang', $jenjang)
                   ->orWhere('jenjang', 'ALL');
             })
+            ->where(function ($q) {
+                $q->whereNull('is_active')->orWhere('is_active', true);
+            })
             ->orderBy('nama_ekskul')
             ->get();
+
+        if ($ekskuls->isEmpty() && !$request->filled('lembaga')) {
+            $fallbackEkskuls = Ekstrakurikuler::where(function ($q) {
+                    $q->whereNull('is_active')->orWhere('is_active', true);
+                })
+                ->orderBy('nama_ekskul')
+                ->get();
+            if ($fallbackEkskuls->isNotEmpty()) {
+                $firstMatch = $fallbackEkskuls->first(fn($e) => $e->lembaga_id && $sekolahLembagas->contains('id', $e->lembaga_id));
+                if ($firstMatch) {
+                    $selectedLembaga = $sekolahLembagas->firstWhere('id', $firstMatch->lembaga_id);
+                    $kodeLembaga = strtolower($selectedLembaga->kode);
+                    $jenjang = strtoupper($kodeLembaga);
+                    $ekskuls = $fallbackEkskuls->filter(fn($e) => $e->lembaga_id == $selectedLembaga->id || $e->jenjang === $jenjang || $e->jenjang === 'ALL')->values();
+                } else {
+                    $ekskuls = $fallbackEkskuls;
+                }
+            }
+        }
 
         $query = JurnalEkskul::with(['ekstrakurikuler', 'pembina'])
             ->whereHas('ekstrakurikuler', function ($q) use ($selectedLembaga, $jenjang) {
@@ -342,6 +452,9 @@ class EkskulJurnalController extends Controller
 
         return view('sekolah.ekskul.rekap_jurnal', compact(
             'selectedLembaga',
+            'kodeLembaga',
+            'isYayasan',
+            'sekolahLembagas',
             'jenjang',
             'ekskuls',
             'jurnals',

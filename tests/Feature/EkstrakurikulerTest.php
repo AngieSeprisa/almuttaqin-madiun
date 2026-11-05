@@ -284,5 +284,64 @@ class EkstrakurikulerTest extends TestCase
         $rekapMatrixResponse->assertSee('Rekap Presensi Ekstrakurikuler');
         $rekapMatrixResponse->assertSee('Robotik & IT');
     }
+
+    public function test_yayasan_user_in_yayasan_room_can_see_ekskul_and_switch_lembaga(): void
+    {
+        $yayasanUser = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+        $smp = Lembaga::where('kode', 'smp')->firstOrFail();
+        $sma = Lembaga::where('kode', 'sma')->firstOrFail();
+
+        $ekskulSmp = Ekstrakurikuler::create([
+            'lembaga_id'   => $smp->id,
+            'jenjang'      => 'SMP',
+            'nama_ekskul'  => 'Futsal SMP',
+            'is_active'    => true,
+        ]);
+
+        $ekskulSma = Ekstrakurikuler::create([
+            'lembaga_id'   => $sma->id,
+            'jenjang'      => 'SMA',
+            'nama_ekskul'  => 'Basket SMA',
+            'is_active'    => true,
+        ]);
+
+        // 1. Yayasan di room active_lembaga = 'yayasan' membuka Jurnal Ekskul
+        $jurnalResp = $this->actingAs($yayasanUser)
+            ->withSession(['active_lembaga' => 'yayasan'])
+            ->get(route('sekolah.ekskul.index'));
+
+        $jurnalResp->assertStatus(200);
+        $jurnalResp->assertSee('Futsal SMP');
+        $jurnalResp->assertSee('SMP');
+        $jurnalResp->assertSee('SMA');
+
+        // Beralih ke SMA lewat switcher
+        $jurnalSmaResp = $this->actingAs($yayasanUser)
+            ->withSession(['active_lembaga' => 'yayasan'])
+            ->get(route('sekolah.ekskul.index', ['lembaga' => 'sma']));
+
+        $jurnalSmaResp->assertStatus(200);
+        $jurnalSmaResp->assertSee('Basket SMA');
+
+        // 2. Yayasan membuka Rekap Jurnal
+        $rekapJurnalResp = $this->actingAs($yayasanUser)
+            ->withSession(['active_lembaga' => 'yayasan'])
+            ->get(route('sekolah.ekskul.rekap-jurnal'));
+
+        $rekapJurnalResp->assertStatus(200);
+        $rekapJurnalResp->assertSee('Futsal SMP');
+        $rekapJurnalResp->assertSee('SMP');
+        $rekapJurnalResp->assertSee('SMA');
+
+        // 3. Yayasan membuka Rekap Absensi Ekskul
+        $rekapAbsensiResp = $this->actingAs($yayasanUser)
+            ->withSession(['active_lembaga' => 'yayasan'])
+            ->get(route('rekap-absensi.ekskul'));
+
+        $rekapAbsensiResp->assertStatus(200);
+        $rekapAbsensiResp->assertSee('Futsal SMP');
+        $rekapAbsensiResp->assertSee('SMP');
+        $rekapAbsensiResp->assertSee('SMA');
+    }
 }
 

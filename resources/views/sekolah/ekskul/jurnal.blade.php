@@ -4,7 +4,19 @@
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px;">
-    <a href="{{ route('sekolah.ekskul.rekap-jurnal') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+    {{-- Switcher Jenjang untuk Yayasan --}}
+    @if(!empty($isYayasan) && isset($sekolahLembagas) && $sekolahLembagas->count() > 1)
+    <div class="yayasan-switch-wrap">
+        @foreach($sekolahLembagas as $lem)
+            <a href="{{ route('sekolah.ekskul.index', ['lembaga' => strtolower($lem->kode)]) }}"
+               class="yayasan-tab-btn {{ ($kodeLembaga ?? '') === strtolower($lem->kode) ? 'active' : '' }}">
+                {{ strtoupper($lem->singkatan ?: $lem->kode) }}
+            </a>
+        @endforeach
+    </div>
+    @endif
+
+    <a href="{{ route('sekolah.ekskul.rekap-jurnal', !empty($isYayasan) ? ['lembaga' => $kodeLembaga] : []) }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
             <polyline points="14 2 14 8 20 8"></polyline>
@@ -19,6 +31,16 @@
 @push('styles')
 <style>
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .yayasan-switch-wrap {
+        display: inline-flex; background: #F3F4F6; border-radius: 8px; padding: 3px; border: 1px solid #E5E7EB;
+    }
+    .dark-mode .yayasan-switch-wrap { background: #1E293B; border-color: #334155; }
+    .yayasan-tab-btn {
+        padding: 5px 13px; font-size: 12px; font-weight: 700; color: #6B7280;
+        text-decoration: none; border-radius: 6px; transition: all 0.15s ease;
+    }
+    .yayasan-tab-btn.active { background: #0052FF; color: #FFFFFF; }
+
     .status-btn-group { display: inline-flex; gap: 4px; background: #F1F5F9; padding: 3px; border-radius: 8px; }
     .dark-mode .status-btn-group { background: #1E293B; }
     .status-btn {
@@ -78,6 +100,9 @@
 
     <form action="{{ route('sekolah.ekskul.store') }}" method="POST" id="formJurnalEkskul" style="display:flex; flex-direction:column; gap:20px;">
         @csrf
+        @if(!empty($isYayasan))
+        <input type="hidden" name="lembaga" value="{{ $kodeLembaga }}">
+        @endif
 
         {{-- Kartu Form Data Jurnal Kegiatan --}}
         <div class="form-section-card">
@@ -109,7 +134,7 @@
                                     data-selesai="{{ $ek->jam_selesai ? substr($ek->jam_selesai, 0, 5) : '' }}"
                                     data-tempat="{{ $ek->tempat }}"
                                     {{ ($selectedEkskul && $selectedEkskul->id == $ek->id) ? 'selected' : '' }}>
-                                {{ $ek->nama_ekskul }} ({{ $ek->hari ?: 'Jadwal belum diatur' }})
+                                {{ $ek->nama_ekskul }}{{ $ek->hari ? " ({$ek->hari})" : '' }}
                             </option>
                         @endforeach
                     </select>
@@ -310,7 +335,11 @@ function onEkskulChange(ekskulId) {
     document.getElementById('label_nama_ekskul').textContent = opt.textContent.split('(')[0].trim();
 
     if (opt.dataset.pembinaId) {
-        document.getElementById('select_pembina').value = opt.dataset.pembinaId;
+        const selPembina = document.getElementById('select_pembina');
+        if (selPembina) {
+            selPembina.value = opt.dataset.pembinaId;
+            selPembina.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
     if (opt.dataset.mulai) {
         document.getElementById('input_jam_mulai').value = opt.dataset.mulai;
@@ -376,7 +405,7 @@ function renderSiswaRows(list) {
                             <line x1="12" y1="16" x2="12.01" y2="16"></line>
                         </svg>
                         <span style="font-size:13.5px; font-weight:500;">Belum ada siswa terdaftar di ekstrakurikuler ini.</span>
-                        <a href="{{ route('plotting-ekskul.index') }}" target="_blank" class="btn btn-sm btn-outline-primary" style="font-size:12px; margin-top:4px;">
+                        <a href="{{ route('plotting-ekskul.index', !empty($isYayasan) ? ['lembaga' => $kodeLembaga] : []) }}" target="_blank" class="btn btn-sm btn-outline-primary" style="font-size:12px; margin-top:4px;">
                             Buka Plotting Ekstrakurikuler &rarr;
                         </a>
                     </div>
