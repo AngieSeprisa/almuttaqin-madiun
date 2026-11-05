@@ -25,15 +25,31 @@ class PresensiDashboardController extends Controller
             ? $request->get('tab')
             : 'pondok';
 
-        // 1. Ambil Sesi yang sedang aktif saat ini
-        $activeSesi = MasterSesi::where('jam_mulai', '<=', $currentTime)
+        // 1. Ambil Sesi yang sedang aktif saat ini sesuai tab awal
+        $sesiQuery = MasterSesi::query();
+        if ($initialTab === 'pegawai') {
+            $sesiQuery->where('kategori', 'pegawai');
+        } elseif ($initialTab === 'sekolah') {
+            $sesiQuery->where('kategori', 'sekolah');
+        } else {
+            $sesiQuery->whereNotIn('kategori', ['pegawai', 'sekolah']);
+        }
+
+        $activeSesi = (clone $sesiQuery)->where('jam_mulai', '<=', $currentTime)
             ->where('jam_selesai', '>=', $currentTime)
             ->first();
 
-        // Jika tidak ada yang sedang aktif persis jam sekarang, ambil sesi terdekat berikutnya
+        // Jika tidak ada yang sedang aktif persis jam sekarang, ambil sesi terdekat berikutnya dalam kategori
         if (!$activeSesi) {
-            $activeSesi = MasterSesi::where('jam_mulai', '>=', $currentTime)
+            $activeSesi = (clone $sesiQuery)->where('jam_mulai', '>=', $currentTime)
                 ->orderBy('jam_mulai', 'asc')
+                ->first() ?: (clone $sesiQuery)->first();
+        }
+
+        // Fallback global jika kategori belum memiliki master_sesis
+        if (!$activeSesi) {
+            $activeSesi = MasterSesi::where('jam_mulai', '<=', $currentTime)
+                ->where('jam_selesai', '>=', $currentTime)
                 ->first() ?: MasterSesi::first();
         }
 
@@ -71,9 +87,30 @@ class PresensiDashboardController extends Controller
         if ($sesiId) {
             $sesi = MasterSesi::find($sesiId);
         } else {
-            $sesi = MasterSesi::where('jam_mulai', '<=', $currentTime)
+            $sesiQuery = MasterSesi::query();
+            if ($tab === 'pegawai') {
+                $sesiQuery->where('kategori', 'pegawai');
+            } elseif ($tab === 'sekolah') {
+                $sesiQuery->where('kategori', 'sekolah');
+            } else {
+                $sesiQuery->whereNotIn('kategori', ['pegawai', 'sekolah']);
+            }
+
+            $sesi = (clone $sesiQuery)->where('jam_mulai', '<=', $currentTime)
                 ->where('jam_selesai', '>=', $currentTime)
-                ->first() ?: MasterSesi::first();
+                ->first();
+
+            if (!$sesi) {
+                $sesi = (clone $sesiQuery)->where('jam_mulai', '>=', $currentTime)
+                    ->orderBy('jam_mulai', 'asc')
+                    ->first() ?: (clone $sesiQuery)->first();
+            }
+
+            if (!$sesi) {
+                $sesi = MasterSesi::where('jam_mulai', '<=', $currentTime)
+                    ->where('jam_selesai', '>=', $currentTime)
+                    ->first() ?: MasterSesi::first();
+            }
         }
 
         // Live Feed 12 Tap Terakhir (Global Hari Ini)
@@ -83,11 +120,19 @@ class PresensiDashboardController extends Controller
             ->take(12)
             ->get()
             ->map(function ($p) {
+                $sesiLabel = $p->sesi?->nama_sesi ?? '-';
+                if ($p->tipe_entitas === 'guru_pegawai') {
+                    if ($p->status_kehadiran === 'pulang' || str_contains(strtoupper((string) $p->sesi?->kode_sesi), 'PULANG')) {
+                        $sesiLabel = 'PULANG';
+                    } elseif ($p->status_kehadiran === 'hadir' || $p->status_kehadiran === 'terlambat' || str_contains(strtoupper((string) $p->sesi?->kode_sesi), 'MASUK')) {
+                        $sesiLabel = 'MASUK';
+                    }
+                }
                 return [
                     'id' => $p->id,
                     'nama' => $p->tipe_entitas === 'santri' ? ($p->siswa?->nama_lengkap ?? 'Santri') : ($p->user?->name ?? 'Pegawai'),
                     'kamar_or_role' => $p->tipe_entitas === 'santri' ? ($p->siswa?->kamar ?? 'Reguler') : 'Guru/Pegawai',
-                    'sesi' => $p->sesi?->nama_sesi ?? '-',
+                    'sesi' => $sesiLabel,
                     'waktu' => Carbon::parse($p->waktu_tap)->format('H:i:s'),
                     'status' => $p->status_kehadiran,
                     'tipe' => $p->tipe_entitas,
@@ -181,39 +226,104 @@ class PresensiDashboardController extends Controller
             })->values();
 
         } else { // 'pegawai'
-            $targetEntities = User::orderBy('name')->get();
+            $targetEntities = User::with('primaryLembaga')->orderBy('name')->get();
             $totalTarget = $targetEntities->count();
 
+            // Cek apakah sesi aktif merupakan sesi pulang
+            $isSesiPulang = $sesi && (
+                str_contains(strtoupper((string) $sesi->kode_sesi), 'PULANG') ||
+                str_contains(strtoupper((string) $sesi->nama_sesi), 'PULANG')
+            );
+
+            // Presensi Guru harian dari tabel presensi_gurus
+            $presensiGurus = \App\Models\PresensiGuru::whereDate('tanggal', $today)
+                ->get()
+                ->keyBy('user_id');
+
+            // Log tap presensis untuk fallback/tambahan
             $presensiMap = Presensi::whereDate('waktu_tap', $today)
-                ->when($sesi, fn($q) => $q->where('sesi_id', $sesi->id))
                 ->where('tipe_entitas', 'guru_pegawai')
                 ->get()
-                ->keyBy('entitas_id');
+                ->groupBy('entitas_id');
 
-            $hadirIds = $presensiMap->keys()->toArray();
+            $hadirList = collect();
+            $waitingList = collect();
 
-            $hadirList = $targetEntities->whereIn('id', $hadirIds)->map(function ($u) use ($presensiMap) {
-                $tap = $presensiMap->get($u->id);
-                return [
+            foreach ($targetEntities as $u) {
+                $pGuru = $presensiGurus->get($u->id);
+                $userTaps = $presensiMap->get($u->id, collect());
+
+                $jamMasuk = null;
+                $jamPulang = null;
+
+                if ($pGuru && $pGuru->jam_masuk) {
+                    $jamMasuk = strlen((string) $pGuru->jam_masuk) > 8
+                        ? Carbon::parse($pGuru->jam_masuk)->format('H:i:s')
+                        : substr((string) $pGuru->jam_masuk, 0, 8);
+                }
+                if ($pGuru && $pGuru->jam_pulang) {
+                    $jamPulang = strlen((string) $pGuru->jam_pulang) > 8
+                        ? Carbon::parse($pGuru->jam_pulang)->format('H:i:s')
+                        : substr((string) $pGuru->jam_pulang, 0, 8);
+                }
+
+                // Fallback jika belum tersimpan di presensi_gurus namun ada di presensis
+                if (!$jamMasuk) {
+                    $tapMasuk = $userTaps->first(function ($t) {
+                        return $t->status_kehadiran !== 'pulang' &&
+                            !str_contains(strtoupper((string) $t->sesi?->kode_sesi), 'PULANG');
+                    });
+                    if ($tapMasuk) {
+                        $jamMasuk = Carbon::parse($tapMasuk->waktu_tap)->format('H:i:s');
+                    }
+                }
+
+                if (!$jamPulang) {
+                    $tapPulang = $userTaps->first(function ($t) {
+                        return $t->status_kehadiran === 'pulang' ||
+                            str_contains(strtoupper((string) $t->sesi?->kode_sesi), 'PULANG');
+                    });
+                    if ($tapPulang) {
+                        $jamPulang = Carbon::parse($tapPulang->waktu_tap)->format('H:i:s');
+                    }
+                }
+
+                // Tentukan status kehadiran
+                $statusKehadiran = null;
+                if ($jamPulang) {
+                    $statusKehadiran = 'pulang';
+                } elseif ($pGuru?->status === 'terlambat' || $userTaps->contains('status_kehadiran', 'terlambat')) {
+                    $statusKehadiran = 'terlambat';
+                } elseif ($jamMasuk) {
+                    $statusKehadiran = 'hadir';
+                }
+
+                // Status hadir pada sesi saat ini:
+                // Jika sedang sesi PULANG, dikatakan hadir bila sudah tap pulang
+                // Jika sesi MASUK/lainnya, dikatakan hadir bila sudah tap masuk
+                $isHadir = $isSesiPulang ? !empty($jamPulang) : !empty($jamMasuk);
+                $waktuTapTampil = $isSesiPulang ? ($jamPulang ?: $jamMasuk) : ($jamMasuk ?: $jamPulang);
+                $roleOrLembaga = $u->jabatan ?: ($u->primaryLembaga?->singkatan ?? 'Yayasan');
+
+                $payload = [
                     'id' => $u->id,
                     'nama' => $u->name,
-                    'sub' => $u->jabatan ?: $u->email,
+                    'sub' => $roleOrLembaga,
                     'rfid_uid' => $u->rfid_uid ?: '-',
-                    'waktu_tap' => $tap ? Carbon::parse($tap->waktu_tap)->format('H:i:s') : null,
-                    'status_kehadiran' => $tap?->status_kehadiran ?? 'tepat_waktu',
-                    'is_hadir' => true,
+                    'waktu_tap' => $waktuTapTampil,
+                    'jam_masuk' => $jamMasuk,
+                    'jam_pulang' => $jamPulang,
+                    'status_kehadiran' => $statusKehadiran,
+                    'is_hadir' => $isHadir,
+                    'is_pulang' => !empty($jamPulang),
                 ];
-            })->values();
 
-            $waitingList = $targetEntities->whereNotIn('id', $hadirIds)->map(fn($u) => [
-                'id' => $u->id,
-                'nama' => $u->name,
-                'sub' => $u->jabatan ?: $u->email,
-                'rfid_uid' => $u->rfid_uid ?: 'Belum ada kartu',
-                'waktu_tap' => null,
-                'status_kehadiran' => null,
-                'is_hadir' => false,
-            ])->values();
+                if ($isHadir) {
+                    $hadirList->push($payload);
+                } else {
+                    $waitingList->push($payload);
+                }
+            }
         }
 
         return response()->json([
@@ -227,6 +337,10 @@ class PresensiDashboardController extends Controller
                 'jam_selesai' => $sesi?->jam_selesai,
                 'kategori' => $sesi?->kategori,
             ],
+            'isSesiPulang' => $tab === 'pegawai' && $sesi && (
+                str_contains(strtoupper((string) $sesi->kode_sesi), 'PULANG') ||
+                str_contains(strtoupper((string) $sesi->nama_sesi), 'PULANG')
+            ),
             'summary' => [
                 'totalTarget' => $totalTarget,
                 'sudahHadir' => $hadirList->count(),

@@ -572,4 +572,82 @@ class PengaturanSesiTest extends TestCase
         $this->assertNotNull($allocPutra);
         $this->assertSame('L', $allocPutra->target_gender);
     }
+
+    public function test_sesi_pegawai_masuk_dan_pulang_tersedia_dan_dapat_diatur(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        // 1. Sesi PEGAWAI_PULANG sudah terdaftar secara otomatis
+        $sesiPulang = DB::table('master_sesis')->where('kode_sesi', 'PEGAWAI_PULANG')->first();
+        $this->assertNotNull($sesiPulang);
+        $this->assertSame('Presensi Pulang Guru & Pegawai', $sesiPulang->nama_sesi);
+        $this->assertSame('pegawai', $sesiPulang->kategori);
+
+        // 2. Tampil di halaman Pengaturan Sesi
+        $resp = $this->actingAs($yayasan)->get(route('pengaturan.sesi'));
+        $resp->assertStatus(200);
+        $resp->assertSee('PEGAWAI_PULANG');
+        $resp->assertSee('Presensi Pulang Guru &amp; Pegawai', false);
+
+        // 3. Admin dapat memperbarui jam pulang pegawai
+        $updateResp = $this->actingAs($yayasan)->put(route('pengaturan.sesi.update', $sesiPulang->id), [
+            'nama_sesi' => 'Presensi Pulang Guru & Karyawan',
+            'jam_mulai' => '13:45',
+            'jam_selesai' => '17:00',
+            'toleransi_menit' => 0,
+            'kategori' => 'pegawai',
+            'allocations_json' => '[]',
+        ]);
+        $updateResp->assertRedirect(route('pengaturan.sesi'));
+
+        $updatedSesi = DB::table('master_sesis')->where('id', $sesiPulang->id)->first();
+        $this->assertSame('13:45:00', $updatedSesi->jam_mulai);
+        $this->assertSame('17:00:00', $updatedSesi->jam_selesai);
+        $this->assertSame('Presensi Pulang Guru & Karyawan', $updatedSesi->nama_sesi);
+    }
+
+    public function test_dashboard_monitoring_pegawai_menampilkan_jam_masuk_dan_jam_pulang(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        $guru = User::factory()->create([
+            'name' => 'Ustadz Ahmad Al-Baqir',
+            'email' => 'ahmad.baqir@almuttaqin.id',
+            'rfid_uid' => '1234567890',
+            'jabatan' => 'Guru Pengajar',
+        ]);
+
+        $today = now('Asia/Jakarta')->toDateString();
+
+        // Buat data presensi_gurus dengan jam masuk dan jam pulang
+        \App\Models\PresensiGuru::create([
+            'user_id' => $guru->id,
+            'lembaga_id' => 1,
+            'tanggal' => $today,
+            'jam_masuk' => '06:45:10',
+            'jam_pulang' => '15:30:25',
+            'status' => 'hadir',
+            'metode_masuk' => 'rfid_tap',
+            'metode_pulang' => 'rfid_tap',
+        ]);
+
+        // Request data dashboard presensi untuk tab pegawai
+        $response = $this->actingAs($yayasan)->getJson(route('dashboard-presensi.data', ['tab' => 'pegawai']));
+        $response->assertStatus(200);
+
+        $json = $response->json();
+        $this->assertNotEmpty($json['hadirList']);
+
+        $guruData = collect($json['hadirList'])->firstWhere('id', $guru->id);
+        if (!$guruData) {
+            $guruData = collect($json['waitingList'])->firstWhere('id', $guru->id);
+        }
+
+        $this->assertNotNull($guruData);
+        $this->assertSame('Ustadz Ahmad Al-Baqir', $guruData['nama']);
+        $this->assertSame('06:45:10', $guruData['jam_masuk']);
+        $this->assertSame('15:30:25', $guruData['jam_pulang']);
+        $this->assertTrue($guruData['is_pulang']);
+        $this->assertSame('pulang', $guruData['status_kehadiran']);
+    }
 }

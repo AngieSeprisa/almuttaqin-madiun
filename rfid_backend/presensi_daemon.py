@@ -904,6 +904,22 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "", all_candidates:
             p_guru = cursor.fetchone()
 
             if not p_guru:
+                # Cari sesi spesifik pegawai masuk jika ada
+                try:
+                    cursor.execute("""
+                        SELECT id, nama_sesi FROM master_sesis
+                        WHERE (kategori = 'pegawai' OR target_kategori = 'pegawai')
+                          AND (kode_sesi LIKE '%MASUK%' OR LOWER(nama_sesi) LIKE '%masuk%' OR LOWER(nama_sesi) LIKE '%datang%')
+                        ORDER BY (jam_mulai <= %s AND jam_selesai >= %s) DESC, id ASC
+                        LIMIT 1
+                    """, (current_time, current_time))
+                    sesi_masuk_row = cursor.fetchone()
+                    if sesi_masuk_row:
+                        sesi_id = sesi_masuk_row["id"]
+                        sesi_name = sesi_masuk_row["nama_sesi"]
+                except Exception as ex_smsk:
+                    logging.debug(f"Lookup sesi pegawai masuk notice: {ex_smsk}")
+
                 # 1. Tap Pertama Hari Ini: Catat Jam Masuk
                 cursor.execute("""
                     INSERT INTO presensi_gurus (user_id, lembaga_id, tanggal, jam_masuk, status, metode_masuk, created_at, updated_at)
@@ -924,7 +940,7 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "", all_candidates:
                     "status": "HADIR MASUK",
                     "pesan": "HADIR MASUK",
                     "kode": "SUCCESS",
-                    "sesi": "Presensi Guru"
+                    "sesi": sesi_name
                 }
             else:
                 # 2. Sudah Pernah Tap: Cek Debounce Anti Double Tap Tak Sengaja
@@ -943,10 +959,26 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "", all_candidates:
                                 "status": "SUDAH ABSEN",
                                 "pesan": "SUDAH ABSEN",
                                 "kode": "DUPLICATE",
-                                "sesi": "Presensi Guru"
+                                "sesi": sesi_name
                             }
                     except Exception as ex_dbnc:
                         logging.warning(f"Error debounce check: {ex_dbnc}")
+
+                # Cari sesi spesifik pegawai pulang jika ada
+                try:
+                    cursor.execute("""
+                        SELECT id, nama_sesi FROM master_sesis
+                        WHERE (kategori = 'pegawai' OR target_kategori = 'pegawai')
+                          AND (kode_sesi LIKE '%PULANG%' OR LOWER(nama_sesi) LIKE '%pulang%')
+                        ORDER BY (jam_mulai <= %s AND jam_selesai >= %s) DESC, id ASC
+                        LIMIT 1
+                    """, (current_time, current_time))
+                    sesi_pulang_row = cursor.fetchone()
+                    if sesi_pulang_row:
+                        sesi_id = sesi_pulang_row["id"]
+                        sesi_name = sesi_pulang_row["nama_sesi"]
+                except Exception as ex_splg:
+                    logging.debug(f"Lookup sesi pegawai pulang notice: {ex_splg}")
 
                 # Update Jam Pulang
                 cursor.execute("""
@@ -968,7 +1000,7 @@ def process_tap(db, uid: str, device_id: str, ip_addr: str = "", all_candidates:
                     "status": "HADIR PULANG",
                     "pesan": "HADIR PULANG",
                     "kode": "SUCCESS",
-                    "sesi": "Presensi Guru"
+                    "sesi": sesi_name
                 }
 
         except Exception as ex_guru:

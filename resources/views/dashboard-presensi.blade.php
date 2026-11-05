@@ -115,11 +115,11 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                  x-text="currentTab === 'pondok' ? 'Santri mukim aktif pada filter kamar' : (currentTab === 'sekolah' ? 'Siswa formal SMP & SMA terdaftar' : 'Guru & pegawai yayasan terdaftar')"></div>
         </div>
 
-        <!-- Sudah Tap Hadir -->
+        <!-- Sudah Tap Hadir / Pulang -->
         <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
             <div class="flex items-start justify-between">
                 <div>
-                    <div class="text-xs font-semibold text-gray-500">Sudah Tap Hadir</div>
+                    <div class="text-xs font-semibold text-gray-500" x-text="currentTab === 'pegawai' ? (isSesiPulang() ? 'Sudah Tap Pulang' : 'Sudah Tap Masuk') : 'Sudah Tap Hadir'">Sudah Tap Hadir</div>
                     <div class="text-3xl font-extrabold text-emerald-600 font-mono mt-1.5" x-text="summary.sudahHadir">0</div>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200/70 text-emerald-600 flex items-center justify-center shrink-0">
@@ -140,7 +140,7 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
         <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
             <div class="flex items-start justify-between">
                 <div>
-                    <div class="text-xs font-semibold text-gray-500">Belum Tap / Absen</div>
+                    <div class="text-xs font-semibold text-gray-500" x-text="currentTab === 'pegawai' ? (isSesiPulang() ? 'Belum Tap Pulang' : 'Belum Tap Masuk') : 'Belum Tap / Absen'">Belum Tap / Absen</div>
                     <div class="text-3xl font-extrabold text-rose-600 font-mono mt-1.5" x-text="summary.belumHadir">0</div>
                 </div>
                 <div class="w-10 h-10 rounded-lg bg-rose-50 border border-rose-200/70 text-rose-600 flex items-center justify-center shrink-0">
@@ -149,7 +149,8 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                     </svg>
                 </div>
             </div>
-            <div class="mt-2.5 text-xs font-medium text-rose-600">Perlu disisir pamong / wali kelas</div>
+            <div class="mt-2.5 text-xs font-medium text-rose-600"
+                 x-text="currentTab === 'pegawai' ? (isSesiPulang() ? 'Pegawai yang belum tap pulang' : 'Pegawai yang belum hadir') : 'Perlu disisir pamong / wali kelas'">Perlu disisir pamong / wali kelas</div>
         </div>
     </div>
 
@@ -274,7 +275,7 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                                 </label>
                                 <label class="flex items-center gap-2.5 text-xs text-gray-700 cursor-pointer select-none">
                                     <input type="checkbox" x-model="columns.waktu" class="rounded border-gray-300 text-blue-600 focus:ring-0">
-                                    <span>Waktu Tap</span>
+                                    <span x-text="currentTab === 'pegawai' ? 'Jam Masuk & Pulang' : 'Waktu Tap'">Waktu Tap</span>
                                 </label>
                             </div>
                         </div>
@@ -308,14 +309,38 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                                 </div>
                             </th>
                             <th class="py-3 px-4" x-show="columns.rfid">Kartu RFID</th>
-                            <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" x-show="columns.waktu" @click="toggleSort('waktu')">
-                                <div class="inline-flex items-center gap-1.5">
-                                    <span>Waktu Tap</span>
-                                    <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </div>
-                            </th>
+                            <!-- Tab Pegawai: Pisah Kolom Jam Masuk & Jam Pulang -->
+                            <template x-if="currentTab === 'pegawai'">
+                                <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" x-show="columns.waktu" @click="toggleSort('jam_masuk')">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <span>Jam Masuk</span>
+                                        <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </th>
+                            </template>
+                            <template x-if="currentTab === 'pegawai'">
+                                <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" x-show="columns.waktu" @click="toggleSort('jam_pulang')">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <span>Jam Pulang</span>
+                                        <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </th>
+                            </template>
+                            <!-- Tab Pondok & Tab Sekolah: Waktu Tap Tunggal -->
+                            <template x-if="currentTab !== 'pegawai'">
+                                <th class="py-3 px-4 cursor-pointer select-none hover:text-gray-950" x-show="columns.waktu" @click="toggleSort('waktu')">
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <span>Waktu Tap</span>
+                                        <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                </th>
+                            </template>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 bg-white">
@@ -331,7 +356,41 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                                 <td class="py-3 px-4">
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="font-bold text-gray-900 text-xs sm:text-[13px]" x-text="item.nama"></span>
-                                        <template x-if="!item.is_hadir">
+
+                                        <!-- Khusus Pegawai -->
+                                        <template x-if="currentTab === 'pegawai'">
+                                            <span class="inline-flex items-center gap-1">
+                                                <template x-if="item.is_pulang">
+                                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                                                        <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                                        </svg>
+                                                        <span>Pulang</span>
+                                                    </span>
+                                                </template>
+                                                <template x-if="!item.is_pulang && item.jam_masuk">
+                                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                                        <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                        <span>Masuk</span>
+                                                    </span>
+                                                </template>
+                                                <template x-if="!item.jam_masuk && !item.is_pulang">
+                                                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 border border-rose-200">
+                                                        <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                            <circle cx="12" cy="12" r="10"></circle>
+                                                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                                                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                                        </svg>
+                                                        <span>Belum Tap</span>
+                                                    </span>
+                                                </template>
+                                            </span>
+                                        </template>
+
+                                        <!-- Selain Pegawai (Pondok & Sekolah) -->
+                                        <template x-if="currentTab !== 'pegawai' && !item.is_hadir">
                                             <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-100 text-rose-700 border border-rose-200">
                                                 <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                                     <circle cx="12" cy="12" r="10"></circle>
@@ -355,20 +414,48 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
 
                                 <!-- Status Badge (Aktif / Hadir vs Terlambat vs Belum Tap) -->
                                 <td class="py-3 px-4 whitespace-nowrap" x-show="columns.status">
-                                    <template x-if="item.is_hadir && item.status_kehadiran !== 'terlambat'">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]">
-                                            Aktif / Hadir
-                                        </span>
+                                    <template x-if="currentTab === 'pegawai'">
+                                        <div>
+                                            <template x-if="item.is_pulang">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#EFF4FF] text-[#0052FF] border border-[#0052FF]/30">
+                                                    Sudah Pulang
+                                                </span>
+                                            </template>
+                                            <template x-if="!item.is_pulang && item.status_kehadiran === 'terlambat'">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
+                                                    Terlambat
+                                                </span>
+                                            </template>
+                                            <template x-if="!item.is_pulang && item.jam_masuk && item.status_kehadiran !== 'terlambat'">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]">
+                                                    Hadir (Masuk)
+                                                </span>
+                                            </template>
+                                            <template x-if="!item.jam_masuk && !item.is_pulang">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEE2E2] text-[#B91C1C] border border-[#FECACA]">
+                                                    Belum Tap
+                                                </span>
+                                            </template>
+                                        </div>
                                     </template>
-                                    <template x-if="item.is_hadir && item.status_kehadiran === 'terlambat'">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
-                                            Terlambat
-                                        </span>
-                                    </template>
-                                    <template x-if="!item.is_hadir">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEE2E2] text-[#B91C1C] border border-[#FECACA]">
-                                            Belum Tap
-                                        </span>
+                                    <template x-if="currentTab !== 'pegawai'">
+                                        <div>
+                                            <template x-if="item.is_hadir && item.status_kehadiran !== 'terlambat'">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#DCFCE7] text-[#15803D] border border-[#BBF7D0]">
+                                                    Aktif / Hadir
+                                                </span>
+                                            </template>
+                                            <template x-if="item.is_hadir && item.status_kehadiran === 'terlambat'">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A]">
+                                                    Terlambat
+                                                </span>
+                                            </template>
+                                            <template x-if="!item.is_hadir">
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEE2E2] text-[#B91C1C] border border-[#FECACA]">
+                                                    Belum Tap
+                                                </span>
+                                            </template>
+                                        </div>
                                     </template>
                                 </td>
 
@@ -388,12 +475,40 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                                     </template>
                                 </td>
 
-                                <!-- Waktu Tap -->
-                                <td class="py-3 px-4 whitespace-nowrap font-mono text-xs"
-                                    x-show="columns.waktu"
-                                    :class="item.waktu_tap ? 'text-gray-800 font-semibold' : 'text-gray-400'"
-                                    x-text="item.waktu_tap ? (item.waktu_tap + ' WIB') : '—'">
-                                </td>
+                                <!-- Waktu Tap (Khusus Pegawai: Pisah Jam Masuk & Jam Pulang) -->
+                                <template x-if="currentTab === 'pegawai'">
+                                    <td class="py-3 px-4 whitespace-nowrap font-mono text-xs" x-show="columns.waktu">
+                                        <template x-if="item.jam_masuk">
+                                            <span class="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                                <span x-text="item.jam_masuk + ' WIB'"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="!item.jam_masuk">
+                                            <span class="text-gray-400 italic">Belum masuk</span>
+                                        </template>
+                                    </td>
+                                </template>
+                                <template x-if="currentTab === 'pegawai'">
+                                    <td class="py-3 px-4 whitespace-nowrap font-mono text-xs" x-show="columns.waktu">
+                                        <template x-if="item.jam_pulang">
+                                            <span class="inline-flex items-center gap-1 font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                                <span x-text="item.jam_pulang + ' WIB'"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="!item.jam_pulang">
+                                            <span class="text-gray-400 italic">Belum pulang</span>
+                                        </template>
+                                    </td>
+                                </template>
+
+                                <!-- Waktu Tap (Tab Pondok & Sekolah: Format Standar) -->
+                                <template x-if="currentTab !== 'pegawai'">
+                                    <td class="py-3 px-4 whitespace-nowrap font-mono text-xs"
+                                        x-show="columns.waktu"
+                                        :class="item.waktu_tap ? 'text-gray-800 font-semibold' : 'text-gray-400'"
+                                        x-text="item.waktu_tap ? (item.waktu_tap + ' WIB') : '—'">
+                                    </td>
+                                </template>
                             </tr>
                         </template>
 
@@ -489,8 +604,8 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                         <div class="text-right shrink-0">
                             <div class="text-xs font-mono font-bold text-gray-900" x-text="feed.waktu"></div>
                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold mt-0.5"
-                                  :class="feed.status === 'terlambat' ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20'"
-                                  x-text="feed.status === 'terlambat' ? 'Terlambat' : 'Berhasil Tap'">
+                                  :class="feed.status === 'pulang' ? 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20' : (feed.status === 'terlambat' ? 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20')"
+                                  x-text="feed.status === 'pulang' ? 'Sudah Pulang' : (feed.status === 'terlambat' ? 'Terlambat' : 'Berhasil Tap')">
                             </span>
                         </div>
                     </div>
@@ -583,6 +698,12 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                 return this.statusFilter !== 'all' ? 1 : 0;
             },
 
+            isSesiPulang() {
+                const kode = (this.sesiAktif?.kode || '').toUpperCase();
+                const nama = (this.sesiAktif?.nama || '').toUpperCase();
+                return kode.includes('PULANG') || nama.includes('PULANG');
+            },
+
             toggleSort(field) {
                 if (this.sortField === field) {
                     this.sortAsc = !this.sortAsc;
@@ -615,6 +736,16 @@ x-data="dashboardApp()" x-init="initApp()" @nfc-tab-switch.window="changeTab($ev
                     if (this.sortField === 'nama') {
                         const cmp = (a.nama || '').localeCompare(b.nama || '', 'id');
                         return this.sortAsc ? cmp : -cmp;
+                    }
+                    if (this.sortField === 'jam_masuk') {
+                        const wa = a.jam_masuk || '99:99:99';
+                        const wb = b.jam_masuk || '99:99:99';
+                        return this.sortAsc ? wa.localeCompare(wb) : wb.localeCompare(wa);
+                    }
+                    if (this.sortField === 'jam_pulang') {
+                        const wa = a.jam_pulang || '99:99:99';
+                        const wb = b.jam_pulang || '99:99:99';
+                        return this.sortAsc ? wa.localeCompare(wb) : wb.localeCompare(wa);
                     }
                     if (this.sortField === 'waktu') {
                         const wa = a.waktu_tap || '99:99:99';
