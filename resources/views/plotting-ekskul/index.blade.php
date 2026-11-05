@@ -225,19 +225,31 @@
                                        id="masterCheckEkskul"
                                        onclick="toggleMasterCheck('ekskul', this.checked)">
                             </th>
-                            <th class="fi-ta-th fi-ta-th-sortable" onclick="sortTable('ekskul', 1)">
-                                <span>Nama Ekskul</span>
-                                <span class="fi-ta-sort-icon">↕</span>
+                            <th class="fi-ta-th">
+                                <button type="button" class="fi-ta-th-sort" onclick="sortTableByEkskul('ekskul', 'nama', this)">
+                                    <span>Nama Ekskul</span>
+                                    <svg class="fi-ta-sort-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
                             </th>
-                            <th class="fi-ta-th fi-ta-th-sortable" onclick="sortTable('ekskul', 2)">
-                                <span>Pembina</span>
-                                <span class="fi-ta-sort-icon">↕</span>
+                            <th class="fi-ta-th">
+                                <button type="button" class="fi-ta-th-sort" onclick="sortTableByEkskul('ekskul', 'pembina', this)">
+                                    <span>Pembina</span>
+                                    <svg class="fi-ta-sort-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
                             </th>
-                            <th class="fi-ta-th fi-ta-th-center fi-ta-th-sortable" onclick="sortTable('ekskul', 3)">
-                                <span>Peserta</span>
-                                <span class="fi-ta-sort-icon">↕</span>
+                            <th class="fi-ta-th" style="text-align: center;">
+                                <button type="button" class="fi-ta-th-sort" onclick="sortTableByEkskul('ekskul', 'peserta', this)" style="justify-content: center;">
+                                    <span>Peserta</span>
+                                    <svg class="fi-ta-sort-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
                             </th>
-                            <th class="fi-ta-th fi-ta-th-right" style="width: 140px;">
+                            <th class="fi-ta-th fi-ta-th-right" style="width: 140px; text-align: right; padding-right: 20px;">
                                 <span>Aksi</span>
                             </th>
                         </tr>
@@ -329,14 +341,47 @@
                         </tr>
                         @empty
                         <tr class="js-empty-initial">
-                            <td colspan="5" style="padding: 36px 16px; text-align: center; color: #6B7280;">
-                                Belum ada data ekstrakurikuler untuk jenjang {{ $jenjang }}. Klik tombol "Tambah Ekskul" di atas.
+                            <td colspan="5" style="padding: 48px 16px; text-align: center;">
+                                <div style="display:flex; flex-direction:column; align-items:center; gap:12px; max-width:420px; margin:0 auto;">
+                                    <div style="width:48px; height:48px; border-radius:50%; background:#EFF6FF; color:#0052FF; display:flex; align-items:center; justify-content:center;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px; height:24px;">
+                                            <circle cx="12" cy="8" r="7"></circle>
+                                            <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 style="margin:0 0 4px 0; font-size:14px; font-weight:700; color:var(--text-primary, #0F172A);">Belum Ada Ekstrakurikuler</h4>
+                                        <p style="margin:0; font-size:12.5px; color:#6B7280; line-height:1.4;">
+                                            Belum ada kegiatan ekstrakurikuler terdaftar untuk jenjang {{ $jenjang }}. Klik tombol di bawah untuk menambahkan.
+                                        </p>
+                                    </div>
+                                    @if(!auth()->check() || auth()->user()->isYayasan() || auth()->user()->canDo('ekstrakurikuler', 'create'))
+                                    <button type="button" class="pk-btn-primary" onclick="openTambahEkskulModal()" style="margin-top:4px;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:14px; height:14px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                        <span>Tambah Ekskul</span>
+                                    </button>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                         @endforelse
                         <tr id="emptyFilterRowEkskul" style="display:none;">
-                            <td colspan="5" style="padding: 32px 16px; text-align: center; color: #6B7280;">
-                                Tidak ada ekstrakurikuler yang sesuai dengan pencarian atau filter.
+                            <td colspan="5" style="padding: 40px 16px; text-align: center;">
+                                <div style="display:flex; flex-direction:column; align-items:center; gap:10px; max-width:380px; margin:0 auto;">
+                                    <div style="width:42px; height:42px; border-radius:50%; background:#F1F5F9; color:#64748B; display:flex; align-items:center; justify-content:center;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;">
+                                            <circle cx="11" cy="11" r="8"></circle>
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 style="margin:0 0 4px 0; font-size:13.5px; font-weight:700; color:var(--text-primary, #0F172A);">Tidak Ada Data Ditemukan</h4>
+                                        <p style="margin:0; font-size:12px; color:#6B7280;">Tidak ada ekstrakurikuler yang sesuai dengan pencarian atau filter.</p>
+                                    </div>
+                                    <button type="button" class="pk-btn-clean" onclick="clearSearch('ekskul'); resetFilter('ekskul');" style="margin-top:2px; font-size:12px; padding:5px 12px;">
+                                        Reset Pencarian
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -504,17 +549,31 @@
                                        id="masterCheckBelum"
                                        onclick="toggleMasterCheck('belum', this.checked)">
                             </th>
-                            <th class="fi-ta-th fi-ta-th-sortable" onclick="sortTable('belum', 1)">
-                                <span>Nama Siswa</span>
-                                <span class="fi-ta-sort-icon">↕</span>
+                            <th class="fi-ta-th">
+                                <button type="button" class="fi-ta-th-sort" onclick="sortTableByEkskul('belum', 'nama', this)">
+                                    <span>Nama Siswa</span>
+                                    <svg class="fi-ta-sort-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
                             </th>
                             <th class="fi-ta-th">
-                                <span>Kelas Formal</span>
+                                <button type="button" class="fi-ta-th-sort" onclick="sortTableByEkskul('belum', 'kelas', this)">
+                                    <span>Kelas Formal</span>
+                                    <svg class="fi-ta-sort-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
                             </th>
-                            <th class="fi-ta-th fi-ta-th-center">
-                                <span>Status</span>
+                            <th class="fi-ta-th" style="text-align: center;">
+                                <button type="button" class="fi-ta-th-sort" onclick="sortTableByEkskul('belum', 'status', this)" style="justify-content: center;">
+                                    <span>Status</span>
+                                    <svg class="fi-ta-sort-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
                             </th>
-                            <th class="fi-ta-th fi-ta-th-right" style="width: 140px;">
+                            <th class="fi-ta-th fi-ta-th-right" style="width: 140px; text-align: right; padding-right: 20px;">
                                 <span>Aksi</span>
                             </th>
                         </tr>
@@ -525,7 +584,8 @@
                             data-id="{{ $siswa->id }}"
                             data-nama="{{ strtolower($siswa->nama_lengkap) }}"
                             data-nisn="{{ strtolower($siswa->pendaftaran?->nisn ?? $siswa->nisn ?? '') }}"
-                            data-kelas="{{ $siswa->kelas ?? '' }}">
+                            data-kelas="{{ $siswa->kelas ?? '' }}"
+                            data-status="{{ strtolower($siswa->status ?? 'aktif') }}">
                             <td class="fi-ta-td-check">
                                 <input type="checkbox"
                                        class="fi-ta-checkbox row-check-belum"
@@ -578,14 +638,41 @@
                         </tr>
                         @empty
                         <tr class="js-empty-initial">
-                            <td colspan="5" style="padding: 36px 16px; text-align: center; color: #6B7280;">
-                                Seluruh siswa jenjang {{ $jenjang }} telah mengikuti kegiatan ekstrakurikuler.
+                            <td colspan="5" style="padding: 48px 16px; text-align: center;">
+                                <div style="display:flex; flex-direction:column; align-items:center; gap:12px; max-width:420px; margin:0 auto;">
+                                    <div style="width:48px; height:48px; border-radius:50%; background:#ECFDF5; color:#059669; display:flex; align-items:center; justify-content:center;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:24px; height:24px;">
+                                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 style="margin:0 0 4px 0; font-size:14px; font-weight:700; color:var(--text-primary, #0F172A);">Semua Siswa Sudah Terdaftar</h4>
+                                        <p style="margin:0; font-size:12.5px; color:#6B7280; line-height:1.4;">
+                                            Seluruh siswa aktif jenjang {{ $jenjang }} telah mengikuti kegiatan ekstrakurikuler.
+                                        </p>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         @endforelse
                         <tr id="emptyFilterRowBelum" style="display:none;">
-                            <td colspan="5" style="padding: 32px 16px; text-align: center; color: #6B7280;">
-                                Tidak ada data siswa yang sesuai dengan pencarian atau filter.
+                            <td colspan="5" style="padding: 40px 16px; text-align: center;">
+                                <div style="display:flex; flex-direction:column; align-items:center; gap:10px; max-width:380px; margin:0 auto;">
+                                    <div style="width:42px; height:42px; border-radius:50%; background:#F1F5F9; color:#64748B; display:flex; align-items:center; justify-content:center;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;">
+                                            <circle cx="11" cy="11" r="8"></circle>
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 style="margin:0 0 4px 0; font-size:13.5px; font-weight:700; color:var(--text-primary, #0F172A);">Tidak Ada Data Siswa Ditemukan</h4>
+                                        <p style="margin:0; font-size:12px; color:#6B7280;">Tidak ada siswa yang sesuai dengan kata kunci pencarian atau filter kelas.</p>
+                                    </div>
+                                    <button type="button" class="pk-btn-clean" onclick="clearSearch('belum'); resetFilter('belum');" style="margin-top:2px; font-size:12px; padding:5px 12px;">
+                                        Reset Pencarian
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -1157,12 +1244,38 @@
 .fi-ta-table-scroll { width: 100%; overflow-x: auto; }
 .fi-ta-table { width: 100%; border-collapse: collapse; text-align: left; }
 .fi-ta-table th {
-    padding: 10px 14px; background: #F8FAFC; border-bottom: 1px solid #E5E7EB;
-    font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em;
+    padding: 12px 14px; background: #FAFAFA; border-bottom: 1px solid #E5E7EB;
+    font-size: 13px; font-weight: 600; color: #111827; text-transform: none; letter-spacing: -0.01em;
+    white-space: nowrap; user-select: none;
 }
-.dark-mode .fi-ta-table th { background: #0F172A; border-bottom-color: #1E293B; color: #94A3B8; }
+.dark-mode .fi-ta-table th { background: #1A2332; border-bottom-color: #263346; color: #F1F5F9; }
 .fi-ta-th-check, .fi-ta-td-check { width: 36px; text-align: center; padding: 10px 8px !important; }
 .fi-ta-checkbox { width: 15px; height: 15px; border-radius: 4px; accent-color: #0052FF; cursor: pointer; }
+.fi-ta-th-sort {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    background: transparent; border: none; padding: 0; font-size: 13px;
+    font-weight: 600; color: inherit; transition: color 0.15s ease;
+}
+.fi-ta-th-sort:hover { color: #0052FF; }
+.dark-mode .fi-ta-th-sort:hover { color: #60A5FA; }
+.fi-ta-sort-arrow {
+    width: 14px; height: 14px; color: #9CA3AF;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease;
+    flex-shrink: 0;
+}
+.fi-ta-th-sort:hover .fi-ta-sort-arrow,
+.fi-ta-th-sort.is-active .fi-ta-sort-arrow {
+    color: #0052FF;
+}
+.dark-mode .fi-ta-th-sort:hover .fi-ta-sort-arrow,
+.dark-mode .fi-ta-th-sort.is-active .fi-ta-sort-arrow {
+    color: #60A5FA;
+}
+.fi-ta-th-sort.is-active { color: #0052FF; }
+.dark-mode .fi-ta-th-sort.is-active { color: #60A5FA; }
+.fi-ta-th-sort.is-asc .fi-ta-sort-arrow { transform: rotate(180deg); }
+.fi-ta-th-sort.is-desc .fi-ta-sort-arrow { transform: rotate(0deg); }
+
 .fi-ta-th-sortable { cursor: pointer; user-select: none; }
 .fi-ta-sort-icon { font-size: 10px; color: #9CA3AF; margin-left: 4px; }
 .fi-ta-th-center, .fi-ta-td-center { text-align: center; }
@@ -1258,22 +1371,26 @@
     backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 16px;
 }
 .pk-modal-dialog { width: 100%; max-width: 640px; }
-.pk-modal-dialog-sm { max-width: 440px; }
+.pk-modal-dialog-sm { max-width: 480px; }
 .pk-modal-content {
-    background: #FFFFFF; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
-    overflow: hidden; display: flex; flex-direction: column;
+    background: #FFFFFF; border-radius: 14px; box-shadow: 0 20px 35px -5px rgba(0,0,0,0.12);
+    overflow: visible !important; display: flex; flex-direction: column; position: relative;
 }
 .dark-mode .pk-modal-content { background: #1E293B; color: #F8FAFC; }
 .pk-modal-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 20px; border-bottom: 1px solid #E5E7EB;
+    padding: 16px 22px; border-bottom: 1px solid #E5E7EB;
+    border-top-left-radius: 14px; border-top-right-radius: 14px;
 }
 .dark-mode .pk-modal-header { border-bottom-color: #334155; }
-.pk-modal-title { font-size: 15px; font-weight: 700; color: var(--text-primary, #0F172A); margin: 0; }
+.pk-modal-title { font-size: 15.5px; font-weight: 700; color: var(--text-primary, #0F172A); margin: 0; }
 .pk-modal-subtitle { font-size: 12px; color: #6B7280; margin-top: 2px; }
-.pk-modal-close { background: transparent; border: none; font-size: 20px; color: #9CA3AF; cursor: pointer; line-height: 1; }
-.pk-modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
-.pk-form-group { display: flex; flex-direction: column; gap: 5px; }
+.pk-modal-close { background: transparent; border: none; font-size: 20px; color: #9CA3AF; cursor: pointer; line-height: 1; padding: 2px; }
+.pk-modal-body {
+    padding: 20px 22px; display: flex; flex-direction: column; gap: 15px;
+    overflow: visible !important; position: relative; z-index: 30; min-height: 190px;
+}
+.pk-form-group { display: flex; flex-direction: column; gap: 5px; position: relative; }
 .pk-form-label { font-size: 12.5px; font-weight: 600; color: #374151; }
 .dark-mode .pk-form-label { color: #CBD5E1; }
 .pk-form-input, .pk-form-select {
@@ -1286,9 +1403,16 @@ textarea.pk-form-input { height: auto; padding: 8px 12px; }
 .pk-form-input:focus, .pk-form-select:focus { border-color: #0052FF; }
 .pk-modal-footer {
     display: flex; align-items: center; justify-content: flex-end; gap: 8px;
-    padding: 12px 20px; border-top: 1px solid #E5E7EB; background: #F8FAFC;
+    padding: 14px 22px; border-top: 1px solid #E5E7EB; background: #F8FAFC;
+    border-bottom-left-radius: 14px; border-bottom-right-radius: 14px;
+    position: relative; z-index: 10;
 }
 .dark-mode .pk-modal-footer { background: #0F172A; border-top-color: #334155; }
+
+/* Custom select popover inside modals */
+.pk-modal-body .fi-select-wrap.is-open .fi-select-popover {
+    z-index: 99999 !important;
+}
 .pk-btn-clean {
     padding: 7px 14px; background: transparent; border: 1px solid #D1D5DB;
     border-radius: 7px; font-size: 12.5px; font-weight: 600; color: #4B5563; cursor: pointer;
@@ -1407,52 +1531,40 @@ function clearSelection(key) {
     onRowCheckChange(key);
 }
 
-// Client search & filter
-function onSearchInput(key) {
-    const val = (document.getElementById(key === 'ekskul' ? 'searchEkskul' : 'searchBelum')?.value || '').toLowerCase().trim();
-    const clearBtn = document.getElementById(key === 'ekskul' ? 'clearSearchEkskul' : 'clearSearchBelum');
-    if (clearBtn) clearBtn.style.display = val.length > 0 ? 'block' : 'none';
-    applyClientFilter(key);
-}
-
-function clearSearch(key) {
-    const input = document.getElementById(key === 'ekskul' ? 'searchEkskul' : 'searchBelum');
-    if (input) input.value = '';
-    const clearBtn = document.getElementById(key === 'ekskul' ? 'clearSearchEkskul' : 'clearSearchBelum');
-    if (clearBtn) clearBtn.style.display = 'none';
-    applyClientFilter(key);
-}
-
-function applyFilter(key) {
-    closeAllPopovers();
-    applyClientFilter(key);
-}
-
-function resetFilter(key) {
-    if (key === 'ekskul') {
-        const c1 = document.getElementById('fltEkskulTerisi');
-        const s1 = document.getElementById('fltEkskulHari');
-        if (c1) c1.checked = false;
-        if (s1) s1.value = '';
-    } else {
-        const s2 = document.getElementById('fltBelumKelas');
-        if (s2) s2.value = '';
+// Table state & pagination
+const tableState = {
+    ekskul: {
+        page: 1,
+        perPage: 10,
+        sortKey: '',
+        sortAsc: true,
+        rowSelector: '#tbodyEkskul tr.js-row-ekskul',
+        tbodyId: 'tbodyEkskul',
+        emptyRowId: 'emptyFilterRowEkskul',
+        footerInfoId: 'footerInfoEkskul',
+        pagesId: 'pagesEkskul'
+    },
+    belum: {
+        page: 1,
+        perPage: 10,
+        sortKey: '',
+        sortAsc: true,
+        rowSelector: '#tbodyBelum tr.js-row-belum',
+        tbodyId: 'tbodyBelum',
+        emptyRowId: 'emptyFilterRowBelum',
+        footerInfoId: 'footerInfoBelum',
+        pagesId: 'pagesBelum'
     }
-    closeAllPopovers();
-    applyClientFilter(key);
-}
+};
 
-function applyClientFilter(key) {
+function getMatchingRows(key) {
     const isEkskul = key === 'ekskul';
-    const rows = document.querySelectorAll(isEkskul ? '.js-row-ekskul' : '.js-row-belum');
-    const emptyRow = document.getElementById(isEkskul ? 'emptyFilterRowEkskul' : 'emptyFilterRowBelum');
+    const rows = Array.from(document.querySelectorAll(tableState[key].rowSelector));
     const searchVal = (document.getElementById(isEkskul ? 'searchEkskul' : 'searchBelum')?.value || '').toLowerCase().trim();
-
-    let filterBadgeCount = 0;
-    let visibleCount = 0;
 
     let fltTerisi = false;
     let fltKelas = '';
+    let filterBadgeCount = 0;
 
     if (isEkskul) {
         fltTerisi = document.getElementById('fltEkskulTerisi')?.checked || false;
@@ -1466,36 +1578,127 @@ function applyClientFilter(key) {
         if (badgeEl) badgeEl.textContent = filterBadgeCount;
     }
 
-    rows.forEach(row => {
-        let match = true;
+    return rows.filter(row => {
         if (isEkskul) {
             const nama = row.getAttribute('data-nama') || '';
             const pembina = row.getAttribute('data-pembina') || '';
             const count = parseInt(row.getAttribute('data-count') || '0', 10);
-
-            if (searchVal) {
-                match = nama.includes(searchVal) || pembina.includes(searchVal);
-            }
-            if (match && fltTerisi && count === 0) match = false;
+            if (searchVal && !nama.includes(searchVal) && !pembina.includes(searchVal)) return false;
+            if (fltTerisi && count === 0) return false;
         } else {
             const nama = row.getAttribute('data-nama') || '';
             const nisn = row.getAttribute('data-nisn') || '';
             const kelas = row.getAttribute('data-kelas') || '';
-
-            if (searchVal) {
-                match = nama.includes(searchVal) || nisn.includes(searchVal);
-            }
-            if (match && fltKelas && kelas !== fltKelas) match = false;
+            if (searchVal && !nama.includes(searchVal) && !nisn.includes(searchVal)) return false;
+            if (fltKelas && kelas !== fltKelas) return false;
         }
+        return true;
+    });
+}
 
-        row.style.display = match ? '' : 'none';
-        if (match) visibleCount++;
+function renderTable(key) {
+    const st = tableState[key];
+    const allRows = Array.from(document.querySelectorAll(st.rowSelector));
+    const matching = getMatchingRows(key);
+    const total = matching.length;
+    const totalPages = Math.max(1, Math.ceil(total / st.perPage));
+    if (st.page > totalPages) st.page = totalPages;
+
+    const startIdx = (st.page - 1) * st.perPage;
+    const endIdx = Math.min(startIdx + st.perPage, total);
+    const visibleSet = new Set(matching.slice(startIdx, endIdx));
+
+    allRows.forEach(tr => {
+        tr.style.display = visibleSet.has(tr) ? '' : 'none';
     });
 
-    if (emptyRow) emptyRow.style.display = visibleCount === 0 ? '' : 'none';
+    const emptyRow = document.getElementById(st.emptyRowId);
+    if (emptyRow) {
+        emptyRow.style.display = (allRows.length > 0 && total === 0) ? '' : 'none';
+    }
 
-    const footerInfo = document.getElementById(isEkskul ? 'footerInfoEkskul' : 'footerInfoBelum');
-    if (footerInfo) footerInfo.textContent = `Menampilkan ${visibleCount} data`;
+    const infoEl = document.getElementById(st.footerInfoId);
+    if (infoEl) {
+        if (total === 0) {
+            infoEl.textContent = 'Menampilkan 0 data';
+        } else {
+            infoEl.textContent = `Menampilkan ${startIdx + 1} sampai ${endIdx} dari ${total} data`;
+        }
+    }
+
+    renderPaginationButtons(key, totalPages);
+}
+
+function renderPaginationButtons(key, totalPages) {
+    const st = tableState[key];
+    const container = document.getElementById(st.pagesId);
+    if (!container) return;
+
+    if (totalPages <= 1) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    container.style.display = 'inline-flex';
+    let html = `<button type="button" class="fi-ta-page-btn" ${st.page <= 1 ? 'disabled' : ''} onclick="goToPage('${key}', ${st.page - 1})">&lsaquo;</button>`;
+    for (let p = 1; p <= totalPages; p++) {
+        if (totalPages <= 7 || p === 1 || p === totalPages || Math.abs(p - st.page) <= 1) {
+            html += `<button type="button" class="fi-ta-page-btn ${p === st.page ? 'active' : ''}" onclick="goToPage('${key}', ${p})">${p}</button>`;
+        } else if (Math.abs(p - st.page) === 2) {
+            html += `<button type="button" class="fi-ta-page-btn" disabled>&hellip;</button>`;
+        }
+    }
+    html += `<button type="button" class="fi-ta-page-btn" ${st.page >= totalPages ? 'disabled' : ''} onclick="goToPage('${key}', ${st.page + 1})">&rsaquo;</button>`;
+    container.innerHTML = html;
+}
+
+function goToPage(key, page) {
+    tableState[key].page = page;
+    renderTable(key);
+}
+
+function changePerPage(key, val) {
+    tableState[key].perPage = parseInt(val, 10) || 10;
+    tableState[key].page = 1;
+    renderTable(key);
+}
+
+// Client search & filter
+function onSearchInput(key) {
+    const val = (document.getElementById(key === 'ekskul' ? 'searchEkskul' : 'searchBelum')?.value || '').toLowerCase().trim();
+    const clearBtn = document.getElementById(key === 'ekskul' ? 'clearSearchEkskul' : 'clearSearchBelum');
+    if (clearBtn) clearBtn.style.display = val.length > 0 ? 'block' : 'none';
+    tableState[key].page = 1;
+    renderTable(key);
+}
+
+function clearSearch(key) {
+    const input = document.getElementById(key === 'ekskul' ? 'searchEkskul' : 'searchBelum');
+    if (input) input.value = '';
+    const clearBtn = document.getElementById(key === 'ekskul' ? 'clearSearchEkskul' : 'clearSearchBelum');
+    if (clearBtn) clearBtn.style.display = 'none';
+    tableState[key].page = 1;
+    renderTable(key);
+}
+
+function applyFilter(key) {
+    closeAllPopovers();
+    tableState[key].page = 1;
+    renderTable(key);
+}
+
+function resetFilter(key) {
+    if (key === 'ekskul') {
+        const c1 = document.getElementById('fltEkskulTerisi');
+        if (c1) c1.checked = false;
+    } else {
+        const s2 = document.getElementById('fltBelumKelas');
+        if (s2) s2.value = '';
+    }
+    closeAllPopovers();
+    tableState[key].page = 1;
+    renderTable(key);
 }
 
 // Confirmation Dialog Modal
@@ -1550,6 +1753,13 @@ function confirmBulkDeleteEkskul() {
 
 // Modal Tambah & Edit Ekskul
 function openTambahEkskulModal() {
+    const form = document.getElementById('formTambahEkskul');
+    if (form) form.reset();
+    const sel = document.getElementById('selectPembina');
+    if (sel) {
+        sel.value = '';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     document.getElementById('modalTambahEkskul').style.display = 'flex';
 }
 function closeTambahEkskulModal() {
@@ -1559,7 +1769,11 @@ function closeTambahEkskulModal() {
 function openEditEkskulModal(data) {
     document.getElementById('formEditEkskul').action = `/plotting-ekskul/ekskul/${data.id}`;
     document.getElementById('editNamaEkskul').value = data.nama_ekskul || '';
-    document.getElementById('editPembina').value = data.pembina_id || '';
+    const sel = document.getElementById('editPembina');
+    if (sel) {
+        sel.value = data.pembina_id || '';
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
     document.getElementById('modalEditEkskul').style.display = 'flex';
 }
 function closeEditEkskulModal() {
@@ -1747,32 +1961,61 @@ function escapeJs(str) {
     return (str || '').replace(/'/g, "\\'");
 }
 
-// Sorting Kolom
-let sortDirections = {};
-function sortTable(key, colIdx) {
-    const tableId = key === 'ekskul' ? 'tableEkskul' : 'tableBelum';
-    const table = document.getElementById(tableId);
-    if (!table) return;
-    const tbody = table.tBodies[0];
-    const rows = Array.from(tbody.querySelectorAll(key === 'ekskul' ? '.js-row-ekskul' : '.js-row-belum'));
-    
-    const sortId = `${key}_${colIdx}`;
-    sortDirections[sortId] = !sortDirections[sortId];
-    const isAsc = sortDirections[sortId];
+// Sorting Kolom (Panah ke Atas / Bawah seperti Tabel Siswa)
+function sortTableByEkskul(key, field, btnEl) {
+    const st = tableState[key];
+    if (st.sortKey === field) {
+        st.sortAsc = !st.sortAsc;
+    } else {
+        st.sortKey = field;
+        st.sortAsc = true;
+    }
 
-    rows.sort((a, b) => {
-        let valA = (a.cells[colIdx]?.textContent || '').trim().toLowerCase();
-        let valB = (b.cells[colIdx]?.textContent || '').trim().toLowerCase();
-        
-        const numA = parseInt(valA, 10);
-        const numB = parseInt(valB, 10);
-        if (!isNaN(numA) && !isNaN(numB) && String(numA) === valA.split(' ')[0]) {
-            return isAsc ? numA - numB : numB - numA;
-        }
-        return isAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    const tableId = key === 'ekskul' ? 'tableEkskul' : 'tableBelum';
+    const thButtons = document.querySelectorAll(`#${tableId} .fi-ta-th-sort`);
+    thButtons.forEach(btn => {
+        btn.classList.remove('is-active', 'is-asc', 'is-desc');
     });
 
-    rows.forEach(r => tbody.appendChild(r));
+    if (btnEl) {
+        btnEl.classList.add('is-active');
+        btnEl.classList.add(st.sortAsc ? 'is-asc' : 'is-desc');
+    }
+
+    const tbody = document.getElementById(st.tbodyId);
+    const rows = Array.from(tbody.querySelectorAll(st.rowSelector));
+    rows.sort((a, b) => {
+        let valA, valB;
+        if (key === 'ekskul') {
+            if (field === 'peserta') {
+                valA = parseInt(a.getAttribute('data-count') || '0', 10);
+                valB = parseInt(b.getAttribute('data-count') || '0', 10);
+                return st.sortAsc ? valA - valB : valB - valA;
+            } else if (field === 'pembina') {
+                valA = a.getAttribute('data-pembina') || '';
+                valB = b.getAttribute('data-pembina') || '';
+            } else {
+                valA = a.getAttribute('data-nama') || '';
+                valB = b.getAttribute('data-nama') || '';
+            }
+        } else {
+            if (field === 'kelas') {
+                valA = a.getAttribute('data-kelas') || '';
+                valB = b.getAttribute('data-kelas') || '';
+            } else if (field === 'status') {
+                valA = a.getAttribute('data-status') || '';
+                valB = b.getAttribute('data-status') || '';
+            } else {
+                valA = a.getAttribute('data-nama') || '';
+                valB = b.getAttribute('data-nama') || '';
+            }
+        }
+        return st.sortAsc ? valA.localeCompare(valB, 'id') : valB.localeCompare(valA, 'id');
+    });
+
+    const emptyRow = document.getElementById(st.emptyRowId);
+    rows.forEach(r => tbody.insertBefore(r, emptyRow));
+    renderTable(key);
 }
 
 // Kustomisasi Visibilitas Kolom
@@ -1882,10 +2125,10 @@ function resetColumns(key) {
     if (btnEl) btnEl.classList.remove('has-hidden-cols');
 }
 
-// Init client filter on page load
+// Init client filter & pagination on page load
 document.addEventListener('DOMContentLoaded', function() {
-    applyClientFilter('ekskul');
-    applyClientFilter('belum');
+    renderTable('ekskul');
+    renderTable('belum');
     initColumnCustomizer('ekskul');
     initColumnCustomizer('belum');
 });
