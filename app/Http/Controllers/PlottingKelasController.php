@@ -213,9 +213,12 @@ class PlottingKelasController extends Controller
                 ->get();
         }
 
-        // Query seluruh siswa aktif di jenjang sekolah ini
+        // Query seluruh siswa di jenjang sekolah ini (aktif, izin pulang, maupun sakit)
         // PENTING: Siswa dengan jenjang 'Reguler' TIDAK MASUK ke data sekolah
-        $siswaQuery = Siswa::where('status', 'aktif')
+        $siswaQuery = Siswa::where(function ($q) {
+                $q->whereIn('status', ['aktif', 'pulang', 'sakit'])
+                  ->orWhereNull('status');
+            })
             ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
             ->where('jenjang', $jenjang)
             ->with('pendaftaran');
@@ -391,8 +394,11 @@ class PlottingKelasController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk menghapus ruang kelas.');
         }
 
-        // Cek keterkaitan siswa
-        $siswaList = Siswa::where('status', 'aktif')->get();
+        // Cek keterkaitan siswa (termasuk yang sedang sakit atau izin pulang)
+        $siswaList = Siswa::where(function ($q) {
+            $q->whereIn('status', ['aktif', 'pulang', 'sakit'])
+              ->orWhereNull('status');
+        })->get();
         $siswaCount = $siswaList->filter(function ($s) use ($classroom) {
             return self::isSameClass($s->kelas, $classroom->nama_kelas);
         })->count();
@@ -455,7 +461,10 @@ class PlottingKelasController extends Controller
         }
 
         $classrooms = Classroom::whereIn('id', $ids)->get();
-        $siswaList = Siswa::where('status', 'aktif')->get();
+        $siswaList = Siswa::where(function ($q) {
+            $q->whereIn('status', ['aktif', 'pulang', 'sakit'])
+              ->orWhereNull('status');
+        })->get();
 
         $deletedCount = 0;
         $blockedNames = [];
@@ -589,7 +598,10 @@ class PlottingKelasController extends Controller
         $kelasDecoded = urldecode($kelas);
         $jenjang = strtoupper($request->get('jenjang', 'SMP'));
 
-        $allSiswa = Siswa::where('status', 'aktif')
+        $allSiswa = Siswa::where(function ($q) {
+                $q->whereIn('status', ['aktif', 'pulang', 'sakit'])
+                  ->orWhereNull('status');
+            })
             ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
             ->where('jenjang', $jenjang)
             ->with('pendaftaran')
@@ -605,6 +617,7 @@ class PlottingKelasController extends Controller
                 'nisn'         => $s->pendaftaran?->nisn ?? $s->nisn ?? '-',
                 'kelas'        => $s->kelas,
                 'jenjang'      => $s->jenjang,
+                'status'       => $s->status ?? 'aktif',
             ];
         });
 

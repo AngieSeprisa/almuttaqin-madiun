@@ -162,7 +162,7 @@
                         <input type="text"
                                id="searchKelas"
                                class="fi-ta-search-input"
-                               placeholder="Cari nama ruang kelas..."
+                               placeholder="Cari ruang kelas atau nama siswa..."
                                oninput="onSearchInput('kelas')">
                         <button type="button" class="fi-ta-search-clear" id="clearSearchKelas" onclick="clearSearch('kelas')" title="Bersihkan pencarian">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
@@ -284,12 +284,16 @@
                     </thead>
                     <tbody id="tbodyKelas">
                         @forelse($dataKelas as $item)
+                        @php
+                            $siswaNamesStr = isset($item->anggota) ? $item->anggota->pluck('nama_lengkap')->join(' ') : '';
+                        @endphp
                         <tr class="pk-row-kelas js-row-kelas"
                             data-id="{{ $item->id }}"
                             data-nama="{{ strtolower('Kelas ' . ($item->nama_kelas_display ?? $item->nama_kelas)) }}"
                             data-kelas="{{ $item->nama_kelas }}"
                             data-tingkat="{{ $item->tingkat ?? 7 }}"
-                            data-jumlah="{{ $item->jumlah_siswa }}">
+                            data-jumlah="{{ $item->jumlah_siswa }}"
+                            data-siswa-names="{{ $siswaNamesStr }}">
                             <td class="fi-ta-td-check">
                                 <input type="checkbox"
                                        class="fi-ta-checkbox js-cb-kelas"
@@ -571,14 +575,28 @@
                                        onchange="onRowCheckboxChange('belum')">
                             </td>
                             <td>
-                                <span class="pk-nama-text">{{ $siswa->nama_lengkap }}</span>
+                                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                    <span class="pk-nama-text">{{ $siswa->nama_lengkap }}</span>
+                                    @if($siswa->status === 'sakit')
+                                        <span style="display:inline-flex; align-items:center; font-size:10px; font-weight:700; padding:1px 7px; border-radius:9999px; background:#FEE2E2; color:#B91C1C; border:1px solid #FECACA;">Sakit</span>
+                                    @elseif($siswa->status === 'pulang')
+                                        <span style="display:inline-flex; align-items:center; font-size:10px; font-weight:700; padding:1px 7px; border-radius:9999px; background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;">Pulang</span>
+                                    @endif
+                                </div>
                                 <div class="pk-nisn-sub-mobile">NISN: {{ $nisnVal }}</div>
                             </td>
                             <td class="pk-td-nisn">
                                 <span class="pk-nisn-text">{{ $nisnVal }}</span>
                             </td>
                             <td>
-                                <span class="pk-status-pill">Belum Terdaftar</span>
+                                <div style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
+                                    <span class="pk-status-pill">Belum Terdaftar</span>
+                                    @if($siswa->status === 'sakit')
+                                        <span class="pk-status-pill" style="background:#FEE2E2; color:#B91C1C; border-color:#FECACA;">Sakit</span>
+                                    @elseif($siswa->status === 'pulang')
+                                        <span class="pk-status-pill" style="background:#FEF3C7; color:#B45309; border-color:#FDE68A;">Izin Pulang</span>
+                                    @endif
+                                </div>
                             </td>
                             <td style="text-align: right; padding-right: 16px;">
                                 <button type="button"
@@ -1182,7 +1200,7 @@ function getMatchingRows(key) {
     const st = tableState[key];
     const allRows = Array.from(document.querySelectorAll(st.rowSelector));
     return allRows.filter(tr => {
-        const text = tr.innerText.toLowerCase();
+        const text = (tr.innerText + ' ' + (tr.dataset.siswaNames || '')).toLowerCase();
         const matchSearch = !st.search || text.includes(st.search);
         if (!matchSearch) return false;
 
@@ -1551,11 +1569,23 @@ function openAnggotaModal(namaKelas) {
             tr.className = 'js-modal-anggota-row';
             const safeNamaJs = String(item.nama_lengkap || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
+            let statusBadge = '';
+            if (item.status === 'sakit') {
+                statusBadge = ` <span style="display:inline-flex; align-items:center; font-size:10px; font-weight:700; padding:1px 7px; border-radius:9999px; background:#FEE2E2; color:#B91C1C; border:1px solid #FECACA;">Sakit</span>`;
+            } else if (item.status === 'pulang') {
+                statusBadge = ` <span style="display:inline-flex; align-items:center; font-size:10px; font-weight:700; padding:1px 7px; border-radius:9999px; background:#FEF3C7; color:#B45309; border:1px solid #FDE68A;">Pulang</span>`;
+            }
+
             tr.innerHTML = `
                 <td class="fi-ta-td-check">
                     <input type="checkbox" class="fi-ta-checkbox js-check-modal" value="${item.id}" data-nama="${escapeHtml(item.nama_lengkap)}" onchange="updateModalSelectionState()">
                 </td>
-                <td style="font-weight:600;">${escapeHtml(item.nama_lengkap)}</td>
+                <td style="font-weight:600;">
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                        <span>${escapeHtml(item.nama_lengkap)}</span>
+                        ${statusBadge}
+                    </div>
+                </td>
                 <td class="pk-td-nisn" style="font-family:monospace; font-size:12px; color:#64748B;">${escapeHtml(item.nisn)}</td>
                 <td style="text-align:right; padding-right:16px;">
                     <div class="fi-ta-row-actions">

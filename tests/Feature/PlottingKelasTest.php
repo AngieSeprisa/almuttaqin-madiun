@@ -422,4 +422,85 @@ class PlottingKelasTest extends TestCase
         $this->assertNull($s1->fresh()->kelas);
         $this->assertNull($s2->fresh()->kelas);
     }
+
+    public function test_siswa_sedang_sakit_atau_pulang_dapat_ditemukan_dan_diplotting_di_menu_plotting_kelas(): void
+    {
+        $adminSMP = User::where('email', 'admin.smp@almuttaqin.id')->firstOrFail();
+
+        // 1. Buat siswa berstatus 'sakit' (misal: belum terdaftar di kelas)
+        $siswaSakit = Siswa::create([
+            'nama_lengkap' => 'Steffani Marinka Sakit',
+            'kelas'        => null,
+            'jenjang'      => 'SMP',
+            'status'       => 'sakit',
+            'kamar'        => 'Khadijah',
+        ]);
+
+        // 2. Buat siswa berstatus 'pulang' (misal: sudah terdaftar di kelas VII A)
+        $siswaPulang = Siswa::create([
+            'nama_lengkap' => 'Ahmad Dani Pulang',
+            'kelas'        => 'VII A',
+            'jenjang'      => 'SMP',
+            'status'       => 'pulang',
+            'kamar'        => 'Ali',
+        ]);
+
+        // 3. Akses halaman plotting kelas dan verifikasi kedua siswa muncul
+        $response = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->get(route('plotting-kelas.index'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Steffani Marinka Sakit');
+        $response->assertSee('Ahmad Dani Pulang');
+        $response->assertSee('Sakit');
+        $response->assertSee('Pulang');
+
+        // 4. Verifikasi pencarian spesifik untuk siswa sakit menemukan siswa
+        $searchResponse = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->get(route('plotting-kelas.index', ['search' => 'Steffani']));
+
+        $searchResponse->assertStatus(200);
+        $searchResponse->assertSee('Steffani Marinka Sakit');
+
+        // 5. Verifikasi pencarian spesifik untuk siswa pulang menemukan siswa
+        $searchPulang = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->get(route('plotting-kelas.index', ['search' => 'Ahmad Dani']));
+
+        $searchPulang->assertStatus(200);
+        $searchPulang->assertSee('Ahmad Dani Pulang');
+
+        // 6. Verifikasi siswa yang sakit dapat dimutasi ke kelas VII A
+        $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->post(route('plotting-kelas.mutasi'), [
+                'siswa_id' => $siswaSakit->id,
+                'kelas'    => 'VII A',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame('VII A', $siswaSakit->fresh()->kelas);
+
+        // 7. Verifikasi endpoint ajax anggota kelas mengembalikan siswa berstatus sakit dan pulang
+        $anggotaResponse = $this->actingAs($adminSMP)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->getJson(route('plotting-kelas.anggota', ['kelas' => 'VII A', 'jenjang' => 'SMP']));
+
+        $anggotaResponse->assertStatus(200);
+        $anggotaJson = $anggotaResponse->json();
+        $this->assertTrue($anggotaJson['success']);
+
+        $names = collect($anggotaJson['anggota'])->pluck('nama_lengkap')->all();
+        $this->assertContains('Steffani Marinka Sakit', $names);
+        $this->assertContains('Ahmad Dani Pulang', $names);
+
+        // Periksa status juga disertakan dalam payload anggota
+        $sakitItem = collect($anggotaJson['anggota'])->firstWhere('id', $siswaSakit->id);
+        $this->assertSame('sakit', $sakitItem['status']);
+
+        $pulangItem = collect($anggotaJson['anggota'])->firstWhere('id', $siswaPulang->id);
+        $this->assertSame('pulang', $pulangItem['status']);
+    }
 }

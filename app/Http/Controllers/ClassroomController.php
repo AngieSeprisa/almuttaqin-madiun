@@ -183,8 +183,11 @@ class ClassroomController extends Controller
             return redirect()->back()->with('error', "Ruang kelas {$kela->nama_kelas} tidak dapat dihapus karena masih digunakan dalam {$scheduleCount} jadwal pelajaran. Silakan hapus atau pindahkan jadwal terlebih dahulu.");
         }
 
-        // Cek keterkaitan siswa
-        $siswaCount = Siswa::where('status', 'aktif')->get()->filter(function ($s) use ($kela) {
+        // Cek keterkaitan siswa (termasuk yang sakit / izin pulang)
+        $siswaCount = Siswa::where(function ($q) {
+            $q->whereIn('status', ['aktif', 'pulang', 'sakit'])
+              ->orWhereNull('status');
+        })->get()->filter(function ($s) use ($kela) {
             return PlottingKelasController::isSameClass($s->kelas, $kela->nama_kelas);
         })->count();
         if ($siswaCount > 0) {
