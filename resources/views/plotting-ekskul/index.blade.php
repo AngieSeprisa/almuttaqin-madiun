@@ -492,12 +492,43 @@
                                     <label for="fltBelumKelas" class="fi-ta-filter-label">Filter Kelas Formal</label>
                                     <select id="fltBelumKelas" class="fi-ta-filter-select">
                                         <option value="">Semua Kelas</option>
-                                        @php
-                                            $uniqueKelas = $belumTerdaftar->pluck('kelas')->filter()->unique()->sort()->values();
-                                        @endphp
-                                        @foreach($uniqueKelas as $uk)
-                                            <option value="{{ $uk }}">Kelas {{ $uk }}</option>
-                                        @endforeach
+                                        @if($jenjang === 'SMP')
+                                            <option value="tingkat:7">Semua Kelas 7 (VII)</option>
+                                            <option value="7A">Kelas 7A</option>
+                                            <option value="7B">Kelas 7B</option>
+                                            <option value="tingkat:8">Semua Kelas 8 (VIII)</option>
+                                            <option value="8A">Kelas 8A</option>
+                                            <option value="8B">Kelas 8B</option>
+                                            <option value="tingkat:9">Semua Kelas 9 (IX)</option>
+                                            <option value="9A">Kelas 9A</option>
+                                            <option value="9B">Kelas 9B</option>
+                                            @foreach($daftarKelas ?? [] as $dk)
+                                                @php
+                                                    $cleanDk = strtoupper(str_replace(' ', '', $dk));
+                                                @endphp
+                                                @if(!in_array($cleanDk, ['7A', '7B', '8A', '8B', '9A', '9B', 'VIIA', 'VIIB', 'VIIIA', 'VIIIB', 'IXA', 'IXB']))
+                                                    <option value="{{ $dk }}">Kelas {{ $dk }}</option>
+                                                @endif
+                                            @endforeach
+                                        @else
+                                            <option value="tingkat:10">Semua Kelas 10 (X)</option>
+                                            <option value="10A">Kelas 10A</option>
+                                            <option value="10B">Kelas 10B</option>
+                                            <option value="tingkat:11">Semua Kelas 11 (XI)</option>
+                                            <option value="11A">Kelas 11A</option>
+                                            <option value="11B">Kelas 11B</option>
+                                            <option value="tingkat:12">Semua Kelas 12 (XII)</option>
+                                            <option value="12A">Kelas 12A</option>
+                                            <option value="12B">Kelas 12B</option>
+                                            @foreach($daftarKelas ?? [] as $dk)
+                                                @php
+                                                    $cleanDk = strtoupper(str_replace(' ', '', $dk));
+                                                @endphp
+                                                @if(!in_array($cleanDk, ['10A', '10B', '11A', '11B', '12A', '12B', 'XA', 'XB', 'XIA', 'XIB', 'XIIA', 'XIIB']))
+                                                    <option value="{{ $dk }}">Kelas {{ $dk }}</option>
+                                                @endif
+                                            @endforeach
+                                        @endif
                                     </select>
                                 </div>
                             </div>
@@ -1557,6 +1588,33 @@ const tableState = {
     }
 };
 
+function matchClassFilter(siswaKelas, filterVal) {
+    if (!filterVal) return true;
+    if (!siswaKelas || siswaKelas === '-') return false;
+
+    const clean = str => str.toString().toLowerCase().replace(/kelas/gi, '').replace(/[^a-z0-9]/gi, '');
+    const toArabic = str => {
+        let s = str.toString().toUpperCase();
+        s = s.replace(/VIII/g, '8')
+             .replace(/VII/g, '7')
+             .replace(/XII/g, '12')
+             .replace(/XI/g, '11')
+             .replace(/IX/g, '9')
+             .replace(/X/g, '10');
+        return s;
+    };
+
+    if (filterVal.startsWith('tingkat:')) {
+        const targetTingkat = filterVal.split(':')[1];
+        const norm = clean(toArabic(siswaKelas));
+        return norm.startsWith(targetTingkat);
+    }
+
+    const normSiswa = clean(toArabic(siswaKelas));
+    const normFilter = clean(toArabic(filterVal));
+    return normSiswa === normFilter;
+}
+
 function getMatchingRows(key) {
     const isEkskul = key === 'ekskul';
     const rows = Array.from(document.querySelectorAll(tableState[key].rowSelector));
@@ -1590,7 +1648,7 @@ function getMatchingRows(key) {
             const nisn = row.getAttribute('data-nisn') || '';
             const kelas = row.getAttribute('data-kelas') || '';
             if (searchVal && !nama.includes(searchVal) && !nisn.includes(searchVal)) return false;
-            if (fltKelas && kelas !== fltKelas) return false;
+            if (fltKelas && !matchClassFilter(kelas, fltKelas)) return false;
         }
         return true;
     });
