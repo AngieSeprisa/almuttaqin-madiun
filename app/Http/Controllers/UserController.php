@@ -105,13 +105,25 @@ class UserController extends Controller
             'lembagas.required'   => 'Pilih minimal satu lembaga.',
         ]);
 
+        $primaryLembagaId = $validated['lembagas'][0] ?? null;
+        if (!empty($validated['jabatan'])) {
+            $jab = strtolower($validated['jabatan']);
+            foreach ($validated['lembagas'] as $lemId) {
+                $lem = Lembaga::find($lemId);
+                if ($lem && (str_contains($jab, strtolower($lem->kode ?? '')) || str_contains($jab, strtolower($lem->singkatan ?? '')))) {
+                    $primaryLembagaId = $lem->id;
+                    break;
+                }
+            }
+        }
+
         $user = User::create([
             'name'                 => $validated['name'],
             'email'                => $validated['email'],
             'password'             => Hash::make($validated['password']),
             'role'                 => $validated['role'],
             'jabatan'              => $validated['jabatan'] ?? null,
-            'primary_lembaga_id'   => $validated['lembagas'][0] ?? null,
+            'primary_lembaga_id'   => $primaryLembagaId,
             'is_active'            => $request->boolean('is_active', true),
             'must_change_password' => $request->boolean('must_change_password', true),
         ]);
@@ -181,12 +193,24 @@ class UserController extends Controller
             'lembagas.required'   => 'Pilih minimal satu lembaga.',
         ]);
 
+        $primaryLembagaId = $validated['lembagas'][0] ?? null;
+        if (!empty($validated['jabatan'])) {
+            $jab = strtolower($validated['jabatan']);
+            foreach ($validated['lembagas'] as $lemId) {
+                $lem = Lembaga::find($lemId);
+                if ($lem && (str_contains($jab, strtolower($lem->kode ?? '')) || str_contains($jab, strtolower($lem->singkatan ?? '')))) {
+                    $primaryLembagaId = $lem->id;
+                    break;
+                }
+            }
+        }
+
         $updateData = [
             'name'               => $validated['name'],
             'email'              => $validated['email'],
             'role'               => $validated['role'],
             'jabatan'            => $validated['jabatan'] ?? null,
-            'primary_lembaga_id' => $validated['lembagas'][0] ?? null,
+            'primary_lembaga_id' => $primaryLembagaId,
             'is_active'          => $request->boolean('is_active'),
         ];
 

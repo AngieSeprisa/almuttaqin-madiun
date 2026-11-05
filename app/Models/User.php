@@ -292,4 +292,91 @@ class User extends Authenticatable
         return array_values(array_filter(array_map('trim', preg_split('/[,|;]/', $raw))));
     }
 
+    /**
+     * Resolusi Lembaga Sekolah untuk Guru / Pegawai (SMP atau SMA).
+     * Menentukan lembaga sekolah asal guru berdasarkan Mapel Diampu, Jabatan, Primary Lembaga, Akses Lembagas, atau Device Tap.
+     */
+    public function resolveSchoolLembaga(?string $deviceId = null): ?Lembaga
+    {
+        // 1. Cek dari Mata Pelajaran yang diampu (Guru Sekolah)
+        if ($this->is_guru_sekolah || !empty($this->mata_pelajaran) || $this->mapel_status === 'disetujui') {
+            $mapelList = $this->daftar_mata_pelajaran;
+            if (!empty($mapelList)) {
+                $mapelRecord = \App\Models\MataPelajaran::with('lembaga')
+                    ->whereIn('mata_pelajaran', $mapelList)
+                    ->whereHas('lembaga', function ($q) {
+                        $q->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), ['smp', 'sma'])
+                          ->orWhereIn(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), ['SMP', 'SMA']);
+                    })
+                    ->first();
+                if ($mapelRecord && $mapelRecord->lembaga) {
+                    return $mapelRecord->lembaga;
+                }
+            }
+
+            // Cek relasi langsung mataPelajaranPengampu
+            $mapelPengampu = \App\Models\MataPelajaran::with('lembaga')
+                ->where('guru_id', $this->id)
+                ->whereHas('lembaga', function ($q) {
+                    $q->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), ['smp', 'sma'])
+                      ->orWhereIn(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), ['SMP', 'SMA']);
+                })
+                ->first();
+            if ($mapelPengampu && $mapelPengampu->lembaga) {
+                return $mapelPengampu->lembaga;
+            }
+        }
+
+        // 2. Cek dari Jabatan (misal "Operator SMP", "Guru Bahasa SMP", "Kepala Sekolah SMA", dll)
+        $jabatan = strtolower((string) ($this->jabatan ?? ''));
+        if (str_contains($jabatan, 'smp')) {
+            $smp = Lembaga::where(fn($q) => $q->where(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), 'smp')->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), 'SMP'))->first();
+            if ($smp) return $smp;
+        } elseif (str_contains($jabatan, 'sma')) {
+            $sma = Lembaga::where(fn($q) => $q->where(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), 'sma')->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), 'SMA'))->first();
+            if ($sma) return $sma;
+        }
+
+        // 3. Cek primaryLembaga jika merupakan sekolah (SMP/SMA)
+        if ($this->primaryLembaga) {
+            $kode = strtolower($this->primaryLembaga->kode ?? '');
+            $singkat = strtoupper($this->primaryLembaga->singkatan ?? '');
+            if (in_array($kode, ['smp', 'sma']) || in_array($singkat, ['SMP', 'SMA'])) {
+                return $this->primaryLembaga;
+            }
+        }
+
+        // 4. Cek relasi lembagas yang tergolong sekolah (SMP/SMA)
+        $sekolahLembagas = $this->lembagas()
+            ->where(function ($q) {
+                $q->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), ['smp', 'sma'])
+                  ->orWhereIn(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), ['SMP', 'SMA']);
+            })
+            ->get();
+
+        if ($sekolahLembagas->count() === 1) {
+            return $sekolahLembagas->first();
+        }
+
+        // 5. Cek dari device_id jika tap fisik dilakukan di alat khusus SMP atau SMA
+        if ($deviceId) {
+            $devId = strtolower($deviceId);
+            if (str_contains($devId, 'smp')) {
+                $smp = Lembaga::where(fn($q) => $q->where(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), 'smp')->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), 'SMP'))->first();
+                if ($smp) return $smp;
+            } elseif (str_contains($devId, 'sma')) {
+                $sma = Lembaga::where(fn($q) => $q->where(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), 'sma')->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), 'SMA'))->first();
+                if ($sma) return $sma;
+            }
+        }
+
+        // 6. Jika memiliki sekolahLembagas lebih dari 1 dan belum teridentifikasi, ambil yang pertama
+        if ($sekolahLembagas->isNotEmpty()) {
+            return $sekolahLembagas->first();
+        }
+
+        // 7. Fallback ke primaryLembaga atau lembaga pertama
+        return $this->primaryLembaga ?: $this->lembagas()->first();
+    }
+
 }

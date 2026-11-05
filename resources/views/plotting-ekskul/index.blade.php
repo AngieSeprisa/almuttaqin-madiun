@@ -174,20 +174,6 @@
                                     <input type="checkbox" id="fltEkskulTerisi" class="fi-ta-checkbox">
                                     <span>Hanya ekskul yang memiliki anggota</span>
                                 </label>
-
-                                <div class="fi-ta-filter-field">
-                                    <label for="fltEkskulHari" class="fi-ta-filter-label">Hari Latihan</label>
-                                    <select id="fltEkskulHari" class="fi-ta-filter-select">
-                                        <option value="">Semua Hari</option>
-                                        <option value="Senin">Senin</option>
-                                        <option value="Selasa">Selasa</option>
-                                        <option value="Rabu">Rabu</option>
-                                        <option value="Kamis">Kamis</option>
-                                        <option value="Jumat">Jumat</option>
-                                        <option value="Sabtu">Sabtu</option>
-                                        <option value="Minggu">Minggu</option>
-                                    </select>
-                                </div>
                             </div>
                             <div class="fi-ta-filter-actions">
                                 <button type="button" class="fi-ta-filter-apply" onclick="applyFilter('ekskul')">
@@ -244,12 +230,9 @@
                                 <span class="fi-ta-sort-icon">↕</span>
                             </th>
                             <th class="fi-ta-th">
-                                <span>Pembina</span>
+                                <span>Pembina Ekstrakurikuler</span>
                             </th>
-                            <th class="fi-ta-th">
-                                <span>Jadwal & Tempat</span>
-                            </th>
-                            <th class="fi-ta-th fi-ta-th-center fi-ta-th-sortable" onclick="sortTable('ekskul', 4)">
+                            <th class="fi-ta-th fi-ta-th-center fi-ta-th-sortable" onclick="sortTable('ekskul', 3)">
                                 <span>Anggota</span>
                                 <span class="fi-ta-sort-icon">↕</span>
                             </th>
@@ -263,10 +246,7 @@
                         <tr class="fi-ta-row js-row-ekskul"
                             data-id="{{ $item->id }}"
                             data-nama="{{ strtolower($item->nama_ekskul) }}"
-                            data-kode="{{ strtolower($item->kode ?? '') }}"
                             data-pembina="{{ strtolower($item->nama_pembina ?? '') }}"
-                            data-hari="{{ $item->hari ?? '' }}"
-                            data-tempat="{{ strtolower($item->tempat ?? '') }}"
                             data-count="{{ $item->anggota_count }}">
                             <td class="fi-ta-td-check">
                                 <input type="checkbox"
@@ -278,19 +258,11 @@
                                 <div class="pk-cell-kelas">
                                     <div class="pk-kelas-main">
                                         <span class="pk-kelas-name">{{ $item->nama_ekskul }}</span>
-                                        @if($item->kode)
-                                            <span class="pk-badge-kode">{{ $item->kode }}</span>
-                                        @endif
                                     </div>
                                     <div class="pk-kelas-sub">
                                         <span class="pk-badge-jenjang {{ strtolower($item->jenjang ?? $jenjang) }}">
                                             {{ $item->jenjang === 'ALL' ? 'SMP & SMA' : ($item->jenjang ?? $jenjang) }}
                                         </span>
-                                        @if($item->deskripsi)
-                                            <span class="pk-text-muted" title="{{ $item->deskripsi }}">
-                                                &bull; {{ \Illuminate\Support\Str::limit($item->deskripsi, 35) }}
-                                            </span>
-                                        @endif
                                     </div>
                                 </div>
                             </td>
@@ -300,31 +272,8 @@
                                         {{ strtoupper(substr($item->nama_pembina ?: 'P', 0, 2)) }}
                                     </div>
                                     <span style="font-weight:600; font-size:13px; color:var(--text-primary, #0F172A);">
-                                        {{ $item->nama_pembina ?: '-' }}
+                                        {{ $item->nama_pembina ?: 'Belum ditentukan' }}
                                     </span>
-                                </div>
-                            </td>
-                            <td class="fi-ta-td">
-                                <div style="display:flex; flex-direction:column; gap:2px; font-size:12.5px;">
-                                    <div style="font-weight:600; color:var(--text-primary, #0F172A); display:flex; align-items:center; gap:5px;">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13" style="color:#0052FF;">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <polyline points="12 6 12 12 16 14"></polyline>
-                                        </svg>
-                                        <span>{{ $item->hari ?: 'Belum diatur' }}</span>
-                                        @if($item->jam_mulai && $item->jam_selesai)
-                                            <span style="color:#6B7280; font-weight:500;">({{ substr($item->jam_mulai, 0, 5) }} - {{ substr($item->jam_selesai, 0, 5) }})</span>
-                                        @endif
-                                    </div>
-                                    @if($item->tempat)
-                                    <div style="color:#6B7280; font-size:11.5px; display:flex; align-items:center; gap:4px;">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                                            <circle cx="12" cy="10" r="3"></circle>
-                                        </svg>
-                                        <span>{{ $item->tempat }}</span>
-                                    </div>
-                                    @endif
                                 </div>
                             </td>
                             <td class="fi-ta-td fi-ta-td-center">
@@ -357,14 +306,7 @@
                                             onclick="openEditEkskulModal({
                                                 id: {{ $item->id }},
                                                 nama_ekskul: '{{ addslashes($item->nama_ekskul) }}',
-                                                kode: '{{ addslashes($item->kode ?? '') }}',
-                                                pembina_id: '{{ $item->pembina_id ?? '' }}',
-                                                nama_pembina: '{{ addslashes($item->nama_pembina ?? '') }}',
-                                                hari: '{{ addslashes($item->hari ?? '') }}',
-                                                jam_mulai: '{{ $item->jam_mulai ? substr($item->jam_mulai, 0, 5) : '' }}',
-                                                jam_selesai: '{{ $item->jam_selesai ? substr($item->jam_selesai, 0, 5) : '' }}',
-                                                tempat: '{{ addslashes($item->tempat ?? '') }}',
-                                                deskripsi: '{{ addslashes($item->deskripsi ?? '') }}'
+                                                pembina_id: '{{ $item->pembina_id ?? '' }}'
                                             })"
                                             title="Edit Ekstrakurikuler">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -388,13 +330,13 @@
                         </tr>
                         @empty
                         <tr class="js-empty-initial">
-                            <td colspan="6" style="padding: 36px 16px; text-align: center; color: #6B7280;">
+                            <td colspan="5" style="padding: 36px 16px; text-align: center; color: #6B7280;">
                                 Belum ada data ekstrakurikuler untuk jenjang {{ $jenjang }}. Klik tombol "Tambah Ekskul" di atas.
                             </td>
                         </tr>
                         @endforelse
                         <tr id="emptyFilterRowEkskul" style="display:none;">
-                            <td colspan="6" style="padding: 32px 16px; text-align: center; color: #6B7280;">
+                            <td colspan="5" style="padding: 32px 16px; text-align: center; color: #6B7280;">
                                 Tidak ada ekstrakurikuler yang sesuai dengan pencarian atau filter.
                             </td>
                         </tr>
@@ -877,7 +819,7 @@
 {{-- MODAL 3: TAMBAH EKSTRAKURIKULER BARU                                    --}}
 {{-- ======================================================================= --}}
 <div class="pk-modal-backdrop" id="modalTambahEkskul" style="display:none;">
-    <div class="pk-modal-dialog">
+    <div class="pk-modal-dialog pk-modal-dialog-sm">
         <div class="pk-modal-content">
 
             <form action="{{ route('plotting-ekskul.store-ekskul') }}" method="POST" id="formTambahEkskul">
@@ -888,83 +830,34 @@
                 <div class="pk-modal-header">
                     <div>
                         <h3 class="pk-modal-title">Tambah Ekstrakurikuler</h3>
-                        <span class="pk-modal-subtitle">Daftarkan kegiatan ekstrakurikuler baru untuk {{ $jenjang }}</span>
+                        <span class="pk-modal-subtitle">Daftarkan ekstrakurikuler baru untuk {{ $jenjang }}</span>
                     </div>
                     <button type="button" class="pk-modal-close" onclick="closeTambahEkskulModal()">&times;</button>
                 </div>
 
                 <div class="pk-modal-body">
-                    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:14px;">
-                        <div class="pk-form-group">
-                            <label for="inputNamaEkskul" class="pk-form-label">Nama Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
-                            <input type="text"
-                                   name="nama_ekskul"
-                                   id="inputNamaEkskul"
-                                   class="pk-form-input"
-                                   placeholder="Contoh: Futsal, Pramuka, Hadroh / Banjari"
-                                   required
-                                   autocomplete="off">
-                        </div>
-
-                        <div class="pk-form-group">
-                            <label for="inputKodeEkskul" class="pk-form-label">Kode (Opsional)</label>
-                            <input type="text"
-                                   name="kode"
-                                   id="inputKodeEkskul"
-                                   class="pk-form-input"
-                                   placeholder="Contoh: FTSL, PRMK"
-                                   autocomplete="off">
-                        </div>
+                    <div class="pk-form-group">
+                        <label for="inputNamaEkskul" class="pk-form-label">Nama Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
+                        <input type="text"
+                               name="nama_ekskul"
+                               id="inputNamaEkskul"
+                               class="pk-form-input"
+                               placeholder="Contoh: Pramuka, Futsal, Hadroh / Banjari"
+                               required
+                               autocomplete="off">
                     </div>
 
                     <div class="pk-form-group">
-                        <label for="selectPembina" class="pk-form-label">Guru Pembina / Pelatih</label>
-                        <select name="pembina_id" id="selectPembina" class="pk-form-select">
-                            <option value="">-- Pilih Guru Pembina --</option>
+                        <label for="selectPembina" class="pk-form-label">Pembina Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
+                        <select name="pembina_id" id="selectPembina" class="pk-form-select" required>
+                            <option value="">-- Pilih Guru Pembina ({{ $jenjang }}) --</option>
                             @foreach($gurus as $g)
                                 <option value="{{ $g->id }}">{{ $g->name }}</option>
                             @endforeach
                         </select>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
-                        <div class="pk-form-group">
-                            <label for="selectHari" class="pk-form-label">Hari Latihan</label>
-                            <select name="hari" id="selectHari" class="pk-form-select">
-                                <option value="">-- Pilih Hari --</option>
-                                <option value="Senin">Senin</option>
-                                <option value="Selasa">Selasa</option>
-                                <option value="Rabu">Rabu</option>
-                                <option value="Kamis">Kamis</option>
-                                <option value="Jumat">Jumat</option>
-                                <option value="Sabtu">Sabtu</option>
-                                <option value="Minggu">Minggu</option>
-                            </select>
-                        </div>
-
-                        <div class="pk-form-group">
-                            <label for="inputJamMulai" class="pk-form-label">Jam Mulai</label>
-                            <input type="time" name="jam_mulai" id="inputJamMulai" class="pk-form-input">
-                        </div>
-
-                        <div class="pk-form-group">
-                            <label for="inputJamSelesai" class="pk-form-label">Jam Selesai</label>
-                            <input type="time" name="jam_selesai" id="inputJamSelesai" class="pk-form-input">
-                        </div>
-                    </div>
-
-                    <div class="pk-form-group">
-                        <label for="inputTempat" class="pk-form-label">Tempat / Lokasi Latihan</label>
-                        <input type="text"
-                               name="tempat"
-                               id="inputTempat"
-                               class="pk-form-input"
-                               placeholder="Contoh: Lapangan Utama, Aula Asrama, Lab Komputer">
-                    </div>
-
-                    <div class="pk-form-group">
-                        <label for="inputDeskripsi" class="pk-form-label">Keterangan / Deskripsi Singkat</label>
-                        <textarea name="deskripsi" id="inputDeskripsi" class="pk-form-input" rows="2" placeholder="Catatan kegiatan ekskul..."></textarea>
+                        <span style="font-size:11.5px; color:#6B7280; margin-top:2px;">
+                            Guru yang terdaftar di Guru Sekolah {{ $jenjang }}.
+                        </span>
                     </div>
                 </div>
 
@@ -982,7 +875,7 @@
 {{-- MODAL 4: EDIT EKSTRAKURIKULER                                           --}}
 {{-- ======================================================================= --}}
 <div class="pk-modal-backdrop" id="modalEditEkskul" style="display:none;">
-    <div class="pk-modal-dialog">
+    <div class="pk-modal-dialog pk-modal-dialog-sm">
         <div class="pk-modal-content">
 
             <form action="" method="POST" id="formEditEkskul">
@@ -992,80 +885,33 @@
                 <div class="pk-modal-header">
                     <div>
                         <h3 class="pk-modal-title">Edit Ekstrakurikuler</h3>
-                        <span class="pk-modal-subtitle">Perbarui data kegiatan ekstrakurikuler</span>
+                        <span class="pk-modal-subtitle">Perbarui nama dan pembina ekstrakurikuler</span>
                     </div>
                     <button type="button" class="pk-modal-close" onclick="closeEditEkskulModal()">&times;</button>
                 </div>
 
                 <div class="pk-modal-body">
-                    <div style="display:grid; grid-template-columns: 2fr 1fr; gap:14px;">
-                        <div class="pk-form-group">
-                            <label for="editNamaEkskul" class="pk-form-label">Nama Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
-                            <input type="text"
-                                   name="nama_ekskul"
-                                   id="editNamaEkskul"
-                                   class="pk-form-input"
-                                   required
-                                   autocomplete="off">
-                        </div>
-
-                        <div class="pk-form-group">
-                            <label for="editKodeEkskul" class="pk-form-label">Kode (Opsional)</label>
-                            <input type="text"
-                                   name="kode"
-                                   id="editKodeEkskul"
-                                   class="pk-form-input"
-                                   autocomplete="off">
-                        </div>
+                    <div class="pk-form-group">
+                        <label for="editNamaEkskul" class="pk-form-label">Nama Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
+                        <input type="text"
+                               name="nama_ekskul"
+                               id="editNamaEkskul"
+                               class="pk-form-input"
+                               required
+                               autocomplete="off">
                     </div>
 
                     <div class="pk-form-group">
-                        <label for="editPembina" class="pk-form-label">Guru Pembina / Pelatih</label>
-                        <select name="pembina_id" id="editPembina" class="pk-form-select">
-                            <option value="">-- Pilih Guru Pembina --</option>
+                        <label for="editPembina" class="pk-form-label">Pembina Ekstrakurikuler <span style="color:#EF4444;">*</span></label>
+                        <select name="pembina_id" id="editPembina" class="pk-form-select" required>
+                            <option value="">-- Pilih Guru Pembina ({{ $jenjang }}) --</option>
                             @foreach($gurus as $g)
                                 <option value="{{ $g->id }}">{{ $g->name }}</option>
                             @endforeach
                         </select>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
-                        <div class="pk-form-group">
-                            <label for="editHari" class="pk-form-label">Hari Latihan</label>
-                            <select name="hari" id="editHari" class="pk-form-select">
-                                <option value="">-- Pilih Hari --</option>
-                                <option value="Senin">Senin</option>
-                                <option value="Selasa">Selasa</option>
-                                <option value="Rabu">Rabu</option>
-                                <option value="Kamis">Kamis</option>
-                                <option value="Jumat">Jumat</option>
-                                <option value="Sabtu">Sabtu</option>
-                                <option value="Minggu">Minggu</option>
-                            </select>
-                        </div>
-
-                        <div class="pk-form-group">
-                            <label for="editJamMulai" class="pk-form-label">Jam Mulai</label>
-                            <input type="time" name="jam_mulai" id="editJamMulai" class="pk-form-input">
-                        </div>
-
-                        <div class="pk-form-group">
-                            <label for="editJamSelesai" class="pk-form-label">Jam Selesai</label>
-                            <input type="time" name="jam_selesai" id="editJamSelesai" class="pk-form-input">
-                        </div>
-                    </div>
-
-                    <div class="pk-form-group">
-                        <label for="editTempat" class="pk-form-label">Tempat / Lokasi Latihan</label>
-                        <input type="text"
-                               name="tempat"
-                               id="editTempat"
-                               class="pk-form-input">
-                    </div>
-
-                    <div class="pk-form-group">
-                        <label for="editDeskripsi" class="pk-form-label">Keterangan / Deskripsi Singkat</label>
-                        <textarea name="deskripsi" id="editDeskripsi" class="pk-form-input" rows="2"></textarea>
+                        <span style="font-size:11.5px; color:#6B7280; margin-top:2px;">
+                            Guru yang terdaftar di Guru Sekolah {{ $jenjang }}.
+                        </span>
                     </div>
                 </div>
 
@@ -1607,14 +1453,11 @@ function applyClientFilter(key) {
     let visibleCount = 0;
 
     let fltTerisi = false;
-    let fltHari = '';
     let fltKelas = '';
 
     if (isEkskul) {
         fltTerisi = document.getElementById('fltEkskulTerisi')?.checked || false;
-        fltHari = (document.getElementById('fltEkskulHari')?.value || '').trim();
         if (fltTerisi) filterBadgeCount++;
-        if (fltHari) filterBadgeCount++;
         const badgeEl = document.getElementById('badgeFilterEkskul');
         if (badgeEl) badgeEl.textContent = filterBadgeCount;
     } else {
@@ -1628,17 +1471,13 @@ function applyClientFilter(key) {
         let match = true;
         if (isEkskul) {
             const nama = row.getAttribute('data-nama') || '';
-            const kode = row.getAttribute('data-kode') || '';
             const pembina = row.getAttribute('data-pembina') || '';
-            const tempat = row.getAttribute('data-tempat') || '';
-            const hari = row.getAttribute('data-hari') || '';
             const count = parseInt(row.getAttribute('data-count') || '0', 10);
 
             if (searchVal) {
-                match = nama.includes(searchVal) || kode.includes(searchVal) || pembina.includes(searchVal) || tempat.includes(searchVal);
+                match = nama.includes(searchVal) || pembina.includes(searchVal);
             }
             if (match && fltTerisi && count === 0) match = false;
-            if (match && fltHari && hari !== fltHari) match = false;
         } else {
             const nama = row.getAttribute('data-nama') || '';
             const nisn = row.getAttribute('data-nisn') || '';
@@ -1721,13 +1560,7 @@ function closeTambahEkskulModal() {
 function openEditEkskulModal(data) {
     document.getElementById('formEditEkskul').action = `/plotting-ekskul/ekskul/${data.id}`;
     document.getElementById('editNamaEkskul').value = data.nama_ekskul || '';
-    document.getElementById('editKodeEkskul').value = data.kode || '';
     document.getElementById('editPembina').value = data.pembina_id || '';
-    document.getElementById('editHari').value = data.hari || '';
-    document.getElementById('editJamMulai').value = data.jam_mulai || '';
-    document.getElementById('editJamSelesai').value = data.jam_selesai || '';
-    document.getElementById('editTempat').value = data.tempat || '';
-    document.getElementById('editDeskripsi').value = data.deskripsi || '';
     document.getElementById('modalEditEkskul').style.display = 'flex';
 }
 function closeEditEkskulModal() {

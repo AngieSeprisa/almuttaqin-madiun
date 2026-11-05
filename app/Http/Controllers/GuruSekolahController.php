@@ -183,6 +183,14 @@ class GuruSekolahController extends Controller
             $user->role = 'guru';
         }
 
+        $school = $user->resolveSchoolLembaga();
+        if ($school && in_array(strtolower($school->kode ?? ''), ['smp', 'sma'])) {
+            $user->lembagas()->syncWithoutDetaching([$school->id]);
+            if (!$user->isYayasan() || empty($user->primary_lembaga_id)) {
+                $user->primary_lembaga_id = $school->id;
+            }
+        }
+
         $user->save();
 
         return redirect()->route('guru-sekolah.index')
@@ -228,6 +236,14 @@ class GuruSekolahController extends Controller
 
         if (!in_array($user->role, ['yayasan', 'admin_lembaga', 'super_admin'])) {
             $user->role = 'guru';
+        }
+
+        $school = $user->resolveSchoolLembaga();
+        if ($school && in_array(strtolower($school->kode ?? ''), ['smp', 'sma'])) {
+            $user->lembagas()->syncWithoutDetaching([$school->id]);
+            if (!$user->isYayasan() || empty($user->primary_lembaga_id)) {
+                $user->primary_lembaga_id = $school->id;
+            }
         }
 
         $user->save();
@@ -305,6 +321,14 @@ class GuruSekolahController extends Controller
 
         if (!in_array($user->role, ['yayasan', 'admin_lembaga', 'super_admin'])) {
             $user->role = 'guru';
+        }
+
+        $school = $user->resolveSchoolLembaga();
+        if ($school && in_array(strtolower($school->kode ?? ''), ['smp', 'sma'])) {
+            $user->lembagas()->syncWithoutDetaching([$school->id]);
+            if (!$user->isYayasan() || empty($user->primary_lembaga_id)) {
+                $user->primary_lembaga_id = $school->id;
+            }
         }
 
         $user->save();

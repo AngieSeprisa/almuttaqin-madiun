@@ -242,4 +242,143 @@ class RekapGuruTest extends TestCase
         $response->assertSee('Guru SMP 1');
         $response->assertSee('Guru Yayasan 1');
     }
+
+    public function test_guru_yayasan_dengan_jabatan_operator_smp_dan_mapel_informatika_otomatis_masuk_rekap_smp_bukan_sma(): void
+    {
+        $today = Carbon::today();
+
+        // Mata pelajaran Informatika di SMP
+        \App\Models\MataPelajaran::firstOrCreate(
+            ['kode' => 'SMP-INF', 'lembaga_id' => $this->lembaga->id],
+            ['mata_pelajaran' => 'Informatika', 'tingkat_kelas' => '7,8,9', 'is_active' => true]
+        );
+
+        // Kasus persis seperti di live VPS:
+        // Akun memiliki role yayasan, primary_lembaga_id SMA atau Yayasan, lembagas berisi SMP dan SMA
+        // Namun jabatan = 'Operator SMP' dan di Guru Sekolah terdaftar mapel 'Informatika'
+        $angie = User::factory()->create([
+            'name'               => 'Angie Seprisa Pamungkas',
+            'email'              => 'angieseprisa@almuttaqin.id',
+            'role'               => 'yayasan',
+            'jabatan'            => 'Operator SMP',
+            'is_guru_sekolah'    => true,
+            'mata_pelajaran'     => 'Informatika',
+            'mapel_status'       => 'disetujui',
+            'primary_lembaga_id' => $this->sma->id, // Sebelumnya tersimpan SMA
+        ]);
+        $angie->lembagas()->sync([$this->yayasan->id, $this->sma->id, $this->lembaga->id]);
+
+        $device = MasterDevice::create([
+            'device_id'     => 'ESP32_MAIN',
+            'nama_lokasi'   => 'Lobby Utama',
+            'kategori_area' => 'umum',
+            'status_aktif'  => true,
+        ]);
+
+        $sesi = MasterSesi::create([
+            'kode_sesi'        => 'SESI_MASUK_PEGAWAI',
+            'nama_sesi'        => 'Presensi Pegawai & Guru',
+            'jam_mulai'        => '06:45:00',
+            'jam_selesai'      => '22:45:00',
+            'kategori'         => 'pegawai',
+        ]);
+
+        // Simulasikan tap masuk di tabel presensis (seperti di Dashboard Presensi)
+        Presensi::create([
+            'device_id'        => 'ESP32_MAIN',
+            'sesi_id'          => $sesi->id,
+            'tipe_entitas'     => 'guru_pegawai',
+            'entitas_id'       => $angie->id,
+            'rfid_uid'         => '2819653521',
+            'waktu_tap'        => $today->copy()->setTime(21, 51, 34),
+            'status_kehadiran' => 'terlambat',
+        ]);
+
+        // 1. Rekap presensi guru dibuka untuk SMP: Angie HARUS MUNCUL di SMP!
+        $responseSmp = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => $today->toDateString(),
+        ]));
+        $responseSmp->assertStatus(200);
+        $responseSmp->assertSee('Angie Seprisa Pamungkas');
+        $responseSmp->assertSee('21:51:34 WIB');
+        $responseSmp->assertSee('Terlambat');
+
+        // 2. Rekap presensi guru dibuka untuk SMA: Angie TIDAK BOLEH MUNCUL di SMA!
+        $responseSma = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
+            'lembaga_id' => $this->sma->id,
+            'tanggal'    => $today->toDateString(),
+        ]));
+        $responseSma->assertStatus(200);
+        $responseSma->assertDontSee('Angie Seprisa Pamungkas');
+    }
+
+    public function test_existing_presensi_guru_yang_salah_lembaga_otomatis_dikoreksi_ke_smp(): void
+    {
+        $today = Carbon::today();
+
+        \App\Models\MataPelajaran::firstOrCreate(
+            ['kode' => 'SMP-INF', 'lembaga_id' => $this->lembaga->id],
+            ['mata_pelajaran' => 'Informatika', 'tingkat_kelas' => '7,8,9', 'is_active' => true]
+        );
+
+        $angie = User::factory()->create([
+            'name'               => 'Angie Seprisa Pamungkas',
+            'email'              => 'angieseprisa2@almuttaqin.id',
+            'role'               => 'yayasan',
+            'jabatan'            => 'Operator SMP',
+            'is_guru_sekolah'    => true,
+            'mata_pelajaran'     => 'Informatika',
+            'mapel_status'       => 'disetujui',
+            'primary_lembaga_id' => $this->sma->id,
+        ]);
+        $angie->lembagas()->sync([$this->yayasan->id, $this->sma->id, $this->lembaga->id]);
+
+        // Simulasikan presensi guru yang TERLANJUR tersimpan di database dengan lembaga SMA
+        $presensiLama = PresensiGuru::create([
+            'user_id'    => $angie->id,
+            'lembaga_id' => $this->sma->id, // Salah tersimpan SMA
+            'tanggal'    => $today->toDateString(),
+            'jam_masuk'  => '21:51:34',
+            'status'     => 'terlambat',
+        ]);
+
+        $sesi = MasterSesi::create([
+            'kode_sesi'        => 'SESI_MASUK_PEGAWAI_2',
+            'nama_sesi'        => 'Presensi Pegawai & Guru 2',
+            'jam_mulai'        => '06:45:00',
+            'jam_selesai'      => '22:45:00',
+            'kategori'         => 'pegawai',
+        ]);
+
+        // Log tap di presensis
+        Presensi::create([
+            'device_id'        => 'ESP32_MAIN',
+            'sesi_id'          => $sesi->id,
+            'tipe_entitas'     => 'guru_pegawai',
+            'entitas_id'       => $angie->id,
+            'rfid_uid'         => '2819653521',
+            'waktu_tap'        => $today->copy()->setTime(21, 51, 34),
+            'status_kehadiran' => 'terlambat',
+        ]);
+
+        // Buka rekap presensi SMP
+        $responseSmp = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => $today->toDateString(),
+        ]));
+        $responseSmp->assertStatus(200);
+        $responseSmp->assertSee('Angie Seprisa Pamungkas');
+
+        // Pastikan di database record sudah dikoreksi ke ID lembaga SMP
+        $this->assertEquals($this->lembaga->id, $presensiLama->fresh()->lembaga_id);
+
+        // Buka rekap presensi SMA: Angie TIDAK BOLEH tampil di SMA
+        $responseSma = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
+            'lembaga_id' => $this->sma->id,
+            'tanggal'    => $today->toDateString(),
+        ]));
+        $responseSma->assertStatus(200);
+        $responseSma->assertDontSee('Angie Seprisa Pamungkas');
+    }
 }

@@ -73,3 +73,4 @@ class Ekstrakurikuler extends Model
         return '-';
     }
 }
+

@@ -218,7 +218,7 @@ class RekapAbsensiController extends Controller
 
     /**
      * Query builder presensi guru yang disesuaikan ketat berdasarkan lembaga tempat guru terdaftar:
-     * - Walaupun akun berstatus yayasan, jika terdaftarnya sebagai guru SMP (primary_lembaga_id SMP),
+     * - Walaupun akun berstatus yayasan, jika terdaftarnya sebagai guru SMP,
      *   maka absensinya HANYA terlihat saat memilih lembaga SMP.
      * - Tidak akan bocor ke SMA atau lembaga lainnya.
      * - Opsi "Semua Lembaga" tetap menampilkan seluruh guru.
@@ -228,19 +228,7 @@ class RekapAbsensiController extends Controller
         $query = PresensiGuru::with(['user', 'lembaga']);
 
         if ($lembagaId) {
-            $query->where(function ($q) use ($lembagaId) {
-                // Tampilkan presensi jika guru/staf memang terdaftar pada lembaga ini (primary_lembaga_id)
-                $q->whereHas('user', function ($uq) use ($lembagaId) {
-                    $uq->where('primary_lembaga_id', $lembagaId);
-                })
-                // ATAU jika record presensi dicatat di lembaga ini dan akun guru belum memiliki primary_lembaga_id
-                ->orWhere(function ($sub) use ($lembagaId) {
-                    $sub->where('lembaga_id', $lembagaId)
-                        ->whereHas('user', function ($uq) {
-                            $uq->whereNull('primary_lembaga_id');
-                        });
-                });
-            });
+            $query->where('lembaga_id', $lembagaId);
         }
 
         if ($tanggal) {
@@ -313,26 +301,16 @@ class RekapAbsensiController extends Controller
                 default     => 'hadir',
             };
 
-            // Lembaga terdaftar guru (prioritaskan primary_lembaga_id guru)
-            $registeredLembagaId = $user->primary_lembaga_id;
-            if (!$registeredLembagaId) {
-                // Deteksi dari serial device jika ada indikasi khusus
-                $devId = strtolower((string) $firstTap->device_id);
-                if (str_contains($devId, 'smp')) {
-                    $smp = Lembaga::where(fn($q) => $q->where('kode', 'smp')->orWhere('singkatan', 'SMP'))->first();
-                    if ($smp) {
-                        $registeredLembagaId = $smp->id;
-                    }
-                } elseif (str_contains($devId, 'sma')) {
-                    $sma = Lembaga::where(fn($q) => $q->where('kode', 'sma')->orWhere('singkatan', 'SMA'))->first();
-                    if ($sma) {
-                        $registeredLembagaId = $sma->id;
-                    }
-                }
-            }
+            // Resolusi lembaga terdaftar guru secara cerdas (prioritaskan mapel, jabatan, dan relasi sekolah)
+            $schoolLembaga = $user->resolveSchoolLembaga($firstTap->device_id);
+            $registeredLembagaId = $schoolLembaga ? $schoolLembaga->id : ($user->primary_lembaga_id ?: ($user->lembagas()->first()?->id ?: 1));
 
-            if (!$registeredLembagaId) {
-                $registeredLembagaId = $user->lembagas()->first()?->id ?: 1;
+            // Jika guru sekolah teridentifikasi sebagai SMP/SMA dan primary_lembaga_id belum sesuai, selaraskan
+            if ($schoolLembaga && in_array(strtolower($schoolLembaga->kode ?? ''), ['smp', 'sma'])) {
+                if ($user->primary_lembaga_id !== $schoolLembaga->id && !$user->isYayasan()) {
+                    $user->primary_lembaga_id = $schoolLembaga->id;
+                    $user->save();
+                }
             }
 
             // Cek apakah presensi guru untuk user ini di tanggal ini sudah ada

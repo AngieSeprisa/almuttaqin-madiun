@@ -70,3 +70,4 @@ class JurnalEkskul extends Model
         return 0.0;
     }
 }
+

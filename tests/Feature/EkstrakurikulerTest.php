@@ -36,30 +36,59 @@ class EkstrakurikulerTest extends TestCase
         $response->assertSee('Daftar Ekstrakurikuler');
         $response->assertSee('Belum Ikut Ekskul');
 
-        // 2. Tambah Ekskul Baru
+        // 2. Tambah Ekskul Baru (Hanya berisi nama ekskul dan pembina ekskul)
         $storeResponse = $this->actingAs($admin)
             ->withSession(['active_lembaga' => 'smp'])
             ->post(route('plotting-ekskul.store-ekskul'), [
                 'lembaga_id'   => $smp->id,
                 'jenjang'      => 'SMP',
                 'nama_ekskul'  => 'Pramuka Penggalang',
-                'kode'         => 'PRMK',
                 'pembina_id'   => $admin->id,
-                'nama_pembina' => $admin->name,
-                'hari'         => 'Jumat',
-                'jam_mulai'    => '14:30',
-                'jam_selesai'  => '16:30',
-                'tempat'       => 'Lapangan Utama',
-                'deskripsi'    => 'Latihan pramuka rutin',
             ]);
 
         $storeResponse->assertRedirect();
         $this->assertDatabaseHas('ekstrakurikulers', [
-            'nama_ekskul' => 'Pramuka Penggalang',
-            'kode'        => 'PRMK',
-            'jenjang'     => 'SMP',
-            'hari'        => 'Jumat',
+            'nama_ekskul'  => 'Pramuka Penggalang',
+            'pembina_id'   => $admin->id,
+            'nama_pembina' => $admin->name,
+            'jenjang'      => 'SMP',
         ]);
+    }
+
+    public function test_pembina_dropdown_only_lists_teachers_registered_in_guru_sekolah_for_active_lembaga(): void
+    {
+        $admin = User::where('email', 'admin.smp@almuttaqin.id')->firstOrFail();
+        $smp = Lembaga::where('kode', 'smp')->firstOrFail();
+        $sma = Lembaga::where('kode', 'sma')->firstOrFail();
+
+        $guruSMP = User::factory()->create([
+            'name'               => 'Guru Pembina SMP, S.Pd.',
+            'email'              => 'pembina.smp@almuttaqin.id',
+            'is_guru_sekolah'    => true,
+            'primary_lembaga_id' => $smp->id,
+            'mapel_status'       => 'disetujui',
+            'is_active'          => true,
+        ]);
+        $guruSMP->lembagas()->sync([$smp->id]);
+
+        $guruSMA = User::factory()->create([
+            'name'               => 'Guru Pembina SMA, M.Pd.',
+            'email'              => 'pembina.sma@almuttaqin.id',
+            'is_guru_sekolah'    => true,
+            'primary_lembaga_id' => $sma->id,
+            'mapel_status'       => 'disetujui',
+            'is_active'          => true,
+        ]);
+        $guruSMA->lembagas()->sync([$sma->id]);
+
+        // Cek halaman SMP
+        $responseSMP = $this->actingAs($admin)
+            ->withSession(['active_lembaga' => 'smp'])
+            ->get(route('plotting-ekskul.index', ['lembaga' => 'smp']));
+
+        $responseSMP->assertStatus(200);
+        $responseSMP->assertSee('Guru Pembina SMP, S.Pd.');
+        $responseSMP->assertDontSee('Guru Pembina SMA, M.Pd.');
     }
 
     public function test_admin_can_assign_and_unassign_student_to_ekskul(): void
@@ -233,3 +262,4 @@ class EkstrakurikulerTest extends TestCase
         $rekapMatrixResponse->assertSee('Robotik & IT');
     }
 }
+

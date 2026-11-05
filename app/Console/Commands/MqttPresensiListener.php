@@ -60,7 +60,8 @@ class MqttPresensiListener extends Command
 
                 $today = Carbon::today()->toDateString();
                 $nowTime = Carbon::now()->toTimeString();
-                $lembagaId = $user->primary_lembaga_id ?: ($user->lembagas()->first()?->id ?: 1);
+                $schoolLembaga = $user->resolveSchoolLembaga($deviceSerial);
+                $lembagaId = $schoolLembaga ? $schoolLembaga->id : ($user->primary_lembaga_id ?: ($user->lembagas()->first()?->id ?: 1));
 
                 $presensiGuru = \App\Models\PresensiGuru::firstOrNew([
                     'user_id'    => $user->id,

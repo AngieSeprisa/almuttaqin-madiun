@@ -96,14 +96,37 @@ class EkskulJurnalController extends Controller
                 ->get();
         }
 
-        // Daftar pembina (guru)
-        $gurus = User::where(function ($q) use ($selectedLembaga) {
+        // Daftar guru resmi yang terdaftar di menu Guru Sekolah sesuai lembaga aktif (SMP / SMA)
+        $gurus = User::with(['primaryLembaga', 'lembagas'])
+            ->where(function ($q) {
+                $q->whereNull('is_active')->orWhere('is_active', true);
+            })
+            ->where(function ($q) {
+                $q->where('is_guru_sekolah', true)
+                  ->orWhere('mapel_status', 'disetujui');
+            })
+            ->where('mapel_status', '!=', 'ditolak')
+            ->where(function ($q) use ($selectedLembaga) {
                 $q->where('primary_lembaga_id', $selectedLembaga->id)
-                  ->orWhereHas('lembagas', fn($l) => $l->where('lembagas.id', $selectedLembaga->id))
-                  ->orWhere('role', 'guru');
+                  ->orWhereHas('lembagas', function ($l) use ($selectedLembaga) {
+                      $l->where('lembagas.id', $selectedLembaga->id);
+                  });
             })
             ->orderBy('name')
             ->get();
+
+        // Fallback jika belum ada approval resmi
+        if ($gurus->isEmpty()) {
+            $gurus = User::where(function ($q) use ($selectedLembaga) {
+                    $q->where('primary_lembaga_id', $selectedLembaga->id)
+                      ->orWhereHas('lembagas', fn($l) => $l->where('lembagas.id', $selectedLembaga->id));
+                })
+                ->where(function ($q) {
+                    $q->where('role', 'guru')->orWhere('is_guru_sekolah', true);
+                })
+                ->orderBy('name')
+                ->get();
+        }
 
         $periode = self::hitungPeriodeOtomatis($request->get('tanggal'));
 
@@ -378,3 +401,4 @@ class EkskulJurnalController extends Controller
         return redirect()->back()->with('success', "Jurnal kegiatan {$ekskul} tanggal {$tgl} berhasil dihapus.");
     }
 }
+

@@ -117,14 +117,37 @@ class PlottingEkskulController extends Controller
             return $s->ekstrakurikulers->isEmpty();
         })->values();
 
-        // Daftar guru untuk pilihan Pembina Ekskul
-        $gurus = User::where(function ($q) use ($selectedLembaga) {
+        // Daftar guru resmi yang terdaftar di menu Guru Sekolah sesuai lembaga aktif (SMP / SMA)
+        $gurus = User::with(['primaryLembaga', 'lembagas'])
+            ->where(function ($q) {
+                $q->whereNull('is_active')->orWhere('is_active', true);
+            })
+            ->where(function ($q) {
+                $q->where('is_guru_sekolah', true)
+                  ->orWhere('mapel_status', 'disetujui');
+            })
+            ->where('mapel_status', '!=', 'ditolak')
+            ->where(function ($q) use ($selectedLembaga) {
                 $q->where('primary_lembaga_id', $selectedLembaga->id)
-                  ->orWhereHas('lembagas', fn($l) => $l->where('lembagas.id', $selectedLembaga->id))
-                  ->orWhere('role', 'guru');
+                  ->orWhereHas('lembagas', function ($l) use ($selectedLembaga) {
+                      $l->where('lembagas.id', $selectedLembaga->id);
+                  });
             })
             ->orderBy('name')
             ->get();
+
+        // Fallback jika belum ada approval resmi
+        if ($gurus->isEmpty()) {
+            $gurus = User::where(function ($q) use ($selectedLembaga) {
+                    $q->where('primary_lembaga_id', $selectedLembaga->id)
+                      ->orWhereHas('lembagas', fn($l) => $l->where('lembagas.id', $selectedLembaga->id));
+                })
+                ->where(function ($q) {
+                    $q->where('role', 'guru')->orWhere('is_guru_sekolah', true);
+                })
+                ->orderBy('name')
+                ->get();
+        }
 
         // Tab aktif: 'ekskul' atau 'belum_terdaftar'
         $activeTab = $request->get('tab', 'ekskul');
@@ -169,22 +192,17 @@ class PlottingEkskulController extends Controller
                              ->where('jenjang', $request->jenjang);
                 }),
             ],
-            'kode'         => 'nullable|string|max:50',
             'pembina_id'   => 'nullable|exists:users,id',
-            'nama_pembina' => 'nullable|string|max:100',
-            'hari'         => 'nullable|string|max:20',
-            'jam_mulai'    => 'nullable',
-            'jam_selesai'  => 'nullable',
-            'tempat'       => 'nullable|string|max:100',
-            'deskripsi'    => 'nullable|string',
         ], [
             'nama_ekskul.required' => 'Nama ekstrakurikuler wajib diisi.',
             'nama_ekskul.unique'   => 'Ekstrakurikuler tersebut sudah terdaftar.',
         ]);
 
-        if (!empty($validated['pembina_id']) && empty($validated['nama_pembina'])) {
+        if (!empty($validated['pembina_id'])) {
             $p = User::find($validated['pembina_id']);
             $validated['nama_pembina'] = $p?->name;
+        } else {
+            $validated['nama_pembina'] = null;
         }
 
         $validated['is_active'] = true;
@@ -217,19 +235,17 @@ class PlottingEkskulController extends Controller
                              ->where('jenjang', $ekstrakurikuler->jenjang);
                 })->ignore($ekstrakurikuler->id),
             ],
-            'kode'         => 'nullable|string|max:50',
             'pembina_id'   => 'nullable|exists:users,id',
-            'nama_pembina' => 'nullable|string|max:100',
-            'hari'         => 'nullable|string|max:20',
-            'jam_mulai'    => 'nullable',
-            'jam_selesai'  => 'nullable',
-            'tempat'       => 'nullable|string|max:100',
-            'deskripsi'    => 'nullable|string',
+        ], [
+            'nama_ekskul.required' => 'Nama ekstrakurikuler wajib diisi.',
+            'nama_ekskul.unique'   => 'Ekstrakurikuler tersebut sudah terdaftar.',
         ]);
 
-        if (!empty($validated['pembina_id']) && empty($validated['nama_pembina'])) {
+        if (!empty($validated['pembina_id'])) {
             $p = User::find($validated['pembina_id']);
             $validated['nama_pembina'] = $p?->name;
+        } else {
+            $validated['nama_pembina'] = null;
         }
 
         $ekstrakurikuler->update($validated);
@@ -384,3 +400,4 @@ class PlottingEkskulController extends Controller
         return back()->with('success', $msg);
     }
 }
+
