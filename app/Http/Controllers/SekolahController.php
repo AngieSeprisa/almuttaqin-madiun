@@ -8,6 +8,7 @@ use App\Models\JurnalAbsensi;
 use App\Models\Lembaga;
 use App\Models\MataPelajaran;
 use App\Models\Siswa;
+use App\Models\TimeSlot;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -508,11 +509,172 @@ class SekolahController extends Controller
 
         $jurnals = $query->latest('tanggal')->latest('id')->paginate(15)->withQueryString();
 
+        try {
+            $timeSlots = TimeSlot::active()->kbm()->orderBy('urutan')->get();
+        } catch (\Throwable $e) {
+            $timeSlots = collect();
+        }
+
         return view('sekolah.rekap_jurnal', compact(
             'jurnals',
             'kelasList',
-            'activeRoom'
+            'activeRoom',
+            'timeSlots'
         ));
+    }
+
+    /**
+     * Format metadata tampilan kartu Rekap Jurnal Pembelajaran
+     */
+    public static function formatJurnalCardMeta(Jurnal $item, $timeSlots = null): array
+    {
+        // 1. Baris 1: Mata Pelajaran (Title Case / ucwords + akronim kurikulum tetap rapi)
+        $rawMapel = trim((string) ($item->mata_pelajaran ?? ''));
+        if ($rawMapel === '') {
+            $mapelTitle = '-';
+        } else {
+            $mapelTitle = ucwords(mb_strtolower($rawMapel, 'UTF-8'), " \t\r\n\f\v-/(.");
+            $acronyms = [
+                'Ipa'  => 'IPA',
+                'Ips'  => 'IPS',
+                'Pai'  => 'PAI',
+                'Pjok' => 'PJOK',
+                'Pkn'  => 'PKn',
+                'Ppkn' => 'PPKn',
+                'Tik'  => 'TIK',
+                'Mtk'  => 'MTK',
+                'Bk'   => 'BK',
+                'Btq'  => 'BTQ',
+                'Sbdp' => 'SBdP',
+            ];
+            foreach ($acronyms as $from => $to) {
+                $mapelTitle = preg_replace('/\b' . preg_quote($from, '/') . '\b/u', $to, $mapelTitle);
+            }
+        }
+
+        // 2. Kelas & Hari/Tanggal
+        $cleanKelas = preg_replace('/^kelas\s+/iu', '', trim((string) ($item->kelas ?? '')));
+        $kelasLabel = $cleanKelas !== '' ? 'Kelas ' . $cleanKelas : 'Kelas -';
+
+        $carbonDate = Carbon::parse($item->tanggal);
+        $hariMap = [
+            'Sunday'    => 'Minggu',
+            'Monday'    => 'Senin',
+            'Tuesday'   => 'Selasa',
+            'Wednesday' => 'Rabu',
+            'Thursday'  => 'Kamis',
+            'Friday'    => 'Jumat',
+            'Saturday'  => 'Sabtu',
+        ];
+        $rawHari = trim((string) ($item->hari ?? ''));
+        $hariNama = $rawHari !== ''
+            ? ucwords(mb_strtolower($rawHari, 'UTF-8'))
+            : ($hariMap[$carbonDate->format('l')] ?? $carbonDate->format('l'));
+        $hariTanggalLabel = $hariNama . ', ' . $carbonDate->format('d/m/Y');
+
+        // 3. Jam Ke & Rentang Jam Dinding (contoh: "Jam ke 1–2" & "07.30–08.50")
+        $rawJam = trim((string) ($item->jam_ke ?? ''));
+        $waktuDindingLabel = '';
+        $jamWithoutClock = $rawJam;
+
+        if (preg_match('/(\d{1,2})[:.](\d{2})\s*(?:[-–—]|s\/?d|sampai)\s*(\d{1,2})[:.](\d{2})/iu', $rawJam, $mClock)) {
+            $waktuDindingLabel = sprintf(
+                '%02d.%02d–%02d.%02d',
+                (int) $mClock[1],
+                (int) $mClock[2],
+                (int) $mClock[3],
+                (int) $mClock[4]
+            );
+            $jamWithoutClock = preg_replace('/\(\s*\d{1,2}[:.]\d{2}.*?\)/u', '', $jamWithoutClock);
+            $jamWithoutClock = trim(preg_replace('/\d{1,2}[:.]\d{2}\s*(?:[-–—]|s\/?d|sampai)\s*\d{1,2}[:.]\d{2}/iu', '', $jamWithoutClock));
+        }
+
+        $startJam = null;
+        $endJam = null;
+        $jamKeLabel = '';
+
+        if (preg_match('/\b(\d{1,2})\s*(?:[-–—]|s\/?d|sampai|,|&)\s*(\d{1,2})\b/iu', $jamWithoutClock, $mRange)) {
+            $startJam = (int) $mRange[1];
+            $endJam = (int) $mRange[2];
+            $jamKeLabel = ($startJam === $endJam)
+                ? "Jam ke {$startJam}"
+                : "Jam ke {$startJam}–{$endJam}";
+        } elseif (preg_match('/\b(\d{1,2})\b/u', $jamWithoutClock, $mSingle)) {
+            $startJam = (int) $mSingle[1];
+            $endJam = $startJam;
+            $jamKeLabel = "Jam ke {$startJam}";
+        } elseif ($jamWithoutClock !== '') {
+            $trimmedJam = trim($jamWithoutClock, " -–—()");
+            if ($trimmedJam !== '') {
+                $jamKeLabel = stripos($trimmedJam, 'jam') === 0
+                    ? preg_replace('/^jam\s+(?!ke\b)/iu', 'Jam ke ', $trimmedJam)
+                    : $trimmedJam;
+            }
+        }
+
+        if ($waktuDindingLabel === '' && $startJam !== null && $startJam >= 1 && $endJam !== null && $endJam >= $startJam) {
+            $slots = $timeSlots ? collect($timeSlots) : collect();
+            if ($slots->isNotEmpty()) {
+                $lembagaKode = strtolower((string) ($item->lembaga?->kode ?? ''));
+                if ($lembagaKode === 'sma' || preg_match('/\b(10|11|12|X|XI|XII)\b/i', $cleanKelas)) {
+                    $jenjang = 'SMA';
+                } else {
+                    $jenjang = 'SMP';
+                }
+
+                $jenjangSlots = $slots->filter(function ($s) use ($jenjang) {
+                    $sj = strtoupper(trim((string) ($s->jenjang ?? '')));
+                    return $sj === $jenjang || $sj === 'SEMUA' || $sj === '';
+                });
+
+                $daySlots = $jenjangSlots->filter(fn ($s) => mb_strtolower(trim((string) $s->hari)) === mb_strtolower($hariNama));
+                if ($daySlots->isEmpty()) {
+                    $daySlots = $jenjangSlots->filter(fn ($s) => mb_strtolower(trim((string) $s->hari)) === 'senin');
+                }
+                if ($daySlots->isEmpty()) {
+                    $daySlots = $jenjangSlots;
+                }
+
+                $slotStart = $daySlots->first(fn ($s) => (int) $s->jam_ke === $startJam);
+                $slotEnd   = $daySlots->first(fn ($s) => (int) $s->jam_ke === $endJam);
+
+                if ($slotStart && $slotEnd && !empty($slotStart->waktu_mulai) && !empty($slotEnd->waktu_selesai)) {
+                    $wMulai   = str_replace(':', '.', substr((string) $slotStart->waktu_mulai, 0, 5));
+                    $wSelesai = str_replace(':', '.', substr((string) $slotEnd->waktu_selesai, 0, 5));
+                    $waktuDindingLabel = $wMulai . '–' . $wSelesai;
+                }
+            }
+
+            // Fallback standar 40 menit mulai pukul 07.30 jika master time_slots kosong / belum mencakup jam tersebut
+            if ($waktuDindingLabel === '' && $endJam <= 16) {
+                $startMin = 450 + (($startJam - 1) * 40);
+                $endMin   = 450 + ($endJam * 40);
+                $waktuDindingLabel = sprintf(
+                    '%02d.%02d–%02d.%02d',
+                    intdiv($startMin, 60),
+                    $startMin % 60,
+                    intdiv($endMin, 60),
+                    $endMin % 60
+                );
+            }
+        }
+
+        $totalSiswa = (int) ($item->total_siswa ?? 0);
+        $totalHadir = (int) ($item->total_hadir ?? 0);
+        $totalAbsen = (int) ($item->total_sakit ?? 0) + (int) ($item->total_izin ?? 0) + (int) ($item->total_alpa ?? 0);
+        $isHadirLengkap = $totalSiswa > 0 && $totalHadir >= $totalSiswa && $totalAbsen === 0;
+
+        return [
+            'mapel_title'         => $mapelTitle,
+            'kelas_label'         => $kelasLabel,
+            'jam_ke_label'        => $jamKeLabel,
+            'hari_tanggal_label'  => $hariTanggalLabel,
+            'waktu_dinding_label' => $waktuDindingLabel,
+            'baris_2'             => $jamKeLabel !== '' ? "{$kelasLabel} • {$jamKeLabel}" : $kelasLabel,
+            'baris_3'             => $waktuDindingLabel !== '' ? "{$hariTanggalLabel} • {$waktuDindingLabel}" : $hariTanggalLabel,
+            'is_hadir_lengkap'    => $isHadirLengkap,
+            'badge_text'          => ($isHadirLengkap ? '✓ ' : 'H: ') . $totalHadir . '/' . $totalSiswa,
+        ];
     }
 
     /**
