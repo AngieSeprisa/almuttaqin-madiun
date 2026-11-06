@@ -614,23 +614,52 @@
         }
     }
 
-    function copyWaText() {
-        var textarea = document.getElementById('waTextarea');
-        if (!textarea) return;
-        textarea.select();
-        textarea.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(textarea.value).then(function() {
-            var btnText = document.getElementById('btnSalinWaText');
-            if (btnText) btnText.textContent = 'Tersalin!';
+    function showPengajianCopyToast() {
+        var btnText = document.getElementById('btnSalinWaText');
+        if (btnText) {
+            btnText.textContent = 'Tersalin! ✓';
+            setTimeout(function() {
+                btnText.textContent = 'Salin Teks';
+            }, 2000);
+        }
+        if (window.Swal) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil Disalin!',
+                text: 'Format laporan WhatsApp berhasil disalin ke clipboard.',
+                timer: 2000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        } else {
             var notif = document.getElementById('copyNotif');
             if (notif) {
                 notif.style.display = 'block';
                 setTimeout(function() {
                     notif.style.display = 'none';
-                    if (btnText) btnText.textContent = 'Salin Teks';
-                }, 3000);
+                }, 2000);
             }
-        });
+        }
+    }
+
+    function copyWaText() {
+        var textarea = document.getElementById('waTextarea');
+        if (!textarea) return;
+        textarea.select();
+        textarea.setSelectionRange(0, 99999);
+        var text = textarea.value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function() {
+                showPengajianCopyToast();
+            }).catch(function() {
+                document.execCommand('copy');
+                showPengajianCopyToast();
+            });
+        } else {
+            document.execCommand('copy');
+            showPengajianCopyToast();
+        }
     }
 
     function openWaWeb() {

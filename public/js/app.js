@@ -539,12 +539,46 @@ document.addEventListener('DOMContentLoaded', function () {
       // Inject Master Header Checkbox + Row Checkboxes + Synced Mobile Checkboxes
       var thCheck = document.createElement('th');
       thCheck.className = 'fi-ta-th-check';
+      if (table.tHead.rows.length > 1) {
+        thCheck.rowSpan = table.tHead.rows.length;
+      }
       var masterCheck = document.createElement('input');
       masterCheck.type = 'checkbox';
       masterCheck.className = 'fi-ta-checkbox';
       masterCheck.setAttribute('aria-label', 'Pilih semua baris');
       thCheck.appendChild(masterCheck);
       headRow.insertBefore(thCheck, headRow.firstChild);
+
+      // Map top header cells to sub-header cells (for multi-row matrix thead) and tbody column indices
+      var subHeadRow = table.tHead.rows.length > 1 ? table.tHead.rows[1] : null;
+      var bodyColCursor = 0;
+      var subHeadCursor = 0;
+      var headColMeta = Array.from(headRow.cells).map(function (th, hIdx) {
+        var span = Math.max(1, th.colSpan || 1);
+        var rSpan = Math.max(1, th.rowSpan || 1);
+        var bodyCols = [];
+        for (var c = 0; c < span; c++) {
+          bodyCols.push(bodyColCursor++);
+        }
+        var subCells = [];
+        if (subHeadRow && rSpan === 1) {
+          for (var s = 0; s < span; s++) {
+            if (subHeadRow.cells[subHeadCursor]) {
+              subCells.push(subHeadRow.cells[subHeadCursor]);
+            }
+            subHeadCursor++;
+          }
+        }
+        var isDateOrGroup = subCells.length > 0 || span > 1 || th.classList.contains('th-date-group');
+        return {
+          th: th,
+          hIdx: hIdx,
+          span: span,
+          isDateOrGroup: isDateOrGroup,
+          bodyCols: bodyCols,
+          subCells: subCells
+        };
+      });
 
       var rowMeta = dataRows.map(function (tr, idx) {
         var tdCheck = document.createElement('td');
@@ -988,8 +1022,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
       function updateColspans() {
         var visibleCount = 0;
-        Array.from(headRow.cells).forEach(function (th) {
-          if (th.style.display !== 'none') visibleCount++;
+        headColMeta.forEach(function (meta) {
+          if (meta.th.style.display !== 'none') visibleCount += meta.span;
         });
         if (noMatchTd) noMatchTd.colSpan = Math.max(1, visibleCount);
         emptyRows.forEach(function (er) {
@@ -998,14 +1032,29 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       function applyColVisibility(colIdx, isVisible) {
-        if (headRow && headRow.cells[colIdx]) {
-          headRow.cells[colIdx].style.display = isVisible ? '' : 'none';
-        }
-        dataRows.forEach(function (tr) {
-          if (tr.cells[colIdx]) {
-            tr.cells[colIdx].style.display = isVisible ? '' : 'none';
+        var meta = headColMeta[colIdx];
+        if (meta) {
+          meta.th.style.display = isVisible ? '' : 'none';
+          meta.subCells.forEach(function (subTh) {
+            subTh.style.display = isVisible ? '' : 'none';
+          });
+          dataRows.forEach(function (tr) {
+            meta.bodyCols.forEach(function (bIdx) {
+              if (tr.cells[bIdx]) {
+                tr.cells[bIdx].style.display = isVisible ? '' : 'none';
+              }
+            });
+          });
+        } else {
+          if (headRow && headRow.cells[colIdx]) {
+            headRow.cells[colIdx].style.display = isVisible ? '' : 'none';
           }
-        });
+          dataRows.forEach(function (tr) {
+            if (tr.cells[colIdx]) {
+              tr.cells[colIdx].style.display = isVisible ? '' : 'none';
+            }
+          });
+        }
         if (mobileList) {
           mobileList.querySelectorAll('[data-col-idx="' + colIdx + '"]').forEach(function (el) {
             el.style.display = isVisible ? '' : 'none';
@@ -1618,6 +1667,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var currentSortAsc = true;
       Array.from(headRow.cells).forEach(function (th, colIdx) {
         if (colIdx === 0) return;
+        var meta = headColMeta[colIdx];
+        if (meta && meta.isDateOrGroup) return;
         var labelTxt = (th.textContent || '').replace(/\s+/g, ' ').trim();
         if (!labelTxt || /^aksi/i.test(labelTxt)) return;
 
@@ -1650,9 +1701,10 @@ document.addEventListener('DOMContentLoaded', function () {
           var activeSvg = sortBtn.querySelector('svg');
           if (activeSvg) activeSvg.style.transform = currentSortAsc ? 'rotate(180deg)' : 'rotate(0deg)';
 
+          var targetBodyIdx = (meta && meta.bodyCols.length > 0) ? meta.bodyCols[0] : colIdx;
           rowMeta.sort(function (a, b) {
-            var aTxt = a.tr.cells[colIdx] ? (a.tr.cells[colIdx].textContent || '').trim() : '';
-            var bTxt = b.tr.cells[colIdx] ? (b.tr.cells[colIdx].textContent || '').trim() : '';
+            var aTxt = a.tr.cells[targetBodyIdx] ? (a.tr.cells[targetBodyIdx].textContent || '').trim() : '';
+            var bTxt = b.tr.cells[targetBodyIdx] ? (b.tr.cells[targetBodyIdx].textContent || '').trim() : '';
             var aNum = parseFloat(aTxt.replace(/[^\d.-]/g, ''));
             var bNum = parseFloat(bTxt.replace(/[^\d.-]/g, ''));
             var cmp = (!isNaN(aNum) && !isNaN(bNum) && /^\d/.test(aTxt) && /^\d/.test(bTxt))

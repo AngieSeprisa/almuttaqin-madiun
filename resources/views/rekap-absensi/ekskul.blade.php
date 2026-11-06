@@ -433,14 +433,42 @@ function renderWaText() {
     document.getElementById('waTextarea').value = text;
 }
 
+function showEkskulCopyToast() {
+    if (window.Swal) {
+        Swal.fire({
+            icon: 'success',
+            title: 'Berhasil Disalin!',
+            text: 'Format laporan WhatsApp berhasil disalin ke clipboard.',
+            timer: 2000,
+            showConfirmButton: false,
+            toast: true,
+            position: 'top-end'
+        });
+    } else {
+        const notif = document.getElementById('copyNotif');
+        if (notif) {
+            notif.style.display = 'block';
+            setTimeout(() => { notif.style.display = 'none'; }, 2000);
+        }
+    }
+}
+
 function copyWaText() {
     const ta = document.getElementById('waTextarea');
+    if (!ta) return;
     ta.select();
-    navigator.clipboard.writeText(ta.value).then(() => {
-        const notif = document.getElementById('copyNotif');
-        notif.style.display = 'block';
-        setTimeout(() => { notif.style.display = 'none'; }, 2500);
-    });
+    ta.setSelectionRange(0, 99999);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value).then(() => {
+            showEkskulCopyToast();
+        }).catch(() => {
+            document.execCommand('copy');
+            showEkskulCopyToast();
+        });
+    } else {
+        document.execCommand('copy');
+        showEkskulCopyToast();
+    }
 }
 </script>
 @endsection

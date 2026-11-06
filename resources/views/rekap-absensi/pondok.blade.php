@@ -1682,15 +1682,27 @@
     }
 
     function showCopyFeedback() {
-        var notif = document.getElementById('waCopyNotification');
-        if (notif) notif.style.display = 'block';
-
         var btnText = document.getElementById('btnSalinWaText');
         if (btnText) btnText.textContent = 'Tersalin! ✓';
 
         setTimeout(function () {
             if (btnText) btnText.textContent = 'Salin Format WA';
-        }, 3000);
+        }, 2000);
+
+        if (window.Swal) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil Disalin!',
+                text: 'Format laporan WhatsApp berhasil disalin ke clipboard.',
+                timer: 2000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        } else {
+            var notif = document.getElementById('waCopyNotification');
+            if (notif) notif.style.display = 'block';
+        }
     }
 
     function openWhatsAppWeb() {

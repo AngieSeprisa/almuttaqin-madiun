@@ -113,7 +113,7 @@
                 @endif
             </div>
 
-            {{-- Filter Pencarian Nama Siswa & Action Laporan WA --}}
+            {{-- Filter Pencarian Nama Siswa --}}
             <div style="display:flex; align-items:center; gap:8px;">
                 <div class="filter-search-wrap">
                     <input type="text" name="search" value="{{ request('search') }}"
@@ -126,14 +126,6 @@
                         </svg>
                     </button>
                 </div>
-
-                {{-- Tombol Laporan WA --}}
-                <button type="button" class="btn-wa" onclick="openWaModal()" title="Buka &amp; Salin Format Laporan WhatsApp">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.41 1.56 1.56 2.41 3.63 2.41 5.83s-.85 4.27-2.41 5.83c-1.55 1.55-3.62 2.41-5.82 2.41-1.5 0-2.97-.39-4.27-1.13l-.3-.17-3.17.83.85-3.09-.2-.31c-.81-1.33-1.25-2.88-1.25-4.47 0-2.2 0.86-4.27 2.42-5.83 1.56-1.55 3.63-2.41 5.82-2.41m-2.64 5.34c-.16 0-.39.06-.6.28-.2.22-.79.77-.79 1.88s.81 2.18.92 2.33c.12.16 1.57 2.4 3.82 3.37.53.23.95.37 1.28.47.54.17 1.03.15 1.42.09.43-.06 1.33-.54 1.52-1.07.19-.52.19-.97.13-1.07-.06-.09-.22-.16-.47-.28-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.65.81-.8 1-.15.19-.3.21-.55.09-.25-.12-1.07-.39-2.04-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.28.37-.42.12-.15.16-.25.25-.42.08-.16.04-.31-.02-.43s-.56-1.36-.77-1.86c-.2-.48-.41-.42-.56-.43h-.48z"/>
-                    </svg>
-                    <span>Laporan WA</span>
-                </button>
             </div>
         </form>
     </div>
@@ -412,89 +404,107 @@
     </div>
 </div>
 
-{{-- Modal Laporan WhatsApp --}}
-<div class="modal-backdrop-custom" id="modalLaporanWA" style="display:none;">
-    <div class="modal-dialog-custom" style="max-width: 680px;">
-        <div class="modal-content-custom">
-            
-            {{-- Modal Header --}}
-            <div class="modal-header-custom" style="background:#f8fafc;">
-                <div class="modal-title-wrap">
-                    <div class="modal-avatar-icon" style="background:#dcfce7; color:#16a34a;">
-                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                            <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.41 1.56 1.56 2.41 3.63 2.41 5.83s-.85 4.27-2.41 5.83c-1.55 1.55-3.62 2.41-5.82 2.41-1.5 0-2.97-.39-4.27-1.13l-.3-.17-3.17.83.85-3.09-.2-.31c-.81-1.33-1.25-2.88-1.25-4.47 0-2.2 0.86-4.27 2.42-5.83 1.56-1.55 3.63-2.41 5.82-2.41m-2.64 5.34c-.16 0-.39.06-.6.28-.2.22-.79.77-.79 1.88s.81 2.18.92 2.33c.12.16 1.57 2.4 3.82 3.37.53.23.95.37 1.28.47.54.17 1.03.15 1.42.09.43-.06 1.33-.54 1.52-1.07.19-.52.19-.97.13-1.07-.06-.09-.22-.16-.47-.28-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.65.81-.8 1-.15.19-.3.21-.55.09-.25-.12-1.07-.39-2.04-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.28.37-.42.12-.15.16-.25.25-.42.08-.16.04-.31-.02-.43s-.56-1.36-.77-1.86c-.2-.48-.41-.42-.56-.43h-.48z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="modal-title-text" style="font-size:16px;">Laporan WhatsApp Absensi Sekolah</h3>
-                        <p class="modal-subtitle-text">
-                            Kelas {{ \App\Http\Controllers\PlottingKelasController::toRomanDisplay($selectedKelas ?? '-') }} &bull; {{ $bulan ? ($bulanList[$bulan] ?? 'Bulan ' . $bulan) : 'Semua Bulan' }} {{ $tahun }}
-                        </p>
-                    </div>
-                </div>
-                <button type="button" class="modal-close-btn" onclick="closeWaModal()" aria-label="Tutup Modal">&times;</button>
+@php
+    $waDateMap = [];
+    foreach ($jurnals as $jItem) {
+        $dIso = \Carbon\Carbon::parse($jItem->tanggal)->format('Y-m-d');
+        if (!isset($waDateMap[$dIso])) {
+            $waDateMap[$dIso] = [
+                'date'      => $dIso,
+                'formatted' => \Carbon\Carbon::parse($jItem->tanggal)->locale('id')->translatedFormat('l, j F Y'),
+            ];
+        }
+    }
+    $waDateList = array_values($waDateMap);
+    $defaultWaDate = !empty($waDateList) ? end($waDateList)['date'] : 'semua';
+
+    $waKamarList = collect($rekapSiswa)
+        ->map(fn($item) => trim((string) ($item->siswa->kamar ?? '')))
+        ->filter(fn($k) => $k !== '' && $k !== '-')
+        ->unique()
+        ->sort()
+        ->values()
+        ->all();
+
+    $waPeriodeLabel = ($bulan ? ($bulanList[$bulan] ?? 'Bulan ' . $bulan) : 'Semua Bulan') . ' ' . $tahun;
+@endphp
+
+{{-- Modal Laporan WhatsApp (Seragam dengan Rekap Presensi Sholat) --}}
+<div id="modalLaporanWA" class="rp-modal-backdrop" style="display:none;">
+    <div class="rp-modal-dialog">
+        <div class="rp-modal-header">
+            <div>
+                <h3 class="rp-modal-title" style="display:flex;align-items:center;gap:8px;">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="color:#16a34a;">
+                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.41 1.56 1.56 2.41 3.63 2.41 5.83s-.85 4.27-2.41 5.83c-1.55 1.55-3.62 2.41-5.82 2.41-1.5 0-2.97-.39-4.27-1.13l-.3-.17-3.17.83.85-3.09-.2-.31c-.81-1.33-1.25-2.88-1.25-4.47 0-2.2 0.86-4.27 2.42-5.83 1.56-1.55 3.63-2.41 5.82-2.41m-2.64 5.34c-.16 0-.39.06-.6.28-.2.22-.79.77-.79 1.88s.81 2.18.92 2.33c.12.16 1.57 2.4 3.82 3.37.53.23.95.37 1.28.47.54.17 1.03.15 1.42.09.43-.06 1.33-.54 1.52-1.07.19-.52.19-.97.13-1.07-.06-.09-.22-.16-.47-.28-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.12-.17.25-.65.81-.8 1-.15.19-.3.21-.55.09-.25-.12-1.07-.39-2.04-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.51.11-.11.25-.28.37-.42.12-.15.16-.25.25-.42.08-.16.04-.31-.02-.43s-.56-1.36-.77-1.86c-.2-.48-.41-.42-.56-.43h-.48z"/>
+                    </svg>
+                    Laporan WhatsApp Presensi
+                </h3>
             </div>
+            <button type="button" class="rp-modal-close-btn" onclick="closeWaModal()" aria-label="Tutup Modal">&times;</button>
+        </div>
 
-            {{-- Modal Body --}}
-            <div class="modal-body-custom" style="padding:18px 24px; gap:14px;">
-                {{-- Controls Filter Mode --}}
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
-                    <div>
-                        <label style="display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:5px;">PILIH FORMAT LAPORAN</label>
-                        <select id="waModeSelect" class="form-select" style="font-size:12.5px; height:38px;" onchange="handleWaModeChange()">
-                            <option value="rekap">Rekap Keseluruhan (Bulan/Periode)</option>
-                            <option value="sesi">Per Sesi Pertemuan / Tanggal</option>
-                        </select>
-                    </div>
-                    <div id="waSesiWrap" style="display:none;">
-                        <label style="display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:5px;">PILIH SESI PERTEMUAN</label>
-                        <select id="waSesiSelect" class="form-select" style="font-size:12.5px; height:38px;" onchange="renderSekolahWaPreview()">
-                            @foreach($jurnals as $j)
-                                <option value="{{ $j->id }}">
-                                    {{ $j->tgl_full }} - {{ $j->kode_mapel }} ({{ $j->jam_ke }}) - {{ $j->nama_guru }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+        <div class="rp-modal-body">
+            <div class="rp-wa-filter-grid">
+                {{-- Dropdown Tanggal --}}
+                <div class="fi-filter-item">
+                    <label class="fi-filter-label" for="waTanggalSelect">Tanggal</label>
+                    <select id="waTanggalSelect" class="fi-select" onchange="handleWaTanggalChange()">
+                        @foreach($waDateList as $dItem)
+                            <option value="{{ $dItem['date'] }}" {{ $dItem['date'] === $defaultWaDate ? 'selected' : '' }}>
+                                {{ $dItem['formatted'] }}
+                            </option>
+                        @endforeach
+                        <option value="semua" {{ $defaultWaDate === 'semua' ? 'selected' : '' }}>
+                            Semua Tanggal ({{ $waPeriodeLabel }})
+                        </option>
+                    </select>
                 </div>
 
-                {{-- Textarea Preview --}}
-                <div>
-                    <label style="display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:5px;">TEKS PESAN WHATSAPP</label>
-                    <textarea id="waTextarea" spellcheck="false" style="width:100%; height:270px; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; line-height:1.6; padding:12px; border:1px solid #cbd5e1; border-radius:10px; resize:vertical; background:#f8fafc; color:#0f172a; box-sizing:border-box;"></textarea>
+                {{-- Dropdown Kamar --}}
+                <div class="fi-filter-item">
+                    <label class="fi-filter-label" for="waKamarSelect">Kamar</label>
+                    <select id="waKamarSelect" class="fi-select" onchange="renderSekolahWaPreview()">
+                        <option value="semua">Semua Kamar</option>
+                        @foreach($waKamarList as $kmr)
+                            <option value="{{ $kmr }}">{{ $kmr }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
-                <div id="copyNotif" style="display:none; padding:8px 12px; background:#dcfce7; color:#15803d; font-size:12px; font-weight:600; border-radius:6px; text-align:center;">
-                    Format WhatsApp berhasil disalin ke clipboard!
-                </div>
-            </div>
-
-            {{-- Modal Footer --}}
-            <div class="modal-footer-custom" style="display:flex; align-items:center; justify-content:space-between; padding:14px 24px; background:#f8fafc;">
-                <div style="font-size:11.5px; color:#64748b;">
-                    Gunakan tombol salin atau buka langsung via WhatsApp Web.
-                </div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <button type="button" class="btn btn-secondary" onclick="closeWaModal()" style="height:38px; padding:0 16px; font-size:13px; font-weight:600;">
-                        Tutup
-                    </button>
-                    <button type="button" class="btn-wa" onclick="copyWaText()" id="btnSalinWa" style="height:38px; padding:0 18px; font-size:13px; font-weight:600;">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                        <span id="btnSalinWaText">Salin Teks</span>
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="openWaWeb()" title="Buka WhatsApp Web" style="height:38px; padding:0 12px; color:#16a34a; border-color:#86efac; background:#f0fdf4;">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                            <polyline points="15 3 21 3 21 9"></polyline>
-                            <line x1="10" y1="14" x2="21" y2="3"></line>
-                        </svg>
-                    </button>
+                {{-- Dropdown Sesi --}}
+                <div class="fi-filter-item">
+                    <label class="fi-filter-label" for="waSessionSelect">Sesi</label>
+                    <select id="waSessionSelect" class="fi-select" onchange="renderSekolahWaPreview()">
+                        <option value="semua">Semua Sesi</option>
+                    </select>
                 </div>
             </div>
 
+            {{-- Textarea Pratinjau Teks WhatsApp --}}
+            <div>
+                <label class="fi-filter-label" for="waTextarea" style="margin-bottom:6px;display:block;">Teks Pesan WhatsApp:</label>
+                <textarea id="waTextarea" class="rp-wa-textarea" spellcheck="false"></textarea>
+            </div>
+        </div>
+
+        <div class="rp-modal-footer">
+            <button type="button" class="rp-btn-tutup" onclick="closeWaModal()">Tutup</button>
+            <button type="button" class="fi-btn-secondary" onclick="openWaWeb()" title="Buka WhatsApp Web di tab baru">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                <span>Buka WhatsApp Web</span>
+            </button>
+            <button type="button" class="btn-wa fi-btn-wa" id="btnSalinWa" onclick="copyWaText()">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span id="btnSalinWaText">Salin Format WA</span>
+            </button>
         </div>
     </div>
 </div>
@@ -660,13 +670,14 @@
 
 /* Fixed Columns */
 .th-col-no {
-    width: 48px;
-    min-width: 48px;
-    text-align: center;
+    width: 46px;
+    min-width: 46px;
+    text-align: center !important;
     border-right: 1px solid #E2E8F0 !important;
 }
 .th-col-nama {
-    min-width: 200px;
+    min-width: 220px;
+    width: 100%;
     text-align: left !important;
     padding-left: 16px !important;
     border-right: 1px solid #E2E8F0 !important;
@@ -676,7 +687,7 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    background-color: #00875a;
+    background-color: #16a34a;
     color: #ffffff !important;
     border: none;
     padding: 8px 16px;
@@ -685,13 +696,13 @@
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
-    transition: background-color 0.2s, transform 0.1s;
+    transition: background-color 0.15s ease, transform 0.1s;
     height: 38px;
     box-sizing: border-box;
     white-space: nowrap;
 }
 .btn-wa:hover {
-    background-color: #006644;
+    background-color: #15803d;
     color: #ffffff !important;
 }
 .btn-wa:active {
@@ -703,8 +714,10 @@
     font-weight: 700;
     color: #1E293B !important;
     padding: 6px 4px !important;
-    height: 32px;
-    line-height: 20px;
+    height: 34px;
+    line-height: 22px;
+    text-align: center !important;
+    vertical-align: middle !important;
     box-sizing: border-box;
     border-bottom: 1px solid #CBD5E1 !important;
     background: #EDF2F7 !important;
@@ -718,31 +731,37 @@
     font-size: 11px;
     font-weight: 700;
     color: #1E293B;
-    padding: 4px 2px !important;
-    min-width: 48px;
-    width: 48px;
-    height: 32px;
+    padding: 5px 4px !important;
+    min-width: 54px;
+    width: 54px;
+    height: 34px;
     box-sizing: border-box;
-    text-align: center;
-    vertical-align: middle;
+    text-align: center !important;
+    vertical-align: middle !important;
     background: #F8FAFC !important;
     border-bottom: 2px solid #CBD5E1 !important;
 }
 .th-mapel-code .mapel-code,
 .th-mapel-code .mapel-code-pill {
-    display: inline-block;
-    padding: 2px 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 22px;
+    padding: 0 6px;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 800;
+    line-height: 1;
     color: #0F172A;
     background: #E2E8F0;
     border: 1px solid #CBD5E1;
-    border-radius: 4px;
+    border-radius: 5px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
     white-space: nowrap;
     text-align: center;
+    box-sizing: border-box;
 }
 .dark-mode .th-mapel-code {
     background: #172033 !important;
@@ -755,7 +774,7 @@
     border-color: #334155;
 }
 
-/* Gaya buku absensi: kolom No & Nama menempel saat digeser, header menempel saat scroll */
+/* Gaya buku absensi: Checkbox, No & Nama menempel saat digeser, header menempel saat scroll */
 .rekap-scroll-wrap { max-height: 78vh; overflow: auto; }
 .rekap-matrix-table thead tr:first-child th {
     position: sticky;
@@ -764,41 +783,56 @@
 }
 .rekap-matrix-table thead tr:nth-child(2) th {
     position: sticky;
-    top: 32px;
+    top: 34px;
     z-index: 4;
 }
-.rekap-matrix-table .th-col-no,
-.rekap-matrix-table .td-col-no {
+.rekap-matrix-table .fi-ta-th-check,
+.rekap-matrix-table .fi-ta-td-check {
     position: sticky;
     left: 0;
     z-index: 4;
     background: #fff;
-    min-width: 44px;
     width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    box-sizing: border-box;
+    border-right: 1px solid #EDF2F7 !important;
 }
-.rekap-matrix-table .th-col-nama,
-.rekap-matrix-table .td-col-nama {
+.rekap-matrix-table .th-col-no,
+.rekap-matrix-table .td-col-no {
     position: sticky;
     left: 44px;
     z-index: 4;
     background: #fff;
+    min-width: 46px;
+    width: 46px;
+}
+.rekap-matrix-table .th-col-nama,
+.rekap-matrix-table .td-col-nama {
+    position: sticky;
+    left: 90px;
+    z-index: 4;
+    background: #fff;
     box-shadow: 2px 0 4px -2px rgba(15, 23, 42, 0.12);
 }
+.rekap-matrix-table thead .fi-ta-th-check,
 .rekap-matrix-table thead .th-col-no,
 .rekap-matrix-table thead .th-col-nama {
     z-index: 8;
     background: #F8FAFC;
 }
+.dark-mode .rekap-matrix-table .fi-ta-td-check,
 .dark-mode .rekap-matrix-table .td-col-no,
-.dark-mode .rekap-matrix-table .td-col-nama { background: #0F172A; }
+.dark-mode .rekap-matrix-table .td-col-nama { background: #0F172A; border-right-color: #1E293B !important; }
+.dark-mode .rekap-matrix-table thead .fi-ta-th-check,
 .dark-mode .rekap-matrix-table thead .th-col-no,
-.dark-mode .rekap-matrix-table thead .th-col-nama { background: #1E293B; }
-.rekap-matrix-table .td-matrix-cell { border-right: 1px solid #E2E8F0; text-align: center; }
+.dark-mode .rekap-matrix-table thead .th-col-nama { background: #1E293B; border-right-color: #334155 !important; }
+.rekap-matrix-table .td-matrix-cell { min-width: 54px; width: 54px; border-right: 1px solid #E2E8F0; text-align: center !important; }
 
 @media (max-width: 768px) {
     .rekap-matrix-card { display: block !important; }
     .rekap-matrix-table { font-size: 12px; }
-    .th-col-nama { min-width: 130px; padding-left: 10px !important; }
+    .th-col-nama { width: auto; min-width: 140px; padding-left: 10px !important; }
     .rekap-matrix-table .td-col-nama { padding-left: 10px !important; }
     .siswa-nama-text { font-size: 12.5px; white-space: normal; min-width: 120px; max-width: 150px; }
     .absen-pill { width: 24px; height: 24px; font-size: 11px; }
@@ -806,15 +840,16 @@
 .th-no-session {
     min-width: 140px;
     color: #94A3B8;
+    text-align: center !important;
 }
 
 /* Stat Columns Header */
 .th-stat-summary {
-    width: 36px;
-    min-width: 36px;
+    width: 42px;
+    min-width: 42px;
     font-size: 12.5px;
     font-weight: 800;
-    text-align: center;
+    text-align: center !important;
 }
 .col-stat-h { color: #059669 !important; }
 .col-stat-t { color: #D97706 !important; }
@@ -822,9 +857,9 @@
 .col-stat-s { color: #D97706 !important; }
 .col-stat-a { color: #EF4444 !important; }
 .th-col-aksi {
-    width: 90px;
-    min-width: 90px;
-    text-align: center;
+    width: 96px;
+    min-width: 96px;
+    text-align: center !important;
     border-right: none !important;
 }
 
@@ -1280,10 +1315,247 @@
 .dark-mode .modal-footer-custom {
     border-top-color: #1E293B;
 }
+
+/* Modal Laporan WhatsApp (Seragam dengan Rekap Presensi Sholat) */
+.rp-modal-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(15, 23, 42, 0.48) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    z-index: 999999 !important;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+.rp-modal-dialog {
+    width: 100%;
+    max-width: 640px;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    max-height: 88vh;
+}
+.dark-mode .rp-modal-dialog {
+    background: #0f172a;
+    border-color: #334155;
+}
+.rp-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 16px 22px 14px;
+    border-bottom: 1px solid #f3f4f6;
+}
+.dark-mode .rp-modal-header {
+    border-bottom-color: #1e293b;
+}
+.rp-modal-title {
+    font-size: 15.5px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+}
+.dark-mode .rp-modal-title {
+    color: #f8fafc;
+}
+.rp-modal-close-btn {
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: color 0.15s ease;
+}
+.rp-modal-close-btn:hover {
+    color: #111827;
+}
+.dark-mode .rp-modal-close-btn:hover {
+    color: #f8fafc;
+}
+.rp-modal-body {
+    padding: 16px 22px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.rp-wa-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+@media (max-width: 560px) {
+    .rp-wa-filter-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.fi-filter-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.fi-filter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+}
+.dark-mode .fi-filter-label {
+    color: #cbd5e1;
+}
+.fi-select {
+    width: 100%;
+    height: 38px;
+    padding: 7px 32px 7px 12px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #111827;
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 10px center;
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+    appearance: none;
+    -webkit-appearance: none;
+}
+.fi-select:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+.dark-mode .fi-select {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #f8fafc;
+}
+.rp-wa-textarea {
+    width: 100%;
+    height: 250px;
+    padding: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #111827;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    outline: none;
+    resize: vertical;
+    box-sizing: border-box;
+    white-space: pre-wrap;
+}
+.rp-wa-textarea:focus {
+    border-color: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+    background: #ffffff;
+}
+.dark-mode .rp-wa-textarea {
+    background: #1e293b;
+    border-color: #334155;
+    color: #f8fafc;
+}
+.rp-modal-footer {
+    padding: 12px 22px 16px;
+    border-top: 1px solid #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.dark-mode .rp-modal-footer {
+    border-top-color: #1e293b;
+}
+.rp-btn-tutup {
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.rp-btn-tutup:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
+.dark-mode .rp-btn-tutup {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+.fi-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #d1d5db;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+.fi-btn-secondary:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    color: #111827;
+}
+.dark-mode .fi-btn-secondary {
+    background: #1e293b;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+.fi-btn-wa {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 8px;
+    background: #16a34a;
+    color: #ffffff !important;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+.fi-btn-wa:hover {
+    background: #15803d;
+    color: #ffffff !important;
+}
 </style>
 
 <script>
-    // Data JSON untuk generator teks laporan WhatsApp
+    // Data JSON untuk generator teks laporan WhatsApp (Seragam dengan Rekap Sholat)
     window.SEKOLAH_REKAP_DATA = {
         lembaga: {!! json_encode(strtoupper($activeRoom ?? 'SMP AL MUTTAQIN')) !!},
         kelas: {!! json_encode(\App\Http\Controllers\PlottingKelasController::toRomanDisplay($selectedKelas ?? '-')) !!},
@@ -1294,27 +1566,33 @@
         totalSemuaSakit: {{ (int) $totalSemuaSakit }},
         totalSemuaIzin: {{ (int) $totalSemuaIzin }},
         totalSemuaAlpa: {{ (int) $totalSemuaAlpa }},
+        dates: {!! json_encode($waDateList) !!},
         jurnals: {!! json_encode($jurnals->map(function($j) {
             return [
-                'id' => $j->id,
-                'tanggal' => $j->tgl_full,
-                'mapel' => $j->mata_pelajaran,
-                'kode_mapel' => $j->kode_mapel,
-                'guru' => $j->nama_guru,
-                'jam_ke' => $j->jam_ke,
-                'materi' => $j->materi,
+                'id'          => $j->id,
+                'tanggal_iso' => \Carbon\Carbon::parse($j->tanggal)->format('Y-m-d'),
+                'hari_tanggal'=> \Carbon\Carbon::parse($j->tanggal)->locale('id')->translatedFormat('l, j F Y'),
+                'tanggal'     => $j->tgl_full,
+                'mapel'       => $j->mata_pelajaran,
+                'kode_mapel'  => $j->kode_mapel,
+                'guru'        => $j->nama_guru,
+                'jam_ke'      => $j->jam_ke,
+                'materi'      => $j->materi,
             ];
         })) !!},
         siswas: {!! json_encode(collect($rekapSiswa)->map(function($item) {
             return [
-                'nama' => $item->siswa->nama_lengkap,
-                'nisn' => $item->nisn,
-                'hadir' => $item->hadir,
-                'sakit' => $item->sakit,
-                'izin' => $item->izin,
-                'alpa' => $item->alpa,
-                'persentase' => $item->persentase,
-                'absensi' => $item->pertemuan_absensi,
+                'nama'        => $item->siswa->nama_lengkap,
+                'nama_bersih' => \App\Http\Controllers\RekapPondokController::cleanStudentName($item->siswa->nama_lengkap),
+                'nisn'        => $item->nisn,
+                'kamar'       => $item->siswa->kamar ?? '',
+                'hadir'       => $item->hadir,
+                'terlambat'   => $item->terlambat,
+                'sakit'       => $item->sakit,
+                'izin'        => $item->izin,
+                'alpa'        => $item->alpa,
+                'persentase'  => $item->persentase,
+                'absensi'     => $item->pertemuan_absensi,
             ];
         })) !!}
     };
@@ -1326,12 +1604,52 @@
         }
     }
 
+    function syncWaSessionOptions() {
+        var d = window.SEKOLAH_REKAP_DATA;
+        var tglEl = document.getElementById('waTanggalSelect');
+        var sesiEl = document.getElementById('waSessionSelect');
+        if (!d || !sesiEl) return;
+
+        var selTgl = tglEl ? tglEl.value : 'semua';
+        var jurnals = (d.jurnals || []).filter(function (j) {
+            return selTgl === 'semua' || j.tanggal_iso === selTgl;
+        });
+
+        sesiEl.innerHTML = '';
+
+        var optAll = document.createElement('option');
+        optAll.value = 'semua';
+        optAll.textContent = jurnals.length > 0
+            ? 'Semua Sesi (' + jurnals.length + ' Mapel)'
+            : 'Semua Sesi';
+        sesiEl.appendChild(optAll);
+
+        jurnals.forEach(function (j) {
+            var opt = document.createElement('option');
+            opt.value = String(j.id);
+            var prefix = selTgl === 'semua' ? (j.tanggal + ' - ') : '';
+            var jamStr = j.jam_ke ? (' (' + j.jam_ke + ')') : '';
+            opt.textContent = prefix + (j.kode_mapel || j.mapel) + jamStr;
+            sesiEl.appendChild(opt);
+        });
+
+        sesiEl.value = 'semua';
+    }
+
+    function handleWaTanggalChange() {
+        syncWaSessionOptions();
+        renderSekolahWaPreview();
+    }
+
     function openWaModal() {
         setupWaModalDom();
         var modal = document.getElementById('modalLaporanWA');
         if (modal) {
             modal.style.setProperty('display', 'flex', 'important');
             document.body.style.overflow = 'hidden';
+            var btnText = document.getElementById('btnSalinWaText');
+            if (btnText) btnText.textContent = 'Salin Format WA';
+            syncWaSessionOptions();
             renderSekolahWaPreview();
         }
     }
@@ -1344,16 +1662,6 @@
         }
     }
 
-    function handleWaModeChange() {
-        var modeSelect = document.getElementById('waModeSelect');
-        var mode = modeSelect ? modeSelect.value : 'rekap';
-        var sesiWrap = document.getElementById('waSesiWrap');
-        if (sesiWrap) {
-            sesiWrap.style.display = mode === 'sesi' ? 'block' : 'none';
-        }
-        renderSekolahWaPreview();
-    }
-
     function renderSekolahWaPreview() {
         var d = window.SEKOLAH_REKAP_DATA;
         if (!d) return;
@@ -1361,131 +1669,174 @@
         var textarea = document.getElementById('waTextarea');
         if (!textarea) return;
 
-        var mode = document.getElementById('waModeSelect') ? document.getElementById('waModeSelect').value : 'rekap';
+        var tglEl = document.getElementById('waTanggalSelect');
+        var kamarEl = document.getElementById('waKamarSelect');
+        var sesiEl = document.getElementById('waSessionSelect');
 
-        var namaLembaga = d.lembaga || 'SMP/SMA AL MUTTAQIN';
-        if (!namaLembaga.includes('AL MUTTAQIN')) {
-            namaLembaga = namaLembaga + ' AL MUTTAQIN';
+        var selTgl = tglEl ? (tglEl.value || 'semua') : 'semua';
+        var selKamar = kamarEl ? (kamarEl.value || 'semua').trim() : 'semua';
+        var selSession = sesiEl ? (sesiEl.value || 'semua') : 'semua';
+
+        // Filter siswa berdasarkan Kamar
+        var matchedStudents = [];
+        (d.siswas || []).forEach(function (s) {
+            if (selKamar !== 'semua' && selKamar !== '') {
+                var k = (s.kamar || '').toLowerCase();
+                var cleanK = k.replace(/^kamar\s+/i, '').trim();
+                var cleanSel = selKamar.toLowerCase().replace(/^kamar\s+/i, '').trim();
+                if (cleanK !== cleanSel && k.indexOf(selKamar.toLowerCase()) === -1 && selKamar.toLowerCase().indexOf(k) === -1 && cleanK.indexOf(cleanSel) === -1 && cleanSel.indexOf(cleanK) === -1) {
+                    return;
+                }
+            }
+            matchedStudents.push(s);
+        });
+
+        // Filter sesi jurnal berdasarkan Tanggal & Sesi terpilih
+        var dateJurnals = (d.jurnals || []).filter(function (j) {
+            return selTgl === 'semua' || j.tanggal_iso === selTgl;
+        });
+
+        var isSemuaSesi = (selSession === 'semua');
+        var activeJurnals = isSemuaSesi
+            ? dateJurnals
+            : dateJurnals.filter(function (j) { return String(j.id) === String(selSession); });
+
+        // Tentukan Header Sasaran Kelas (& Kamar bila difilter)
+        var sasaran = (d.kelas || '-').toUpperCase();
+        if (selKamar !== 'semua' && selKamar !== '') {
+            var kmrClean = selKamar.replace(/^kamar\s+/i, '').trim().toUpperCase();
+            sasaran = sasaran + ' - KAMAR ' + kmrClean;
         }
 
-        if (mode === 'sesi') {
-            var sesiSelect = document.getElementById('waSesiSelect');
-            var selectedJurnalId = sesiSelect ? parseInt(sesiSelect.value) : null;
-            var jurnal = null;
-            if (d.jurnals && d.jurnals.length > 0) {
-                jurnal = d.jurnals.find(function(j) { return j.id === selectedJurnalId; }) || d.jurnals[0];
-            }
-
-            if (!jurnal) {
-                textarea.value = "Belum ada data sesi pertemuan pada kelas dan periode ini.";
-                return;
-            }
-
-            var hadirList = [];
-            var sakitList = [];
-            var izinList = [];
-            var alpaList = [];
-
-            (d.siswas || []).forEach(function(s) {
-                var st = s.absensi ? s.absensi[jurnal.id] : null;
-                if (st === 'hadir') {
-                    hadirList.push(s.nama);
-                } else if (st === 'sakit') {
-                    sakitList.push(s.nama);
-                } else if (st === 'izin') {
-                    izinList.push(s.nama);
-                } else if (st === 'alpa') {
-                    alpaList.push(s.nama);
-                }
-            });
-
-            var lines = [];
-            lines.push("*LAPORAN PRESENSI KELAS*");
-            lines.push("*" + namaLembaga + "*");
-            lines.push("========================================");
-            lines.push("📚 *Kelas*        : Kelas " + d.kelas);
-            lines.push("📅 *Tanggal*      : " + jurnal.tanggal);
-            lines.push("📖 *Mata Pelajaran*: " + jurnal.mapel + " (" + jurnal.kode_mapel + ")");
-            lines.push("⏰ *Jam Pelajaran*: " + (jurnal.jam_ke || '-'));
-            lines.push("👨‍🏫 *Guru Pengajar*: " + jurnal.guru);
-            if (jurnal.materi) {
-                lines.push("📝 *Materi*       : " + jurnal.materi);
-            }
-            lines.push("========================================");
-            lines.push("*Ringkasan Kehadiran:*");
-            lines.push("👥 Total Siswa : " + (d.siswas ? d.siswas.length : 0) + " Siswa");
-            lines.push("✅ Hadir       : " + hadirList.length + " Siswa");
-            lines.push("🤒 Sakit       : " + sakitList.length + " Siswa");
-            lines.push("📩 Izin        : " + izinList.length + " Siswa");
-            lines.push("❌ Alpa        : " + alpaList.length + " Siswa");
-            lines.push("----------------------------------------");
-
-            if (sakitList.length > 0 || izinList.length > 0 || alpaList.length > 0) {
-                lines.push("*Keterangan Siswa Tidak Hadir:*");
-                if (sakitList.length > 0) lines.push("• *Sakit*: " + sakitList.join(', '));
-                if (izinList.length > 0) lines.push("• *Izin*: " + izinList.join(', '));
-                if (alpaList.length > 0) lines.push("• *Alpa*: " + alpaList.join(', '));
-                lines.push("----------------------------------------");
-            }
-
-            lines.push("*Daftar Absensi Siswa:*");
-            (d.siswas || []).forEach(function(s, idx) {
-                var st = s.absensi ? s.absensi[jurnal.id] : null;
-                var mark = '➖ Belum ada data';
-                if (st === 'hadir') mark = '✅ Hadir';
-                else if (st === 'sakit') mark = '🤒 Sakit';
-                else if (st === 'izin') mark = '📩 Izin';
-                else if (st === 'alpa') mark = '❌ Alpa';
-                lines.push((idx + 1) + ". " + s.nama + " : " + mark);
-            });
-
-            lines.push("========================================");
-            lines.push("_Laporan otomatis dari Sistem Presensi Al Muttaqin_");
-
-            textarea.value = lines.join("\n");
+        // Tentukan Baris Tanggal miring seperti Rekap Sholat
+        var dateFormatted = '';
+        if (selTgl !== 'semua') {
+            var foundDate = (d.dates || []).find(function (dt) { return dt.date === selTgl; });
+            dateFormatted = foundDate ? ('_' + foundDate.formatted + '_') : ('_' + selTgl + '_');
         } else {
-            // Mode Rekap Keseluruhan
-            var lines = [];
-            lines.push("*REKAPITULASI ABSENSI SISWA*");
-            lines.push("*" + namaLembaga + "*");
-            lines.push("========================================");
-            lines.push("📚 *Kelas*          : Kelas " + d.kelas);
-            lines.push("📅 *Periode*        : " + d.bulanText + " " + d.tahun);
-            lines.push("👥 *Total Siswa*    : " + (d.siswas ? d.siswas.length : 0) + " Siswa");
-            lines.push("📊 *Total Pertemuan*: " + d.totalPertemuan + " Sesi");
-            lines.push("========================================");
-            lines.push("*Akumulasi Kehadiran Kelas:*");
-            lines.push("✅ Total Hadir : " + d.totalSemuaHadir);
-            lines.push("🤒 Total Sakit : " + d.totalSemuaSakit);
-            lines.push("📩 Total Izin  : " + d.totalSemuaIzin);
-            lines.push("❌ Total Alpa  : " + d.totalSemuaAlpa);
-            lines.push("----------------------------------------");
+            dateFormatted = '_Periode: ' + (d.bulanText || '') + ' ' + (d.tahun || '') + '_';
+        }
 
-            var butuhPerhatian = (d.siswas || []).filter(function(s) {
-                return (s.alpa > 0 || s.sakit > 0 || s.izin > 0);
-            });
-
-            if (butuhPerhatian.length > 0) {
-                lines.push("*Catatan Siswa (Perlu Perhatian):*");
-                butuhPerhatian.forEach(function(s, idx) {
-                    var notes = [];
-                    if (s.sakit > 0) notes.push(s.sakit + "S");
-                    if (s.izin > 0) notes.push(s.izin + "I");
-                    if (s.alpa > 0) notes.push(s.alpa + "A");
-                    lines.push((idx + 1) + ". " + s.nama + " (" + notes.join(', ') + ")");
-                });
-                lines.push("----------------------------------------");
+        // Tentukan Keterangan Mata Pelajaran / Sesi
+        var mapelInfo = '';
+        if (activeJurnals.length === 0) {
+            mapelInfo = 'Belum ada sesi jurnal';
+        } else if (isSemuaSesi) {
+            var mapelCodes = activeJurnals.map(function (j) { return j.kode_mapel || j.mapel; });
+            if (mapelCodes.length <= 6) {
+                mapelInfo = 'Semua Sesi (' + mapelCodes.join(', ') + ')';
+            } else {
+                mapelInfo = 'Semua Sesi (' + activeJurnals.length + ' Pertemuan)';
             }
+        } else {
+            var jSingle = activeJurnals[0];
+            mapelInfo = (jSingle.mapel || jSingle.kode_mapel || '-') + (jSingle.jam_ke ? ' (' + jSingle.jam_ke + ')' : '');
+        }
 
-            lines.push("*Daftar Kehadiran Siswa:*");
-            (d.siswas || []).forEach(function(s, idx) {
-                lines.push((idx + 1) + ". " + s.nama + " - H:" + s.hadir + " S:" + s.sakit + " I:" + s.izin + " A:" + s.alpa + " (" + s.persentase + "%)");
+        var header = "📅 *LAPORAN ABSENSI SEKOLAH SISWA KELAS " + sasaran + "*\n" +
+                     dateFormatted + "\n\n" +
+                     "*Mata Pelajaran:* " + mapelInfo + "\n\n" +
+                     "*Daftar Kehadiran Siswa:*";
+
+        var lines = [];
+        var hadirCount = 0;
+        var izinTerlambatCount = 0;
+        var alpaCount = 0;
+
+        if (activeJurnals.length === 0) {
+            textarea.value = header + "\n\nBelum ada sesi jurnal pembelajaran pada periode ini.\n\n*Ringkasan Kehadiran:*\n• Total Siswa: " + matchedStudents.length + " Siswa\n• Total Hadir: 0 Siswa\n• Total Izin/Sakit/Terlambat: 0 Siswa\n• Total Alpha: 0 Siswa";
+            return;
+        }
+
+        matchedStudents.forEach(function (s, idx) {
+            var cleanName = s.nama_bersih || s.nama || '';
+
+            if (isSemuaSesi) {
+                var emojis = [];
+                var ketNotes = [];
+                activeJurnals.forEach(function (j) {
+                    var sName = (j.kode_mapel || j.mapel || 'sesi').toLowerCase();
+                    var st = s.absensi ? s.absensi[j.id] : null;
+                    if (st === 'hadir') {
+                        emojis.push('✅');
+                        hadirCount++;
+                    } else if (st === 'terlambat') {
+                        emojis.push('⚠️');
+                        ketNotes.push('telat - ' + sName);
+                        izinTerlambatCount++;
+                    } else if (st === 'izin') {
+                        emojis.push('✉️');
+                        ketNotes.push('izin - ' + sName);
+                        izinTerlambatCount++;
+                    } else if (st === 'sakit') {
+                        emojis.push('✉️');
+                        ketNotes.push('sakit - ' + sName);
+                        izinTerlambatCount++;
+                    } else if (st === 'alpa') {
+                        emojis.push('❌');
+                        ketNotes.push('alpa - ' + sName);
+                        alpaCount++;
+                    } else {
+                        emojis.push('❌');
+                        ketNotes.push('tidak absen - ' + sName);
+                        alpaCount++;
+                    }
+                });
+                var ketStr = ketNotes.length > 0 ? ' (' + ketNotes.join(', ') + ')' : '';
+                lines.push((idx + 1) + '. ' + cleanName + ' ' + emojis.join(' ') + ketStr);
+            } else {
+                var jTarget = activeJurnals[0];
+                var stSingle = (s.absensi && jTarget) ? s.absensi[jTarget.id] : null;
+                var tag = '❌ - ALPA';
+                if (stSingle === 'hadir') {
+                    tag = '✅ - HADIR';
+                    hadirCount++;
+                } else if (stSingle === 'terlambat') {
+                    tag = '⚠️ - TERLAMBAT';
+                    izinTerlambatCount++;
+                } else if (stSingle === 'izin') {
+                    tag = '✉️ - IZIN';
+                    izinTerlambatCount++;
+                } else if (stSingle === 'sakit') {
+                    tag = '✉️ - SAKIT';
+                    izinTerlambatCount++;
+                } else {
+                    tag = '❌ - ALPA';
+                    alpaCount++;
+                }
+                lines.push((idx + 1) + '. ' + cleanName + ' ' + tag);
+            }
+        });
+
+        var body = lines.length > 0 ? lines.join("\n") : "Tidak ada siswa dalam kelompok ini.";
+        var summary = "*Ringkasan Kehadiran:*\n" +
+                      "• Total Siswa: " + matchedStudents.length + " Siswa\n" +
+                      (isSemuaSesi ?
+                          ("• Total Hadir: " + hadirCount + " Siswa\n• Total Izin/Sakit/Terlambat: " + izinTerlambatCount + " Siswa\n• Total Alpha: " + alpaCount + " Siswa") :
+                          ("• Hadir: " + hadirCount + " Siswa\n• Sakit/Izin/Terlambat: " + izinTerlambatCount + " Siswa\n• Alpha: " + alpaCount + " Siswa")
+                      );
+
+        textarea.value = header + "\n\n" + body + "\n\n" + summary;
+    }
+
+    function showWaCopyToast() {
+        var btnText = document.getElementById('btnSalinWaText');
+        if (btnText) {
+            btnText.textContent = 'Tersalin! ✓';
+            setTimeout(function () {
+                btnText.textContent = 'Salin Format WA';
+            }, 2000);
+        }
+        if (window.Swal) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil Disalin!',
+                text: 'Format laporan WhatsApp berhasil disalin ke clipboard.',
+                timer: 2000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
             });
-
-            lines.push("========================================");
-            lines.push("_Laporan otomatis dari Sistem Presensi Al Muttaqin_");
-
-            textarea.value = lines.join("\n");
         }
     }
 
@@ -1494,18 +1845,18 @@
         if (!textarea) return;
         textarea.select();
         textarea.setSelectionRange(0, 99999);
-        navigator.clipboard.writeText(textarea.value).then(function() {
-            var btnText = document.getElementById('btnSalinWaText');
-            if (btnText) btnText.textContent = 'Tersalin!';
-            var notif = document.getElementById('copyNotif');
-            if (notif) {
-                notif.style.display = 'block';
-                setTimeout(function() {
-                    notif.style.display = 'none';
-                    if (btnText) btnText.textContent = 'Salin Teks';
-                }, 3000);
-            }
-        });
+        var text = textarea.value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                showWaCopyToast();
+            }).catch(function () {
+                document.execCommand('copy');
+                showWaCopyToast();
+            });
+        } else {
+            document.execCommand('copy');
+            showWaCopyToast();
+        }
     }
 
     function openWaWeb() {
@@ -1519,7 +1870,7 @@
     window.closeWaModal = closeWaModal;
     window.copyWaText = copyWaText;
     window.openWaWeb = openWaWeb;
-    window.handleWaModeChange = handleWaModeChange;
+    window.handleWaTanggalChange = handleWaTanggalChange;
     window.renderSekolahWaPreview = renderSekolahWaPreview;
 
     document.addEventListener('click', function(e) {

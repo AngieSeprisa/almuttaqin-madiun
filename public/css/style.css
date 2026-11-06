@@ -4121,7 +4121,7 @@ html.dark-mode .autocomplete-dropdown {
    SWEETALERT2 MODERN THEME & INTEGRATION
    ======================================================== */
 .swal2-container {
-  z-index: 10000 !important;
+  z-index: 10000020 !important;
 }
 
 .swal2-popup.swal2-modern-popup {

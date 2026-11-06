@@ -125,11 +125,22 @@ class RekapAbsensiSekolahTest extends TestCase
         $response->assertSee('js-btn-detail');
         $response->assertSee('modalDetailSiswa');
 
-        // Tombol Laporan WA & Modal Laporan WA
+        // Tombol Laporan WA (hanya 1 tombol utama di header) & Modal Laporan WA seragam Rekap Sholat
         $response->assertSee('Laporan WA');
         $response->assertSee('openWaModal');
         $response->assertSee('modalLaporanWA');
         $response->assertSee('btn-wa');
+        $this->assertSame(1, substr_count($response->getContent(), 'onclick="openWaModal()"'));
+
+        // Modal WA menyerupai Rekap Sholat + SweetAlert toast pojok kanan atas
+        $response->assertSee('Laporan WhatsApp Presensi');
+        $response->assertSee('id="waTanggalSelect"', false);
+        $response->assertSee('id="waKamarSelect"', false);
+        $response->assertSee('id="waSessionSelect"', false);
+        $response->assertSee('Buka WhatsApp Web');
+        $response->assertSee('Salin Format WA');
+        $response->assertSee("position: 'top-end'", false);
+        $response->assertSee('toast: true', false);
     }
 
     public function test_format_kode_mapel_maps_curriculum_and_case_variants_correctly(): void
