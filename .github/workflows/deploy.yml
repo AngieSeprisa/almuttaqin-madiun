@@ -14,13 +14,16 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
           script: |
             cd /var/www/al-muttaqin
             git config --global --add safe.directory /var/www/al-muttaqin
-            git pull origin main
-            php artisan storage:link
+            git config core.fileMode false
+            git fetch origin main
+            git reset --hard origin/main
+            php artisan storage:link || true
             php artisan migrate --force
             php artisan optimize:clear
             php artisan optimize
             chown -R www-data:www-data storage bootstrap/cache
-            chmod -R 775 storage bootstrap/cache
+            chmod -R ug+rwX storage bootstrap/cache
