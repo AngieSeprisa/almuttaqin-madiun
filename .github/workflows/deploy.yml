@@ -11,35 +11,24 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 5
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Deploy via SSH
+        id: ssh_primary
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          fetch-depth: 0
-
-      - name: Create git bundle and deploy via SSH
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-        run: |
-          set -euo pipefail
-          git bundle create /tmp/deploy.bundle main
-
-          mkdir -p ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-
-          scp -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i ~/.ssh/id_deploy /tmp/deploy.bundle "${VPS_USERNAME}@${VPS_HOST}:/tmp/deploy.bundle"
-
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i ~/.ssh/id_deploy "${VPS_USERNAME}@${VPS_HOST}" '
-            set -e
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 35s
+          command_timeout: 90s
+          script_stop: true
+          script: |
             cd /var/www/al-muttaqin
             git config --global --add safe.directory /var/www/al-muttaqin
             git config core.fileMode false
-            git fetch --force /tmp/deploy.bundle main:refs/remotes/origin/main
-            rm -f /tmp/deploy.bundle
+            git fetch origin main || (sleep 3 && git fetch origin main)
             git reset --hard origin/main
             php artisan storage:link || true
             php artisan migrate --force
@@ -48,4 +37,28 @@ jobs:
             php artisan optimize
             chown -R www-data:www-data storage bootstrap/cache
             chmod -R ug+rwX storage bootstrap/cache
-          '
+
+      - name: Retry Deploy via SSH on transient failure
+        if: steps.ssh_primary.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 120s
+          script_stop: true
+          script: |
+            sleep 3
+            cd /var/www/al-muttaqin
+            git config --global --add safe.directory /var/www/al-muttaqin
+            git config core.fileMode false
+            git fetch origin main || (sleep 3 && git fetch origin main)
+            git reset --hard origin/main
+            php artisan storage:link || true
+            php artisan migrate --force
+            php artisan optimize:clear
+            php artisan view:clear
+            php artisan optimize
+            chown -R www-data:www-data storage bootstrap/cache
+            chmod -R ug+rwX storage bootstrap/cache
