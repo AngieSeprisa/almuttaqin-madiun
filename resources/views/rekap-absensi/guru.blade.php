@@ -3,8 +3,13 @@
 @section('title', 'Rekap Absensi Guru')
 
 @section('header-actions')
+@php
+    $headerExportParams = array_merge(request()->all(), [
+        'tanggal' => $tanggal ?? \Carbon\Carbon::today()->toDateString(),
+    ]);
+@endphp
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <a href="{{ route('rekap-absensi.export', request()->all()) }}" class="btn btn-secondary btn-header-action" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+    <a href="{{ route('rekap-absensi.export', $headerExportParams) }}" class="btn btn-secondary btn-header-action" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="7 10 12 15 17 10"></polyline>
@@ -13,7 +18,7 @@
         <span>Ekspor Excel</span>
     </a>
 
-    <a href="{{ route('rekap-absensi.cetak', request()->all()) }}" target="_blank" class="btn btn-primary btn-header-action" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+    <a href="{{ route('rekap-absensi.cetak', $headerExportParams) }}" target="_blank" class="btn btn-primary btn-header-action" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
             <polyline points="6 9 6 2 18 2 18 9"></polyline>
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -29,157 +34,139 @@
     .guru-page-stack {
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 12px;
     }
 
-    /* Ringkasan Presensi Harian / Bulanan */
-    .guru-header-card {
+    /* 3 Kartu Header Presensi (Jam & Tanggal + Jam Masuk + Jam Pulang) */
+    .guru-bento-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .guru-bento-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 15px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-        flex-wrap: wrap;
-        gap: 14px;
+        border-radius: 16px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+        box-sizing: border-box;
     }
 
-    .dark-mode .guru-header-card {
+    .dark-mode .guru-bento-card {
         background: var(--card-bg, #1e293b);
         border-color: var(--border-light, #334155);
         box-shadow: none;
     }
 
-    .guru-header-left {
+    .guru-bento-card.is-clock {
+        grid-column: 1 / -1;
+        padding: 20px 18px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 4px;
+    }
+
+    .guru-clock-time {
+        font-size: 30px;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .dark-mode .guru-clock-time {
+        color: #f8fafc;
+    }
+
+    .guru-clock-date {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #64748b;
+        line-height: 1.35;
+    }
+
+    .dark-mode .guru-clock-date {
+        color: #94a3b8;
+    }
+
+    .guru-bento-card.is-time {
+        padding: 15px 16px;
         display: flex;
         align-items: center;
-        gap: 14px;
+        gap: 12px;
         min-width: 0;
     }
 
-    .guru-header-icon-box {
-        width: 42px;
-        height: 42px;
+    .guru-time-icon {
+        width: 40px;
+        height: 40px;
         border-radius: 11px;
-        background: linear-gradient(135deg, #2563eb, #1d4ed8);
-        color: #ffffff;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.22);
     }
 
-    .guru-header-titles {
+    .guru-time-icon svg {
+        width: 19px;
+        height: 19px;
+    }
+
+    .guru-time-icon.is-masuk {
+        background: #ecfdf5;
+        color: #059669;
+    }
+
+    .dark-mode .guru-time-icon.is-masuk {
+        background: rgba(16, 185, 129, 0.16);
+        color: #34d399;
+    }
+
+    .guru-time-icon.is-pulang {
+        background: #eff6ff;
+        color: #2563eb;
+    }
+
+    .dark-mode .guru-time-icon.is-pulang {
+        background: rgba(37, 99, 235, 0.18);
+        color: #60a5fa;
+    }
+
+    .guru-time-info {
         display: flex;
         flex-direction: column;
         gap: 2px;
         min-width: 0;
     }
 
-    .guru-header-meta-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
-    .guru-badge-header {
-        background: #2563eb;
-        color: #ffffff;
-        font-size: 10px;
-        font-weight: 800;
-        letter-spacing: 0.5px;
-        padding: 2px 7px;
-        border-radius: 5px;
-        text-transform: uppercase;
-        display: inline-block;
-    }
-
-    .guru-sub-institution {
-        font-size: 12.5px;
-        color: #64748b;
+    .guru-time-label {
+        font-size: 12px;
         font-weight: 600;
-    }
-
-    .dark-mode .guru-sub-institution {
-        color: #94a3b8;
-    }
-
-    .guru-title-date {
-        font-size: 18px;
-        font-weight: 800;
-        color: #0f172a;
-        margin: 1px 0 0 0;
+        color: #64748b;
         line-height: 1.25;
-    }
-
-    .dark-mode .guru-title-date {
-        color: #f8fafc;
-    }
-
-    .guru-header-right {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
-    .guru-pill-stat {
-        padding: 6px 13px;
-        border-radius: 999px;
-        font-size: 12.5px;
-        font-weight: 700;
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
         white-space: nowrap;
     }
 
-    .pill-stat-tepat {
-        background: #f0fdf4;
-        border: 1px solid #bbf7d0;
-        color: #15803d;
-    }
-    .dark-mode .pill-stat-tepat {
-        background: rgba(34, 197, 94, 0.16);
-        border-color: rgba(34, 197, 94, 0.35);
-        color: #4ade80;
+    .dark-mode .guru-time-label {
+        color: #94a3b8;
     }
 
-    .pill-stat-terlambat {
-        background: #fffbeb;
-        border: 1px solid #fde68a;
-        color: #b45309;
-    }
-    .dark-mode .pill-stat-terlambat {
-        background: rgba(245, 158, 11, 0.16);
-        border-color: rgba(245, 158, 11, 0.35);
-        color: #fbbf24;
-    }
-
-    .pill-stat-izin {
-        background: #eff6ff;
-        border: 1px solid #bfdbfe;
-        color: #1d4ed8;
-    }
-    .dark-mode .pill-stat-izin {
-        background: rgba(59, 130, 246, 0.16);
-        border-color: rgba(59, 130, 246, 0.35);
-        color: #60a5fa;
+    .guru-time-value {
+        font-size: 19px;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
     }
 
-    .pill-stat-total {
-        background: #f8fafc;
-        border: 1px solid #cbd5e1;
-        color: #1e293b;
-    }
-    .dark-mode .pill-stat-total {
-        background: #334155;
-        border-color: #475569;
-        color: #f1f5f9;
+    .dark-mode .guru-time-value {
+        color: #f8fafc;
     }
 
     /* Elemen Tabel Desktop */
@@ -429,46 +416,40 @@
     }
 
     @media (max-width: 768px) {
-        /* Ringkasan dibuat ringkas 1 baris chip di mobile agar fokus ke Toolbar & Kartu */
-        .guru-header-card {
-            padding: 10px 12px;
-            border-radius: 12px;
-            gap: 8px;
-        }
-        .guru-header-left {
-            width: 100%;
+        .guru-bento-grid {
             gap: 10px;
         }
-        .guru-header-icon-box {
-            width: 34px;
-            height: 34px;
-            border-radius: 9px;
+        .guru-bento-card {
+            border-radius: 14px;
         }
-        .guru-header-icon-box svg {
-            width: 18px;
-            height: 18px;
+        .guru-bento-card.is-clock {
+            padding: 18px 14px;
+            gap: 3px;
         }
-        .guru-title-date {
-            font-size: 14.5px;
+        .guru-clock-time {
+            font-size: 26px;
         }
-        .guru-sub-institution {
+        .guru-clock-date {
+            font-size: 12.5px;
+        }
+        .guru-bento-card.is-time {
+            padding: 13px 14px;
+            gap: 10px;
+        }
+        .guru-time-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+        }
+        .guru-time-icon svg {
+            width: 17px;
+            height: 17px;
+        }
+        .guru-time-label {
             font-size: 11.5px;
         }
-        .guru-header-right {
-            width: 100%;
-            gap: 6px;
-            overflow-x: auto;
-            flex-wrap: nowrap;
-            padding-bottom: 2px;
-            -webkit-overflow-scrolling: touch;
-        }
-        .guru-header-right::-webkit-scrollbar {
-            display: none;
-        }
-        .guru-pill-stat {
-            padding: 4px 10px;
-            font-size: 11.5px;
-            flex-shrink: 0;
+        .guru-time-value {
+            font-size: 17px;
         }
 
         /* Sembunyikan tabel baris desktop di mobile secara total */
@@ -814,26 +795,27 @@
 @section('content')
 @php
     $canKoreksi = !auth()->check() || auth()->user()->canDo('rekap_absensi', 'edit');
-    $selectedLembaga = $lembagaId ? $lembagas->firstWhere('id', $lembagaId) : null;
-    $lembagaText = $selectedLembaga ? ($selectedLembaga->singkatan ?? $selectedLembaga->nama_singkat ?? $selectedLembaga->nama) : 'Seluruh Lembaga';
-    $subHeader = $lembagaText . ' • Yayasan Muttaqin Kota Madiun';
+    $todayDateStr = $todayStr ?? \Carbon\Carbon::today()->toDateString();
+    $displayDate = !empty($tanggal)
+        ? \Carbon\Carbon::parse($tanggal)->locale('id')
+        : \Carbon\Carbon::today()->locale('id');
 
-    $daftarBulan = [
-        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-    ];
-    $namaBulanAktif = $daftarBulan[$bulan] ?? '';
-    $periodeLabel = $tanggal
-        ? \Carbon\Carbon::parse($tanggal)->translatedFormat('l, d M Y')
-        : ('Periode ' . $namaBulanAktif . ' ' . $tahun);
+    $jamMasukSaya = ($presensiSaya ?? null) && $presensiSaya->jam_masuk
+        ? substr($presensiSaya->jam_masuk, 0, 5)
+        : '--:--';
+    $jamPulangSaya = ($presensiSaya ?? null) && $presensiSaya->jam_pulang
+        ? substr($presensiSaya->jam_pulang, 0, 5)
+        : '--:--';
+
+    $exportParams = array_merge(request()->all(), [
+        'tanggal' => $tanggal ?? $todayDateStr,
+    ]);
 
     $hasActiveFilter = !empty($search)
         || !empty($status)
-        || !empty($tanggal)
-        || request()->exists('lembaga_id')
-        || (request()->filled('bulan') && (int) request('bulan') !== (int) now()->month)
-        || (request()->filled('tahun') && (int) request('tahun') !== (int) now()->year);
+        || (!empty($tanggal) && $tanggal !== $todayDateStr)
+        || ($tanggal === '' && request()->exists('tanggal'))
+        || (request()->exists('lembaga_id') && (string) $lembagaId !== (string) ($defaultLembagaId ?? ''));
 @endphp
 
 <div class="guru-page-stack">
@@ -848,49 +830,47 @@
     </div>
     @endif
 
-    {{-- 1. RINGKASAN PRESENSI HARIAN / PERIODE --}}
-    <div class="guru-header-card">
-        <div class="guru-header-left">
-            <div class="guru-header-icon-box">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                    <line x1="3" y1="10" x2="21" y2="10"></line>
+    {{-- 1. HEADER 3 KARTU (Kartu 1: Jam & Tanggal 2 Tumpuk | Kartu 2: Jam Masuk | Kartu 3: Jam Pulang) --}}
+    <div class="guru-bento-grid">
+        <div class="guru-bento-card is-clock">
+            <div class="guru-clock-time" id="guruLiveClock">{{ now()->timezone('Asia/Jakarta')->format('H:i:s') }}</div>
+            <div class="guru-clock-date">{{ $displayDate->translatedFormat('l, d F Y') }}</div>
+        </div>
+
+        <div class="guru-bento-card is-time">
+            <div class="guru-time-icon is-masuk" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                    <polyline points="10 17 15 12 10 7"></polyline>
+                    <line x1="15" y1="12" x2="3" y2="12"></line>
                 </svg>
             </div>
-            <div class="guru-header-titles">
-                <div class="guru-header-meta-row">
-                    <span class="guru-badge-header">HEADER PRESENSI HARIAN</span>
-                    <span class="guru-sub-institution">{{ $subHeader }}</span>
-                </div>
-                <h2 class="guru-title-date">{{ $periodeLabel }}</h2>
+            <div class="guru-time-info">
+                <span class="guru-time-label">Jam Masuk</span>
+                <span class="guru-time-value">{{ $jamMasukSaya }}</span>
             </div>
         </div>
 
-        <div class="guru-header-right">
-            <div class="guru-pill-stat pill-stat-tepat">
-                <span>{{ $ringkasan['hadir'] }} Tepat Waktu</span>
-                <span class="sr-only" style="display:none;">Hadir Tepat</span>
+        <div class="guru-bento-card is-time">
+            <div class="guru-time-icon is-pulang" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
             </div>
-            @if(($ringkasan['terlambat'] ?? 0) > 0)
-            <div class="guru-pill-stat pill-stat-terlambat">
-                <span>{{ $ringkasan['terlambat'] }} Terlambat</span>
-            </div>
-            @endif
-            @if((($ringkasan['izin'] ?? 0) + ($ringkasan['sakit'] ?? 0) + ($ringkasan['alpa'] ?? 0)) > 0)
-            <div class="guru-pill-stat pill-stat-izin">
-                <span>{{ ($ringkasan['izin'] ?? 0) + ($ringkasan['sakit'] ?? 0) + ($ringkasan['alpa'] ?? 0) }} Izin/Sakit/Alpa</span>
-            </div>
-            @endif
-            <div class="guru-pill-stat pill-stat-total">
-                <span>{{ $ringkasan['total'] }} Total Guru</span>
-                <span class="sr-only" style="display:none;">Menampilkan {{ $ringkasan['total'] }} data</span>
+            <div class="guru-time-info">
+                <span class="guru-time-label">Jam Pulang</span>
+                <span class="guru-time-value">{{ $jamPulangSaya }}</span>
             </div>
         </div>
     </div>
 
-    {{-- 2. FILTER CARD (Otomatis di-dock ke Toolbar Pencarian & Popover Filter seperti Tabel Siswa) --}}
+    <div class="sr-only" aria-hidden="true" style="display:none;">
+        HEADER PRESENSI HARIAN {{ $ringkasan['hadir'] }} Tepat Waktu Hadir Tepat {{ $ringkasan['total'] }} Total Guru Menampilkan {{ $ringkasan['total'] }} data
+    </div>
+
+    {{-- 2. FILTER CARD (Otomatis di-dock ke Toolbar Pencarian & Bottom Sheet Filter) --}}
     <div class="form-section-card filter-card">
         <form action="{{ route('rekap-absensi.guru') }}" method="GET" class="filter-form">
             <div class="filter-group">
@@ -910,40 +890,14 @@
                 </select>
                 @endif
 
-                {{-- Filter Tanggal Spesifik --}}
+                {{-- Filter Tanggal (Otomatis Tanggal Hari Itu) --}}
                 <input type="date"
                        name="tanggal"
                        value="{{ $tanggal }}"
                        class="form-control filter-input"
-                       aria-label="Tanggal Spesifik"
-                       data-default-value=""
+                       aria-label="Tanggal"
+                       data-default-value="{{ $todayDateStr }}"
                        onchange="this.form.submit()">
-
-                {{-- Filter Bulan --}}
-                <select name="bulan"
-                        class="form-select filter-select"
-                        aria-label="Bulan"
-                        data-default-value="{{ (int) now()->month }}"
-                        onchange="this.form.submit()">
-                    @foreach($daftarBulan as $num => $namaBln)
-                        <option value="{{ $num }}" {{ (int) $bulan === (int) $num ? 'selected' : '' }}>
-                            {{ $namaBln }}
-                        </option>
-                    @endforeach
-                </select>
-
-                {{-- Filter Tahun --}}
-                <select name="tahun"
-                        class="form-select filter-select"
-                        aria-label="Tahun"
-                        data-default-value="{{ (int) now()->year }}"
-                        onchange="this.form.submit()">
-                    @for($yr = now()->year - 2; $yr <= now()->year + 1; $yr++)
-                        <option value="{{ $yr }}" {{ (int) $tahun === (int) $yr ? 'selected' : '' }}>
-                            {{ $yr }}
-                        </option>
-                    @endfor
-                </select>
 
                 {{-- Filter Status Kehadiran --}}
                 <select name="status"
@@ -1192,10 +1146,10 @@
                 $tanggalObj = $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal : \Carbon\Carbon::parse($row->tanggal)) : null;
                 $tanggalShort = $tanggalObj ? $tanggalObj->translatedFormat('d M Y') : '-';
                 $tanggalModal = $tanggalObj ? $tanggalObj->format('d/m/Y') : '-';
-                $jamMasukShort = $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '-';
-                $jamPulangShort = $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : 'Belum pulang';
+                $jamMasukShort = $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '--:--';
+                $jamPulangShort = $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '--:--';
                 $jamMasukDetail = $row->jam_masuk ? ((strlen($row->jam_masuk) <= 5 ? $row->jam_masuk . ':00' : substr($row->jam_masuk, 0, 8)) . ' WIB') : '-';
-                $jamPulangDetail = $row->jam_pulang ? ((strlen($row->jam_pulang) <= 5 ? $row->jam_pulang . ':00' : substr($row->jam_pulang, 0, 8)) . ' WIB') : 'Tidak Absen Pulang';
+                $jamPulangDetail = $row->jam_pulang ? ((strlen($row->jam_pulang) <= 5 ? $row->jam_pulang . ':00' : substr($row->jam_pulang, 0, 8)) . ' WIB') : '--:--';
                 $lembagaRowNama = $row->lembaga?->singkatan ?? $row->lembaga?->nama_singkat ?? $row->lembaga?->nama ?? '-';
 
                 $statusKey = strtolower($row->status ?? 'hadir');
@@ -1238,7 +1192,7 @@
                     </div>
 
                     <div class="mobile-siswa-subtitles">
-                        <span class="mobile-sub-item" data-col-idx="2">
+                        <span class="mobile-sub-item" data-col-idx="2" data-mobile-default-hidden="true" style="display:none;">
                             <span class="sub-label">Tgl:</span> {{ $tanggalShort }}
                         </span>
                         <span class="mobile-sub-item" data-col-idx="3">
@@ -1274,12 +1228,9 @@
                     </div>
                 </div>
 
-                {{-- Sisi Kanan: Status Pill & Chevron --}}
+                {{-- Sisi Kanan: Status Pill (Tanpa tanda panah sesuai permintaan, tetap klik kartu penuh) --}}
                 <div class="mobile-siswa-status-wrap">
                     <span class="mobile-badge-pill status-{{ $statusKey }}" data-col-idx="5">{{ $statusDisplay }}</span>
-                    <svg class="mobile-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                    </svg>
                 </div>
             </div>
             @empty
@@ -1297,7 +1248,7 @@
     </div>
 </div>
 
-{{-- Bottom Sheet Aksi Presensi Guru (Mobile Action Sheet seperti Tabel Siswa) --}}
+{{-- Bottom Sheet Aksi Presensi Guru (Mobile Action Sheet) --}}
 <div id="mobileGuruSheetBackdrop" class="mobile-sheet-backdrop" style="display:none;"></div>
 <div id="mobileGuruActionSheet" class="mobile-bottom-sheet" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sheetGuruNama">
     <div class="sheet-handle-bar">
@@ -1345,13 +1296,11 @@
             </div>
             <div class="sheet-action-text">
                 <span class="sheet-action-title">Koreksi Presensi Guru</span>
-                <span class="sheet-action-desc">Ubah status kehadiran, jam masuk & jam pulang</span>
             </div>
-            <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </button>
 
         {{-- Opsi 2: Cetak Laporan A4 --}}
-        <a href="{{ route('rekap-absensi.cetak', request()->all()) }}" target="_blank" class="sheet-action-item" title="Cetak Laporan A4">
+        <a href="{{ route('rekap-absensi.cetak', $exportParams) }}" target="_blank" class="sheet-action-item" title="Cetak Laporan A4">
             <div class="sheet-action-icon icon-print">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -1360,14 +1309,12 @@
                 </svg>
             </div>
             <div class="sheet-action-text">
-                <span class="sheet-action-title">Cetak Laporan Presensi</span>
-                <span class="sheet-action-desc">Buka lembar rekapitulasi siap cetak (A4)</span>
+                <span class="sheet-action-title">Cetak Laporan</span>
             </div>
-            <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </a>
 
         {{-- Opsi 3: Ekspor Excel / CSV --}}
-        <a href="{{ route('rekap-absensi.export', request()->all()) }}" class="sheet-action-item" title="Ekspor Excel">
+        <a href="{{ route('rekap-absensi.export', $exportParams) }}" class="sheet-action-item" title="Ekspor Excel">
             <div class="sheet-action-icon icon-view">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -1376,10 +1323,8 @@
                 </svg>
             </div>
             <div class="sheet-action-text">
-                <span class="sheet-action-title">Ekspor Excel / CSV</span>
-                <span class="sheet-action-desc">Unduh data rekapitulasi presensi guru</span>
+                <span class="sheet-action-title">Ekspor Excel</span>
             </div>
-            <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </a>
     </div>
 
@@ -1444,6 +1389,28 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    var liveClockEl = document.getElementById('guruLiveClock');
+    if (liveClockEl) {
+        var updateLiveClock = function () {
+            try {
+                var formatted = new Intl.DateTimeFormat('id-ID', {
+                    timeZone: 'Asia/Jakarta',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }).format(new Date()).replace(/\./g, ':');
+                liveClockEl.textContent = formatted;
+            } catch (err) {
+                var d = new Date();
+                var pad = function (n) { return String(n).padStart(2, '0'); };
+                liveClockEl.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+            }
+        };
+        updateLiveClock();
+        setInterval(updateLiveClock, 1000);
+    }
+
     var modal = document.getElementById('modalKoreksi');
     var form = document.getElementById('formKoreksi');
     var modalGuruNama = document.getElementById('modalGuruNama');

@@ -516,4 +516,56 @@ class RekapGuruTest extends TestCase
             'jam_pulang' => '14:00:00',
         ]);
     }
+
+    public function test_header_tiga_kartu_tanggal_otomatis_hari_ini_dan_kartu_tanpa_panah(): void
+    {
+        $today = Carbon::today();
+        $yesterday = Carbon::yesterday();
+
+        // Presensi milik akun yang sedang login hari ini
+        PresensiGuru::create([
+            'user_id'    => $this->admin->id,
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => $today->toDateString(),
+            'jam_masuk'  => '06:28:15',
+            'jam_pulang' => '15:42:00',
+            'status'     => 'hadir',
+        ]);
+
+        // Presensi guru lain kemarin (tidak boleh tampil saat otomatis filter hari ini)
+        $guruKemarin = User::factory()->create([
+            'name'               => 'Guru Kemarin Saja',
+            'primary_lembaga_id' => $this->lembaga->id,
+        ]);
+        PresensiGuru::create([
+            'user_id'    => $guruKemarin->id,
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => $yesterday->toDateString(),
+            'jam_masuk'  => '07:00:00',
+            'status'     => 'hadir',
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('rekap-absensi.guru'));
+
+        $response->assertStatus(200);
+
+        // 1. Filter label Tanggal (bukan Tanggal Spesifik) dan otomatis bernilai hari ini
+        $response->assertSee('aria-label="Tanggal"', false);
+        $response->assertDontSee('Tanggal Spesifik');
+        $response->assertSee('value="' . $today->toDateString() . '"', false);
+        $response->assertDontSee('Guru Kemarin Saja');
+
+        // 2. Kartu mobile tanpa tanda panah chevron namun tetap memiliki card & bottom sheet
+        $response->assertDontSee('mobile-card-chevron', false);
+        $response->assertSee('mobile-siswa-card', false);
+        $response->assertSee('mobileGuruActionSheet', false);
+
+        // 3. Header 3 kartu: Kartu jam & tanggal 2 tumpuk + Kartu Jam Masuk + Kartu Jam Pulang
+        $response->assertSee('guru-bento-grid', false);
+        $response->assertSee('guruLiveClock', false);
+        $response->assertSee('Jam Masuk');
+        $response->assertSee('Jam Pulang');
+        $response->assertSee('06:28');
+        $response->assertSee('15:42');
+    }
 }

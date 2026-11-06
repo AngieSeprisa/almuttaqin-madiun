@@ -38,10 +38,11 @@ class RekapAbsensiController extends Controller
             $lembagaId = $defaultLembagaId;
         }
 
-        // Filter Periode
+        // Filter Periode (Default otomatis ke tanggal hari ini)
+        $todayStr = Carbon::today()->toDateString();
         $bulan = (int) $request->get('bulan', Carbon::now()->month);
         $tahun = (int) $request->get('tahun', Carbon::now()->year);
-        $tanggal = $request->get('tanggal');
+        $tanggal = $request->exists('tanggal') ? $request->get('tanggal') : $todayStr;
         $status = $request->get('status');
         $search = $request->get('search');
 
@@ -51,6 +52,12 @@ class RekapAbsensiController extends Controller
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Gagal sinkronisasi RFID tap ke presensi guru: ' . $e->getMessage());
         }
+
+        // Data presensi milik akun yang sedang login pada tanggal terpilih
+        $presensiSaya = $user ? PresensiGuru::where('user_id', $user->id)
+            ->whereDate('tanggal', $tanggal ?: $todayStr)
+            ->orderByDesc('id')
+            ->first() : null;
 
         // Query Presensi Terpadu yang Disesuaikan Ketat Berdasarkan Lembaga Terdaftar Guru
         $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, $status, $search);
@@ -72,9 +79,11 @@ class RekapAbsensiController extends Controller
 
         return view('rekap-absensi.guru', compact(
             'presensis',
+            'presensiSaya',
             'lembagas',
             'lembagaId',
             'defaultLembagaId',
+            'todayStr',
             'bulan',
             'tahun',
             'tanggal',

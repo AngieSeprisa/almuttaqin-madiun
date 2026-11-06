@@ -679,6 +679,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<span class="fi-ta-filter-badge">0</span>' +
         '</button>' +
         '<div class="fi-ta-filter-popover">' +
+          '<div class="fi-ta-sheet-handle"><span></span></div>' +
           '<div class="fi-ta-filter-head">' +
             '<span class="fi-ta-filter-title">Filter</span>' +
             '<button type="button" class="fi-ta-filter-reset">Reset</button>' +
@@ -823,6 +824,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '</svg>' +
         '</button>' +
         '<div class="fi-ta-col-popover">' +
+          '<div class="fi-ta-sheet-handle"><span></span></div>' +
           '<div class="fi-ta-col-head">' +
             '<span class="fi-ta-col-title">Kolom</span>' +
             '<button type="button" class="fi-ta-col-reset">Reset</button>' +
@@ -831,6 +833,9 @@ document.addEventListener('DOMContentLoaded', function () {
             '<input type="text" class="fi-ta-col-search" placeholder="Cari nama kolom...">' +
           '</div>' +
           '<div class="fi-ta-col-list"></div>' +
+          '<div class="fi-ta-col-actions">' +
+            '<button type="button" class="fi-ta-col-done">Tutup</button>' +
+          '</div>' +
         '</div>';
 
       var colBtn = colWrap.querySelector('.fi-ta-col-btn');
@@ -838,6 +843,66 @@ document.addEventListener('DOMContentLoaded', function () {
       var colSearchInput = colWrap.querySelector('.fi-ta-col-search');
       var colListEl = colWrap.querySelector('.fi-ta-col-list');
       var colResetBtn = colWrap.querySelector('.fi-ta-col-reset');
+      var colDoneBtn = colWrap.querySelector('.fi-ta-col-done');
+
+      filterPopover._hostWrap = filterWrap;
+      colPopover._hostWrap = colWrap;
+
+      var fiPopoverBackdrop = document.getElementById('fiTaPopoverBackdrop');
+      if (!fiPopoverBackdrop) {
+        fiPopoverBackdrop = document.createElement('div');
+        fiPopoverBackdrop.id = 'fiTaPopoverBackdrop';
+        fiPopoverBackdrop.className = 'fi-ta-popover-backdrop';
+        document.body.appendChild(fiPopoverBackdrop);
+      }
+
+      function syncGlobalPopoverBackdrop() {
+        var anyOpen = !!document.querySelector('.fi-ta-filter-popover.is-open, .fi-ta-col-popover.is-open');
+        if (fiPopoverBackdrop) {
+          fiPopoverBackdrop.classList.toggle('is-open', anyOpen && window.innerWidth <= 768);
+        }
+        if (window.innerWidth <= 768 && anyOpen) {
+          document.body.style.overflow = 'hidden';
+        } else if (!document.querySelector('.mobile-bottom-sheet.is-open, .app-modal.is-active, .guru-modal-backdrop.is-open')) {
+          document.body.style.overflow = '';
+        }
+      }
+
+      function closeFilterAndColPopovers() {
+        document.querySelectorAll('.fi-ta-filter-popover.is-open, .fi-ta-col-popover.is-open').forEach(function (pop) {
+          pop.classList.remove('is-open');
+          if (pop._hostWrap && pop.parentElement !== pop._hostWrap) {
+            pop._hostWrap.appendChild(pop);
+          }
+        });
+        filterPopover.classList.remove('is-open');
+        colPopover.classList.remove('is-open');
+        if (filterPopover.parentElement !== filterWrap) filterWrap.appendChild(filterPopover);
+        if (colPopover.parentElement !== colWrap) colWrap.appendChild(colPopover);
+        syncGlobalPopoverBackdrop();
+      }
+
+      if (!fiPopoverBackdrop.dataset.boundClose) {
+        fiPopoverBackdrop.dataset.boundClose = '1';
+        fiPopoverBackdrop.addEventListener('click', function () {
+          closeFilterAndColPopovers();
+        });
+      }
+
+      function toggleSheetOrPopover(targetPopover, hostWrap) {
+        var wasOpen = targetPopover.classList.contains('is-open');
+        bulkMenu.classList.remove('is-open');
+        closeFilterAndColPopovers();
+        if (!wasOpen) {
+          if (window.innerWidth <= 768) {
+            document.body.appendChild(targetPopover);
+          } else if (targetPopover.parentElement !== hostWrap) {
+            hostWrap.appendChild(targetPopover);
+          }
+          targetPopover.classList.add('is-open');
+          syncGlobalPopoverBackdrop();
+        }
+      }
 
       toolbarRight.appendChild(searchWrap);
       toolbarRight.appendChild(filterWrap);
@@ -954,7 +1019,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (idx === 0 || th.classList.contains('fi-ta-th-check')) return;
         var colTitle = (th.querySelector('span') ? th.querySelector('span').textContent : th.textContent || '').replace(/\s+/g, ' ').trim() || ('Kolom ' + idx);
 
-        var defaultVisible = !th.hasAttribute('data-col-hidden') && th.getAttribute('data-col-hidden') !== 'true';
+        var isMobileViewport = window.innerWidth <= 768;
+        var hasMobileDefHidden = !!(mobileList && mobileList.querySelector('[data-col-idx="' + idx + '"][data-mobile-default-hidden="true"]'));
+        var defaultVisible = (!th.hasAttribute('data-col-hidden') && th.getAttribute('data-col-hidden') !== 'true') && !(isMobileViewport && hasMobileDefHidden);
         var isVisible = savedCols[idx] !== undefined ? !!savedCols[idx] : defaultVisible;
         if (!isVisible) hasHiddenCols = true;
 
@@ -998,15 +1065,18 @@ document.addEventListener('DOMContentLoaded', function () {
       updateColspans();
 
       colResetBtn.addEventListener('click', function () {
+        var isMobileViewport = window.innerWidth <= 768;
         Array.from(headRow.cells).forEach(function (th, idx) {
           if (idx === 0) return;
-          var defVis = !th.hasAttribute('data-col-hidden') || th.getAttribute('data-col-hidden') !== 'true';
+          var hasMobDefHid = !!(mobileList && mobileList.querySelector('[data-col-idx="' + idx + '"][data-mobile-default-hidden="true"]'));
+          var defVis = (!th.hasAttribute('data-col-hidden') || th.getAttribute('data-col-hidden') !== 'true') && !(isMobileViewport && hasMobDefHid);
           applyColVisibility(idx, defVis);
         });
         colListEl.querySelectorAll('.fi-ta-col-check').forEach(function (cb) {
           var idx = parseInt(cb.dataset.colIdx, 10);
           var th = headRow.cells[idx];
-          cb.checked = th ? (!th.hasAttribute('data-col-hidden') || th.getAttribute('data-col-hidden') !== 'true') : true;
+          var hasMobDefHid = !!(mobileList && mobileList.querySelector('[data-col-idx="' + idx + '"][data-mobile-default-hidden="true"]'));
+          cb.checked = th ? ((!th.hasAttribute('data-col-hidden') || th.getAttribute('data-col-hidden') !== 'true') && !(isMobileViewport && hasMobDefHid)) : true;
         });
         if (colSearchInput) {
           colSearchInput.value = '';
@@ -1024,13 +1094,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
       colBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        bulkMenu.classList.remove('is-open');
-        filterPopover.classList.remove('is-open');
-        colPopover.classList.toggle('is-open');
-        if (colPopover.classList.contains('is-open') && colSearchInput) {
+        toggleSheetOrPopover(colPopover, colWrap);
+        if (colPopover.classList.contains('is-open') && colSearchInput && window.innerWidth > 768) {
           setTimeout(function () { colSearchInput.focus(); }, 50);
         }
       });
+
+      if (colDoneBtn) {
+        colDoneBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          closeFilterAndColPopovers();
+        });
+      }
 
       colPopover.addEventListener('click', function (ev) {
         ev.stopPropagation();
@@ -1423,8 +1498,7 @@ document.addEventListener('DOMContentLoaded', function () {
       bulkBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
         if (bulkBtn.disabled) return;
-        filterPopover.classList.remove('is-open');
-        colPopover.classList.remove('is-open');
+        closeFilterAndColPopovers();
         bulkMenu.classList.toggle('is-open');
       });
 
@@ -1456,12 +1530,10 @@ document.addEventListener('DOMContentLoaded', function () {
         renderTableState();
       });
 
-      // Wire Filter Funnel Popover
+      // Wire Filter Funnel Popover / Mobile Bottom Sheet
       filterBtn.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        bulkMenu.classList.remove('is-open');
-        colPopover.classList.remove('is-open');
-        filterPopover.classList.toggle('is-open');
+        toggleSheetOrPopover(filterPopover, filterWrap);
       });
 
       filterPopover.addEventListener('click', function (ev) {
@@ -1486,7 +1558,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         currentPage = 1;
         updateFilterBadge();
-        filterPopover.classList.remove('is-open');
+        closeFilterAndColPopovers();
         renderTableState();
       });
 
@@ -1497,8 +1569,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (origForm && syncedServerControls.length > 0) {
           syncedServerControls.forEach(function (pair) {
-            pair.proxy.value = '';
-            pair.orig.value = '';
+            var defV = pair.orig.getAttribute('data-default-value');
+            var resetVal = defV !== null ? defV : '';
+            pair.proxy.value = resetVal;
+            pair.orig.value = resetVal;
           });
           if (origSearchInput) origSearchInput.value = '';
           origForm.submit();
@@ -1516,21 +1590,26 @@ document.addEventListener('DOMContentLoaded', function () {
         searchClear.classList.remove('is-visible');
         currentPage = 1;
         updateFilterBadge();
-        filterPopover.classList.remove('is-open');
+        closeFilterAndColPopovers();
         renderTableState();
       });
 
       document.addEventListener('click', function (ev) {
         if (!bulkWrap.contains(ev.target)) bulkMenu.classList.remove('is-open');
-        if (!filterWrap.contains(ev.target)) filterPopover.classList.remove('is-open');
-        if (!colWrap.contains(ev.target)) colPopover.classList.remove('is-open');
+        var clickedInFilter = filterWrap.contains(ev.target) || filterPopover.contains(ev.target);
+        var clickedInCol = colWrap.contains(ev.target) || colPopover.contains(ev.target);
+        if (!clickedInFilter && filterPopover.classList.contains('is-open')) {
+          closeFilterAndColPopovers();
+        }
+        if (!clickedInCol && colPopover.classList.contains('is-open')) {
+          closeFilterAndColPopovers();
+        }
       });
 
       document.addEventListener('keydown', function (ev) {
         if (ev.key === 'Escape') {
           bulkMenu.classList.remove('is-open');
-          filterPopover.classList.remove('is-open');
-          colPopover.classList.remove('is-open');
+          closeFilterAndColPopovers();
         }
       });
 
