@@ -290,8 +290,7 @@
                 <th style="width:85px;">Waktu</th>
                 @foreach($classrooms as $cls)
                 <th>
-                    <div>Kelas {{ $cls->nama_kelas }}</div>
-                    <div style="font-size:9px; font-weight:normal; color:#475569;">Tingkat {{ $cls->tingkat }}</div>
+                    <div>{{ stripos((string) $cls->nama_kelas, 'kelas') === 0 ? $cls->nama_kelas : 'Kelas ' . $cls->nama_kelas }}</div>
                 </th>
                 @endforeach
             </tr>

@@ -12,8 +12,290 @@
 </a>
 @endsection
 
+@push('styles')
+<style>
+    .mobile-siswa-list {
+        display: none;
+    }
+
+    @media (min-width: 769px) {
+        .mobile-siswa-list,
+        body .mobile-siswa-list {
+            display: none !important;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .mobile-siswa-card .fi-ta-checkbox {
+            display: none !important;
+        }
+
+        .mobile-sheet-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 9998;
+            opacity: 0;
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+        }
+        .mobile-sheet-backdrop.is-active {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            display: block !important;
+        }
+
+        .mobile-bottom-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            max-width: 540px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            max-height: 86vh;
+            overflow: hidden;
+        }
+        .dark-mode .mobile-bottom-sheet {
+            background: #1e293b;
+            border-top: 1px solid #334155;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+        }
+        .mobile-bottom-sheet.is-open {
+            transform: translateY(0) !important;
+            display: flex !important;
+        }
+
+        .sheet-handle-bar {
+            width: 100%;
+            padding: 12px 0 8px;
+            display: flex;
+            justify-content: center;
+        }
+        .sheet-drag-handle {
+            width: 48px;
+            height: 5px;
+            border-radius: 999px;
+            background: #cbd5e1;
+        }
+        .dark-mode .sheet-drag-handle {
+            background: #475569;
+        }
+
+        .sheet-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 20px 14px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .dark-mode .sheet-header {
+            border-bottom-color: #334155;
+        }
+
+        .sheet-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .sheet-title-wrap {
+            flex: 1;
+            min-width: 0;
+        }
+        .sheet-siswa-nama {
+            font-size: 15.5px;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+            line-height: 1.3;
+        }
+        .dark-mode .sheet-siswa-nama {
+            color: #f8fafc;
+        }
+
+        .sheet-siswa-meta {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 3px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .dark-mode .sheet-siswa-meta {
+            color: #94a3b8;
+        }
+
+        .sheet-detail-box {
+            margin: 12px 18px 2px;
+            padding: 11px 14px;
+            border-radius: 13px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .dark-mode .sheet-detail-box {
+            background: #0f172a;
+            border-color: #334155;
+        }
+        .sheet-detail-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 12.5px;
+        }
+        .sheet-detail-lbl {
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .sheet-detail-val {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .dark-mode .sheet-detail-val {
+            color: #f1f5f9;
+        }
+        .sheet-materi-text {
+            font-size: 12.5px;
+            color: #334155;
+            line-height: 1.45;
+            border-top: 1px dashed #e2e8f0;
+            padding-top: 8px;
+        }
+        .dark-mode .sheet-materi-text {
+            color: #cbd5e1;
+            border-top-color: #334155;
+        }
+
+        .sheet-actions-list {
+            padding: 8px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .sheet-action-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: transparent;
+            border: none;
+            color: #1e293b;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            font-family: inherit;
+        }
+        .dark-mode .sheet-action-item {
+            color: #f1f5f9;
+        }
+        .sheet-action-item:active,
+        .sheet-action-item:hover {
+            background: #f8fafc;
+        }
+        .dark-mode .sheet-action-item:active,
+        .dark-mode .sheet-action-item:hover {
+            background: #334155;
+        }
+        .sheet-action-item.is-danger {
+            color: #dc2626;
+        }
+        .dark-mode .sheet-action-item.is-danger {
+            color: #f87171;
+        }
+
+        .sheet-action-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .sheet-action-icon svg {
+            width: 19px;
+            height: 19px;
+        }
+        .sheet-action-icon.icon-view {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+        .dark-mode .sheet-action-icon.icon-view {
+            background: rgba(37, 99, 235, 0.2);
+            color: #60a5fa;
+        }
+        .sheet-action-icon.icon-delete {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        .dark-mode .sheet-action-icon.icon-delete {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .sheet-action-title {
+            font-size: 14.5px;
+            font-weight: 600;
+        }
+
+        .sheet-footer {
+            padding: 12px 18px 20px;
+            border-top: 1px solid #f1f5f9;
+        }
+        .dark-mode .sheet-footer {
+            border-top-color: #334155;
+        }
+
+        .sheet-btn-close {
+            width: 100%;
+            height: 48px;
+            border-radius: 14px;
+            background: #234e38;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .dark-mode .sheet-btn-close {
+            background: #2d5a44;
+        }
+    }
+</style>
+@endpush
+
 @section('content')
-<div style="display:flex; flex-direction:column; gap:20px; width:100%;">
+<div style="display:flex; flex-direction:column; gap:14px; width:100%;">
 
     {{-- Feedback Alerts --}}
     @if(session('success'))
@@ -37,7 +319,7 @@
                             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                         </svg>
                     </div>
-                    <select name="kelas" class="form-select filter-select" onchange="this.form.submit()">
+                    <select name="kelas" aria-label="Kelas" class="form-select filter-select" onchange="this.form.submit()">
                         <option value="">Semua Kelas</option>
                         @foreach($kelasList as $k)
                             @php
@@ -66,7 +348,7 @@
                             <line x1="3" y1="10" x2="21" y2="10"></line>
                         </svg>
                     </div>
-                    <select name="semester" class="form-select filter-select" onchange="this.form.submit()">
+                    <select name="semester" aria-label="Semester" class="form-select filter-select" onchange="this.form.submit()">
                         <option value="">Semua Semester</option>
                         <option value="Semester Ganjil" {{ request('semester') === 'Semester Ganjil' ? 'selected' : '' }}>Semester Ganjil</option>
                         <option value="Semester Genap" {{ request('semester') === 'Semester Genap' ? 'selected' : '' }}>Semester Genap</option>
@@ -80,14 +362,14 @@
 
                 {{-- Filter Tanggal --}}
                 <div class="filter-select-wrap">
-                    <input type="date" name="tanggal" value="{{ request('tanggal') }}"
+                    <input type="date" name="tanggal" aria-label="Tanggal" value="{{ request('tanggal') }}"
                            class="form-control" style="font-size:13px; padding:6px 12px; border-radius:10px; width:auto;"
                            onchange="this.form.submit()">
                 </div>
 
                 {{-- Reset Button jika ada filter aktif --}}
                 @if(request()->hasAny(['kelas', 'semester', 'tanggal', 'search']))
-                <a href="{{ route('sekolah.rekap-jurnal') }}" class="btn btn-secondary filter-btn-reset">
+                <a href="{{ route('sekolah.rekap-jurnal') }}" class="btn btn-secondary filter-btn-reset" title="Reset Filter">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -112,9 +394,9 @@
         </form>
     </div>
 
-    {{-- Tabel Rekap Jurnal --}}
-    <div class="table-card">
-        <div class="table-wrapper">
+    {{-- Tabel Rekap Jurnal + Kartu Mobile --}}
+    <div class="table-card has-mobile-list">
+        <div class="table-wrapper table-wrapper-siswa-desktop">
             <table class="modern-table">
                 <thead>
                     <tr>
@@ -216,7 +498,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="10" style="text-align:center; padding:48px 16px; color:var(--text-secondary);">
+                        <td colspan="10" class="cell-empty" style="text-align:center; padding:48px 16px; color:var(--text-secondary);">
                             <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="width:40px;height:40px;opacity:0.4;">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -234,82 +516,133 @@
             </table>
         </div>
 
+        {{-- Tampilan Mobile Card List (<= 768px) --}}
+        <div class="mobile-siswa-list">
+            @forelse($jurnals as $index => $item)
+            @php
+                $kelasLabel = stripos((string) $item->kelas, 'kelas') !== false ? $item->kelas : 'Kelas ' . $item->kelas;
+                $tglShort = $item->hari . ', ' . \Carbon\Carbon::parse($item->tanggal)->format('d/m/Y');
+                $jamLabel = stripos((string) $item->jam_ke, 'jam') !== false ? $item->jam_ke : 'Jam ' . $item->jam_ke;
+                $absensiSummary = 'H: ' . $item->total_hadir
+                    . ($item->total_sakit > 0 ? ' • S: ' . $item->total_sakit : '')
+                    . ($item->total_izin > 0 ? ' • I: ' . $item->total_izin : '')
+                    . ($item->total_alpa > 0 ? ' • A: ' . $item->total_alpa : '');
+            @endphp
+            <div class="mobile-siswa-card"
+                 data-id="{{ $item->id }}"
+                 data-mapel="{{ $item->mata_pelajaran }}"
+                 data-kelas="{{ $kelasLabel }}"
+                 data-tanggal="{{ $tglShort }}"
+                 data-jam="{{ $jamLabel }}"
+                 data-guru="{{ $item->nama_guru }}"
+                 data-materi="{{ $item->materi }}"
+                 data-absensi="{{ $absensiSummary }}">
+                <div class="mobile-siswa-info">
+                    <div class="mobile-siswa-nama-wrap">
+                        <span class="mobile-siswa-nama">{{ $item->mata_pelajaran }}</span>
+                    </div>
+                    <div class="mobile-siswa-subtitles">
+                        <span class="mobile-sub-item" data-col-idx="3">{{ $kelasLabel }}</span>
+                        <span class="mobile-sub-item" data-col-idx="2">{{ $tglShort }}</span>
+                        <span class="mobile-sub-item" data-col-idx="6">{{ $jamLabel }}</span>
+                        <span class="mobile-sub-item" data-col-idx="4" data-mobile-default-hidden="true" style="display:none;">
+                            <span class="sub-label">Guru:</span> {{ $item->nama_guru }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="7" data-mobile-default-hidden="true" style="display:none;">
+                            <span class="sub-label">Materi:</span> {{ \Illuminate\Support\Str::limit($item->materi, 42) }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="8" data-mobile-default-hidden="true" style="display:none;">
+                            <span class="sub-label">Catatan:</span> {{ $item->catatan ?: '-' }}
+                        </span>
+                    </div>
+                </div>
+                <div class="mobile-siswa-status-wrap">
+                    <span class="mobile-badge-pill status-hadir" data-col-idx="9">H: {{ $item->total_hadir }}/{{ $item->total_siswa }}</span>
+                </div>
+            </div>
+            @empty
+            <div class="mobile-empty-card">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:36px;height:36px;color:var(--text-muted);">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <span>Belum ada data jurnal pembelajaran yang diinput.</span>
+            </div>
+            @endforelse
+        </div>
+
         @if($jurnals->hasPages())
-        <div style="padding:16px 20px; border-top:1px solid var(--border-light);">
+        <div style="padding:12px 16px; border-top:1px solid var(--border-light);">
             {{ $jurnals->links() }}
         </div>
         @endif
     </div>
 
-    {{-- Card List untuk Tampilan Mobile (<= 768px) --}}
-    <div class="mobile-card-list">
-        @forelse($jurnals as $index => $item)
-        <div class="mobile-card-item">
-            <div class="mobile-card-info">
-                <div class="mobile-card-title">{{ $item->mata_pelajaran }}</div>
-                <div class="mobile-card-subtitle">
-                    {{ $item->hari }}, {{ \Carbon\Carbon::parse($item->tanggal)->format('d/m/Y') }} &bull; {{ $item->nama_guru }}
-                </div>
+</div>
 
-                <div class="mobile-card-meta-grid">
-                    <div class="mobile-card-meta-item">
-                        <span class="mobile-card-meta-label">Kelas</span>
-                        <span class="mobile-card-pill mobile-card-pill-blue">{{ $item->kelas }}</span>
-                    </div>
-                    <div class="mobile-card-meta-item">
-                        <span class="mobile-card-meta-label">Jam</span>
-                        <span class="mobile-card-pill mobile-card-pill-gray">Jam {{ $item->jam_ke }}</span>
-                    </div>
-                    <div class="mobile-card-meta-item">
-                        <span class="mobile-card-meta-label">Presensi</span>
-                        <div style="display:inline-flex; align-items:center; gap:3px;">
-                            <span style="font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(16, 185, 129, 0.15); color:#059669;">H:{{ $item->total_hadir }}</span>
-                            @if($item->total_sakit > 0)
-                            <span style="font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(245, 158, 11, 0.15); color:#D97706;">S:{{ $item->total_sakit }}</span>
-                            @endif
-                            @if($item->total_izin > 0)
-                            <span style="font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(37, 99, 235, 0.15); color:#2563EB;">I:{{ $item->total_izin }}</span>
-                            @endif
-                            @if($item->total_alpa > 0)
-                            <span style="font-size:10px; font-weight:700; padding:1px 5px; border-radius:6px; background:rgba(239, 68, 68, 0.15); color:#DC2626;">A:{{ $item->total_alpa }}</span>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mobile-card-actions">
-                <span class="mobile-card-action-title">Aksi</span>
-                <div class="mobile-card-action-buttons">
-                    <button type="button" class="mobile-btn-pastel mobile-btn-view" data-modal-target="modalDetailJurnal{{ $item->id }}" title="Lihat Detail Jurnal">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    </button>
-
-                    <button type="button" class="mobile-btn-pastel mobile-btn-delete" data-modal-target="modalDeleteJurnal{{ $item->id }}" title="Hapus Jurnal">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-        @empty
-        <div style="background:#fff; border-radius:12px; padding:30px 16px; text-align:center; color:var(--text-muted); border:1px solid #e2e8f0;">
-            Belum ada data jurnal pembelajaran yang diinput.
-        </div>
-        @endforelse
-
-        @if($jurnals->hasPages())
-        <div style="margin-top:16px; display:flex; justify-content:center;">
-            {{ $jurnals->links() }}
-        </div>
-        @endif
+{{-- Bottom Sheet Aksi Jurnal (Mobile) --}}
+<div id="mobileJurnalSheetBackdrop" class="mobile-sheet-backdrop" style="display:none;"></div>
+<div id="mobileJurnalActionSheet" class="mobile-bottom-sheet" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sheetJurnalMapel">
+    <div class="sheet-handle-bar">
+        <span class="sheet-drag-handle"></span>
     </div>
 
+    <div class="sheet-header">
+        <div class="sheet-avatar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+        </div>
+        <div class="sheet-title-wrap">
+            <h3 class="sheet-siswa-nama" id="sheetJurnalMapel">Mata Pelajaran</h3>
+            <div class="sheet-siswa-meta">
+                <span id="sheetJurnalKelas">Kelas</span>
+                <span>•</span>
+                <span id="sheetJurnalTanggal">-</span>
+                <span>•</span>
+                <span id="sheetJurnalJam">-</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="sheet-detail-box">
+        <div class="sheet-detail-row">
+            <span class="sheet-detail-lbl">Guru</span>
+            <span class="sheet-detail-val" id="sheetJurnalGuru">-</span>
+        </div>
+        <div class="sheet-detail-row">
+            <span class="sheet-detail-lbl">Kehadiran</span>
+            <span class="sheet-detail-val" id="sheetJurnalAbsensi">-</span>
+        </div>
+        <div class="sheet-materi-text" id="sheetJurnalMateri">-</div>
+    </div>
+
+    <div class="sheet-actions-list">
+        <button type="button" id="sheetBtnViewJurnal" class="sheet-action-item">
+            <div class="sheet-action-icon icon-view">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+            </div>
+            <span class="sheet-action-title">Lihat Detail Jurnal</span>
+        </button>
+
+        <button type="button" id="sheetBtnDeleteJurnal" class="sheet-action-item is-danger">
+            <div class="sheet-action-icon icon-delete">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </div>
+            <span class="sheet-action-title">Hapus Jurnal</span>
+        </button>
+    </div>
+
+    <div class="sheet-footer">
+        <button type="button" class="sheet-btn-close" id="sheetJurnalBtnClose">Tutup</button>
+    </div>
 </div>
 
 {{-- MODAL DETAIL JURNAL & HAPUS JURNAL UNTUK SETIAP ITEM --}}
@@ -340,7 +673,7 @@
             <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; background:var(--bg-card-header); padding:14px; border-radius:10px;">
                 <div>
                     <span style="font-size:11.5px; color:var(--text-secondary); display:block;">Kelas & Waktu</span>
-                    <strong style="font-size:13.5px; color:var(--text-primary);">Kelas {{ $item->kelas }}</strong>
+                    <strong style="font-size:13.5px; color:var(--text-primary);">{{ stripos((string) $item->kelas, 'kelas') !== false ? $item->kelas : 'Kelas ' . $item->kelas }}</strong>
                     <div style="font-size:12px; color:var(--text-secondary);">{{ $item->hari }}, {{ \Carbon\Carbon::parse($item->tanggal)->format('d F Y') }}</div>
                     <div style="font-size:12px; color:var(--text-secondary);">{{ $item->jam_ke }}</div>
                 </div>
@@ -456,7 +789,7 @@
 
             <div class="modal-body" style="text-align:left;">
                 <p style="margin:0 0 10px; font-size:13.5px; color:var(--text-primary);">
-                    Apakah Anda yakin ingin menghapus data jurnal pembelajaran <strong>Kelas {{ $item->kelas }}</strong> tanggal <strong>{{ \Carbon\Carbon::parse($item->tanggal)->format('d/m/Y') }}</strong>?
+                    Apakah Anda yakin ingin menghapus data jurnal pembelajaran <strong>{{ stripos((string) $item->kelas, 'kelas') !== false ? $item->kelas : 'Kelas ' . $item->kelas }}</strong> tanggal <strong>{{ \Carbon\Carbon::parse($item->tanggal)->format('d/m/Y') }}</strong>?
                 </p>
                 <p style="margin:0; font-size:12px; color:var(--text-secondary);">
                     Seluruh rekap kehadiran siswa pada sesi ini juga akan ikut terhapus. Tindakan ini tidak dapat dibatalkan.
@@ -473,7 +806,7 @@
 
 @endforeach
 
-{{-- SCRIPT PENGENDALI MODAL --}}
+{{-- SCRIPT PENGENDALI MODAL & MOBILE BOTTOM SHEET --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     function openModal(modalId) {
@@ -516,8 +849,96 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // Mobile Bottom Sheet Aksi Jurnal
+    var sheet = document.getElementById('mobileJurnalActionSheet');
+    var backdrop = document.getElementById('mobileJurnalSheetBackdrop');
+    var btnCloseSheet = document.getElementById('sheetJurnalBtnClose');
+    var btnViewJurnal = document.getElementById('sheetBtnViewJurnal');
+    var btnDeleteJurnal = document.getElementById('sheetBtnDeleteJurnal');
+    var currentJurnalId = null;
+
+    function openJurnalSheet(card) {
+        if (!sheet || !backdrop) return;
+        currentJurnalId = card.getAttribute('data-id');
+
+        var elMapel = document.getElementById('sheetJurnalMapel');
+        var elKelas = document.getElementById('sheetJurnalKelas');
+        var elTanggal = document.getElementById('sheetJurnalTanggal');
+        var elJam = document.getElementById('sheetJurnalJam');
+        var elGuru = document.getElementById('sheetJurnalGuru');
+        var elAbsensi = document.getElementById('sheetJurnalAbsensi');
+        var elMateri = document.getElementById('sheetJurnalMateri');
+
+        if (elMapel) elMapel.textContent = card.getAttribute('data-mapel') || '-';
+        if (elKelas) elKelas.textContent = card.getAttribute('data-kelas') || '-';
+        if (elTanggal) elTanggal.textContent = card.getAttribute('data-tanggal') || '-';
+        if (elJam) elJam.textContent = card.getAttribute('data-jam') || '-';
+        if (elGuru) elGuru.textContent = card.getAttribute('data-guru') || '-';
+        if (elAbsensi) elAbsensi.textContent = card.getAttribute('data-absensi') || '-';
+        if (elMateri) elMateri.textContent = card.getAttribute('data-materi') || '-';
+
+        backdrop.style.display = 'block';
+        sheet.style.display = 'flex';
+        requestAnimationFrame(function () {
+            backdrop.classList.add('is-active');
+            sheet.classList.add('is-open');
+        });
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeJurnalSheet(keepBodyLock) {
+        if (!sheet || !backdrop) return;
+        backdrop.classList.remove('is-active');
+        sheet.classList.remove('is-open');
+        if (!keepBodyLock && !document.querySelector('.app-modal.is-active')) {
+            document.body.style.overflow = '';
+        }
+        setTimeout(function () {
+            if (!sheet.classList.contains('is-open')) {
+                sheet.style.display = 'none';
+                backdrop.style.display = 'none';
+            }
+        }, 280);
+    }
+
+    document.querySelectorAll('.mobile-siswa-card').forEach(function (card) {
+        card.addEventListener('click', function (e) {
+            if (e.target.closest('input, button, a, label')) return;
+            openJurnalSheet(card);
+        });
+    });
+
+    if (btnCloseSheet) {
+        btnCloseSheet.addEventListener('click', function () {
+            closeJurnalSheet(false);
+        });
+    }
+    if (backdrop) {
+        backdrop.addEventListener('click', function () {
+            closeJurnalSheet(false);
+        });
+    }
+    if (btnViewJurnal) {
+        btnViewJurnal.addEventListener('click', function () {
+            var id = currentJurnalId;
+            closeJurnalSheet(true);
+            if (id) openModal('modalDetailJurnal' + id);
+        });
+    }
+    if (btnDeleteJurnal) {
+        btnDeleteJurnal.addEventListener('click', function () {
+            var id = currentJurnalId;
+            closeJurnalSheet(true);
+            if (id) openModal('modalDeleteJurnal' + id);
+        });
+    }
+
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
+            if (sheet && sheet.classList.contains('is-open')) {
+                closeJurnalSheet(false);
+                return;
+            }
             var activeModal = document.querySelector('.app-modal.is-active');
             if (activeModal) {
                 closeModal(activeModal);

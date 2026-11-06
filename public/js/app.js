@@ -478,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function () {
           card.appendChild(mobileList);
         }
       }
-      if (mobileList) {
+      if (mobileList && mobileList.classList.contains('mobile-siswa-list')) {
         card.classList.add('has-mobile-list');
         if (tableWrap) {
           tableWrap.classList.add('has-mobile-list');

@@ -54,6 +54,8 @@ class JadwalPelajaranTest extends TestCase
         $response->assertSee('Jadwal Mengajar Saya');
         $response->assertSee('Input Jadwal Mengajar');
         $response->assertSee('Kalender Mengajar Mingguan Saya');
+        $response->assertSee('jms-stats-grid', false);
+        $response->assertDontSee('(Tingkat ', false);
     }
 
     public function test_guru_dapat_menginput_jadwal_mengajar_mandiri(): void

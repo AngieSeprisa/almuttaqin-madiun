@@ -120,6 +120,9 @@ class SinkronisasiKelasJurnalTest extends TestCase
 
         $responseJurnal->assertStatus(200);
         $responseJurnal->assertSee('Ekosistem');
+        $responseJurnal->assertSee('mobile-siswa-list', false);
+        $responseJurnal->assertSee('mobile-siswa-card', false);
+        $responseJurnal->assertSee('mobileJurnalActionSheet', false);
     }
 
     public function test_get_equivalent_class_names_helper(): void
