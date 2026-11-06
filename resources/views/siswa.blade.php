@@ -216,7 +216,16 @@
 }
 
 @media (max-width: 768px) {
-    /* Sembunyikan hanya tabel baris desktop di mobile, container card & toolbar tetap tampil */
+    /* Sembunyikan tabel baris desktop di mobile, container card & toolbar tetap tampil */
+    body .table-card.has-mobile-list > .table-wrapper,
+    body .table-card.has-mobile-list > .fi-ta-table-wrap,
+    body .table-card.fi-ta-enhanced.has-mobile-list > .table-wrapper,
+    body .table-card.fi-ta-enhanced.has-mobile-list > .fi-ta-table-wrap,
+    body .table-card.fi-ta-enhanced:has(.mobile-siswa-list) > .table-wrapper,
+    body .table-card:has(.mobile-siswa-list) > .table-wrapper,
+    body .table-card.fi-ta-enhanced > .table-wrapper,
+    body .table-card > .table-wrapper,
+    body .fi-ta-ctn > .fi-ta-table-wrap,
     .table-wrapper,
     .fi-ta-table-wrap {
         display: none !important;
@@ -230,11 +239,20 @@
     }
 
     /* Tampilkan daftar card mobile */
+    body .table-card.has-mobile-list > .mobile-siswa-list,
+    body .table-card.fi-ta-enhanced > .mobile-siswa-list,
+    body .table-card > .mobile-siswa-list,
+    body .mobile-siswa-list,
     .mobile-siswa-list {
         display: flex !important;
-        flex-direction: column;
-        gap: 10px;
-        padding: 0 0 16px 0;
+        flex-direction: column !important;
+        gap: 10px !important;
+        padding: 8px 0 16px 0 !important;
+        width: 100% !important;
+    }
+
+    .mobile-siswa-card .fi-ta-checkbox {
+        display: none !important;
     }
 
     /* Container Card Siswa Mobile Sesuai Gambar Referensi */
@@ -431,8 +449,9 @@
         pointer-events: none;
     }
     .mobile-sheet-backdrop.is-active {
-        opacity: 1;
-        pointer-events: auto;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        display: block !important;
     }
 
     .mobile-bottom-sheet {
@@ -462,7 +481,8 @@
     }
 
     .mobile-bottom-sheet.is-open {
-        transform: translateY(0);
+        transform: translateY(0) !important;
+        display: flex !important;
     }
 
     .sheet-handle-bar {
@@ -1081,7 +1101,7 @@
     </div>
 
     {{-- Tabel Siswa --}}
-    <div class="table-card">
+    <div class="table-card has-mobile-list">
         <div class="table-wrapper">
             <table class="modern-table">
                 <thead>
@@ -1321,10 +1341,9 @@
                 </tbody>
             </table>
         </div>
-    </div>
 
-    {{-- Tampilan Mobile Card List (Khusus Tampilan Layar HP Sesuai Gambar Referensi) --}}
-    <div class="mobile-siswa-list">
+        {{-- Tampilan Mobile Card List (Khusus Tampilan Layar HP Sesuai Gambar Referensi) --}}
+        <div class="mobile-siswa-list">
         @forelse($siswa as $item)
         @php
             $isLengkap = $item->isDataLengkap();
@@ -1405,6 +1424,7 @@
             <span>Tidak ada data siswa yang ditemukan.</span>
         </div>
         @endforelse
+    </div>
     </div>
 
     {{-- Bottom Sheet Aksi Santri (Mobile Action Sheet sesuai contoh gambar) --}}

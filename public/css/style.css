@@ -7698,10 +7698,8 @@ html.dark-mode .fi-confirm-btn-cancel {
 
   /* Requirement 3: Mobile displays the real desktop table with smooth horizontal scroll & friendly touch styles */
   .mobile-card-list,
-  .mobile-siswa-list,
   .fi-ta-mobile-list,
   body .table-card.fi-ta-enhanced > .mobile-card-list,
-  body .table-card.fi-ta-enhanced > .mobile-siswa-list,
   .fi-ta-ctn > .fi-ta-mobile-list {
     display: none !important;
   }
@@ -7715,6 +7713,36 @@ html.dark-mode .fi-confirm-btn-cancel {
     -webkit-overflow-scrolling: touch !important;
     position: relative;
     border-radius: 0 0 12px 12px;
+  }
+
+  /* Siswa Mobile Card View (Sesuai Permintaan Desain Mobile Siswa) */
+  body .table-card.has-mobile-list > .table-wrapper,
+  body .table-card.has-mobile-list > .fi-ta-table-wrap,
+  body .table-card.fi-ta-enhanced.has-mobile-list > .table-wrapper,
+  body .table-card.fi-ta-enhanced.has-mobile-list > .fi-ta-table-wrap,
+  body .fi-ta-ctn.has-mobile-list > .fi-ta-table-wrap,
+  body .table-card:has(.mobile-siswa-list) > .table-wrapper,
+  body .table-card:has(.mobile-siswa-list) > .fi-ta-table-wrap,
+  body .table-card.fi-ta-enhanced:has(.mobile-siswa-list) > .table-wrapper,
+  body .table-card.fi-ta-enhanced:has(.mobile-siswa-list) > .fi-ta-table-wrap,
+  body .fi-ta-ctn:has(.mobile-siswa-list) > .fi-ta-table-wrap {
+    display: none !important;
+  }
+
+  body .mobile-siswa-list,
+  body .table-card.fi-ta-enhanced > .mobile-siswa-list,
+  body .fi-ta-ctn > .mobile-siswa-list,
+  body .table-card > .mobile-siswa-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 10px 12px 16px 12px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .mobile-siswa-card .fi-ta-checkbox {
+    display: none !important;
   }
 
   /* Make mobile table comfortable and prevent narrow crushed columns */

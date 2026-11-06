@@ -478,6 +478,12 @@ document.addEventListener('DOMContentLoaded', function () {
           card.appendChild(mobileList);
         }
       }
+      if (mobileList) {
+        card.classList.add('has-mobile-list');
+        if (tableWrap) {
+          tableWrap.classList.add('has-mobile-list');
+        }
+      }
 
       // Remove duplicate mobile pagination inside mobileList if desktop pagination already exists
       var desktopServerPagination = null;

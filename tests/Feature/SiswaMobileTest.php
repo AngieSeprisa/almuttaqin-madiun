@@ -55,6 +55,7 @@ class SiswaMobileTest extends TestCase
         $response->assertStatus(200);
 
         // Memastikan elemen mobile card list dan atribut sesuai screenshot ada
+        $response->assertSee('has-mobile-list');
         $response->assertSee('mobile-siswa-list');
         $response->assertSee('mobile-siswa-card');
         $response->assertSee('Aprilia Khoirunnisa');
