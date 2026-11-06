@@ -788,7 +788,12 @@ document.addEventListener('DOMContentLoaded', function () {
         var activeCount = 0;
         syncedServerControls.forEach(function (pair) {
           var v = (pair.orig.value || '').trim();
-          if (v !== '' && v.toLowerCase() !== 'all') activeCount++;
+          var defVal = pair.orig.getAttribute('data-default-value');
+          if (defVal !== null) {
+            if (v !== defVal) activeCount++;
+          } else if (v !== '' && v.toLowerCase() !== 'all') {
+            activeCount++;
+          }
         });
         clientColumnFilters.forEach(function (cf) {
           if (cf.appliedValue !== '') activeCount++;
@@ -1071,8 +1076,27 @@ document.addEventListener('DOMContentLoaded', function () {
           var viewLnk = tr.querySelector('a.action-btn-view, a.btn-view, a[title*="Lihat"], a[href*="show"]') || (tr.dataset && tr.dataset.viewUrl ? { href: tr.dataset.viewUrl } : null);
           var printLnk = tr.querySelector('a.action-btn-print, a.btn-print, a[title*="Cetak"], a[href*="cetak"]') || (tr.dataset && tr.dataset.cetakUrl ? { href: tr.dataset.cetakUrl } : null);
           var editLnk = tr.querySelector('a.action-btn-edit, a.btn-edit, a.action-btn-koreksi, a[title*="Edit"], a[href*="edit"]') || (tr.dataset && tr.dataset.editUrl ? { href: tr.dataset.editUrl } : null);
+          var koreksiBtn = tr.querySelector('button.btn-koreksi, button.action-btn-koreksi');
           var rfidBtn = tr.querySelector('button.btn-rfid-pair, button[data-uid], button[title*="RFID"]');
           var delBtn = tr.querySelector('.action-btn-delete, .btn-delete, button.js-swal-confirm');
+
+          // 0. Koreksi Presensi Guru (Modal Button)
+          if (koreksiBtn) {
+            var bKoreksi = document.createElement('button');
+            bKoreksi.type = 'button';
+            bKoreksi.className = 'fi-ta-bulk-item';
+            bKoreksi.innerHTML =
+              '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>' +
+                '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>' +
+              '</svg>' +
+              '<span>Koreksi Presensi Guru</span>';
+            bKoreksi.addEventListener('click', function () {
+              bulkMenu.classList.remove('is-open');
+              koreksiBtn.click();
+            });
+            bulkMenu.appendChild(bKoreksi);
+          }
 
           // 1. Lihat Formulir Siswa
           if (viewLnk) {
@@ -1136,7 +1160,7 @@ document.addEventListener('DOMContentLoaded', function () {
             bulkMenu.appendChild(bRfid);
           }
 
-          if (viewLnk || printLnk || editLnk || rfidBtn) {
+          if (viewLnk || printLnk || editLnk || rfidBtn || koreksiBtn) {
             var div1 = document.createElement('div');
             div1.className = 'fi-ta-bulk-divider';
             bulkMenu.appendChild(div1);

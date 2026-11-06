@@ -78,12 +78,22 @@ class RekapGuruTest extends TestCase
         $response->assertSee('Tepat Waktu');
         $response->assertSee('Total Guru');
 
-        // Kolom tabel sesuai Gambar 3
-        $response->assertSee('NAMA GURU');
-        $response->assertSee('JAM MASUK');
-        $response->assertSee('JAM PULANG');
-        $response->assertSee('STATUS KEHADIRAN');
-        $response->assertSee('AKSI');
+        // Kolom tabel utama & kustom (identik gaya Tabel Siswa)
+        $response->assertSee('Nama Guru');
+        $response->assertSee('Tanggal');
+        $response->assertSee('Jam Masuk');
+        $response->assertSee('Jam Pulang');
+        $response->assertSee('Status Kehadiran');
+        $response->assertSee('Lembaga');
+        $response->assertSee('Jabatan');
+        $response->assertSee('Mata Pelajaran');
+        $response->assertSee('Kartu RFID');
+        $response->assertSee('Aksi');
+
+        // Kartu mobile & Bottom Sheet
+        $response->assertSee('mobile-siswa-list', false);
+        $response->assertSee('mobile-siswa-card', false);
+        $response->assertSee('mobileGuruActionSheet', false);
 
         // Data guru
         $response->assertSee('Adi Kara Prabowo, S. Pd., Gr.');
@@ -433,5 +443,77 @@ class RekapGuruTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('HEADER PRESENSI HARIAN');
         $response->assertSee('Menampilkan');
+    }
+
+    public function test_pencarian_filter_status_dan_koreksi_presensi_guru_berfungsi_sesuai_tabel_siswa(): void
+    {
+        $today = Carbon::today();
+
+        $guruHadir = User::factory()->create([
+            'name'               => 'Ustadz Ahmad Fauzi',
+            'nip'                => '198801012020',
+            'jabatan'            => 'Waka Kurikulum',
+            'mata_pelajaran'     => 'Matematika',
+            'rfid_uid'           => 'ABCD1234',
+            'primary_lembaga_id' => $this->lembaga->id,
+        ]);
+
+        $guruTerlambat = User::factory()->create([
+            'name'               => 'Ibu Siti Aminah',
+            'nip'                => '199202022022',
+            'jabatan'            => 'Guru Bahasa',
+            'mata_pelajaran'     => 'Bahasa Indonesia',
+            'primary_lembaga_id' => $this->lembaga->id,
+        ]);
+
+        $presensi1 = PresensiGuru::create([
+            'user_id'    => $guruHadir->id,
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => $today->toDateString(),
+            'jam_masuk'  => '06:50:00',
+            'jam_pulang' => '15:10:00',
+            'status'     => 'hadir',
+        ]);
+
+        $presensi2 = PresensiGuru::create([
+            'user_id'    => $guruTerlambat->id,
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => $today->toDateString(),
+            'jam_masuk'  => '07:35:00',
+            'status'     => 'terlambat',
+        ]);
+
+        // 1. Filter berdasarkan pencarian jabatan / nama
+        $resSearch = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
+            'lembaga_id' => $this->lembaga->id,
+            'search'     => 'Waka Kurikulum',
+        ]));
+        $resSearch->assertStatus(200);
+        $resSearch->assertSee('Ustadz Ahmad Fauzi');
+        $resSearch->assertDontSee('Ibu Siti Aminah');
+        $resSearch->assertSee('data-col-idx="8"', false);
+
+        // 2. Filter berdasarkan status kehadiran
+        $resStatus = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
+            'lembaga_id' => $this->lembaga->id,
+            'status'     => 'terlambat',
+        ]));
+        $resStatus->assertStatus(200);
+        $resStatus->assertSee('Ibu Siti Aminah');
+        $resStatus->assertDontSee('Ustadz Ahmad Fauzi');
+
+        // 3. Koreksi presensi guru (seperti dari Bottom Sheet / Modal Koreksi)
+        $resKoreksi = $this->actingAs($this->admin)->put(route('rekap-absensi.koreksi', $presensi2->id), [
+            'status'     => 'izin',
+            'jam_masuk'  => '07:35',
+            'jam_pulang' => '14:00',
+            'keterangan' => 'Izin keperluan keluarga',
+        ]);
+        $resKoreksi->assertRedirect();
+        $this->assertDatabaseHas('presensi_gurus', [
+            'id'         => $presensi2->id,
+            'status'     => 'izin',
+            'jam_pulang' => '14:00:00',
+        ]);
     }
 }

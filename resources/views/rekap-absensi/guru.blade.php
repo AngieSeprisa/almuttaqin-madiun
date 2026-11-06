@@ -1,16 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Rekap Presensi Guru')
-
-@section('page_header')
-{{-- Dikosongkan agar Banner Header Presensi Harian menjadi tampilan utama sesuai Gambar 3 --}}
-<span class="sr-only" style="display:none;">Rekap Absensi Guru</span>
-@endsection
+@section('title', 'Rekap Absensi Guru')
 
 @section('header-actions')
-<div style="display:flex; align-items:center; gap:8px;">
-    <a href="{{ route('rekap-absensi.export', request()->all()) }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:8px 14px; font-size:13px; border-radius:8px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <a href="{{ route('rekap-absensi.export', request()->all()) }}" class="btn btn-secondary btn-header-action" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
             <polyline points="7 10 12 15 17 10"></polyline>
             <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -18,8 +13,8 @@
         <span>Ekspor Excel</span>
     </a>
 
-    <a href="{{ route('rekap-absensi.cetak', request()->all()) }}" target="_blank" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none; padding:8px 14px; font-size:13px; border-radius:8px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+    <a href="{{ route('rekap-absensi.cetak', request()->all()) }}" target="_blank" class="btn btn-primary btn-header-action" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
             <polyline points="6 9 6 2 18 2 18 9"></polyline>
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
             <rect x="6" y="14" width="12" height="8"></rect>
@@ -29,170 +24,169 @@
 </div>
 @endsection
 
-@section('content')
+@push('styles')
 <style>
-    .guru-container {
+    .guru-page-stack {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 14px;
     }
 
-    /* 1. Header Banner Card (Persis Gambar 3) */
+    /* Ringkasan Presensi Harian / Bulanan */
     .guru-header-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 14px;
-        padding: 16px 22px;
+        padding: 15px 20px;
         display: flex;
         align-items: center;
         justify-content: space-between;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         flex-wrap: wrap;
-        gap: 16px;
+        gap: 14px;
     }
+
+    .dark-mode .guru-header-card {
+        background: var(--card-bg, #1e293b);
+        border-color: var(--border-light, #334155);
+        box-shadow: none;
+    }
+
     .guru-header-left {
         display: flex;
         align-items: center;
         gap: 14px;
+        min-width: 0;
     }
+
     .guru-header-icon-box {
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        background: #2563eb;
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
         color: #ffffff;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.22);
     }
+
     .guru-header-titles {
         display: flex;
         flex-direction: column;
         gap: 2px;
+        min-width: 0;
     }
+
     .guru-header-meta-row {
         display: flex;
         align-items: center;
         gap: 8px;
         flex-wrap: wrap;
     }
+
     .guru-badge-header {
         background: #2563eb;
         color: #ffffff;
         font-size: 10px;
         font-weight: 800;
-        letter-spacing: 0.6px;
-        padding: 2.5px 8px;
+        letter-spacing: 0.5px;
+        padding: 2px 7px;
         border-radius: 5px;
         text-transform: uppercase;
         display: inline-block;
     }
+
     .guru-sub-institution {
         font-size: 12.5px;
         color: #64748b;
         font-weight: 600;
     }
+
+    .dark-mode .guru-sub-institution {
+        color: #94a3b8;
+    }
+
     .guru-title-date {
-        font-size: 21px;
+        font-size: 18px;
         font-weight: 800;
         color: #0f172a;
-        margin: 2px 0 0 0;
+        margin: 1px 0 0 0;
         line-height: 1.25;
+    }
+
+    .dark-mode .guru-title-date {
+        color: #f8fafc;
     }
 
     .guru-header-right {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         flex-wrap: wrap;
     }
+
     .guru-pill-stat {
-        padding: 7px 16px;
-        border-radius: 8px;
-        font-size: 13px;
+        padding: 6px 13px;
+        border-radius: 999px;
+        font-size: 12.5px;
         font-weight: 700;
         display: inline-flex;
         align-items: center;
-        background: #ffffff;
-        transition: all 0.15s ease;
-    }
-    .pill-stat-tepat {
-        border: 1.5px solid #10b981;
-        color: #059669;
-    }
-    .pill-stat-total {
-        border: 1.5px solid #3b82f6;
-        color: #2563eb;
-    }
-
-    /* 2. Filter Bar Card */
-    .guru-filter-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 14px 20px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-    }
-    .guru-filter-grid {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-    .guru-filter-select, .guru-filter-input {
-        height: 38px;
-        padding: 6px 12px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 13px;
-        color: #111827;
-        background: #ffffff;
-        outline: none;
-        transition: border-color 0.15s ease;
-    }
-    .guru-filter-select:focus, .guru-filter-input:focus {
-        border-color: #2563eb;
-    }
-
-    /* 3. Table Card (Persis Gambar 3) */
-    .guru-table-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-    .guru-table-scroll {
-        overflow-x: auto;
-        width: 100%;
-    }
-    .guru-table {
-        width: 100%;
-        border-collapse: collapse;
-        text-align: left;
+        gap: 5px;
         white-space: nowrap;
     }
-    .guru-table th {
-        background: #ffffff;
-        color: #64748b;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.6px;
-        text-transform: uppercase;
-        padding: 14px 18px;
-        border-bottom: 1px solid #e2e8f0;
+
+    .pill-stat-tepat {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #15803d;
     }
-    .guru-table td {
-        padding: 14px 18px;
-        border-bottom: 1px solid #f1f5f9;
-        font-size: 13px;
-        color: #334155;
-        vertical-align: middle;
+    .dark-mode .pill-stat-tepat {
+        background: rgba(34, 197, 94, 0.16);
+        border-color: rgba(34, 197, 94, 0.35);
+        color: #4ade80;
     }
-    .guru-table tbody tr:hover td {
-        background-color: #f8fafc;
+
+    .pill-stat-terlambat {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #b45309;
+    }
+    .dark-mode .pill-stat-terlambat {
+        background: rgba(245, 158, 11, 0.16);
+        border-color: rgba(245, 158, 11, 0.35);
+        color: #fbbf24;
+    }
+
+    .pill-stat-izin {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1d4ed8;
+    }
+    .dark-mode .pill-stat-izin {
+        background: rgba(59, 130, 246, 0.16);
+        border-color: rgba(59, 130, 246, 0.35);
+        color: #60a5fa;
+    }
+
+    .pill-stat-total {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        color: #1e293b;
+    }
+    .dark-mode .pill-stat-total {
+        background: #334155;
+        border-color: #475569;
+        color: #f1f5f9;
+    }
+
+    /* Elemen Tabel Desktop */
+    .guru-cell-nama {
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
 
     .guru-avatar-circle {
@@ -201,25 +195,32 @@
         border-radius: 50%;
         background: #dbeafe;
         color: #1e40af;
-        font-size: 12.5px;
+        font-size: 12px;
         font-weight: 700;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        text-transform: uppercase;
     }
+
+    .dark-mode .guru-avatar-circle {
+        background: rgba(59, 130, 246, 0.22);
+        color: #93c5fd;
+    }
+
     .guru-name-text {
         font-size: 13.5px;
-        font-weight: 700;
-        color: #1e293b;
+        font-weight: 600;
+        color: var(--text-main, #0f172a);
     }
 
     .guru-jam-pill {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 5px 11px;
-        border-radius: 8px;
+        gap: 5px;
+        padding: 4px 10px;
+        border-radius: 7px;
         border: 1px solid #e2e8f0;
         background: #f8fafc;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -227,13 +228,20 @@
         font-weight: 600;
         color: #0f172a;
     }
+
+    .dark-mode .guru-jam-pill {
+        background: #0f172a;
+        border-color: #334155;
+        color: #e2e8f0;
+    }
+
     .guru-jam-pill svg {
         color: #64748b;
     }
 
     .guru-tidak-pulang-pill {
         display: inline-block;
-        padding: 5px 12px;
+        padding: 4px 10px;
         border-radius: 6px;
         background: #f1f5f9;
         color: #64748b;
@@ -241,118 +249,610 @@
         font-weight: 600;
     }
 
-    /* Badges Status Kehadiran (Gambar 3) */
+    .dark-mode .guru-tidak-pulang-pill {
+        background: #334155;
+        color: #94a3b8;
+    }
+
     .guru-status-badge {
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        padding: 5px 14px;
-        border-radius: 20px;
+        padding: 4px 12px;
+        border-radius: 999px;
         font-size: 12px;
         font-weight: 700;
         white-space: nowrap;
     }
+
     .badge-tepat {
-        background: #f0fdf4;
+        background: #dcfce7;
         border: 1px solid #bbf7d0;
-        color: #16a34a;
+        color: #15803d;
     }
+    .dark-mode .badge-tepat {
+        background: rgba(34, 197, 94, 0.18);
+        border-color: rgba(34, 197, 94, 0.35);
+        color: #4ade80;
+    }
+
     .badge-terlambat {
-        background: #fffbeb;
-        border: 1px solid #fef08a;
-        color: #d97706;
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        color: #b45309;
     }
+    .dark-mode .badge-terlambat {
+        background: rgba(245, 158, 11, 0.18);
+        border-color: rgba(245, 158, 11, 0.35);
+        color: #fbbf24;
+    }
+
     .badge-izin {
-        background: #eff6ff;
+        background: #dbeafe;
         border: 1px solid #bfdbfe;
-        color: #2563eb;
+        color: #1d4ed8;
     }
+    .dark-mode .badge-izin {
+        background: rgba(59, 130, 246, 0.18);
+        border-color: rgba(59, 130, 246, 0.35);
+        color: #60a5fa;
+    }
+
     .badge-sakit {
         background: #f5f3ff;
         border: 1px solid #ddd6fe;
         color: #7c3aed;
     }
+    .dark-mode .badge-sakit {
+        background: rgba(124, 58, 237, 0.2);
+        border-color: rgba(124, 58, 237, 0.35);
+        color: #c4b5fd;
+    }
+
     .badge-alpa {
-        background: #fef2f2;
+        background: #fee2e2;
         border: 1px solid #fecaca;
         color: #dc2626;
     }
+    .dark-mode .badge-alpa {
+        background: rgba(239, 68, 68, 0.18);
+        border-color: rgba(239, 68, 68, 0.35);
+        color: #f87171;
+    }
 
-    .guru-action-eye-btn {
-        display: inline-flex;
+    /* Modal Koreksi Presensi */
+    .guru-modal-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 10050;
         align-items: center;
         justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        background: #ffffff;
-        color: #64748b;
-        cursor: pointer;
-        transition: all 0.15s ease;
+        padding: 16px;
     }
-    .guru-action-eye-btn:hover {
-        background: #eff6ff;
-        border-color: #bfdbfe;
-        color: #2563eb;
+    .guru-modal-backdrop.is-open {
+        display: flex !important;
     }
 
-    /* Footer Pagination */
-    .guru-table-footer {
-        padding: 14px 20px;
+    .guru-modal-dialog {
+        background: #ffffff;
+        border-radius: 18px;
+        border: 1px solid #e2e8f0;
+        width: 100%;
+        max-width: 440px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.28);
+        overflow: hidden;
+    }
+    .dark-mode .guru-modal-dialog {
+        background: #1e293b;
+        border-color: #334155;
+    }
+
+    .guru-modal-head {
+        padding: 16px 20px;
+        border-bottom: 1px solid #e2e8f0;
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        border-top: 1px solid #e2e8f0;
+        justify-content: space-between;
+    }
+    .dark-mode .guru-modal-head {
+        border-bottom-color: #334155;
+    }
+
+    .guru-modal-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+    }
+    .dark-mode .guru-modal-title {
+        color: #f8fafc;
+    }
+
+    .guru-modal-sub {
         font-size: 12.5px;
         color: #64748b;
-        flex-wrap: wrap;
-        gap: 12px;
-        background: #ffffff;
+        display: block;
+        margin-top: 2px;
     }
-    .guru-footer-left {
-        display: flex;
-        align-items: center;
-        gap: 8px;
+    .dark-mode .guru-modal-sub {
+        color: #94a3b8;
     }
-    .guru-perpage-select {
-        height: 32px;
-        padding: 2px 8px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        font-size: 12px;
+
+    .guru-modal-label {
+        display: block;
+        font-size: 13px;
         font-weight: 600;
-        color: #111827;
+        color: #0f172a;
+        margin-bottom: 6px;
+    }
+    .dark-mode .guru-modal-label {
+        color: #e2e8f0;
+    }
+
+    .guru-modal-control {
+        width: 100%;
+        padding: 9px 12px;
+        font-size: 13.5px;
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
         background: #ffffff;
-        outline: none;
+        color: #0f172a;
+        box-sizing: border-box;
+    }
+    .dark-mode .guru-modal-control {
+        background: #0f172a;
+        border-color: #334155;
+        color: #f8fafc;
+    }
+
+    /* ========================================================
+       TAMPILAN KHUSUS MOBILE SESUAI KARTU SISWA (<= 768px)
+       ======================================================== */
+    .mobile-siswa-list {
+        display: none;
+    }
+
+    @media (min-width: 769px) {
+        .mobile-siswa-list,
+        body .mobile-siswa-list {
+            display: none !important;
+        }
+    }
+
+    .mobile-sheet-backdrop,
+    .mobile-bottom-sheet {
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        /* Ringkasan dibuat ringkas 1 baris chip di mobile agar fokus ke Toolbar & Kartu */
+        .guru-header-card {
+            padding: 10px 12px;
+            border-radius: 12px;
+            gap: 8px;
+        }
+        .guru-header-left {
+            width: 100%;
+            gap: 10px;
+        }
+        .guru-header-icon-box {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+        }
+        .guru-header-icon-box svg {
+            width: 18px;
+            height: 18px;
+        }
+        .guru-title-date {
+            font-size: 14.5px;
+        }
+        .guru-sub-institution {
+            font-size: 11.5px;
+        }
+        .guru-header-right {
+            width: 100%;
+            gap: 6px;
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            padding-bottom: 2px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .guru-header-right::-webkit-scrollbar {
+            display: none;
+        }
+        .guru-pill-stat {
+            padding: 4px 10px;
+            font-size: 11.5px;
+            flex-shrink: 0;
+        }
+
+        /* Sembunyikan tabel baris desktop di mobile secara total */
+        .table-wrapper-siswa-desktop,
+        div.table-wrapper-siswa-desktop,
+        body .table-wrapper-siswa-desktop,
+        body .table-card .table-wrapper-siswa-desktop,
+        body .table-card.has-mobile-list > .table-wrapper,
+        body .table-card.has-mobile-list > .fi-ta-table-wrap,
+        body .table-card.fi-ta-enhanced.has-mobile-list > .table-wrapper,
+        body .table-card.fi-ta-enhanced.has-mobile-list > .fi-ta-table-wrap {
+            display: none !important;
+        }
+
+        /* Hilangkan border kaku container luar agar toolbar & card mengambang rapi seperti Siswa */
+        .table-card {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        body .table-card.has-mobile-list > .mobile-siswa-list,
+        body .table-card.fi-ta-enhanced > .mobile-siswa-list,
+        body .table-card > .mobile-siswa-list,
+        body .mobile-siswa-list,
+        .mobile-siswa-list {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 10px !important;
+            padding: 8px 0 14px 0 !important;
+            width: 100% !important;
+        }
+
+        .mobile-siswa-card .fi-ta-checkbox {
+            display: none !important;
+        }
+
+        /* Bottom Sheet Aksi Guru (Persis Bottom Sheet Siswa) */
+        .mobile-sheet-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 9998;
+            opacity: 0;
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: none;
+        }
+        .mobile-sheet-backdrop.is-active {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            display: block !important;
+        }
+
+        .mobile-bottom-sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            max-width: 540px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            max-height: 86vh;
+            overflow: hidden;
+        }
+        .dark-mode .mobile-bottom-sheet {
+            background: #1e293b;
+            border-top: 1px solid #334155;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+        }
+        .mobile-bottom-sheet.is-open {
+            transform: translateY(0) !important;
+            display: flex !important;
+        }
+
+        .sheet-handle-bar {
+            width: 100%;
+            padding: 12px 0 8px;
+            display: flex;
+            justify-content: center;
+            cursor: grab;
+        }
+        .sheet-drag-handle {
+            width: 48px;
+            height: 5px;
+            border-radius: 999px;
+            background: #cbd5e1;
+        }
+        .dark-mode .sheet-drag-handle {
+            background: #475569;
+        }
+
+        .sheet-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 6px 20px 14px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .dark-mode .sheet-header {
+            border-bottom-color: #334155;
+        }
+
+        .sheet-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            text-transform: uppercase;
+        }
+
+        .sheet-title-wrap {
+            flex: 1;
+            min-width: 0;
+        }
+        .sheet-siswa-nama {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dark-mode .sheet-siswa-nama {
+            color: #f8fafc;
+        }
+
+        .sheet-siswa-meta {
+            font-size: 12.5px;
+            color: #64748b;
+            margin-top: 3px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .dark-mode .sheet-siswa-meta {
+            color: #94a3b8;
+        }
+
+        /* Kotak Info Detail Jam Masuk / Pulang di dalam Bottom Sheet */
+        .sheet-detail-box {
+            margin: 12px 18px 2px;
+            padding: 11px 14px;
+            border-radius: 13px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 12px;
+        }
+        .dark-mode .sheet-detail-box {
+            background: #0f172a;
+            border-color: #334155;
+        }
+        .sheet-detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .sheet-detail-item.is-full {
+            grid-column: 1 / -1;
+            border-top: 1px dashed #e2e8f0;
+            padding-top: 8px;
+        }
+        .dark-mode .sheet-detail-item.is-full {
+            border-top-color: #334155;
+        }
+        .sheet-detail-lbl {
+            font-size: 11px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .sheet-detail-val {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+        .dark-mode .sheet-detail-val {
+            color: #f1f5f9;
+        }
+
+        .sheet-actions-list {
+            padding: 8px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .sheet-action-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: transparent;
+            border: none;
+            text-decoration: none;
+            color: #1e293b;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.1s ease;
+            width: 100%;
+            text-align: left;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        .dark-mode .sheet-action-item {
+            color: #f1f5f9;
+        }
+        .sheet-action-item:active,
+        .sheet-action-item:hover {
+            background: #f8fafc;
+        }
+        .dark-mode .sheet-action-item:active,
+        .dark-mode .sheet-action-item:hover {
+            background: #334155;
+        }
+
+        .sheet-action-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .sheet-action-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+        .sheet-action-icon.icon-edit {
+            background: #fefce8;
+            color: #ca8a04;
+        }
+        .dark-mode .sheet-action-icon.icon-edit {
+            background: rgba(202, 138, 4, 0.2);
+            color: #facc15;
+        }
+        .sheet-action-icon.icon-print {
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+        .dark-mode .sheet-action-icon.icon-print {
+            background: rgba(22, 163, 74, 0.2);
+            color: #4ade80;
+        }
+        .sheet-action-icon.icon-view {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+        .dark-mode .sheet-action-icon.icon-view {
+            background: rgba(37, 99, 235, 0.2);
+            color: #60a5fa;
+        }
+
+        .sheet-action-text {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .sheet-action-title {
+            font-size: 14.5px;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+        .sheet-action-desc {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 1px;
+        }
+        .dark-mode .sheet-action-desc {
+            color: #94a3b8;
+        }
+
+        .sheet-chevron {
+            width: 16px;
+            height: 16px;
+            color: #cbd5e1;
+            flex-shrink: 0;
+        }
+        .dark-mode .sheet-chevron {
+            color: #64748b;
+        }
+
+        .sheet-footer {
+            padding: 12px 18px 20px;
+            border-top: 1px solid #f1f5f9;
+        }
+        .dark-mode .sheet-footer {
+            border-top-color: #334155;
+        }
+
+        .sheet-btn-close {
+            width: 100%;
+            height: 48px;
+            border-radius: 14px;
+            background: #234e38;
+            color: #ffffff;
+            font-size: 15px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.15s ease, transform 0.1s ease;
+        }
+        .sheet-btn-close:active {
+            transform: scale(0.98);
+            opacity: 0.9;
+        }
+        .dark-mode .sheet-btn-close {
+            background: #2d5a44;
+        }
     }
 </style>
+@endpush
 
-<div class="guru-container">
+@section('content')
+@php
+    $canKoreksi = !auth()->check() || auth()->user()->canDo('rekap_absensi', 'edit');
+    $selectedLembaga = $lembagaId ? $lembagas->firstWhere('id', $lembagaId) : null;
+    $lembagaText = $selectedLembaga ? ($selectedLembaga->singkatan ?? $selectedLembaga->nama_singkat ?? $selectedLembaga->nama) : 'Seluruh Lembaga';
+    $subHeader = $lembagaText . ' • Yayasan Muttaqin Kota Madiun';
+
+    $daftarBulan = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+    ];
+    $namaBulanAktif = $daftarBulan[$bulan] ?? '';
+    $periodeLabel = $tanggal
+        ? \Carbon\Carbon::parse($tanggal)->translatedFormat('l, d M Y')
+        : ('Periode ' . $namaBulanAktif . ' ' . $tahun);
+
+    $hasActiveFilter = !empty($search)
+        || !empty($status)
+        || !empty($tanggal)
+        || request()->exists('lembaga_id')
+        || (request()->filled('bulan') && (int) request('bulan') !== (int) now()->month)
+        || (request()->filled('tahun') && (int) request('tahun') !== (int) now()->year);
+@endphp
+
+<div class="guru-page-stack">
 
     {{-- Alert Banner --}}
     @if(session('success'))
-    <div class="alert-banner alert-success" style="display:flex; align-items:center; gap:12px; padding:12px 18px; border-radius:12px; background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.25); color:#065F46;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px; flex-shrink:0; color:#10B981;">
+    <div class="alert-banner alert-success" style="margin-bottom:0;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px; flex-shrink:0;">
             <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
         <span style="font-size:13.5px; font-weight:600;">{{ session('success') }}</span>
     </div>
     @endif
 
-    {{-- 1. HEADER PRESENSI HARIAN (PERSIS GAMBAR 3) --}}
-    @php
-        $selectedLembaga = $lembagaId ? $lembagas->firstWhere('id', $lembagaId) : null;
-        $lembagaText = $selectedLembaga ? ($selectedLembaga->nama_singkat ?? $selectedLembaga->nama) : 'Seluruh Lembaga';
-        $subHeader = $selectedLembaga ? ($lembagaText . ' • Yayasan Muttaqin Kota Madiun') : 'Seluruh Lembaga • Yayasan Muttaqin Kota Madiun';
-        $displayDate = $tanggal ? \Carbon\Carbon::parse($tanggal) : \Carbon\Carbon::now();
-        $dateFormatted = $displayDate->translatedFormat('l, d M Y');
-    @endphp
-
+    {{-- 1. RINGKASAN PRESENSI HARIAN / PERIODE --}}
     <div class="guru-header-card">
         <div class="guru-header-left">
             <div class="guru-header-icon-box">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="16" y1="2" x2="16" y2="6"></line>
                     <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -364,7 +864,7 @@
                     <span class="guru-badge-header">HEADER PRESENSI HARIAN</span>
                     <span class="guru-sub-institution">{{ $subHeader }}</span>
                 </div>
-                <h1 class="guru-title-date">{{ $dateFormatted }}</h1>
+                <h2 class="guru-title-date">{{ $periodeLabel }}</h2>
             </div>
         </div>
 
@@ -373,118 +873,213 @@
                 <span>{{ $ringkasan['hadir'] }} Tepat Waktu</span>
                 <span class="sr-only" style="display:none;">Hadir Tepat</span>
             </div>
+            @if(($ringkasan['terlambat'] ?? 0) > 0)
+            <div class="guru-pill-stat pill-stat-terlambat">
+                <span>{{ $ringkasan['terlambat'] }} Terlambat</span>
+            </div>
+            @endif
+            @if((($ringkasan['izin'] ?? 0) + ($ringkasan['sakit'] ?? 0) + ($ringkasan['alpa'] ?? 0)) > 0)
+            <div class="guru-pill-stat pill-stat-izin">
+                <span>{{ ($ringkasan['izin'] ?? 0) + ($ringkasan['sakit'] ?? 0) + ($ringkasan['alpa'] ?? 0) }} Izin/Sakit/Alpa</span>
+            </div>
+            @endif
             <div class="guru-pill-stat pill-stat-total">
                 <span>{{ $ringkasan['total'] }} Total Guru</span>
+                <span class="sr-only" style="display:none;">Menampilkan {{ $ringkasan['total'] }} data</span>
             </div>
         </div>
     </div>
 
-    {{-- 2. FILTER KONTROL --}}
-    <div class="guru-filter-card">
-        <form action="{{ route('rekap-absensi.guru') }}" method="GET" class="guru-filter-grid">
-            {{-- Filter Lembaga --}}
-            @if($lembagas->count() > 1)
-            <select name="lembaga_id" class="guru-filter-select" onchange="this.form.submit()">
-                <option value="" {{ empty($lembagaId) ? 'selected' : '' }}>Semua Lembaga</option>
-                @foreach($lembagas as $lem)
-                <option value="{{ $lem->id }}" {{ (string)$lembagaId === (string)$lem->id ? 'selected' : '' }}>
-                    {{ $lem->nama_singkat ?? $lem->nama }}
-                </option>
-                @endforeach
-            </select>
-            @endif
+    {{-- 2. FILTER CARD (Otomatis di-dock ke Toolbar Pencarian & Popover Filter seperti Tabel Siswa) --}}
+    <div class="form-section-card filter-card">
+        <form action="{{ route('rekap-absensi.guru') }}" method="GET" class="filter-form">
+            <div class="filter-group">
+                {{-- Filter Lembaga --}}
+                @if($lembagas->count() > 1)
+                <select name="lembaga_id"
+                        class="form-select filter-select"
+                        aria-label="Lembaga"
+                        data-default-value="{{ $defaultLembagaId ?? '' }}"
+                        onchange="this.form.submit()">
+                    <option value="all" {{ empty($lembagaId) ? 'selected' : '' }}>Semua Lembaga</option>
+                    @foreach($lembagas as $lem)
+                        <option value="{{ $lem->id }}" {{ (string) $lembagaId === (string) $lem->id ? 'selected' : '' }}>
+                            {{ $lem->singkatan ?? $lem->nama_singkat ?? $lem->nama }}
+                        </option>
+                    @endforeach
+                </select>
+                @endif
 
-            {{-- Filter Tanggal Harian --}}
-            <input type="date" name="tanggal" value="{{ $tanggal ?: date('Y-m-d') }}" class="guru-filter-input" onchange="this.form.submit()" title="Pilih Tanggal Presensi">
+                {{-- Filter Tanggal Spesifik --}}
+                <input type="date"
+                       name="tanggal"
+                       value="{{ $tanggal }}"
+                       class="form-control filter-input"
+                       aria-label="Tanggal Spesifik"
+                       data-default-value=""
+                       onchange="this.form.submit()">
 
-            {{-- Filter Status --}}
-            <select name="status" class="guru-filter-select" onchange="this.form.submit()">
-                <option value="">Semua Status</option>
-                <option value="hadir" {{ $status === 'hadir' ? 'selected' : '' }}>Tepat Waktu</option>
-                <option value="terlambat" {{ $status === 'terlambat' ? 'selected' : '' }}>Terlambat</option>
-                <option value="izin" {{ $status === 'izin' ? 'selected' : '' }}>Izin</option>
-                <option value="sakit" {{ $status === 'sakit' ? 'selected' : '' }}>Sakit</option>
-                <option value="alpa" {{ $status === 'alpa' ? 'selected' : '' }}>Alpa</option>
-            </select>
+                {{-- Filter Bulan --}}
+                <select name="bulan"
+                        class="form-select filter-select"
+                        aria-label="Bulan"
+                        data-default-value="{{ (int) now()->month }}"
+                        onchange="this.form.submit()">
+                    @foreach($daftarBulan as $num => $namaBln)
+                        <option value="{{ $num }}" {{ (int) $bulan === (int) $num ? 'selected' : '' }}>
+                            {{ $namaBln }}
+                        </option>
+                    @endforeach
+                </select>
 
-            {{-- Pencarian --}}
-            <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-                <input type="text" name="search" value="{{ $search }}" placeholder="Cari nama guru..." class="guru-filter-input" style="width:220px;">
-                <button type="submit" class="btn btn-secondary" style="height:38px; padding:0 14px; border-radius:8px;">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                {{-- Filter Tahun --}}
+                <select name="tahun"
+                        class="form-select filter-select"
+                        aria-label="Tahun"
+                        data-default-value="{{ (int) now()->year }}"
+                        onchange="this.form.submit()">
+                    @for($yr = now()->year - 2; $yr <= now()->year + 1; $yr++)
+                        <option value="{{ $yr }}" {{ (int) $tahun === (int) $yr ? 'selected' : '' }}>
+                            {{ $yr }}
+                        </option>
+                    @endfor
+                </select>
+
+                {{-- Filter Status Kehadiran --}}
+                <select name="status"
+                        class="form-select filter-select"
+                        aria-label="Status Kehadiran"
+                        data-default-value=""
+                        onchange="this.form.submit()">
+                    <option value="">Semua Status</option>
+                    <option value="hadir" {{ $status === 'hadir' ? 'selected' : '' }}>Tepat Waktu</option>
+                    <option value="terlambat" {{ $status === 'terlambat' ? 'selected' : '' }}>Terlambat</option>
+                    <option value="izin" {{ $status === 'izin' ? 'selected' : '' }}>Izin</option>
+                    <option value="sakit" {{ $status === 'sakit' ? 'selected' : '' }}>Sakit</option>
+                    <option value="alpa" {{ $status === 'alpa' ? 'selected' : '' }}>Alpa</option>
+                </select>
+
+                <a href="{{ route('rekap-absensi.guru') }}"
+                   class="btn btn-sm btn-secondary filter-btn-reset"
+                   title="Reset Filter"
+                   style="{{ $hasActiveFilter ? '' : 'display:none;' }}">
+                    <span>Reset</span>
+                </a>
+            </div>
+
+            <div class="filter-search-wrap">
+                <input type="text"
+                       name="search"
+                       value="{{ $search }}"
+                       class="form-control filter-search-input"
+                       placeholder="Cari nama guru / NIP / jabatan...">
+                <button type="submit" class="btn btn-secondary filter-search-btn" title="Cari">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
                 </button>
-                @if($search || $status || request('tanggal'))
-                <a href="{{ route('rekap-absensi.guru') }}" class="btn btn-secondary" style="height:38px; display:inline-flex; align-items:center; border-radius:8px;" title="Reset Filter">
-                    ✕
-                </a>
-                @endif
             </div>
         </form>
     </div>
 
-    {{-- 3. TABEL PRESENSI GURU (PERSIS GAMBAR 3) --}}
-    <div class="guru-table-card">
-        <div class="guru-table-scroll">
-            <table class="guru-table">
+    {{-- 3. TABEL DESKTOP + KARTU MOBILE (Identik dengan Tabel Siswa) --}}
+    <div class="table-card has-mobile-list">
+        <div class="table-wrapper table-wrapper-siswa-desktop">
+            <table class="modern-table">
                 <thead>
                     <tr>
-                        <th style="width:50px;">NO</th>
-                        <th style="min-width:240px;">NAMA GURU</th>
-                        <th style="min-width:160px;">TANGGAL</th>
-                        <th style="min-width:160px;">JAM MASUK</th>
-                        <th style="min-width:160px;">JAM PULANG</th>
-                        <th style="min-width:160px;">STATUS KEHADIRAN</th>
-                        <th style="width:80px; text-align:center;">AKSI</th>
+                        <th>Nama Guru</th>
+                        <th>Tanggal</th>
+                        <th>Jam Masuk</th>
+                        <th>Jam Pulang</th>
+                        <th>Status Kehadiran</th>
+                        <th data-col-hidden="true" style="display:none;">Lembaga</th>
+                        <th data-col-hidden="true" style="display:none;">NIP</th>
+                        <th data-col-hidden="true" style="display:none;">Jabatan</th>
+                        <th data-col-hidden="true" style="display:none;">Mata Pelajaran</th>
+                        <th data-col-hidden="true" style="display:none;">Metode Absen</th>
+                        <th data-col-hidden="true" style="display:none;">Jarak Lokasi</th>
+                        <th data-col-hidden="true" style="display:none;">Kartu RFID</th>
+                        <th data-col-hidden="true" style="display:none;">Keterangan</th>
+                        <th data-col-hidden="true" class="col-aksi-head" style="text-align:center; width:100px; display:none;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($presensis as $index => $row)
-                    <tr>
-                        <td>
-                            {{ $presensis->firstItem() + $index }}
-                        </td>
-                        <td>
-                            <div style="display:flex; align-items:center; gap:12px;">
-                                <div class="guru-avatar-circle">
-                                    {{ strtoupper(substr($row->user?->name ?? 'G', 0, 1)) }}
-                                </div>
-                                <div>
-                                    <span class="guru-name-text">{{ $row->user?->name ?? '-' }}</span>
-                                </div>
+                    @forelse($presensis as $row)
+                    @php
+                        $namaGuru = $row->user?->name ?? '-';
+                        $tanggalObj = $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal : \Carbon\Carbon::parse($row->tanggal)) : null;
+                        $tanggalDesktop = $tanggalObj ? $tanggalObj->translatedFormat('l, d M Y') : '-';
+                        $tanggalModal = $tanggalObj ? $tanggalObj->format('d/m/Y') : '-';
+                        $jamMasukFull = $row->jam_masuk ? ((strlen($row->jam_masuk) <= 5 ? $row->jam_masuk . ':00' : substr($row->jam_masuk, 0, 8)) . ' WIB') : null;
+                        $jamPulangFull = $row->jam_pulang ? ((strlen($row->jam_pulang) <= 5 ? $row->jam_pulang . ':00' : substr($row->jam_pulang, 0, 8)) . ' WIB') : null;
+                        $lembagaRowNama = $row->lembaga?->singkatan ?? $row->lembaga?->nama_singkat ?? $row->lembaga?->nama ?? '-';
+                        $lembagaKode = strtolower($row->lembaga?->kode ?? 'pondok');
+                        $lembagaBadgeClass = in_array($lembagaKode, ['smp', 'sma', 'yayasan']) ? $lembagaKode : 'pondok';
+
+                        $metodeLabel = match($row->metode_masuk) {
+                            'rfid_tap' => 'Tap RFID',
+                            'gps', 'web' => 'GPS / Web',
+                            default => $row->metode_masuk ? ucfirst(str_replace('_', ' ', $row->metode_masuk)) : 'Manual / Sistem',
+                        };
+                        $jarakLabel = $row->jarak_masuk_meter !== null ? ($row->jarak_masuk_meter . ' m') : '-';
+                        $rfidUid = $row->user?->rfid_uid ?? '';
+
+                        $words = preg_split('/\s+/', trim(preg_replace('/[^a-zA-Z\s]/', '', $namaGuru))) ?: [];
+                        $initials = '';
+                        foreach ($words as $w) {
+                            if ($w !== '' && strlen($initials) < 2) {
+                                $initials .= strtoupper(substr($w, 0, 1));
+                            }
+                        }
+                        if ($initials === '') {
+                            $initials = 'GR';
+                        }
+                    @endphp
+                    <tr data-id="{{ $row->id }}" data-nama="{{ $namaGuru }}">
+                        {{-- 1. Nama Guru --}}
+                        <td class="cell-nama">
+                            <div class="guru-cell-nama">
+                                <div class="guru-avatar-circle">{{ $initials }}</div>
+                                <span class="guru-name-text">{{ $namaGuru }}</span>
                             </div>
                         </td>
+
+                        {{-- 2. Tanggal --}}
+                        <td>{{ $tanggalDesktop }}</td>
+
+                        {{-- 3. Jam Masuk --}}
                         <td>
-                            {{ $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal->translatedFormat('l, d M Y') : \Carbon\Carbon::parse($row->tanggal)->translatedFormat('l, d M Y')) : '-' }}
-                        </td>
-                        <td>
-                            @if($row->jam_masuk)
+                            @if($jamMasukFull)
                             <div class="guru-jam-pill">
                                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <circle cx="12" cy="12" r="10"></circle>
                                     <polyline points="12 6 12 12 16 14"></polyline>
                                 </svg>
-                                <span>{{ strlen($row->jam_masuk) <= 5 ? $row->jam_masuk . ':00' : substr($row->jam_masuk, 0, 8) }} WIB</span>
+                                <span>{{ $jamMasukFull }}</span>
                             </div>
                             @else
                             <span style="color:#94a3b8; font-size:13px;">-</span>
                             @endif
                         </td>
+
+                        {{-- 4. Jam Pulang --}}
                         <td>
-                            @if($row->jam_pulang)
+                            @if($jamPulangFull)
                             <div class="guru-jam-pill">
                                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <circle cx="12" cy="12" r="10"></circle>
                                     <polyline points="12 6 12 12 16 14"></polyline>
                                 </svg>
-                                <span>{{ strlen($row->jam_pulang) <= 5 ? $row->jam_pulang . ':00' : substr($row->jam_pulang, 0, 8) }} WIB</span>
+                                <span>{{ $jamPulangFull }}</span>
                             </div>
                             @else
                             <span class="guru-tidak-pulang-pill">Tidak Absen Pulang</span>
                             @endif
                         </td>
+
+                        {{-- 5. Status Kehadiran --}}
                         <td>
                             @if($row->status === 'hadir')
                             <span class="guru-status-badge badge-tepat">
@@ -509,27 +1104,79 @@
                             <span class="guru-status-badge badge-alpa">Alpa</span>
                             @endif
                         </td>
-                        <td style="text-align:center;">
-                            <button type="button" class="guru-action-eye-btn btn-koreksi"
-                                    data-id="{{ $row->id }}"
-                                    data-nama="{{ $row->user?->name ?? '-' }}"
-                                    data-tanggal="{{ $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal->format('d/m/Y') : \Carbon\Carbon::parse($row->tanggal)->format('d/m/Y')) : '' }}"
-                                    data-status="{{ $row->status }}"
-                                    data-masuk="{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '' }}"
-                                    data-pulang="{{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '' }}"
-                                    data-keterangan="{{ $row->keterangan ?? '' }}"
-                                    title="Lihat / Koreksi Presensi">
-                                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                            </button>
+
+                        {{-- 6. Lembaga (Custom Column) --}}
+                        <td style="display:none;">
+                            <span class="badge-lembaga badge-lembaga-{{ $lembagaBadgeClass }}">{{ $lembagaRowNama }}</span>
+                        </td>
+
+                        {{-- 7. NIP (Custom Column) --}}
+                        <td style="display:none; font-family:monospace;">{{ $row->user?->nip ?: '-' }}</td>
+
+                        {{-- 8. Jabatan (Custom Column) --}}
+                        <td style="display:none;">{{ $row->user?->jabatan ?: '-' }}</td>
+
+                        {{-- 9. Mata Pelajaran (Custom Column) --}}
+                        <td style="display:none;">{{ $row->user?->mata_pelajaran ?: '-' }}</td>
+
+                        {{-- 10. Metode Absen (Custom Column) --}}
+                        <td style="display:none;">{{ $metodeLabel }}</td>
+
+                        {{-- 11. Jarak Lokasi (Custom Column) --}}
+                        <td style="display:none;">{{ $jarakLabel }}</td>
+
+                        {{-- 12. Kartu RFID (Custom Column) --}}
+                        <td style="display:none;">
+                            @if($rfidUid !== '')
+                                <span style="background: rgba(16, 185, 129, 0.12); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); font-family: monospace; font-weight: 600; padding: 2px 7px; border-radius: 6px; font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px;">
+                                    {{ $rfidUid }}
+                                </span>
+                            @else
+                                <span style="color: var(--text-muted); font-size: 11px; font-style: italic;">Belum dipairing</span>
+                            @endif
+                        </td>
+
+                        {{-- 13. Keterangan (Custom Column) --}}
+                        <td style="display:none;">{{ $row->keterangan ?: '-' }}</td>
+
+                        {{-- 14. Aksi (Custom Column & Synced ke Toolbar [ ⋮ Aksi ]) --}}
+                        <td class="col-aksi-cell" style="text-align:center; display:none;">
+                            @if($canKoreksi)
+                            <div class="action-btn-group">
+                                <button type="button"
+                                        class="action-btn action-btn-edit btn-koreksi"
+                                        data-id="{{ $row->id }}"
+                                        data-nama="{{ $namaGuru }}"
+                                        data-tanggal="{{ $tanggalModal }}"
+                                        data-status="{{ $row->status }}"
+                                        data-masuk="{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '' }}"
+                                        data-pulang="{{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '' }}"
+                                        data-keterangan="{{ $row->keterangan ?? '' }}"
+                                        title="Koreksi Presensi Guru"
+                                        aria-label="Koreksi Presensi {{ $namaGuru }}">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            @else
+                            <span style="color:var(--text-muted); font-size:12px;">-</span>
+                            @endif
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" style="padding:48px 20px; text-align:center; color:#94a3b8; font-size:14px;">
-                            Tidak ada data presensi guru untuk filter yang dipilih.
+                        <td colspan="14" class="cell-empty" style="padding:44px 20px;">
+                            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;color:var(--text-muted);">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                                <span>Tidak ada data presensi guru untuk filter yang dipilih.</span>
+                            </div>
                         </td>
                     </tr>
                     @endforelse
@@ -537,62 +1184,232 @@
             </table>
         </div>
 
-        {{-- Footer Paginasi (Persis Gambar 3) --}}
-        <div class="guru-table-footer">
-            <div class="guru-footer-left">
-                <span>Menampilkan</span>
-                <select name="per_page" class="guru-perpage-select" onchange="changeGuruPerPage(this.value)">
-                    <option value="15" {{ request('per_page', 15) == 15 ? 'selected' : '' }}>15</option>
-                    <option value="25" {{ request('per_page', 15) == 25 ? 'selected' : '' }}>25</option>
-                    <option value="50" {{ request('per_page', 15) == 50 ? 'selected' : '' }}>50</option>
-                    <option value="100" {{ request('per_page', 15) == 100 ? 'selected' : '' }}>100</option>
-                </select>
-                <span>dari {{ $presensis->total() }} total baris rekapitulasi</span>
-            </div>
-            <div class="guru-footer-right">
-                @if($presensis->hasPages())
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        @if($presensis->onFirstPage())
-                            <span style="color:#cbd5e1; cursor:not-allowed;">&lsaquo;</span>
-                        @else
-                            <a href="{{ $presensis->previousPageUrl() }}" style="color:#2563eb; text-decoration:none;">&lsaquo;</a>
-                        @endif
-                        <span style="font-weight:600; color:#1e293b;">Halaman {{ $presensis->currentPage() }} dari {{ $presensis->lastPage() }}</span>
-                        @if($presensis->hasMorePages())
-                            <a href="{{ $presensis->nextPageUrl() }}" style="color:#2563eb; text-decoration:none;">&rsaquo;</a>
-                        @else
-                            <span style="color:#cbd5e1; cursor:not-allowed;">&rsaquo;</span>
-                        @endif
+        {{-- Tampilan Mobile Card List (Persis Kartu di Tabel Siswa) --}}
+        <div class="mobile-siswa-list">
+            @forelse($presensis as $row)
+            @php
+                $namaGuru = $row->user?->name ?? '-';
+                $tanggalObj = $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal : \Carbon\Carbon::parse($row->tanggal)) : null;
+                $tanggalShort = $tanggalObj ? $tanggalObj->translatedFormat('d M Y') : '-';
+                $tanggalModal = $tanggalObj ? $tanggalObj->format('d/m/Y') : '-';
+                $jamMasukShort = $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '-';
+                $jamPulangShort = $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : 'Belum pulang';
+                $jamMasukDetail = $row->jam_masuk ? ((strlen($row->jam_masuk) <= 5 ? $row->jam_masuk . ':00' : substr($row->jam_masuk, 0, 8)) . ' WIB') : '-';
+                $jamPulangDetail = $row->jam_pulang ? ((strlen($row->jam_pulang) <= 5 ? $row->jam_pulang . ':00' : substr($row->jam_pulang, 0, 8)) . ' WIB') : 'Tidak Absen Pulang';
+                $lembagaRowNama = $row->lembaga?->singkatan ?? $row->lembaga?->nama_singkat ?? $row->lembaga?->nama ?? '-';
+
+                $statusKey = strtolower($row->status ?? 'hadir');
+                $statusDisplay = match($statusKey) {
+                    'hadir'     => 'Tepat Waktu',
+                    'terlambat' => 'Terlambat',
+                    'izin'      => 'Izin',
+                    'sakit'     => 'Sakit',
+                    'alpa'      => 'Alpa',
+                    default     => ucfirst($statusKey),
+                };
+
+                $metodeLabel = match($row->metode_masuk) {
+                    'rfid_tap' => 'Tap RFID',
+                    'gps', 'web' => 'GPS / Web',
+                    default => $row->metode_masuk ? ucfirst(str_replace('_', ' ', $row->metode_masuk)) : 'Manual / Sistem',
+                };
+                $jarakLabel = $row->jarak_masuk_meter !== null ? ($row->jarak_masuk_meter . ' m') : '-';
+            @endphp
+            <div class="mobile-siswa-card"
+                 data-id="{{ $row->id }}"
+                 data-nama="{{ $namaGuru }}"
+                 data-lembaga="{{ $lembagaRowNama }}"
+                 data-tanggal="{{ $tanggalShort }}"
+                 data-tanggal-modal="{{ $tanggalModal }}"
+                 data-status="{{ $statusKey }}"
+                 data-status-text="{{ $statusDisplay }}"
+                 data-masuk="{{ $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '' }}"
+                 data-pulang="{{ $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '' }}"
+                 data-masuk-detail="{{ $jamMasukDetail }}"
+                 data-pulang-detail="{{ $jamPulangDetail }}"
+                 data-metode="{{ $metodeLabel }}"
+                 data-keterangan="{{ $row->keterangan ?? '' }}"
+                 data-can-koreksi="{{ $canKoreksi ? '1' : '0' }}">
+
+                {{-- Sisi Kiri: Nama Guru & Subtitle Dinamis (Tersinkronisasi dengan Kolom Kustom [ ||| ]) --}}
+                <div class="mobile-siswa-info">
+                    <div class="mobile-siswa-nama-wrap">
+                        <span class="mobile-siswa-nama">{{ $namaGuru }}</span>
                     </div>
-                @else
-                    <span style="font-weight:600; color:#1e293b;">Halaman 1 dari 1</span>
-                @endif
+
+                    <div class="mobile-siswa-subtitles">
+                        <span class="mobile-sub-item" data-col-idx="2">
+                            <span class="sub-label">Tgl:</span> {{ $tanggalShort }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="3">
+                            <span class="sub-label">Masuk:</span> {{ $jamMasukShort }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="4">
+                            <span class="sub-label">Pulang:</span> {{ $jamPulangShort }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="6" style="display:none;">
+                            <span class="sub-label">Lembaga:</span> {{ $lembagaRowNama }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="7" style="display:none;">
+                            <span class="sub-label">NIP:</span> {{ $row->user?->nip ?: '-' }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="8" style="display:none;">
+                            <span class="sub-label">Jabatan:</span> {{ $row->user?->jabatan ?: '-' }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="9" style="display:none;">
+                            <span class="sub-label">Mapel:</span> {{ $row->user?->mata_pelajaran ?: '-' }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="10" style="display:none;">
+                            <span class="sub-label">Metode:</span> {{ $metodeLabel }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="11" style="display:none;">
+                            <span class="sub-label">Jarak:</span> {{ $jarakLabel }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="12" style="display:none;">
+                            <span class="sub-label">RFID:</span> {{ $row->user?->rfid_uid ?: '-' }}
+                        </span>
+                        <span class="mobile-sub-item" data-col-idx="13" style="display:none;">
+                            <span class="sub-label">Ket:</span> {{ $row->keterangan ?: '-' }}
+                        </span>
+                    </div>
+                </div>
+
+                {{-- Sisi Kanan: Status Pill & Chevron --}}
+                <div class="mobile-siswa-status-wrap">
+                    <span class="mobile-badge-pill status-{{ $statusKey }}" data-col-idx="5">{{ $statusDisplay }}</span>
+                    <svg class="mobile-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </div>
             </div>
+            @empty
+            <div class="mobile-empty-card">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:36px;height:36px;color:var(--text-muted);">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span>Tidak ada data presensi guru untuk filter yang dipilih.</span>
+            </div>
+            @endforelse
         </div>
     </div>
 </div>
 
-{{-- Modal Koreksi Presensi --}}
-<div id="modalKoreksi" style="display:none; position:fixed; inset:0; background:rgba(15, 23, 42, 0.45); backdrop-filter:blur(3px); z-index:9999; align-items:center; justify-content:center; padding:16px;">
-    <div style="background:#ffffff; border-radius:16px; border:1px solid #e2e8f0; width:100%; max-width:440px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); overflow:hidden;">
-        <div style="padding:18px 22px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between;">
-            <div>
-                <h3 style="font-size:16px; font-weight:700; color:#0f172a; margin:0;">Koreksi Presensi Guru</h3>
-                <span id="modalGuruNama" style="font-size:12.5px; color:#64748b; display:block; margin-top:2px;"></span>
+{{-- Bottom Sheet Aksi Presensi Guru (Mobile Action Sheet seperti Tabel Siswa) --}}
+<div id="mobileGuruSheetBackdrop" class="mobile-sheet-backdrop" style="display:none;"></div>
+<div id="mobileGuruActionSheet" class="mobile-bottom-sheet" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="sheetGuruNama">
+    <div class="sheet-handle-bar">
+        <span class="sheet-drag-handle"></span>
+    </div>
+
+    <div class="sheet-header">
+        <div class="sheet-avatar" id="sheetGuruAvatar">GR</div>
+        <div class="sheet-title-wrap">
+            <h3 class="sheet-siswa-nama" id="sheetGuruNama">Nama Guru</h3>
+            <div class="sheet-siswa-meta">
+                <span id="sheetGuruLembaga">SMP</span>
+                <span>•</span>
+                <span id="sheetGuruTanggal">-</span>
+                <span>•</span>
+                <span class="mobile-badge-pill status-hadir" id="sheetGuruStatus">Tepat Waktu</span>
             </div>
-            <button type="button" id="btnCloseModal" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size:20px;">
+        </div>
+    </div>
+
+    {{-- Kotak Rincian Cepat Jam Masuk & Jam Pulang --}}
+    <div class="sheet-detail-box">
+        <div class="sheet-detail-item">
+            <span class="sheet-detail-lbl">Jam Masuk</span>
+            <span class="sheet-detail-val" id="sheetDetailMasuk">-</span>
+        </div>
+        <div class="sheet-detail-item">
+            <span class="sheet-detail-lbl">Jam Pulang</span>
+            <span class="sheet-detail-val" id="sheetDetailPulang">-</span>
+        </div>
+        <div class="sheet-detail-item is-full" id="sheetDetailKetWrap" style="display:none;">
+            <span class="sheet-detail-lbl">Keterangan</span>
+            <span class="sheet-detail-val" id="sheetDetailKet" style="font-weight:500; font-size:12.5px;">-</span>
+        </div>
+    </div>
+
+    <div class="sheet-actions-list">
+        {{-- Opsi 1: Koreksi Presensi Guru --}}
+        <button type="button" id="sheetActionKoreksi" class="sheet-action-item" title="Koreksi Presensi Guru">
+            <div class="sheet-action-icon icon-edit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+            </div>
+            <div class="sheet-action-text">
+                <span class="sheet-action-title">Koreksi Presensi Guru</span>
+                <span class="sheet-action-desc">Ubah status kehadiran, jam masuk & jam pulang</span>
+            </div>
+            <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+
+        {{-- Opsi 2: Cetak Laporan A4 --}}
+        <a href="{{ route('rekap-absensi.cetak', request()->all()) }}" target="_blank" class="sheet-action-item" title="Cetak Laporan A4">
+            <div class="sheet-action-icon icon-print">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+            </div>
+            <div class="sheet-action-text">
+                <span class="sheet-action-title">Cetak Laporan Presensi</span>
+                <span class="sheet-action-desc">Buka lembar rekapitulasi siap cetak (A4)</span>
+            </div>
+            <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </a>
+
+        {{-- Opsi 3: Ekspor Excel / CSV --}}
+        <a href="{{ route('rekap-absensi.export', request()->all()) }}" class="sheet-action-item" title="Ekspor Excel">
+            <div class="sheet-action-icon icon-view">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+            </div>
+            <div class="sheet-action-text">
+                <span class="sheet-action-title">Ekspor Excel / CSV</span>
+                <span class="sheet-action-desc">Unduh data rekapitulasi presensi guru</span>
+            </div>
+            <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </a>
+    </div>
+
+    <div class="sheet-footer">
+        <button type="button" class="sheet-btn-close" id="sheetGuruBtnClose">
+            Tutup
+        </button>
+    </div>
+</div>
+
+{{-- Modal Koreksi Presensi --}}
+<div id="modalKoreksi" class="guru-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalKoreksiTitle">
+    <div class="guru-modal-dialog">
+        <div class="guru-modal-head">
+            <div>
+                <h3 id="modalKoreksiTitle" class="guru-modal-title">Koreksi Presensi Guru</h3>
+                <span id="modalGuruNama" class="guru-modal-sub"></span>
+            </div>
+            <button type="button" id="btnCloseModal" aria-label="Tutup Modal" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size:22px; line-height:1;">
                 &times;
             </button>
         </div>
 
-        <form id="formKoreksi" method="POST" action="" style="padding:22px; display:flex; flex-direction:column; gap:16px;">
+        <form id="formKoreksi" method="POST" action="" style="padding:20px; display:flex; flex-direction:column; gap:15px;">
             @csrf
             @method('PUT')
 
             <div>
-                <label style="display:block; font-size:13px; font-weight:600; color:#0f172a; margin-bottom:6px;">Status</label>
-                <select name="status" id="modalStatus" class="form-select" required
-                        style="width:100%; padding:9px 12px; font-size:13.5px; border-radius:10px; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a;">
+                <label for="modalStatus" class="guru-modal-label">Status Kehadiran</label>
+                <select name="status" id="modalStatus" class="guru-modal-control" required>
                     <option value="hadir">Tepat Waktu</option>
                     <option value="terlambat">Terlambat</option>
                     <option value="izin">Izin</option>
@@ -603,40 +1420,30 @@
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                 <div>
-                    <label style="display:block; font-size:13px; font-weight:600; color:#0f172a; margin-bottom:6px;">Jam Masuk</label>
-                    <input type="time" name="jam_masuk" id="modalMasuk" class="form-control"
-                           style="width:100%; padding:9px 12px; font-size:13.5px; border-radius:10px; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a;">
+                    <label for="modalMasuk" class="guru-modal-label">Jam Masuk</label>
+                    <input type="time" name="jam_masuk" id="modalMasuk" class="guru-modal-control">
                 </div>
                 <div>
-                    <label style="display:block; font-size:13px; font-weight:600; color:#0f172a; margin-bottom:6px;">Jam Pulang</label>
-                    <input type="time" name="jam_pulang" id="modalPulang" class="form-control"
-                           style="width:100%; padding:9px 12px; font-size:13.5px; border-radius:10px; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a;">
+                    <label for="modalPulang" class="guru-modal-label">Jam Pulang</label>
+                    <input type="time" name="jam_pulang" id="modalPulang" class="guru-modal-control">
                 </div>
             </div>
 
             <div>
-                <label style="display:block; font-size:13px; font-weight:600; color:#0f172a; margin-bottom:6px;">Keterangan Koreksi</label>
-                <textarea name="keterangan" id="modalKeterangan" rows="2" class="form-control" placeholder="Contoh: Tugas luar kota / lupa scan..."
-                          style="width:100%; padding:9px 12px; font-size:13px; border-radius:10px; border:1px solid #cbd5e1; background:#ffffff; color:#0f172a; resize:vertical;"></textarea>
+                <label for="modalKeterangan" class="guru-modal-label">Keterangan Koreksi</label>
+                <textarea name="keterangan" id="modalKeterangan" rows="2" class="guru-modal-control" placeholder="Contoh: Tugas luar kota / lupa scan..." style="resize:vertical;"></textarea>
             </div>
 
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px;">
-                <button type="button" id="btnCancelModal" class="btn btn-secondary" style="padding:8px 16px; font-size:13px; border-radius:8px;">Batal</button>
-                <button type="submit" class="btn btn-primary" style="padding:8px 20px; font-size:13px; font-weight:600; border-radius:8px;">Simpan Koreksi</button>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:4px;">
+                <button type="button" id="btnCancelModal" class="btn btn-secondary" style="padding:8px 16px; font-size:13px; border-radius:9px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:8px 20px; font-size:13px; font-weight:600; border-radius:9px;">Simpan Koreksi</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-function changeGuruPerPage(val) {
-    var url = new URL(window.location.href);
-    url.searchParams.set('per_page', val);
-    url.searchParams.set('page', 1);
-    window.location.href = url.toString();
-}
-
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     var modal = document.getElementById('modalKoreksi');
     var form = document.getElementById('formKoreksi');
     var modalGuruNama = document.getElementById('modalGuruNama');
@@ -647,36 +1454,176 @@ document.addEventListener('DOMContentLoaded', function() {
     var btnClose = document.getElementById('btnCloseModal');
     var btnCancel = document.getElementById('btnCancelModal');
 
-    document.querySelectorAll('.btn-koreksi').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var id = this.getAttribute('data-id');
-            var nama = this.getAttribute('data-nama');
-            var tanggal = this.getAttribute('data-tanggal');
-            var status = this.getAttribute('data-status');
-            var masuk = this.getAttribute('data-masuk');
-            var pulang = this.getAttribute('data-pulang');
-            var keterangan = this.getAttribute('data-keterangan');
+    function openKoreksiModal(data) {
+        if (!modal || !form) return;
+        form.action = '{{ url("rekap-absensi/koreksi") }}/' + data.id;
+        modalGuruNama.textContent = (data.nama || '-') + ' • ' + (data.tanggal || '-');
+        modalStatus.value = data.status || 'hadir';
+        modalMasuk.value = data.masuk || '';
+        modalPulang.value = data.pulang || '';
+        modalKeterangan.value = data.keterangan || '';
+        modal.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+    }
 
-            form.action = '{{ url("rekap-absensi/koreksi") }}/' + id;
-            modalGuruNama.textContent = nama + ' • ' + tanggal;
-            modalStatus.value = status;
-            modalMasuk.value = masuk;
-            modalPulang.value = pulang;
-            modalKeterangan.value = keterangan;
+    function closeKoreksiModal() {
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        document.body.style.overflow = '';
+    }
 
-            modal.style.display = 'flex';
+    document.querySelectorAll('.btn-koreksi').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            openKoreksiModal({
+                id: this.getAttribute('data-id'),
+                nama: this.getAttribute('data-nama'),
+                tanggal: this.getAttribute('data-tanggal'),
+                status: this.getAttribute('data-status'),
+                masuk: this.getAttribute('data-masuk'),
+                pulang: this.getAttribute('data-pulang'),
+                keterangan: this.getAttribute('data-keterangan')
+            });
         });
     });
 
-    function closeModal() {
-        modal.style.display = 'none';
+    if (btnClose) btnClose.addEventListener('click', closeKoreksiModal);
+    if (btnCancel) btnCancel.addEventListener('click', closeKoreksiModal);
+    if (modal) {
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) closeKoreksiModal();
+        });
     }
 
-    if (btnClose) btnClose.addEventListener('click', closeModal);
-    if (btnCancel) btnCancel.addEventListener('click', closeModal);
+    // ========================================================
+    // LOGIKA ACTION BOTTOM SHEET MOBILE (PERSIS TABEL SISWA)
+    // ========================================================
+    var sheet = document.getElementById('mobileGuruActionSheet');
+    var backdrop = document.getElementById('mobileGuruSheetBackdrop');
+    var closeSheetBtn = document.getElementById('sheetGuruBtnClose');
+    var actionKoreksiBtn = document.getElementById('sheetActionKoreksi');
+    var currentCardData = null;
 
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) closeModal();
+    function getInitials(name) {
+        var cleaned = (name || '').replace(/[^a-zA-Z\s]/g, '').trim();
+        var parts = cleaned.split(/\s+/).filter(Boolean);
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
+        return parts.length === 1 ? parts[0].substring(0, 2).toUpperCase() : 'GR';
+    }
+
+    function openGuruSheet(card) {
+        if (!sheet || !backdrop) return;
+        currentCardData = {
+            id: card.getAttribute('data-id'),
+            nama: card.getAttribute('data-nama') || '-',
+            lembaga: card.getAttribute('data-lembaga') || '-',
+            tanggal: card.getAttribute('data-tanggal') || '-',
+            tanggalModal: card.getAttribute('data-tanggal-modal') || '-',
+            status: card.getAttribute('data-status') || 'hadir',
+            statusText: card.getAttribute('data-status-text') || 'Tepat Waktu',
+            masuk: card.getAttribute('data-masuk') || '',
+            pulang: card.getAttribute('data-pulang') || '',
+            masukDetail: card.getAttribute('data-masuk-detail') || '-',
+            pulangDetail: card.getAttribute('data-pulang-detail') || 'Tidak Absen Pulang',
+            keterangan: card.getAttribute('data-keterangan') || '',
+            canKoreksi: card.getAttribute('data-can-koreksi') === '1'
+        };
+
+        document.getElementById('sheetGuruAvatar').textContent = getInitials(currentCardData.nama);
+        document.getElementById('sheetGuruNama').textContent = currentCardData.nama;
+        document.getElementById('sheetGuruLembaga').textContent = currentCardData.lembaga;
+        document.getElementById('sheetGuruTanggal').textContent = currentCardData.tanggal;
+
+        var statusBadge = document.getElementById('sheetGuruStatus');
+        statusBadge.textContent = currentCardData.statusText;
+        statusBadge.className = 'mobile-badge-pill status-' + currentCardData.status;
+
+        document.getElementById('sheetDetailMasuk').textContent = currentCardData.masukDetail;
+        document.getElementById('sheetDetailPulang').textContent = currentCardData.pulangDetail;
+
+        var ketWrap = document.getElementById('sheetDetailKetWrap');
+        var ketEl = document.getElementById('sheetDetailKet');
+        if (currentCardData.keterangan) {
+            ketEl.textContent = currentCardData.keterangan;
+            ketWrap.style.display = 'flex';
+        } else {
+            ketWrap.style.display = 'none';
+        }
+
+        if (actionKoreksiBtn) {
+            actionKoreksiBtn.style.display = currentCardData.canKoreksi ? 'flex' : 'none';
+        }
+
+        backdrop.style.display = 'block';
+        sheet.style.display = 'flex';
+        requestAnimationFrame(function () {
+            backdrop.classList.add('is-active');
+            sheet.classList.add('is-open');
+        });
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeGuruSheet(keepBodyLock) {
+        if (!sheet || !backdrop) return;
+        backdrop.classList.remove('is-active');
+        sheet.classList.remove('is-open');
+        if (!keepBodyLock) {
+            document.body.style.overflow = '';
+        }
+        setTimeout(function () {
+            if (!sheet.classList.contains('is-open')) {
+                backdrop.style.display = 'none';
+                sheet.style.display = 'none';
+            }
+        }, 280);
+    }
+
+    document.querySelectorAll('.mobile-siswa-card').forEach(function (card) {
+        card.addEventListener('click', function (e) {
+            if (e.target.closest('input, button, a, label')) return;
+            openGuruSheet(card);
+        });
+    });
+
+    if (closeSheetBtn) {
+        closeSheetBtn.addEventListener('click', function () {
+            closeGuruSheet(false);
+        });
+    }
+    if (backdrop) {
+        backdrop.addEventListener('click', function () {
+            closeGuruSheet(false);
+        });
+    }
+
+    if (actionKoreksiBtn) {
+        actionKoreksiBtn.addEventListener('click', function () {
+            if (!currentCardData) return;
+            var targetData = {
+                id: currentCardData.id,
+                nama: currentCardData.nama,
+                tanggal: currentCardData.tanggalModal,
+                status: currentCardData.status,
+                masuk: currentCardData.masuk,
+                pulang: currentCardData.pulang,
+                keterangan: currentCardData.keterangan
+            };
+            closeGuruSheet(true);
+            setTimeout(function () {
+                openKoreksiModal(targetData);
+            }, 140);
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            if (modal && modal.classList.contains('is-open')) {
+                closeKoreksiModal();
+            } else if (sheet && sheet.classList.contains('is-open')) {
+                closeGuruSheet(false);
+            }
+        }
     });
 });
 </script>

@@ -27,13 +27,15 @@ class RekapAbsensiController extends Controller
             is_null($request->get('lembaga_id'))
         );
 
+        $defaultLembaga = $user->currentLembaga() ?: $lembagas->first();
+        $defaultLembagaId = $defaultLembaga ? $defaultLembaga->id : null;
+
         if ($isSemuaLembaga) {
             $lembagaId = null;
         } elseif ($request->filled('lembaga_id')) {
             $lembagaId = (int) $request->get('lembaga_id');
         } else {
-            $currentLembaga = $user->currentLembaga() ?: $lembagas->first();
-            $lembagaId = $currentLembaga ? $currentLembaga->id : null;
+            $lembagaId = $defaultLembagaId;
         }
 
         // Filter Periode
@@ -64,20 +66,15 @@ class RekapAbsensiController extends Controller
             'alpa'      => (clone $summaryQuery)->where('status', 'alpa')->count(),
         ];
 
-        $perPage = (int) $request->get('per_page', 15);
-        if ($perPage < 5 || $perPage > 200) {
-            $perPage = 15;
-        }
-
         $presensis = $query->orderBy('tanggal', 'desc')
             ->orderBy('jam_masuk', 'asc')
-            ->paginate($perPage)
-            ->withQueryString();
+            ->get();
 
         return view('rekap-absensi.guru', compact(
             'presensis',
             'lembagas',
             'lembagaId',
+            'defaultLembagaId',
             'bulan',
             'tahun',
             'tanggal',
@@ -101,11 +98,19 @@ class RekapAbsensiController extends Controller
 
         $presensi = PresensiGuru::findOrFail($id);
 
+        $ketBaru = isset($validated['keterangan']) ? trim($validated['keterangan']) : '';
+        $keteranganFinal = $presensi->keterangan;
+        if ($ketBaru !== '' && $ketBaru !== (string) $presensi->keterangan) {
+            $keteranganFinal = str_starts_with($ketBaru, 'Koreksi:')
+                ? $ketBaru
+                : ($presensi->keterangan ? $presensi->keterangan . ' | Koreksi: ' . $ketBaru : 'Koreksi: ' . $ketBaru);
+        }
+
         $presensi->update([
             'status'     => $validated['status'],
             'jam_masuk'  => $validated['jam_masuk'] ? $validated['jam_masuk'] . ':00' : $presensi->jam_masuk,
             'jam_pulang' => $validated['jam_pulang'] ? $validated['jam_pulang'] . ':00' : $presensi->jam_pulang,
-            'keterangan' => $validated['keterangan'] ? ($presensi->keterangan ? $presensi->keterangan . ' | Koreksi: ' . $validated['keterangan'] : 'Koreksi: ' . $validated['keterangan']) : $presensi->keterangan,
+            'keterangan' => $keteranganFinal,
         ]);
 
         return redirect()->back()->with('success', 'Data presensi berhasil dikoreksi.');
@@ -246,9 +251,15 @@ class RekapAbsensiController extends Controller
         }
 
         if ($search) {
-            $query->whereHas('user', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('nip', 'like', "%{$search}%");
+            $query->where(function ($outer) use ($search) {
+                $outer->where('keterangan', 'like', "%{$search}%")
+                      ->orWhereHas('user', function ($q) use ($search) {
+                          $q->where('name', 'like', "%{$search}%")
+                            ->orWhere('nip', 'like', "%{$search}%")
+                            ->orWhere('jabatan', 'like', "%{$search}%")
+                            ->orWhere('mata_pelajaran', 'like', "%{$search}%")
+                            ->orWhere('rfid_uid', 'like', "%{$search}%");
+                      });
             });
         }
 
