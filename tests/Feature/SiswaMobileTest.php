@@ -81,6 +81,10 @@ class SiswaMobileTest extends TestCase
         $response->assertSee('id="sheetActionPrint"', false);
         $response->assertSee('id="sheetActionRfid"', false);
         $response->assertSee('id="sheetActionDelete"', false);
-        $response->assertSee('data-col-idx="3"', false);
+        // Memastikan fitur koreksi data belum lengkap dihilangkan sesuai permintaan user
+        $response->assertDontSee('alert-incomplete-info');
+        $response->assertDontSee('Perlu Dilengkapi');
+        $response->assertDontSee('Saring yang Perlu Koreksi');
+        $response->assertDontSee('filter_kelengkapan');
     }
 }

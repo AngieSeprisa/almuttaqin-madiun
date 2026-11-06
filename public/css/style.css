@@ -7704,9 +7704,9 @@ html.dark-mode .fi-confirm-btn-cancel {
     display: none !important;
   }
 
-  body .table-card.fi-ta-enhanced > .table-wrapper,
-  .fi-ta-ctn > .fi-ta-table-wrap,
-  .fi-ta-ctn > .fi-ta-table-wrap.has-mobile-cards {
+  /* For tables WITHOUT a dedicated mobile list, display real desktop table with smooth horizontal scroll */
+  body .table-card.fi-ta-enhanced:not(.has-mobile-list):not(:has(.mobile-siswa-list)) > .table-wrapper:not(.table-wrapper-siswa-desktop),
+  .fi-ta-ctn:not(.has-mobile-list):not(:has(.mobile-siswa-list)) > .fi-ta-table-wrap:not(.table-wrapper-siswa-desktop) {
     display: block !important;
     width: 100% !important;
     overflow-x: auto !important;
@@ -7716,6 +7716,10 @@ html.dark-mode .fi-confirm-btn-cancel {
   }
 
   /* Siswa Mobile Card View (Sesuai Permintaan Desain Mobile Siswa) */
+  .table-wrapper-siswa-desktop,
+  div.table-wrapper-siswa-desktop,
+  body .table-wrapper-siswa-desktop,
+  body .table-card .table-wrapper-siswa-desktop,
   body .table-card.has-mobile-list > .table-wrapper,
   body .table-card.has-mobile-list > .fi-ta-table-wrap,
   body .table-card.fi-ta-enhanced.has-mobile-list > .table-wrapper,

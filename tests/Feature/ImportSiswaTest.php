@@ -259,9 +259,9 @@ class ImportSiswaTest extends TestCase
     }
 
     /**
-     * Test identifikasi dan penandaan baris siswa yang data dirinya belum lengkap (warna merah tipis).
+     * Test halaman siswa menampilkan daftar santri secara bersih tanpa banner koreksi.
      */
-    public function test_tabel_siswa_menandai_baris_kurang_lengkap_dengan_merah_tipis()
+    public function test_halaman_siswa_menampilkan_daftar_santri_secara_bersih_tanpa_banner_koreksi()
     {
         // 1. Siswa dengan data lengkap
         $pendaftaranLengkap = Pendaftaran::create([
@@ -311,19 +311,9 @@ class ImportSiswaTest extends TestCase
         $response = $this->actingAs($this->admin)->get(route('siswa'));
 
         $response->assertStatus(200);
-        $response->assertSee('row-incomplete');
-        $response->assertSee('Perlu Dilengkapi');
         $response->assertSee('Santri Belum Lengkap');
-
-        // Test filter kelengkapan
-        $filterKurang = $this->actingAs($this->admin)->get(route('siswa', ['kelengkapan' => 'belum_lengkap']));
-        $filterKurang->assertStatus(200);
-        $filterKurang->assertSee('Santri Belum Lengkap');
-        $filterKurang->assertDontSee('Santri Lengkap');
-
-        $filterLengkap = $this->actingAs($this->admin)->get(route('siswa', ['kelengkapan' => 'lengkap']));
-        $filterLengkap->assertStatus(200);
-        $filterLengkap->assertSee('Santri Lengkap');
-        $filterLengkap->assertDontSee('Santri Belum Lengkap');
+        $response->assertSee('Santri Lengkap');
+        $response->assertDontSee('alert-incomplete-info');
+        $response->assertDontSee('Perlu Dilengkapi');
     }
 }

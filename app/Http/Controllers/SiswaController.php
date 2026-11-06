@@ -51,23 +51,12 @@ class SiswaController extends Controller
 
         $siswa = $query->latest('id')->get();
 
-        $countBelumLengkap = $siswa->filter(fn($item) => !$item->isDataLengkap())->count();
-
-        // Filter kelengkapan data diri
-        if ($request->filled('kelengkapan')) {
-            if ($request->kelengkapan === 'belum_lengkap') {
-                $siswa = $siswa->filter(fn($item) => !$item->isDataLengkap())->values();
-            } elseif ($request->kelengkapan === 'lengkap') {
-                $siswa = $siswa->filter(fn($item) => $item->isDataLengkap())->values();
-            }
-        }
-
         // Ambil daftar unik kamar dari master kamars + data siswa
         $kamars = Kamar::daftarNamaKamarAktif();
 
         $jenjangList = ['Reguler', 'SMP', 'SMA'];
 
-        return view('siswa', compact('siswa', 'activeRoom', 'kamars', 'jenjangList', 'countBelumLengkap'));
+        return view('siswa', compact('siswa', 'activeRoom', 'kamars', 'jenjangList'));
     }
 
     /**
