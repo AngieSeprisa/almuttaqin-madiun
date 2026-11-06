@@ -4,9 +4,14 @@ on:
   push:
     branches: [ "main" ]
 
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 4
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -14,17 +19,20 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          timeout: 60s
+          timeout: 45s
+          command_timeout: 2m
           script_stop: true
           script: |
             cd /var/www/al-muttaqin
             git config --global --add safe.directory /var/www/al-muttaqin
             git config core.fileMode false
-            git fetch origin main || (sleep 3 && git fetch origin main)
+            timeout 20 git fetch origin main || (sleep 2 && timeout 25 git fetch origin main)
             git reset --hard origin/main
             php artisan storage:link || true
             php artisan migrate --force
             php artisan optimize:clear
-            php artisan optimize
+            php artisan view:clear
+            php artisan config:cache
+            php artisan route:cache
             chown -R www-data:www-data storage bootstrap/cache
             chmod -R ug+rwX storage bootstrap/cache
