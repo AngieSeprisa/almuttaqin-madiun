@@ -682,6 +682,13 @@ class PondokPengajianController extends Controller
                 ->latest('id')
                 ->first();
         }
+        if (!$targetModel) {
+            $targetModel = PondokTargetPengajian::where('kelas_pengajian_id', $validated['kelas_pengajian_id'])
+                ->where('pondok_materi_id', $validated['pondok_materi_id'])
+                ->orderByDesc('tanggal')
+                ->latest('id')
+                ->first();
+        }
 
         $targetSuratNomor       = null;
         $targetNamaSurat        = null;
@@ -850,6 +857,13 @@ class PondokPengajianController extends Controller
             $targetModel = PondokTargetPengajian::whereDate('tanggal', $validated['tanggal'])
                 ->where('kelas_pengajian_id', $validated['kelas_pengajian_id'])
                 ->where('pondok_materi_id', $validated['pondok_materi_id'])
+                ->latest('id')
+                ->first();
+        }
+        if (!$targetModel) {
+            $targetModel = PondokTargetPengajian::where('kelas_pengajian_id', $validated['kelas_pengajian_id'])
+                ->where('pondok_materi_id', $validated['pondok_materi_id'])
+                ->orderByDesc('tanggal')
                 ->latest('id')
                 ->first();
         }

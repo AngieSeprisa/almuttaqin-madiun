@@ -588,6 +588,7 @@ function filterSuratSelectByRange(selSurat, halAwal, halAkhir) {
     if (!currentValid && firstValidVal) {
         selSurat.value = firstValidVal;
     }
+    selSurat.dispatchEvent(new Event('fi-select:sync'));
 }
 
 function onAwalSuratChanged(prefix) {
@@ -595,6 +596,7 @@ function onAwalSuratChanged(prefix) {
     var selAkhir = document.getElementById('target_' + prefix + '_surat_akhir');
     if (selAwal && selAkhir) {
         selAkhir.value = selAwal.value;
+        selAkhir.dispatchEvent(new Event('fi-select:sync'));
     }
     updateAyatLimit(prefix);
 }

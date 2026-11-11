@@ -111,20 +111,100 @@
         border-color: rgba(99, 102, 241, 0.35);
     }
 
-    .jm-live-preview {
-        padding: 11px 14px;
-        border-radius: 12px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
+    .jm-target-card {
+        padding: 13px 16px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+        border: 1px solid #bfdbfe;
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
+        flex-direction: column;
+        gap: 8px;
     }
 
-    .dark-mode .jm-live-preview {
+    .dark-mode .jm-target-card {
+        background: rgba(30, 41, 59, 0.8);
+        border-color: #334155;
+    }
+
+    .jm-target-card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .jm-target-card-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        font-size: 11px;
+        font-weight: 700;
+        color: #2563eb;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .dark-mode .jm-target-card-meta {
+        color: #60a5fa;
+    }
+
+    .jm-target-card-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--text-primary, #0f172a);
+        line-height: 1.35;
+        margin-top: 3px;
+    }
+
+    .jm-target-card-sub {
+        font-size: 12px;
+        color: #64748b;
+        font-weight: 500;
+        margin-top: 2px;
+    }
+
+    .dark-mode .jm-target-card-sub {
+        color: #94a3b8;
+    }
+
+    .jm-target-switch-pills {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding-top: 6px;
+        border-top: 1px dashed rgba(59, 130, 246, 0.25);
+    }
+
+    .jm-target-pill-btn {
+        border: 1px solid #bfdbfe;
+        background: #ffffff;
+        color: #1e40af;
+        border-radius: 999px;
+        padding: 3px 10px;
+        font-size: 11.5px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .jm-target-pill-btn.active {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+    }
+
+    .dark-mode .jm-target-pill-btn {
         background: #0f172a;
         border-color: #334155;
+        color: #93c5fd;
+    }
+
+    .dark-mode .jm-target-pill-btn.active {
+        background: #2563eb;
+        border-color: #3b82f6;
+        color: #ffffff;
     }
 
     .jm-absensi-box {
@@ -479,33 +559,36 @@
             </div>
 
             <div class="modal-body" style="text-align:left; display:flex; flex-direction:column; gap:14px; max-height:76vh; overflow-y:auto;">
-                <div class="form-group">
-                    <label class="form-label">Acuan Target Pengajian</label>
-                    <select name="target_pengajian_id" id="jm_add_target_ref" class="form-select" onchange="applySelectedTargetRef('add')">
-                        <option value="">Pilih Target Pengajian</option>
-                        @foreach($targetList as $t)
-                            <option value="{{ $t->id }}"
-                                    data-tanggal="{{ \Carbon\Carbon::parse($t->tanggal)->format('Y-m-d') }}"
-                                    data-kelas="{{ $t->kelas_pengajian_id }}"
-                                    data-materi="{{ $t->pondok_materi_id }}"
-                                    data-kategori="{{ $t->materi?->kategori ?? 'al_quran' }}"
-                                    data-surat="{{ (int) ($t->surat_nomor ?: 1) }}"
-                                    data-ayat="{{ (int) ($t->ayat ?: 1) }}"
-                                    data-surat-akhir="{{ (int) ($t->surat_akhir_nomor ?: ($t->surat_nomor ?: 1)) }}"
-                                    data-ayat-akhir="{{ (int) ($t->ayat_akhir ?: ($t->ayat ?: 1)) }}"
-                                    data-target-hal="{{ (int) $t->target_halaman }}"
-                                    data-target-baris="{{ (int) $t->target_baris }}"
-                                    {{ (string) request('target_id') === (string) $t->id ? 'selected' : '' }}>
-                                {{ \Carbon\Carbon::parse($t->tanggal)->format('d/m/Y') }} — {{ $t->kelasPengajian?->nama_kelas }} — {{ $t->materi?->nama_materi }}
-                            </option>
-                        @endforeach
-                    </select>
+                {{-- KARTU TARGET PENGAJIAN DI BAGIAN ATAS FORM (SINKRON OTOMATIS KETIKA KELAS DIPILIH) --}}
+                <div class="jm-target-card" id="jm_add_target_card">
+                    <input type="hidden" name="target_pengajian_id" id="jm_add_target_ref" value="{{ old('target_pengajian_id', request('target_id')) }}">
+                    <input type="hidden" name="target_surat_nomor" id="jm_add_target_surat" value="{{ old('target_surat_nomor', 1) }}">
+                    <input type="hidden" name="target_ayat" id="jm_add_target_ayat" value="{{ old('target_ayat', 1) }}">
+                    <input type="hidden" name="target_surat_akhir_nomor" id="jm_add_target_surat_akhir" value="{{ old('target_surat_akhir_nomor', 1) }}">
+                    <input type="hidden" name="target_ayat_akhir" id="jm_add_target_ayat_akhir" value="{{ old('target_ayat_akhir', 1) }}">
+                    <input type="hidden" name="target_halaman" id="jm_add_target_hal" value="{{ old('target_halaman', 1) }}">
+                    <input type="hidden" name="target_baris" id="jm_add_target_baris" value="{{ old('target_baris', 1) }}">
+
+                    <div class="jm-target-card-top">
+                        <div style="min-width:0; flex:1;">
+                            <div class="jm-target-card-meta">
+                                <span>Target Pengajian</span>
+                                <span id="jm_add_card_date_pill" style="display:none; background:#dbeafe; color:#1d4ed8; padding:1px 8px; border-radius:999px; font-size:10.5px; text-transform:none;"></span>
+                                <span id="jm_add_card_materi_pill" style="display:none; background:#e0e7ff; color:#3730a3; padding:1px 8px; border-radius:999px; font-size:10.5px; text-transform:none;"></span>
+                            </div>
+                            <div class="jm-target-card-title" id="jm_add_card_title">Pilih Kelas Pengajian terlebih dahulu</div>
+                            <div class="jm-target-card-sub" id="jm_add_card_sub">Target materi kelas akan langsung tampil di kartu ini sesuai Menu Target Pengajian.</div>
+                        </div>
+                        <span id="jm_add_live_badge" class="jm-indikator-badge status-tercapai">✓ Tercapai</span>
+                    </div>
+
+                    <div class="jm-target-switch-pills" id="jm_add_card_pills" style="display:none;"></div>
                 </div>
 
                 <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
                     <div class="form-group">
                         <label class="form-label">Tanggal <span class="required-mark">*</span></label>
-                        <input type="date" name="tanggal" id="jm_add_tanggal" value="{{ old('tanggal', date('Y-m-d')) }}" class="form-control" required>
+                        <input type="date" name="tanggal" id="jm_add_tanggal" value="{{ old('tanggal', date('Y-m-d')) }}" class="form-control" required onchange="onJurnalKelasOrTanggalChanged('add', false)">
                     </div>
 
                     <div class="form-group">
@@ -521,7 +604,7 @@
 
                     <div class="form-group">
                         <label class="form-label">Kelas Pengajian <span class="required-mark">*</span></label>
-                        <select name="kelas_pengajian_id" id="jm_add_kelas" class="form-select" required onchange="renderAbsensiList('add', this.value)">
+                        <select name="kelas_pengajian_id" id="jm_add_kelas" class="form-select" required onchange="onJurnalKelasOrTanggalChanged('add', true)">
                             <option value="">Pilih Kelas</option>
                             @foreach($kelasList as $kls)
                                 <option value="{{ $kls->id }}" {{ (string) old('kelas_pengajian_id') === (string) $kls->id ? 'selected' : '' }}>
@@ -535,7 +618,7 @@
                 <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
                     <div class="form-group">
                         <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
-                        <select name="pondok_materi_id" id="jm_add_materi" class="form-select" required onchange="syncJurnalMateriMode('add')">
+                        <select name="pondok_materi_id" id="jm_add_materi" class="form-select" required onchange="onJurnalMateriChanged('add')">
                             <option value="" data-kategori="al_quran" data-halaman="604" data-baris="15" data-hal-awal="1" data-hal-akhir="604">Pilih Materi</option>
                             @foreach($materiList as $m)
                                 <option value="{{ $m->id }}"
@@ -557,47 +640,11 @@
                     </div>
                 </div>
 
-                {{-- SEKSI AL-QUR'AN: TARGET & CAPAIAN AWAL SURAT + AKHIR SURAT --}}
-                <div id="jm_add_quran_wrap" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
-                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
-                            <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Awal Surat</label>
-                                <select name="target_surat_nomor" id="jm_add_target_surat" class="form-select" onchange="onJurnalAwalSuratChanged('add', 'target')">
-                                    @foreach($daftarSurat as $srt)
-                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}">
-                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Ayat</label>
-                                <input type="number" name="target_ayat" id="jm_add_target_ayat" min="1" value="{{ old('target_ayat', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
-                            </div>
-                        </div>
-                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
-                            <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Akhir Surat</label>
-                                <select name="target_surat_akhir_nomor" id="jm_add_target_surat_akhir" class="form-select" onchange="updateLiveIndikator('add')">
-                                    @foreach($daftarSurat as $srt)
-                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}">
-                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Ayat</label>
-                                <input type="number" name="target_ayat_akhir" id="jm_add_target_ayat_akhir" min="1" value="{{ old('target_ayat_akhir', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                {{-- SEKSI AL-QUR'AN: PENCAPAIAN KELAS (AWAL SURAT & AKHIR SURAT) --}}
+                <div id="jm_add_quran_wrap" style="display:flex; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                    <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
+                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                        <div style="display:grid; grid-template-columns: 1.45fr 1fr; gap:8px;">
                             <div class="form-group" style="margin:0;">
                                 <label class="form-label" style="font-size:12px;">Awal Surat <span class="required-mark">*</span></label>
                                 <select name="capaian_surat_nomor" id="jm_add_capaian_surat" class="form-select" onchange="onJurnalAwalSuratChanged('add', 'capaian')">
@@ -613,7 +660,7 @@
                                 <input type="number" name="capaian_ayat" id="jm_add_capaian_ayat" min="1" value="{{ old('capaian_ayat', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
                             </div>
                         </div>
-                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                        <div style="display:grid; grid-template-columns: 1.45fr 1fr; gap:8px;">
                             <div class="form-group" style="margin:0;">
                                 <label class="form-label" style="font-size:12px;">Akhir Surat <span class="required-mark">*</span></label>
                                 <select name="capaian_surat_akhir_nomor" id="jm_add_capaian_surat_akhir" class="form-select" onchange="updateLiveIndikator('add')">
@@ -632,22 +679,10 @@
                     </div>
                 </div>
 
-                {{-- SEKSI AL-HADIST: TARGET & CAPAIAN HALAMAN + BARIS --}}
-                <div id="jm_add_hadist_wrap" style="display:none; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Halaman</label>
-                            <input type="number" name="target_halaman" id="jm_add_target_hal" min="0" value="{{ old('target_halaman', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
-                        </div>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Baris</label>
-                            <input type="number" name="target_baris" id="jm_add_target_baris" min="0" value="{{ old('target_baris', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
-                        </div>
-                    </div>
-
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
+                {{-- SEKSI AL-HADIST: PENCAPAIAN KELAS (HALAMAN & BARIS) --}}
+                <div id="jm_add_hadist_wrap" style="display:none; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                    <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
+                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label" style="font-size:12px;">Halaman <span class="required-mark">*</span></label>
                             <input type="number" name="capaian_halaman" id="jm_add_capaian_hal" min="0" value="{{ old('capaian_halaman', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
@@ -657,12 +692,6 @@
                             <input type="number" name="capaian_baris" id="jm_add_capaian_baris" min="0" value="{{ old('capaian_baris', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
                         </div>
                     </div>
-                </div>
-
-                {{-- Live Preview Indikator Ketercapaian --}}
-                <div class="jm-live-preview">
-                    <span style="font-size:12.5px; font-weight:600; color:var(--text-secondary);">Indikator Ketercapaian Materi</span>
-                    <span id="jm_add_live_badge" class="jm-indikator-badge status-tercapai">✓ Tercapai</span>
                 </div>
 
                 {{-- SEKSI ABSENSI SANTRI PENGAJIAN --}}
@@ -713,10 +742,42 @@
             </div>
 
             <div class="modal-body" style="text-align:left; display:flex; flex-direction:column; gap:14px; max-height:76vh; overflow-y:auto;">
+                {{-- KARTU TARGET PENGAJIAN DI BAGIAN ATAS FORM EDIT --}}
+                <div class="jm-target-card" id="jm_edit_{{ $item->id }}_target_card">
+                    <input type="hidden" name="target_pengajian_id" id="jm_edit_{{ $item->id }}_target_ref" value="{{ $item->target_pengajian_id }}">
+                    <input type="hidden" name="target_surat_nomor" id="jm_edit_{{ $item->id }}_target_surat" value="{{ (int) ($item->target_surat_nomor ?: 1) }}">
+                    <input type="hidden" name="target_ayat" id="jm_edit_{{ $item->id }}_target_ayat" value="{{ (int) ($item->target_ayat ?: 1) }}">
+                    <input type="hidden" name="target_surat_akhir_nomor" id="jm_edit_{{ $item->id }}_target_surat_akhir" value="{{ (int) ($item->target_surat_akhir_nomor ?: ($item->target_surat_nomor ?: 1)) }}">
+                    <input type="hidden" name="target_ayat_akhir" id="jm_edit_{{ $item->id }}_target_ayat_akhir" value="{{ (int) ($item->target_ayat_akhir ?: ($item->target_ayat ?: 1)) }}">
+                    <input type="hidden" name="target_halaman" id="jm_edit_{{ $item->id }}_target_hal" value="{{ (int) $item->target_halaman }}">
+                    <input type="hidden" name="target_baris" id="jm_edit_{{ $item->id }}_target_baris" value="{{ (int) $item->target_baris }}">
+
+                    <div class="jm-target-card-top">
+                        <div style="min-width:0; flex:1;">
+                            <div class="jm-target-card-meta">
+                                <span>Target Pengajian</span>
+                                <span id="jm_edit_{{ $item->id }}_card_date_pill" style="background:#dbeafe; color:#1d4ed8; padding:1px 8px; border-radius:999px; font-size:10.5px; text-transform:none;">
+                                    {{ \Carbon\Carbon::parse($item->tanggal)->format('d/m/Y') }}
+                                </span>
+                                <span id="jm_edit_{{ $item->id }}_card_materi_pill" style="background:#e0e7ff; color:#3730a3; padding:1px 8px; border-radius:999px; font-size:10.5px; text-transform:none;">
+                                    {{ $item->materi?->nama_materi ?? '-' }}
+                                </span>
+                            </div>
+                            <div class="jm-target-card-title" id="jm_edit_{{ $item->id }}_card_title">{{ $item->target_label }}</div>
+                            <div class="jm-target-card-sub" id="jm_edit_{{ $item->id }}_card_sub">{{ $item->kelasPengajian?->nama_kelas ?? '-' }}</div>
+                        </div>
+                        <span id="jm_edit_{{ $item->id }}_live_badge" class="jm-indikator-badge status-{{ $item->status_ketercapaian }}">
+                            {{ $item->status_label }}
+                        </span>
+                    </div>
+
+                    <div class="jm-target-switch-pills" id="jm_edit_{{ $item->id }}_card_pills" style="display:none;"></div>
+                </div>
+
                 <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
                     <div class="form-group">
                         <label class="form-label">Tanggal <span class="required-mark">*</span></label>
-                        <input type="date" name="tanggal" value="{{ \Carbon\Carbon::parse($item->tanggal)->format('Y-m-d') }}" class="form-control" required>
+                        <input type="date" name="tanggal" id="jm_edit_{{ $item->id }}_tanggal" value="{{ \Carbon\Carbon::parse($item->tanggal)->format('Y-m-d') }}" class="form-control" required onchange="onJurnalKelasOrTanggalChanged('edit_{{ $item->id }}', false)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Sesi Pengajian</label>
@@ -730,7 +791,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Kelas Pengajian <span class="required-mark">*</span></label>
-                        <select name="kelas_pengajian_id" id="jm_edit_{{ $item->id }}_kelas" class="form-select" required onchange="renderAbsensiList('edit_{{ $item->id }}', this.value)">
+                        <select name="kelas_pengajian_id" id="jm_edit_{{ $item->id }}_kelas" class="form-select" required onchange="onJurnalKelasOrTanggalChanged('edit_{{ $item->id }}', true)">
                             @foreach($kelasList as $kls)
                                 <option value="{{ $kls->id }}" {{ (int) $item->kelas_pengajian_id === (int) $kls->id ? 'selected' : '' }}>
                                     {{ $kls->nama_kelas }}
@@ -743,7 +804,7 @@
                 <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
                     <div class="form-group">
                         <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
-                        <select name="pondok_materi_id" id="jm_edit_{{ $item->id }}_materi" class="form-select" required onchange="syncJurnalMateriMode('edit_{{ $item->id }}')">
+                        <select name="pondok_materi_id" id="jm_edit_{{ $item->id }}_materi" class="form-select" required onchange="onJurnalMateriChanged('edit_{{ $item->id }}')">
                             @foreach($materiList as $m)
                                 <option value="{{ $m->id }}"
                                         data-kategori="{{ $m->kategori }}"
@@ -763,46 +824,10 @@
                     </div>
                 </div>
 
-                <div id="jm_edit_{{ $item->id }}_quran_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'none' : 'grid' }}; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
-                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
-                            <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Awal Surat</label>
-                                <select name="target_surat_nomor" id="jm_edit_{{ $item->id }}_target_surat" class="form-select" onchange="onJurnalAwalSuratChanged('edit_{{ $item->id }}', 'target')">
-                                    @foreach($daftarSurat as $srt)
-                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}" {{ (int) ($item->target_surat_nomor ?: 1) === (int) $srt['nomor'] ? 'selected' : '' }}>
-                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Ayat</label>
-                                <input type="number" name="target_ayat" id="jm_edit_{{ $item->id }}_target_ayat" min="1" value="{{ (int) ($item->target_ayat ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
-                            </div>
-                        </div>
-                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
-                            <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Akhir Surat</label>
-                                <select name="target_surat_akhir_nomor" id="jm_edit_{{ $item->id }}_target_surat_akhir" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
-                                    @foreach($daftarSurat as $srt)
-                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}" {{ (int) ($item->target_surat_akhir_nomor ?: ($item->target_surat_nomor ?: 1)) === (int) $srt['nomor'] ? 'selected' : '' }}>
-                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Ayat</label>
-                                <input type="number" name="target_ayat_akhir" id="jm_edit_{{ $item->id }}_target_ayat_akhir" min="1" value="{{ (int) ($item->target_ayat_akhir ?: ($item->target_ayat ?: 1)) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                <div id="jm_edit_{{ $item->id }}_quran_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'none' : 'flex' }}; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                    <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
+                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                        <div style="display:grid; grid-template-columns: 1.45fr 1fr; gap:8px;">
                             <div class="form-group" style="margin:0;">
                                 <label class="form-label" style="font-size:12px;">Awal Surat <span class="required-mark">*</span></label>
                                 <select name="capaian_surat_nomor" id="jm_edit_{{ $item->id }}_capaian_surat" class="form-select" onchange="onJurnalAwalSuratChanged('edit_{{ $item->id }}', 'capaian')">
@@ -818,7 +843,7 @@
                                 <input type="number" name="capaian_ayat" id="jm_edit_{{ $item->id }}_capaian_ayat" min="1" value="{{ (int) ($item->capaian_ayat ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
                             </div>
                         </div>
-                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                        <div style="display:grid; grid-template-columns: 1.45fr 1fr; gap:8px;">
                             <div class="form-group" style="margin:0;">
                                 <label class="form-label" style="font-size:12px;">Akhir Surat <span class="required-mark">*</span></label>
                                 <select name="capaian_surat_akhir_nomor" id="jm_edit_{{ $item->id }}_capaian_surat_akhir" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
@@ -837,21 +862,9 @@
                     </div>
                 </div>
 
-                <div id="jm_edit_{{ $item->id }}_hadist_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'grid' : 'none' }}; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Halaman</label>
-                            <input type="number" name="target_halaman" id="jm_edit_{{ $item->id }}_target_hal" min="0" value="{{ (int) $item->target_halaman }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
-                        </div>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Baris</label>
-                            <input type="number" name="target_baris" id="jm_edit_{{ $item->id }}_target_baris" min="0" value="{{ (int) $item->target_baris }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
-                        </div>
-                    </div>
-
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
+                <div id="jm_edit_{{ $item->id }}_hadist_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'flex' : 'none' }}; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                    <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
+                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label" style="font-size:12px;">Halaman <span class="required-mark">*</span></label>
                             <input type="number" name="capaian_halaman" id="jm_edit_{{ $item->id }}_capaian_hal" min="0" value="{{ (int) $item->capaian_halaman }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
@@ -861,13 +874,6 @@
                             <input type="number" name="capaian_baris" id="jm_edit_{{ $item->id }}_capaian_baris" min="0" value="{{ (int) $item->capaian_baris }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
                         </div>
                     </div>
-                </div>
-
-                <div class="jm-live-preview">
-                    <span style="font-size:12.5px; font-weight:600; color:var(--text-secondary);">Indikator Ketercapaian Materi</span>
-                    <span id="jm_edit_{{ $item->id }}_live_badge" class="jm-indikator-badge status-{{ $item->status_ketercapaian }}">
-                        {{ $item->status_label }}
-                    </span>
                 </div>
 
                 {{-- SEKSI ABSENSI SANTRI PENGAJIAN (EDIT) --}}
@@ -921,8 +927,37 @@
 </div>
 @endforeach
 
+@php
+    $targetsForJs = $targetList->map(function ($t) {
+        return [
+            'id'                => (int) $t->id,
+            'tanggal'           => \Carbon\Carbon::parse($t->tanggal)->format('Y-m-d'),
+            'tanggal_label'     => \Carbon\Carbon::parse($t->tanggal)->format('d/m/Y'),
+            'kelas_id'          => (int) $t->kelas_pengajian_id,
+            'nama_kelas'        => $t->kelasPengajian?->nama_kelas ?? '-',
+            'materi_id'         => (int) $t->pondok_materi_id,
+            'nama_materi'       => $t->materi?->nama_materi ?? '-',
+            'kategori'          => $t->materi?->kategori ?? 'al_quran',
+            'target_label'      => $t->ringkasan_target,
+            'surat_nomor'       => (int) ($t->surat_nomor ?: 1),
+            'ayat'              => (int) ($t->ayat ?: 1),
+            'surat_akhir_nomor' => (int) ($t->surat_akhir_nomor ?: ($t->surat_nomor ?: 1)),
+            'ayat_akhir'        => (int) ($t->ayat_akhir ?: ($t->ayat ?: 1)),
+            'target_halaman'    => (int) $t->target_halaman,
+            'target_baris'      => (int) ($t->target_baris ?? 0),
+            'keterangan'        => $t->keterangan ?: '',
+        ];
+    })->values()->all();
+@endphp
+
 <script>
 var SANTRI_BY_KELAS = @json($santriByKelas ?? []);
+var TARGET_LIST = @json($targetsForJs ?? []);
+
+function syncFiSelect(selectEl) {
+    if (!selectEl) return;
+    selectEl.dispatchEvent(new Event('fi-select:sync'));
+}
 
 function getMateriKategori(prefix) {
     var sel = document.getElementById('jm_' + prefix + '_materi');
@@ -952,6 +987,8 @@ function filterJurnalSuratOptions(selectEl, halAwal, halAkhir) {
     if (!currentValid && firstValid !== null) {
         selectEl.value = firstValid;
     }
+
+    syncFiSelect(selectEl);
 }
 
 function onJurnalAwalSuratChanged(prefix, group) {
@@ -959,6 +996,7 @@ function onJurnalAwalSuratChanged(prefix, group) {
     var selAkhir = document.getElementById('jm_' + prefix + '_' + group + '_surat_akhir');
     if (selAwal && selAkhir) {
         selAkhir.value = selAwal.value;
+        syncFiSelect(selAkhir);
     }
     updateLiveIndikator(prefix);
 }
@@ -972,17 +1010,249 @@ function syncJurnalMateriMode(prefix) {
 
     var qWrap = document.getElementById('jm_' + prefix + '_quran_wrap');
     var hWrap = document.getElementById('jm_' + prefix + '_hadist_wrap');
-    if (qWrap) qWrap.style.display = (kat === 'al_hadist') ? 'none' : 'grid';
-    if (hWrap) hWrap.style.display = (kat === 'al_hadist') ? 'grid' : 'none';
+    if (qWrap) qWrap.style.display = (kat === 'al_hadist') ? 'none' : 'flex';
+    if (hWrap) hWrap.style.display = (kat === 'al_hadist') ? 'flex' : 'none';
 
     if (kat !== 'al_hadist') {
-        filterJurnalSuratOptions(document.getElementById('jm_' + prefix + '_target_surat'), halAwal, halAkhir);
-        filterJurnalSuratOptions(document.getElementById('jm_' + prefix + '_target_surat_akhir'), halAwal, halAkhir);
         filterJurnalSuratOptions(document.getElementById('jm_' + prefix + '_capaian_surat'), halAwal, halAkhir);
         filterJurnalSuratOptions(document.getElementById('jm_' + prefix + '_capaian_surat_akhir'), halAwal, halAkhir);
     }
 
     updateLiveIndikator(prefix);
+}
+
+function applyTargetToForm(prefix, targetObj, autoFillCapaian, candidateTargets) {
+    var elRef = document.getElementById('jm_' + prefix + '_target_ref');
+    var elMat = document.getElementById('jm_' + prefix + '_materi');
+    var elTSurat = document.getElementById('jm_' + prefix + '_target_surat');
+    var elTAyat = document.getElementById('jm_' + prefix + '_target_ayat');
+    var elTSuratAkhir = document.getElementById('jm_' + prefix + '_target_surat_akhir');
+    var elTAyatAkhir = document.getElementById('jm_' + prefix + '_target_ayat_akhir');
+    var elTHal = document.getElementById('jm_' + prefix + '_target_hal');
+    var elTBar = document.getElementById('jm_' + prefix + '_target_baris');
+
+    var elCSurat = document.getElementById('jm_' + prefix + '_capaian_surat');
+    var elCAyat = document.getElementById('jm_' + prefix + '_capaian_ayat');
+    var elCSuratAkhir = document.getElementById('jm_' + prefix + '_capaian_surat_akhir');
+    var elCAyatAkhir = document.getElementById('jm_' + prefix + '_capaian_ayat_akhir');
+    var elCHal = document.getElementById('jm_' + prefix + '_capaian_hal');
+    var elCBar = document.getElementById('jm_' + prefix + '_capaian_baris');
+
+    var titleEl = document.getElementById('jm_' + prefix + '_card_title');
+    var subEl = document.getElementById('jm_' + prefix + '_card_sub');
+    var datePill = document.getElementById('jm_' + prefix + '_card_date_pill');
+    var matPill = document.getElementById('jm_' + prefix + '_card_materi_pill');
+    var pillsWrap = document.getElementById('jm_' + prefix + '_card_pills');
+
+    if (!targetObj) {
+        if (elRef) elRef.value = '';
+        if (datePill) datePill.style.display = 'none';
+        if (matPill) matPill.style.display = 'none';
+        if (pillsWrap) {
+            pillsWrap.style.display = 'none';
+            pillsWrap.innerHTML = '';
+        }
+        var klsSel = document.getElementById('jm_' + prefix + '_kelas');
+        if (!klsSel || !klsSel.value) {
+            if (titleEl) titleEl.textContent = 'Pilih Kelas Pengajian terlebih dahulu';
+            if (subEl) subEl.textContent = 'Target materi kelas akan langsung tampil di kartu ini sesuai Menu Target Pengajian.';
+        } else {
+            if (titleEl) titleEl.textContent = 'Belum ada target pengajian untuk kelas ini';
+            if (subEl) subEl.innerHTML = 'Silakan tambahkan target di menu <a href="{{ route("pondok.target.index") }}" style="color:#2563eb;font-weight:700;text-decoration:underline;">Target Pengajian</a> atau langsung isi pencapaian kelas di bawah.';
+        }
+        syncJurnalMateriMode(prefix);
+        return;
+    }
+
+    if (elRef) elRef.value = targetObj.id;
+    if (elTSurat) elTSurat.value = targetObj.surat_nomor || 1;
+    if (elTAyat) elTAyat.value = targetObj.ayat || 1;
+    if (elTSuratAkhir) elTSuratAkhir.value = targetObj.surat_akhir_nomor || targetObj.surat_nomor || 1;
+    if (elTAyatAkhir) elTAyatAkhir.value = targetObj.ayat_akhir || targetObj.ayat || 1;
+    if (elTHal) elTHal.value = targetObj.target_halaman || 1;
+    if (elTBar) elTBar.value = targetObj.target_baris || 0;
+
+    if (datePill) {
+        datePill.textContent = targetObj.tanggal_label;
+        datePill.style.display = 'inline-flex';
+    }
+    if (matPill) {
+        matPill.textContent = targetObj.nama_materi;
+        matPill.style.display = 'inline-flex';
+    }
+    if (titleEl) {
+        titleEl.textContent = targetObj.target_label;
+    }
+    if (subEl) {
+        var subText = targetObj.nama_kelas;
+        if (targetObj.keterangan) {
+            subText += ' • ' + targetObj.keterangan;
+        }
+        subEl.textContent = subText;
+    }
+
+    if (pillsWrap) {
+        var list = candidateTargets || [];
+        if (list.length > 1) {
+            var htmlPills = '';
+            for (var i = 0; i < list.length; i++) {
+                var cand = list[i];
+                var isAct = (cand.id === targetObj.id) ? ' active' : '';
+                htmlPills += '<button type="button" class="jm-target-pill-btn' + isAct + '" onclick="selectTargetFromCardPill(\'' + prefix + '\', ' + cand.id + ')">';
+                htmlPills += cand.nama_materi + ' • ' + cand.target_label;
+                htmlPills += '</button>';
+            }
+            pillsWrap.innerHTML = htmlPills;
+            pillsWrap.style.display = 'flex';
+        } else {
+            pillsWrap.style.display = 'none';
+            pillsWrap.innerHTML = '';
+        }
+    }
+
+    if (elMat && String(elMat.value) !== String(targetObj.materi_id)) {
+        elMat.value = String(targetObj.materi_id);
+        syncFiSelect(elMat);
+    }
+
+    syncJurnalMateriMode(prefix);
+
+    if (autoFillCapaian) {
+        if (targetObj.kategori === 'al_hadist') {
+            if (elCHal) elCHal.value = targetObj.target_halaman || 1;
+            if (elCBar) elCBar.value = targetObj.target_baris || 1;
+        } else {
+            var sAwal = String(targetObj.surat_nomor || 1);
+            var sAkhir = String(targetObj.surat_akhir_nomor || targetObj.surat_nomor || 1);
+            if (elCSurat) {
+                elCSurat.value = sAwal;
+                syncFiSelect(elCSurat);
+            }
+            if (elCAyat) elCAyat.value = targetObj.ayat || 1;
+            if (elCSuratAkhir) {
+                elCSuratAkhir.value = sAkhir;
+                syncFiSelect(elCSuratAkhir);
+            }
+            if (elCAyatAkhir) elCAyatAkhir.value = targetObj.ayat_akhir || targetObj.ayat || 1;
+        }
+    }
+
+    updateLiveIndikator(prefix);
+}
+
+function getCandidateTargetsForKelas(kelasId, tanggalStr) {
+    if (!kelasId) return [];
+    var kId = parseInt(kelasId, 10);
+    var classTargets = [];
+    for (var i = 0; i < TARGET_LIST.length; i++) {
+        if (parseInt(TARGET_LIST[i].kelas_id, 10) === kId) {
+            classTargets.push(TARGET_LIST[i]);
+        }
+    }
+    if (classTargets.length === 0) return [];
+
+    if (tanggalStr) {
+        var exactDate = [];
+        for (var j = 0; j < classTargets.length; j++) {
+            if (classTargets[j].tanggal === tanggalStr) {
+                exactDate.push(classTargets[j]);
+            }
+        }
+        if (exactDate.length > 0) return exactDate;
+    }
+
+    var latestDate = classTargets[0].tanggal;
+    var latestList = [];
+    for (var m = 0; m < classTargets.length; m++) {
+        if (classTargets[m].tanggal === latestDate) {
+            latestList.push(classTargets[m]);
+        }
+    }
+    return latestList.length > 0 ? latestList : [classTargets[0]];
+}
+
+function selectTargetFromCardPill(prefix, targetId) {
+    var tId = parseInt(targetId, 10);
+    var found = null;
+    for (var i = 0; i < TARGET_LIST.length; i++) {
+        if (parseInt(TARGET_LIST[i].id, 10) === tId) {
+            found = TARGET_LIST[i];
+            break;
+        }
+    }
+    if (!found) return;
+
+    var elKls = document.getElementById('jm_' + prefix + '_kelas');
+    var elTgl = document.getElementById('jm_' + prefix + '_tanggal');
+    var candidates = getCandidateTargetsForKelas(elKls ? elKls.value : found.kelas_id, elTgl ? elTgl.value : found.tanggal);
+    applyTargetToForm(prefix, found, true, candidates);
+}
+
+function onJurnalKelasOrTanggalChanged(prefix, autoFillCapaian) {
+    var elKls = document.getElementById('jm_' + prefix + '_kelas');
+    var elTgl = document.getElementById('jm_' + prefix + '_tanggal');
+    var elMat = document.getElementById('jm_' + prefix + '_materi');
+    var kelasId = elKls ? elKls.value : '';
+    var tanggalStr = elTgl ? elTgl.value : '';
+
+    renderAbsensiList(prefix, kelasId);
+
+    if (!kelasId) {
+        applyTargetToForm(prefix, null, false, []);
+        return;
+    }
+
+    var candidates = getCandidateTargetsForKelas(kelasId, tanggalStr);
+    if (candidates.length === 0) {
+        applyTargetToForm(prefix, null, false, []);
+        return;
+    }
+
+    var chosen = candidates[0];
+    if (elMat && elMat.value) {
+        for (var i = 0; i < candidates.length; i++) {
+            if (String(candidates[i].materi_id) === String(elMat.value)) {
+                chosen = candidates[i];
+                break;
+            }
+        }
+    }
+
+    applyTargetToForm(prefix, chosen, autoFillCapaian !== false, candidates);
+}
+
+function onJurnalMateriChanged(prefix) {
+    var elKls = document.getElementById('jm_' + prefix + '_kelas');
+    var elTgl = document.getElementById('jm_' + prefix + '_tanggal');
+    var elMat = document.getElementById('jm_' + prefix + '_materi');
+    var kelasId = elKls ? elKls.value : '';
+    var tanggalStr = elTgl ? elTgl.value : '';
+    var materiId = elMat ? elMat.value : '';
+
+    if (kelasId && materiId) {
+        var candidates = getCandidateTargetsForKelas(kelasId, tanggalStr);
+        var matched = null;
+        for (var i = 0; i < candidates.length; i++) {
+            if (String(candidates[i].materi_id) === String(materiId)) {
+                matched = candidates[i];
+                break;
+            }
+        }
+        if (!matched) {
+            for (var j = 0; j < TARGET_LIST.length; j++) {
+                if (String(TARGET_LIST[j].kelas_id) === String(kelasId) && String(TARGET_LIST[j].materi_id) === String(materiId)) {
+                    matched = TARGET_LIST[j];
+                    break;
+                }
+            }
+        }
+        if (matched) {
+            applyTargetToForm(prefix, matched, prefix === 'add', candidates);
+            return;
+        }
+    }
+
+    syncJurnalMateriMode(prefix);
 }
 
 function updateLiveIndikator(prefix) {
@@ -1104,65 +1374,35 @@ function markAllHadir(prefix) {
     }
 }
 
-function applySelectedTargetRef(prefix) {
-    var refSel = document.getElementById('jm_' + prefix + '_target_ref');
-    if (!refSel || !refSel.value) return;
-    var opt = refSel.options[refSel.selectedIndex];
-    if (!opt) return;
-
-    var elTgl = document.getElementById('jm_' + prefix + '_tanggal');
-    var elKls = document.getElementById('jm_' + prefix + '_kelas');
-    var elMat = document.getElementById('jm_' + prefix + '_materi');
-    var elTSurat = document.getElementById('jm_' + prefix + '_target_surat');
-    var elTAyat = document.getElementById('jm_' + prefix + '_target_ayat');
-    var elTSuratAkhir = document.getElementById('jm_' + prefix + '_target_surat_akhir');
-    var elTAyatAkhir = document.getElementById('jm_' + prefix + '_target_ayat_akhir');
-    var elCSurat = document.getElementById('jm_' + prefix + '_capaian_surat');
-    var elCAyat = document.getElementById('jm_' + prefix + '_capaian_ayat');
-    var elCSuratAkhir = document.getElementById('jm_' + prefix + '_capaian_surat_akhir');
-    var elCAyatAkhir = document.getElementById('jm_' + prefix + '_capaian_ayat_akhir');
-    var elTHal = document.getElementById('jm_' + prefix + '_target_hal');
-    var elTBar = document.getElementById('jm_' + prefix + '_target_baris');
-    var elCHal = document.getElementById('jm_' + prefix + '_capaian_hal');
-    var elCBar = document.getElementById('jm_' + prefix + '_capaian_baris');
-
-    if (elTgl && opt.getAttribute('data-tanggal')) elTgl.value = opt.getAttribute('data-tanggal');
-    if (elKls && opt.getAttribute('data-kelas')) {
-        elKls.value = opt.getAttribute('data-kelas');
-        renderAbsensiList(prefix, elKls.value);
+function applyTargetByIdToAddModal(targetId) {
+    var tId = parseInt(targetId, 10);
+    var found = null;
+    for (var i = 0; i < TARGET_LIST.length; i++) {
+        if (parseInt(TARGET_LIST[i].id, 10) === tId) {
+            found = TARGET_LIST[i];
+            break;
+        }
     }
-    if (elMat && opt.getAttribute('data-materi')) elMat.value = opt.getAttribute('data-materi');
+    if (!found) return;
 
-    syncJurnalMateriMode(prefix);
+    var elTgl = document.getElementById('jm_add_tanggal');
+    var elKls = document.getElementById('jm_add_kelas');
+    if (elTgl) elTgl.value = found.tanggal;
+    if (elKls) {
+        elKls.value = String(found.kelas_id);
+        syncFiSelect(elKls);
+        renderAbsensiList('add', elKls.value);
+    }
 
-    var srt = opt.getAttribute('data-surat') || '1';
-    var ayt = opt.getAttribute('data-ayat') || '1';
-    var srtAkhir = opt.getAttribute('data-surat-akhir') || srt;
-    var aytAkhir = opt.getAttribute('data-ayat-akhir') || ayt;
-
-    if (elTSurat) elTSurat.value = srt;
-    if (elTAyat) elTAyat.value = ayt;
-    if (elTSuratAkhir) elTSuratAkhir.value = srtAkhir;
-    if (elTAyatAkhir) elTAyatAkhir.value = aytAkhir;
-
-    if (elCSurat) elCSurat.value = srt;
-    if (elCAyat) elCAyat.value = ayt;
-    if (elCSuratAkhir) elCSuratAkhir.value = srtAkhir;
-    if (elCAyatAkhir) elCAyatAkhir.value = aytAkhir;
-
-    if (elTHal) elTHal.value = opt.getAttribute('data-target-hal') || 1;
-    if (elTBar) elTBar.value = opt.getAttribute('data-target-baris') || 1;
-    if (elCHal) elCHal.value = opt.getAttribute('data-target-hal') || 1;
-    if (elCBar) elCBar.value = opt.getAttribute('data-target-baris') || 1;
-
-    updateLiveIndikator(prefix);
+    var candidates = getCandidateTargetsForKelas(found.kelas_id, found.tanggal);
+    applyTargetToForm('add', found, true, candidates);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
     syncJurnalMateriMode('add');
     var addKls = document.getElementById('jm_add_kelas');
     if (addKls && addKls.value) {
-        renderAbsensiList('add', addKls.value);
+        onJurnalKelasOrTanggalChanged('add', true);
     }
 
     @foreach($jurnals as $item)
@@ -1171,7 +1411,7 @@ document.addEventListener('DOMContentLoaded', function () {
     @endforeach
 
     @if(request()->filled('target_id'))
-        applySelectedTargetRef('add');
+        applyTargetByIdToAddModal('{{ request('target_id') }}');
         var modal = document.getElementById('modalTambahJurnalMengaji');
         if (modal) modal.classList.add('active');
     @endif

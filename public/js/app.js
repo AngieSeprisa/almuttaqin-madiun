@@ -1897,6 +1897,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var rawOptions = Array.from(selectEl.options);
 
         rawOptions.forEach(function (opt) {
+          if (opt.hidden) return;
           var item = document.createElement('div');
           item.className = 'fi-select-option';
           if (opt.selected) item.classList.add('is-selected');
@@ -2099,6 +2100,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
       // Synchronize when native select changes programmatically
       selectEl.addEventListener('change', function () {
+        renderOptions();
+        syncFromNative();
+      });
+      selectEl.addEventListener('fi-select:sync', function () {
+        renderOptions();
         syncFromNative();
       });
 
