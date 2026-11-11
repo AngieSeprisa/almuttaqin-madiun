@@ -6,6 +6,7 @@ use App\Support\MushafMadinah;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PondokJurnalMengaji extends Model
 {
@@ -19,6 +20,7 @@ class PondokJurnalMengaji extends Model
 
     protected $fillable = [
         'tanggal',
+        'sesi_pengajian',
         'kelas_pengajian_id',
         'pondok_materi_id',
         'target_pengajian_id',
@@ -37,6 +39,12 @@ class PondokJurnalMengaji extends Model
         'halaman_awal',
         'halaman_akhir',
         'status_ketercapaian',
+        'total_santri',
+        'total_hadir',
+        'total_terlambat',
+        'total_izin',
+        'total_sakit',
+        'total_alpa',
         'catatan',
     ];
 
@@ -54,6 +62,12 @@ class PondokJurnalMengaji extends Model
             'capaian_baris'       => 'integer',
             'halaman_awal'        => 'integer',
             'halaman_akhir'       => 'integer',
+            'total_santri'        => 'integer',
+            'total_hadir'         => 'integer',
+            'total_terlambat'     => 'integer',
+            'total_izin'          => 'integer',
+            'total_sakit'         => 'integer',
+            'total_alpa'          => 'integer',
         ];
     }
 
@@ -75,6 +89,18 @@ class PondokJurnalMengaji extends Model
     public function pengajar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'pengajar_id');
+    }
+
+    public function absensis(): HasMany
+    {
+        return $this->hasMany(PondokJurnalAbsensi::class, 'jurnal_mengaji_id');
+    }
+
+    public function getSesiLabelAttribute(): string
+    {
+        $map = MushafMadinah::daftarSesiPengajian();
+        $key = $this->sesi_pengajian ?: 'bada_maghrib';
+        return $map[$key] ?? ucwords(str_replace('_', ' ', $key));
     }
 
     /**

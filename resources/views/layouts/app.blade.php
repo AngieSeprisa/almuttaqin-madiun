@@ -204,7 +204,7 @@
                         </span>
                     </button>
                     <div class="sidebar-subnav">
-                        <a href="{{ route('pondok.materi.index') }}" class="subnav-item {{ request()->routeIs('pondok.materi.*') ? 'active' : '' }}" title="Daftar Materi Pondok (Al-Qur'an & Al-Hadist)">
+                        <a href="{{ route('pondok.materi.index') }}" class="subnav-item {{ request()->routeIs('pondok.materi.*') ? 'active' : '' }}" title="Daftar Materi Pondok">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Daftar Materi</span>
                         </a>
@@ -212,9 +212,17 @@
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Target Pengajian</span>
                         </a>
-                        <a href="{{ route('pondok.jurnal.index') }}" class="subnav-item {{ request()->routeIs('pondok.jurnal.*') ? 'active' : '' }}" title="Jurnal Mengaji & Ketercapaian Materi">
+                        <a href="{{ route('pondok.jurnal.index') }}" class="subnav-item {{ request()->routeIs('pondok.jurnal.*') ? 'active' : '' }}" title="Jurnal Mengaji & Absensi Santri">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Jurnal Mengaji</span>
+                        </a>
+                        <a href="{{ route('pondok.rekap-jurnal') }}" class="subnav-item {{ request()->routeIs('pondok.rekap-jurnal*') ? 'active' : '' }}" title="Rekap Jurnal Pengajian">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Rekap Jurnal</span>
+                        </a>
+                        <a href="{{ route('pondok.rekap-absensi') }}" class="subnav-item {{ request()->routeIs('pondok.rekap-absensi*') ? 'active' : '' }}" title="Rekap Absensi Pengajian">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Rekap Absensi</span>
                         </a>
                     </div>
                 </div>

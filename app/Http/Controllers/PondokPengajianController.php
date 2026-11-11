@@ -3,11 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterKelasPengajian;
+use App\Models\PerizinanSakit;
+use App\Models\PerizinanSambang;
+use App\Models\PondokJurnalAbsensi;
 use App\Models\PondokJurnalMengaji;
 use App\Models\PondokMateri;
 use App\Models\PondokTargetPengajian;
+use App\Models\Siswa;
 use App\Models\User;
 use App\Support\MushafMadinah;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -35,18 +40,33 @@ class PondokPengajianController extends Controller
             });
         }
 
-        $materis = $query->orderBy('kategori')->orderBy('nama_materi')->get();
+        $materis = $query->orderBy('kategori')->orderBy('id')->get();
 
-        $totalMateri = PondokMateri::count();
-        $totalQuran  = PondokMateri::where('kategori', PondokMateri::KATEGORI_AL_QURAN)->count();
-        $totalHadist = PondokMateri::where('kategori', PondokMateri::KATEGORI_AL_HADIST)->count();
+        $totalMateri    = PondokMateri::count();
+        $totalQuran     = PondokMateri::where('kategori', PondokMateri::KATEGORI_AL_QURAN)->count();
+        $totalHadist    = PondokMateri::where('kategori', PondokMateri::KATEGORI_AL_HADIST)->count();
+        $paketQuranList = MushafMadinah::daftarPaketQuran();
 
         return view('pondok.materi', compact(
             'materis',
             'totalMateri',
             'totalQuran',
-            'totalHadist'
+            'totalHadist',
+            'paketQuranList'
         ));
+    }
+
+    public function muatStandarMateri()
+    {
+        $added = PondokMateri::seedStandar();
+
+        if ($added > 0) {
+            return redirect()->route('pondok.materi.index')
+                ->with('success', "{$added} materi standar pondok berhasil dimuat.");
+        }
+
+        return redirect()->route('pondok.materi.index')
+            ->with('success', 'Seluruh materi standar pondok sudah tersedia.');
     }
 
     public function storeMateri(Request $request)
@@ -55,6 +75,9 @@ class PondokPengajianController extends Controller
             'kode_materi'    => ['nullable', 'string', 'max:50'],
             'nama_materi'    => ['required', 'string', 'max:150'],
             'kategori'       => ['required', Rule::in([PondokMateri::KATEGORI_AL_QURAN, PondokMateri::KATEGORI_AL_HADIST])],
+            'paket_quran'    => ['nullable', 'string', 'max:30'],
+            'halaman_awal'   => ['nullable', 'integer', 'min:1', 'max:604'],
+            'halaman_akhir'  => ['nullable', 'integer', 'min:1', 'max:9999'],
             'jumlah_halaman' => ['nullable', 'integer', 'min:1'],
             'jumlah_baris'   => ['nullable', 'integer', 'min:0'],
             'keterangan'     => ['nullable', 'string', 'max:1000'],
@@ -67,9 +90,53 @@ class PondokPengajianController extends Controller
             return back()->withInput()->with('error', 'Untuk kategori Al-Hadist, jumlah baris wajib diisi.');
         }
 
-        $jmlHalaman = !empty($validated['jumlah_halaman'])
-            ? (int) $validated['jumlah_halaman']
-            : ($validated['kategori'] === PondokMateri::KATEGORI_AL_QURAN ? MushafMadinah::TOTAL_HALAMAN : 1);
+        $paketQuran   = null;
+        $halamanAwal  = 1;
+        $halamanAkhir = 604;
+        $jmlHalaman   = 604;
+
+        if ($validated['kategori'] === PondokMateri::KATEGORI_AL_QURAN) {
+            $paketList = MushafMadinah::daftarPaketQuran();
+            $reqPaket  = $validated['paket_quran'] ?? null;
+
+            if ($reqPaket && isset($paketList[$reqPaket])) {
+                $paketQuran   = $reqPaket;
+                $halamanAwal  = $paketList[$reqPaket]['halaman_awal'];
+                $halamanAkhir = $paketList[$reqPaket]['halaman_akhir'];
+                $jmlHalaman   = !empty($validated['jumlah_halaman'])
+                    ? (int) $validated['jumlah_halaman']
+                    : $paketList[$reqPaket]['jumlah_halaman'];
+            } elseif (!empty($validated['halaman_awal']) && !empty($validated['halaman_akhir'])) {
+                $paketQuran   = $reqPaket ?: MushafMadinah::PAKET_KUSTOM;
+                $halamanAwal  = max(1, min(604, (int) $validated['halaman_awal']));
+                $halamanAkhir = max($halamanAwal, min(604, (int) $validated['halaman_akhir']));
+                $jmlHalaman   = !empty($validated['jumlah_halaman'])
+                    ? (int) $validated['jumlah_halaman']
+                    : ($halamanAkhir - $halamanAwal + 1);
+            } else {
+                $namaLower = mb_strtolower(trim($validated['nama_materi']));
+                if (str_contains($namaLower, 'cepatan')) {
+                    $paketQuran   = MushafMadinah::PAKET_CEPATAN;
+                    $halamanAwal  = 1;
+                    $halamanAkhir = 341;
+                    $jmlHalaman   = !empty($validated['jumlah_halaman']) ? (int) $validated['jumlah_halaman'] : 341;
+                } elseif (str_contains($namaLower, 'lambatan')) {
+                    $paketQuran   = MushafMadinah::PAKET_LAMBATAN;
+                    $halamanAwal  = 342;
+                    $halamanAkhir = 604;
+                    $jmlHalaman   = !empty($validated['jumlah_halaman']) ? (int) $validated['jumlah_halaman'] : 263;
+                } else {
+                    $paketQuran   = MushafMadinah::PAKET_REGULER;
+                    $halamanAwal  = 1;
+                    $halamanAkhir = 604;
+                    $jmlHalaman   = !empty($validated['jumlah_halaman']) ? (int) $validated['jumlah_halaman'] : MushafMadinah::TOTAL_HALAMAN;
+                }
+            }
+        } else {
+            $jmlHalaman   = !empty($validated['jumlah_halaman']) ? (int) $validated['jumlah_halaman'] : 1;
+            $halamanAwal  = 1;
+            $halamanAkhir = $jmlHalaman;
+        }
 
         $prefix = $validated['kategori'] === PondokMateri::KATEGORI_AL_HADIST ? 'HAD' : 'QUR';
         $kode = !empty($validated['kode_materi'])
@@ -80,6 +147,9 @@ class PondokPengajianController extends Controller
             'kode_materi'    => $kode,
             'nama_materi'    => trim($validated['nama_materi']),
             'kategori'       => $validated['kategori'],
+            'paket_quran'    => $paketQuran,
+            'halaman_awal'   => $halamanAwal,
+            'halaman_akhir'  => $halamanAkhir,
             'jumlah_halaman' => $jmlHalaman,
             'jumlah_baris'   => $validated['kategori'] === PondokMateri::KATEGORI_AL_HADIST ? (int) ($validated['jumlah_baris'] ?? 0) : null,
             'keterangan'     => $validated['keterangan'] ?? null,
@@ -96,6 +166,9 @@ class PondokPengajianController extends Controller
             'kode_materi'    => ['nullable', 'string', 'max:50'],
             'nama_materi'    => ['required', 'string', 'max:150'],
             'kategori'       => ['required', Rule::in([PondokMateri::KATEGORI_AL_QURAN, PondokMateri::KATEGORI_AL_HADIST])],
+            'paket_quran'    => ['nullable', 'string', 'max:30'],
+            'halaman_awal'   => ['nullable', 'integer', 'min:1', 'max:604'],
+            'halaman_akhir'  => ['nullable', 'integer', 'min:1', 'max:9999'],
             'jumlah_halaman' => ['nullable', 'integer', 'min:1'],
             'jumlah_baris'   => ['nullable', 'integer', 'min:0'],
             'keterangan'     => ['nullable', 'string', 'max:1000'],
@@ -105,14 +178,46 @@ class PondokPengajianController extends Controller
             return back()->withInput()->with('error', 'Untuk kategori Al-Hadist, jumlah baris wajib diisi.');
         }
 
-        $jmlHalaman = !empty($validated['jumlah_halaman'])
-            ? (int) $validated['jumlah_halaman']
-            : ($validated['kategori'] === PondokMateri::KATEGORI_AL_QURAN ? MushafMadinah::TOTAL_HALAMAN : $materi->jumlah_halaman);
+        $paketQuran   = null;
+        $halamanAwal  = 1;
+        $halamanAkhir = 604;
+        $jmlHalaman   = (int) ($validated['jumlah_halaman'] ?? $materi->jumlah_halaman);
+
+        if ($validated['kategori'] === PondokMateri::KATEGORI_AL_QURAN) {
+            $paketList = MushafMadinah::daftarPaketQuran();
+            $reqPaket  = $validated['paket_quran'] ?? null;
+
+            if ($reqPaket && isset($paketList[$reqPaket])) {
+                $paketQuran   = $reqPaket;
+                $halamanAwal  = $paketList[$reqPaket]['halaman_awal'];
+                $halamanAkhir = $paketList[$reqPaket]['halaman_akhir'];
+                $jmlHalaman   = !empty($validated['jumlah_halaman'])
+                    ? (int) $validated['jumlah_halaman']
+                    : $paketList[$reqPaket]['jumlah_halaman'];
+            } elseif (!empty($validated['halaman_awal']) && !empty($validated['halaman_akhir'])) {
+                $paketQuran   = $reqPaket ?: MushafMadinah::PAKET_KUSTOM;
+                $halamanAwal  = max(1, min(604, (int) $validated['halaman_awal']));
+                $halamanAkhir = max($halamanAwal, min(604, (int) $validated['halaman_akhir']));
+                $jmlHalaman   = !empty($validated['jumlah_halaman'])
+                    ? (int) $validated['jumlah_halaman']
+                    : ($halamanAkhir - $halamanAwal + 1);
+            } else {
+                $paketQuran   = $materi->paket_quran ?: MushafMadinah::PAKET_REGULER;
+                $halamanAwal  = $materi->effective_halaman_awal;
+                $halamanAkhir = $materi->effective_halaman_akhir;
+            }
+        } else {
+            $halamanAwal  = 1;
+            $halamanAkhir = $jmlHalaman;
+        }
 
         $materi->update([
             'kode_materi'    => !empty($validated['kode_materi']) ? strtoupper(trim($validated['kode_materi'])) : $materi->kode_materi,
             'nama_materi'    => trim($validated['nama_materi']),
             'kategori'       => $validated['kategori'],
+            'paket_quran'    => $paketQuran,
+            'halaman_awal'   => $halamanAwal,
+            'halaman_akhir'  => $halamanAkhir,
             'jumlah_halaman' => $jmlHalaman,
             'jumlah_baris'   => $validated['kategori'] === PondokMateri::KATEGORI_AL_HADIST ? (int) ($validated['jumlah_baris'] ?? 0) : null,
             'keterangan'     => $validated['keterangan'] ?? null,
@@ -142,8 +247,9 @@ class PondokPengajianController extends Controller
         }
 
         $kelasList   = MasterKelasPengajian::orderBy('id')->get();
-        $materiList  = PondokMateri::where('is_active', true)->orderBy('kategori')->orderBy('nama_materi')->get();
+        $materiList  = PondokMateri::where('is_active', true)->orderBy('kategori')->orderBy('id')->get();
         $daftarSurat = MushafMadinah::daftarSurat();
+        $sesiList    = MushafMadinah::daftarSesiPengajian();
 
         $query = PondokTargetPengajian::with(['kelasPengajian', 'materi', 'jurnals']);
 
@@ -176,7 +282,8 @@ class PondokPengajianController extends Controller
             'targets',
             'kelasList',
             'materiList',
-            'daftarSurat'
+            'daftarSurat',
+            'sesiList'
         ));
     }
 
@@ -184,6 +291,7 @@ class PondokPengajianController extends Controller
     {
         $validated = $request->validate([
             'tanggal'            => ['required', 'date'],
+            'sesi_pengajian'     => ['nullable', 'string', 'max:40'],
             'kelas_pengajian_id' => ['required', 'exists:master_kelas_pengajians,id'],
             'pondok_materi_id'   => ['required', 'exists:pondok_materis,id'],
             'surat_nomor'        => ['nullable', 'integer', 'min:1', 'max:114'],
@@ -214,7 +322,7 @@ class PondokPengajianController extends Controller
                 $ayat       = max(1, min($maxAyat, (int) ($validated['ayat'] ?? 1)));
                 $targetHalaman = MushafMadinah::estimasiHalaman($suratNomor, $ayat);
             } else {
-                $targetHalaman = (int) ($validated['target_halaman'] ?? $validated['halaman'] ?? 1);
+                $targetHalaman = (int) ($validated['target_halaman'] ?? $validated['halaman'] ?? $materi->effective_halaman_awal);
             }
             $targetBaris = null;
         } else {
@@ -229,6 +337,7 @@ class PondokPengajianController extends Controller
 
         PondokTargetPengajian::create([
             'tanggal'            => $validated['tanggal'],
+            'sesi_pengajian'     => $validated['sesi_pengajian'] ?? 'bada_maghrib',
             'kelas_pengajian_id' => $validated['kelas_pengajian_id'],
             'pondok_materi_id'   => $validated['pondok_materi_id'],
             'surat_nomor'        => $suratNomor,
@@ -248,6 +357,7 @@ class PondokPengajianController extends Controller
     {
         $validated = $request->validate([
             'tanggal'            => ['required', 'date'],
+            'sesi_pengajian'     => ['nullable', 'string', 'max:40'],
             'kelas_pengajian_id' => ['required', 'exists:master_kelas_pengajians,id'],
             'pondok_materi_id'   => ['required', 'exists:pondok_materis,id'],
             'surat_nomor'        => ['nullable', 'integer', 'min:1', 'max:114'],
@@ -289,6 +399,7 @@ class PondokPengajianController extends Controller
 
         $target->update([
             'tanggal'            => $validated['tanggal'],
+            'sesi_pengajian'     => $validated['sesi_pengajian'] ?? $target->sesi_pengajian ?? 'bada_maghrib',
             'kelas_pengajian_id' => $validated['kelas_pengajian_id'],
             'pondok_materi_id'   => $validated['pondok_materi_id'],
             'surat_nomor'        => $suratNomor,
@@ -337,25 +448,88 @@ class PondokPengajianController extends Controller
     }
 
     /* ======================================================================
-     * 3. SUBMENU JURNAL MENGAJI (PENCAPAIAN PER KELAS & INDIKATOR KETERCAPAIAN)
+     * 3. SUBMENU JURNAL MENGAJI & REKAP JURNAL (TERINTEGRASI ABSENSI SANTRI)
      * ====================================================================== */
 
     public function jurnalIndex(Request $request)
+    {
+        return $this->renderJurnalPage($request, false);
+    }
+
+    public function rekapJurnal(Request $request)
+    {
+        return $this->renderJurnalPage($request, true);
+    }
+
+    protected function renderJurnalPage(Request $request, bool $isRekapPage = false)
     {
         if (MasterKelasPengajian::count() === 0) {
             MasterKelasPengajian::seedStandar();
         }
 
         $kelasList    = MasterKelasPengajian::orderBy('id')->get();
-        $materiList   = PondokMateri::where('is_active', true)->orderBy('kategori')->orderBy('nama_materi')->get();
+        $materiList   = PondokMateri::where('is_active', true)->orderBy('kategori')->orderBy('id')->get();
         $targetList   = PondokTargetPengajian::with(['kelasPengajian', 'materi'])
             ->orderByDesc('tanggal')
             ->orderBy('kelas_pengajian_id')
             ->get();
         $pengajarList = User::where('is_active', true)->orderBy('name')->get();
         $daftarSurat  = MushafMadinah::daftarSurat();
+        $sesiList     = MushafMadinah::daftarSesiPengajian();
 
-        $query = PondokJurnalMengaji::with(['kelasPengajian', 'materi', 'targetPengajian', 'pengajar']);
+        // Ambil daftar santri aktif dikelompokkan per kelas_pengajian_id untuk form absensi pengajian
+        $activeSiswas = Siswa::where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', '')
+                  ->orWhereNotIn('status', ['keluar', 'lulus', 'alumni', 'nonaktif', 'ditolak', 'Ditolak', 'Lulus']);
+            })
+            ->orderBy('nama_lengkap')
+            ->get(['id', 'nama_lengkap', 'nisn', 'kamar', 'kelas', 'kelas_pengajian_id']);
+
+        $todayStr = Carbon::today()->toDateString();
+        $sakitIds = PerizinanSakit::whereDate('tanggal_sakit', '<=', $todayStr)
+            ->where(function ($q) use ($todayStr) {
+                $q->whereNull('tanggal_sembuh')
+                  ->orWhereDate('tanggal_sembuh', '>=', $todayStr)
+                  ->orWhere('status', 'sakit');
+            })
+            ->pluck('siswa_id')
+            ->all();
+        $sambangIds = PerizinanSambang::whereDate('tanggal_mulai', '<=', $todayStr)
+            ->whereDate('tanggal_kembali', '>=', $todayStr)
+            ->pluck('siswa_id')
+            ->all();
+
+        $santriByKelas = [];
+        foreach ($kelasList as $kls) {
+            $santriByKelas[$kls->id] = [];
+        }
+        foreach ($activeSiswas as $sw) {
+            $kId = (int) ($sw->kelas_pengajian_id ?: 0);
+            if ($kId <= 0) {
+                continue;
+            }
+            $defaultStatus = 'hadir';
+            $infoIzin = '';
+            if (in_array($sw->id, $sakitIds, true)) {
+                $defaultStatus = 'sakit';
+                $infoIzin = 'Perizinan Sakit';
+            } elseif (in_array($sw->id, $sambangIds, true)) {
+                $defaultStatus = 'izin';
+                $infoIzin = 'Perizinan Sambang';
+            }
+
+            $santriByKelas[$kId][] = [
+                'id'             => $sw->id,
+                'nama_lengkap'   => RekapPondokController::cleanStudentName($sw->nama_lengkap),
+                'kamar'          => $sw->kamar ?: '-',
+                'kelas'          => $sw->kelas ?: '-',
+                'default_status' => $defaultStatus,
+                'info_izin'      => $infoIzin,
+            ];
+        }
+
+        $query = PondokJurnalMengaji::with(['kelasPengajian', 'materi', 'targetPengajian', 'pengajar', 'absensis.siswa']);
 
         if ($request->filled('tanggal')) {
             $query->whereDate('tanggal', $request->tanggal);
@@ -405,7 +579,10 @@ class PondokPengajianController extends Controller
             'materiList',
             'targetList',
             'pengajarList',
-            'daftarSurat'
+            'daftarSurat',
+            'sesiList',
+            'santriByKelas',
+            'isRekapPage'
         ));
     }
 
@@ -413,6 +590,7 @@ class PondokPengajianController extends Controller
     {
         $validated = $request->validate([
             'tanggal'             => ['required', 'date'],
+            'sesi_pengajian'      => ['nullable', 'string', 'max:40'],
             'kelas_pengajian_id'  => ['required', 'exists:master_kelas_pengajians,id'],
             'pondok_materi_id'    => ['required', 'exists:pondok_materis,id'],
             'target_pengajian_id' => ['nullable', 'exists:pondok_target_pengajians,id'],
@@ -427,6 +605,8 @@ class PondokPengajianController extends Controller
             'capaian_halaman'     => ['nullable', 'integer', 'min:0'],
             'capaian_baris'       => ['nullable', 'integer', 'min:0'],
             'catatan'             => ['nullable', 'string', 'max:1000'],
+            'absensi'             => ['nullable', 'array'],
+            'absensi.*'           => ['nullable', 'string', Rule::in(['hadir', 'terlambat', 'izin', 'sakit', 'alpa'])],
         ], [
             'tanggal.required'            => 'Tanggal jurnal wajib diisi.',
             'kelas_pengajian_id.required' => 'Kelas pengajian wajib dipilih.',
@@ -512,8 +692,13 @@ class PondokPengajianController extends Controller
             ? trim($validated['nama_pengajar'])
             : ($pengajarUser?->name ?? 'Pengajar Pondok');
 
-        PondokJurnalMengaji::create([
+        $sesiPengajian = !empty($validated['sesi_pengajian'])
+            ? $validated['sesi_pengajian']
+            : ($targetModel?->sesi_pengajian ?: 'bada_maghrib');
+
+        $jurnal = PondokJurnalMengaji::create([
             'tanggal'             => $validated['tanggal'],
+            'sesi_pengajian'      => $sesiPengajian,
             'kelas_pengajian_id'  => $validated['kelas_pengajian_id'],
             'pondok_materi_id'    => $validated['pondok_materi_id'],
             'target_pengajian_id' => $targetModel?->id,
@@ -533,14 +718,18 @@ class PondokPengajianController extends Controller
             'catatan'             => $validated['catatan'] ?? null,
         ]);
 
+        // Simpan absensi santri pengajian & sinkronkan rekap kehadiran
+        $this->syncJurnalAbsensi($jurnal, $validated['absensi'] ?? null);
+
         return redirect()->route('pondok.jurnal.index')
-            ->with('success', 'Jurnal mengaji berhasil disimpan dengan status ketercapaian: ' . ucfirst($statusKetercapaian) . '.');
+            ->with('success', 'Jurnal & absensi pengajian berhasil disimpan dengan status ketercapaian: ' . ucfirst($statusKetercapaian) . '.');
     }
 
     public function updateJurnal(Request $request, PondokJurnalMengaji $jurnal)
     {
         $validated = $request->validate([
             'tanggal'             => ['required', 'date'],
+            'sesi_pengajian'      => ['nullable', 'string', 'max:40'],
             'kelas_pengajian_id'  => ['required', 'exists:master_kelas_pengajians,id'],
             'pondok_materi_id'    => ['required', 'exists:pondok_materis,id'],
             'target_pengajian_id' => ['nullable', 'exists:pondok_target_pengajians,id'],
@@ -555,6 +744,8 @@ class PondokPengajianController extends Controller
             'capaian_halaman'     => ['nullable', 'integer', 'min:0'],
             'capaian_baris'       => ['nullable', 'integer', 'min:0'],
             'catatan'             => ['nullable', 'string', 'max:1000'],
+            'absensi'             => ['nullable', 'array'],
+            'absensi.*'           => ['nullable', 'string', Rule::in(['hadir', 'terlambat', 'izin', 'sakit', 'alpa'])],
         ]);
 
         $materi = PondokMateri::findOrFail($validated['pondok_materi_id']);
@@ -638,6 +829,7 @@ class PondokPengajianController extends Controller
 
         $jurnal->update([
             'tanggal'             => $validated['tanggal'],
+            'sesi_pengajian'      => $validated['sesi_pengajian'] ?? $jurnal->sesi_pengajian ?? 'bada_maghrib',
             'kelas_pengajian_id'  => $validated['kelas_pengajian_id'],
             'pondok_materi_id'    => $validated['pondok_materi_id'],
             'target_pengajian_id' => $targetModel?->id,
@@ -657,8 +849,106 @@ class PondokPengajianController extends Controller
             'catatan'             => $validated['catatan'] ?? null,
         ]);
 
+        if (array_key_exists('absensi', $validated)) {
+            $this->syncJurnalAbsensi($jurnal, $validated['absensi']);
+        }
+
         return redirect()->route('pondok.jurnal.index')
-            ->with('success', 'Jurnal mengaji berhasil diperbarui.');
+            ->with('success', 'Jurnal & absensi pengajian berhasil diperbarui.');
+    }
+
+    /**
+     * Simpan detail absensi santri untuk jurnal pengajian dan hitung ringkasan total kehadiran.
+     */
+    protected function syncJurnalAbsensi(PondokJurnalMengaji $jurnal, ?array $absensiInput): void
+    {
+        $santris = Siswa::where('kelas_pengajian_id', $jurnal->kelas_pengajian_id)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhere('status', '')
+                  ->orWhereNotIn('status', ['keluar', 'lulus', 'alumni', 'nonaktif', 'ditolak', 'Ditolak', 'Lulus']);
+            })
+            ->get(['id']);
+
+        $tglStr = Carbon::parse($jurnal->tanggal)->toDateString();
+        $sakitIds = PerizinanSakit::whereDate('tanggal_sakit', '<=', $tglStr)
+            ->where(function ($q) use ($tglStr) {
+                $q->whereNull('tanggal_sembuh')
+                  ->orWhereDate('tanggal_sembuh', '>=', $tglStr)
+                  ->orWhere('status', 'sakit');
+            })
+            ->pluck('siswa_id')
+            ->all();
+        $sambangIds = PerizinanSambang::whereDate('tanggal_mulai', '<=', $tglStr)
+            ->whereDate('tanggal_kembali', '>=', $tglStr)
+            ->pluck('siswa_id')
+            ->all();
+
+        $targetMap = [];
+
+        foreach ($santris as $sw) {
+            $sId = (int) $sw->id;
+            if (is_array($absensiInput) && isset($absensiInput[$sId])) {
+                $status = strtolower(trim((string) $absensiInput[$sId]));
+            } elseif (in_array($sId, $sakitIds, true)) {
+                $status = PondokJurnalAbsensi::STATUS_SAKIT;
+            } elseif (in_array($sId, $sambangIds, true)) {
+                $status = PondokJurnalAbsensi::STATUS_IZIN;
+            } else {
+                $status = PondokJurnalAbsensi::STATUS_HADIR;
+            }
+
+            if (!in_array($status, ['hadir', 'terlambat', 'izin', 'sakit', 'alpa'], true)) {
+                $status = PondokJurnalAbsensi::STATUS_HADIR;
+            }
+            $targetMap[$sId] = $status;
+        }
+
+        // Juga dukung jika ada siswa_id yang dikirim langsung pada $absensiInput meskipun belum di-plot
+        if (is_array($absensiInput)) {
+            foreach ($absensiInput as $sIdKey => $rawSt) {
+                $sId = (int) $sIdKey;
+                if ($sId > 0 && !isset($targetMap[$sId]) && Siswa::where('id', $sId)->exists()) {
+                    $st = strtolower(trim((string) $rawSt));
+                    if (in_array($st, ['hadir', 'terlambat', 'izin', 'sakit', 'alpa'], true)) {
+                        $targetMap[$sId] = $st;
+                    }
+                }
+            }
+        }
+
+        $jurnal->absensis()->delete();
+
+        $totalHadir     = 0;
+        $totalTerlambat = 0;
+        $totalIzin      = 0;
+        $totalSakit     = 0;
+        $totalAlpa      = 0;
+
+        foreach ($targetMap as $sId => $status) {
+            PondokJurnalAbsensi::create([
+                'jurnal_mengaji_id' => $jurnal->id,
+                'siswa_id'          => $sId,
+                'status'            => $status,
+            ]);
+
+            match ($status) {
+                'terlambat' => $totalTerlambat++,
+                'izin'      => $totalIzin++,
+                'sakit'     => $totalSakit++,
+                'alpa'      => $totalAlpa++,
+                default     => $totalHadir++,
+            };
+        }
+
+        $jurnal->update([
+            'total_santri'    => count($targetMap),
+            'total_hadir'     => $totalHadir,
+            'total_terlambat' => $totalTerlambat,
+            'total_izin'      => $totalIzin,
+            'total_sakit'     => $totalSakit,
+            'total_alpa'      => $totalAlpa,
+        ]);
     }
 
     public function destroyJurnal(PondokJurnalMengaji $jurnal)

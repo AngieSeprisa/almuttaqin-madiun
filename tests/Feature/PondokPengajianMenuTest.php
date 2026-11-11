@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Lembaga;
 use App\Models\MasterKelasPengajian;
 use App\Models\PondokJurnalMengaji;
 use App\Models\PondokMateri;
 use App\Models\PondokTargetPengajian;
+use App\Models\Siswa;
 use App\Models\User;
 use Database\Seeders\LembagaAndUserSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -216,5 +218,114 @@ class PondokPengajianMenuTest extends TestCase
         $jurnalPage->assertSee('↑ Terlampaui');
         $jurnalPage->assertSee('QS. Al-Baqarah Ayat 25');
         $jurnalPage->assertSee('Halaman 12 • Baris 14');
+    }
+
+    public function test_muat_standar_materi_dan_sinkronisasi_absensi_jurnal_ke_rekap_absensi_pengajian(): void
+    {
+        MasterKelasPengajian::seedStandar();
+        $kelasLambatan = MasterKelasPengajian::where('kode_kelas', 'KLS_LAMBATAN_SMP')->firstOrFail();
+
+        // 1. Muat materi standar (3 paket Al-Qur'an + 25 kitab Al-Hadist)
+        $this->actingAs($this->user)
+            ->post(route('pondok.materi.muat-standar'))
+            ->assertRedirect(route('pondok.materi.index'));
+
+        $this->assertDatabaseHas('pondok_materis', [
+            'kode_materi'    => 'QUR-CPT',
+            'paket_quran'    => 'cepatan',
+            'halaman_awal'   => 1,
+            'halaman_akhir'  => 341,
+            'jumlah_halaman' => 341,
+        ]);
+        $this->assertDatabaseHas('pondok_materis', [
+            'kode_materi'    => 'QUR-LMB',
+            'paket_quran'    => 'lambatan',
+            'halaman_awal'   => 342,
+            'halaman_akhir'  => 604,
+            'jumlah_halaman' => 263,
+        ]);
+        $this->assertDatabaseHas('pondok_materis', [
+            'kode_materi'    => 'QUR-REG',
+            'paket_quran'    => 'reguler',
+            'halaman_awal'   => 1,
+            'halaman_akhir'  => 604,
+            'jumlah_halaman' => 604,
+        ]);
+        $this->assertDatabaseHas('pondok_materis', [
+            'kode_materi' => 'HAD-01',
+            'nama_materi' => 'K. Sholah',
+            'kategori'    => 'al_hadist',
+        ]);
+
+        // 2. Buat 3 santri di Kelas Lambatan SMP
+        $lembagaSmp = Lembaga::where('jenis', 'smp')->first() ?? Lembaga::first();
+        $santri1 = Siswa::create([
+            'lembaga_id'         => $lembagaSmp?->id,
+            'nama_lengkap'       => 'Ahmad Fauzi',
+            'nisn'               => '10000001',
+            'jenis_kelamin'      => 'L',
+            'kelas'              => '7A',
+            'kamar'              => 'Abu Bakar 1',
+            'kelas_pengajian_id' => $kelasLambatan->id,
+        ]);
+        $santri2 = Siswa::create([
+            'lembaga_id'         => $lembagaSmp?->id,
+            'nama_lengkap'       => 'Budi Santoso',
+            'nisn'               => '10000002',
+            'jenis_kelamin'      => 'L',
+            'kelas'              => '7A',
+            'kamar'              => 'Abu Bakar 1',
+            'kelas_pengajian_id' => $kelasLambatan->id,
+        ]);
+        $santri3 = Siswa::create([
+            'lembaga_id'         => $lembagaSmp?->id,
+            'nama_lengkap'       => 'Chandra Wijaya',
+            'nisn'               => '10000003',
+            'jenis_kelamin'      => 'L',
+            'kelas'              => '7A',
+            'kamar'              => 'Abu Bakar 1',
+            'kelas_pengajian_id' => $kelasLambatan->id,
+        ]);
+
+        $materiLambatan = PondokMateri::where('paket_quran', 'lambatan')->firstOrFail();
+
+        // 3. Input Jurnal Mengaji + Absensi Santri (Santri 1 Hadir, Santri 2 Izin, Santri 3 Alpa)
+        $this->actingAs($this->user)->post(route('pondok.jurnal.store'), [
+            'tanggal'             => '2026-11-11',
+            'sesi_pengajian'      => 'bada_maghrib',
+            'kelas_pengajian_id'  => $kelasLambatan->id,
+            'pondok_materi_id'    => $materiLambatan->id,
+            'target_surat_nomor'  => 23,
+            'target_ayat'         => 15,
+            'capaian_surat_nomor' => 23,
+            'capaian_ayat'        => 15,
+            'absensi'             => [
+                $santri1->id => 'hadir',
+                $santri2->id => 'izin',
+                $santri3->id => 'alpa',
+            ],
+        ])->assertRedirect(route('pondok.jurnal.index'));
+
+        $jurnal = PondokJurnalMengaji::where('kelas_pengajian_id', $kelasLambatan->id)->firstOrFail();
+        $this->assertSame(3, $jurnal->total_santri);
+        $this->assertSame(1, $jurnal->total_hadir);
+        $this->assertSame(1, $jurnal->total_izin);
+        $this->assertSame(1, $jurnal->total_alpa);
+
+        // 4. Pastikan halaman Rekap Jurnal menampilkan badge kehadiran "H: 1/3"
+        $rekapJurnalPage = $this->actingAs($this->user)->get(route('pondok.rekap-jurnal'));
+        $rekapJurnalPage->assertStatus(200);
+        $rekapJurnalPage->assertSee('H: 1/3');
+
+        // 5. Pastikan absensi santri dari Jurnal Mengaji tersinkron ke Rekap Absensi Pengajian
+        $rekapAbsensiPage = $this->actingAs($this->user)->get(route('pondok.rekap-absensi', [
+            'bulan'       => 11,
+            'tahun'       => 2026,
+            'kelas_ngaji' => $kelasLambatan->id,
+        ]));
+        $rekapAbsensiPage->assertStatus(200);
+        $rekapAbsensiPage->assertSee('Ahmad Fauzi');
+        $rekapAbsensiPage->assertSee('Budi Santoso');
+        $rekapAbsensiPage->assertSee('Chandra Wijaya');
     }
 }

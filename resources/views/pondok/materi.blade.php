@@ -4,6 +4,17 @@
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <form action="{{ route('pondok.materi.muat-standar') }}" method="POST" style="margin:0;">
+        @csrf
+        <button type="submit" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Muat Materi Standar</span>
+        </button>
+    </form>
     <a href="{{ route('pondok.target.index') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
         <span>Target Pengajian</span>
     </a>
@@ -59,45 +70,6 @@
     .pm-stat-sub {
         font-size: 11px;
         color: #94a3b8;
-    }
-
-    .pm-kat-tabs {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        background: #f1f5f9;
-        padding: 4px;
-        border-radius: 12px;
-        flex-wrap: wrap;
-    }
-
-    .dark-mode .pm-kat-tabs {
-        background: #0f172a;
-    }
-
-    .pm-kat-tab {
-        padding: 6px 14px;
-        border-radius: 9px;
-        font-size: 12.5px;
-        font-weight: 600;
-        color: #475569;
-        text-decoration: none;
-        transition: all 0.15s ease;
-    }
-
-    .pm-kat-tab.active {
-        background: #ffffff;
-        color: #0f172a;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-    }
-
-    .dark-mode .pm-kat-tab {
-        color: #94a3b8;
-    }
-
-    .dark-mode .pm-kat-tab.active {
-        background: #1e293b;
-        color: #f8fafc;
     }
 
     .badge-kategori-quran {
@@ -156,6 +128,24 @@
         border-color: #334155;
         color: #f1f5f9;
     }
+
+    .pm-range-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 11.5px;
+        font-weight: 700;
+        background: #f0fdf4;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+
+    .dark-mode .pm-range-tag {
+        background: rgba(22, 163, 74, 0.16);
+        color: #4ade80;
+        border-color: rgba(22, 163, 74, 0.3);
+    }
 </style>
 @endpush
 
@@ -193,7 +183,7 @@
         <div class="pm-stat-card">
             <span class="pm-stat-label" style="color:#047857;">Materi Al-Qur'an</span>
             <span class="pm-stat-value" style="color:#047857;">{{ $totalQuran }}</span>
-            <span class="pm-stat-sub">Satuan: Jumlah Halaman</span>
+            <span class="pm-stat-sub">Cepatan • Lambatan • Reguler</span>
         </div>
         <div class="pm-stat-card">
             <span class="pm-stat-label" style="color:#1d4ed8;">Materi Al-Hadist</span>
@@ -202,38 +192,20 @@
         </div>
     </div>
 
-    {{-- Filter Kategori & Pencarian --}}
-    <div class="form-section-card" style="padding:14px 16px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-            <div class="pm-kat-tabs">
-                <a href="{{ route('pondok.materi.index', array_filter(['search' => request('search')])) }}"
-                   class="pm-kat-tab {{ !request('kategori') ? 'active' : '' }}">
-                    Semua
-                </a>
-                <a href="{{ route('pondok.materi.index', array_filter(['kategori' => 'al_quran', 'search' => request('search')])) }}"
-                   class="pm-kat-tab {{ request('kategori') === 'al_quran' ? 'active' : '' }}">
-                    Al-Qur'an
-                </a>
-                <a href="{{ route('pondok.materi.index', array_filter(['kategori' => 'al_hadist', 'search' => request('search')])) }}"
-                   class="pm-kat-tab {{ request('kategori') === 'al_hadist' ? 'active' : '' }}">
-                    Al-Hadist
-                </a>
-            </div>
-
-            <form action="{{ route('pondok.materi.index') }}" method="GET" style="display:flex; align-items:center; gap:8px; flex:1; max-width:340px;">
-                @if(request('kategori'))
-                    <input type="hidden" name="kategori" value="{{ request('kategori') }}">
-                @endif
-                <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Cari nama/kode materi..." style="height:36px; font-size:13px;">
-                <button type="submit" class="btn btn-primary" style="height:36px; padding:0 12px;">Cari</button>
-                @if(request()->hasAny(['kategori', 'search']))
-                    <a href="{{ route('pondok.materi.index') }}" class="btn btn-secondary" style="height:36px; padding:0 10px; display:inline-flex; align-items:center;">Reset</a>
-                @endif
-            </form>
-        </div>
+    {{-- Filter Card (Otomatis diintegrasikan ke dalam Toolbar Tabel Untitled UI oleh app.js) --}}
+    <div class="filter-card" style="display:none;">
+        <form action="{{ route('pondok.materi.index') }}" method="GET">
+            <select name="kategori" class="form-select" aria-label="Kategori Materi" onchange="this.form.submit()">
+                <option value="">Semua Kategori</option>
+                <option value="al_quran" {{ request('kategori') === 'al_quran' ? 'selected' : '' }}>Al-Qur'an</option>
+                <option value="al_hadist" {{ request('kategori') === 'al_hadist' ? 'selected' : '' }}>Al-Hadist</option>
+            </select>
+            <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari nama atau kode materi...">
+            <a href="{{ route('pondok.materi.index') }}" class="filter-btn-reset" title="Reset Filter">Reset</a>
+        </form>
     </div>
 
-    {{-- Tabel Daftar Materi --}}
+    {{-- Tabel Daftar Materi (Custom Blade Tailwind Table - Untitled UI Style) --}}
     <div class="table-card">
         <div class="table-wrapper">
             <table class="modern-table">
@@ -273,9 +245,12 @@
                                     <span style="color:#1d4ed8;">{{ (int) $item->jumlah_baris }} Baris</span>
                                 </span>
                             @else
-                                <span class="pm-volume-pill">
-                                    <span>{{ $item->jumlah_halaman }} Halaman</span>
-                                </span>
+                                <div style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <span class="pm-volume-pill">
+                                        <span>{{ $item->jumlah_halaman }} Halaman</span>
+                                    </span>
+                                    <span class="pm-range-tag">{{ $item->rentang_halaman_label }}</span>
+                                </div>
                             @endif
                         </td>
                         <td style="font-size:12.5px; color:var(--text-secondary);">
@@ -303,10 +278,12 @@
                         <td colspan="7" style="text-align:center; padding:44px 16px; color:var(--text-secondary);">
                             <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
                                 <span style="font-size:14px; font-weight:600;">Belum ada daftar materi pondok</span>
-                                <span style="font-size:12.5px;">Tambahkan materi Al-Qur'an atau Al-Hadist.</span>
-                                <button type="button" class="btn btn-sm btn-primary" data-modal-target="modalTambahMateri" style="margin-top:4px;">
-                                    + Tambah Materi Pertama
-                                </button>
+                                <span style="font-size:12.5px;">Tambahkan materi Al-Qur'an atau Al-Hadist, atau muat daftar kitab standar.</span>
+                                <div style="display:flex; gap:8px; margin-top:4px;">
+                                    <button type="button" class="btn btn-sm btn-primary" data-modal-target="modalTambahMateri">
+                                        + Tambah Materi
+                                    </button>
+                                </div>
                             </div>
                         </td>
                     </tr>
@@ -341,14 +318,26 @@
                     </select>
                 </div>
 
+                {{-- Pilihan Paket Kurikulum Al-Qur'an (Cepatan 1-341, Lambatan 342-604, Reguler 1-604) --}}
+                <div class="form-group" id="add_paket_quran_wrap">
+                    <label class="form-label">Jenis Kelas Al-Qur'an</label>
+                    <select name="paket_quran" id="add_paket_quran" class="form-select" onchange="applyPaketQuran('add')">
+                        <option value="reguler" data-nama="Al-Qur'an Reguler" data-kode="QUR-REG" data-awal="1" data-akhir="604" data-jml="604">Reguler — Halaman 1 s/d 604</option>
+                        <option value="cepatan" data-nama="Al-Qur'an Cepatan" data-kode="QUR-CPT" data-awal="1" data-akhir="341" data-jml="341">Cepatan — Halaman 1 s/d 341</option>
+                        <option value="lambatan" data-nama="Al-Qur'an Lambatan" data-kode="QUR-LMB" data-awal="342" data-akhir="604" data-jml="263">Lambatan — Halaman 342 s/d 604</option>
+                    </select>
+                    <input type="hidden" name="halaman_awal" id="add_halaman_awal" value="1">
+                    <input type="hidden" name="halaman_akhir" id="add_halaman_akhir" value="604">
+                </div>
+
                 <div style="display:grid; grid-template-columns: 1fr 2fr; gap:12px;">
                     <div class="form-group">
                         <label class="form-label">Kode Materi</label>
-                        <input type="text" name="kode_materi" value="{{ old('kode_materi') }}" class="form-control" placeholder="Otomatis">
+                        <input type="text" name="kode_materi" id="add_kode_materi" value="{{ old('kode_materi') }}" class="form-control" placeholder="Otomatis">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Nama Materi <span class="required-mark">*</span></label>
-                        <input type="text" name="nama_materi" value="{{ old('nama_materi') }}" class="form-control" placeholder="Contoh: Al-Qur'an / K. Sholah" required>
+                        <input type="text" name="nama_materi" id="add_nama_materi" value="{{ old('nama_materi') }}" class="form-control" placeholder="Contoh: Al-Qur'an Cepatan / K. Sholah" required>
                     </div>
                 </div>
 
@@ -359,7 +348,7 @@
                     </div>
 
                     <div class="form-group" id="add_baris_wrap" style="{{ old('kategori') === 'al_hadist' ? '' : 'display:none;' }}">
-                        <label class="form-label">Jumlah Baris <span class="required-mark">*</span></label>
+                        <label class="form-label">Jumlah Baris per Halaman <span class="required-mark">*</span></label>
                         <input type="number" name="jumlah_baris" id="add_jumlah_baris" min="0" value="{{ old('jumlah_baris', 16) }}" class="form-control">
                     </div>
                 </div>
@@ -403,25 +392,36 @@
                     </select>
                 </div>
 
+                <div class="form-group" id="edit_{{ $item->id }}_paket_quran_wrap" style="{{ $item->isAlHadist() ? 'display:none;' : '' }}">
+                    <label class="form-label">Jenis Kelas Al-Qur'an</label>
+                    <select name="paket_quran" id="edit_{{ $item->id }}_paket_quran" class="form-select" onchange="applyPaketQuran('edit_{{ $item->id }}')">
+                        <option value="reguler" data-nama="Al-Qur'an Reguler" data-kode="QUR-REG" data-awal="1" data-akhir="604" data-jml="604" {{ $item->paket_quran === 'reguler' ? 'selected' : '' }}>Reguler — Halaman 1 s/d 604</option>
+                        <option value="cepatan" data-nama="Al-Qur'an Cepatan" data-kode="QUR-CPT" data-awal="1" data-akhir="341" data-jml="341" {{ ($item->paket_quran === 'cepatan' || $item->effective_halaman_akhir === 341) ? 'selected' : '' }}>Cepatan — Halaman 1 s/d 341</option>
+                        <option value="lambatan" data-nama="Al-Qur'an Lambatan" data-kode="QUR-LMB" data-awal="342" data-akhir="604" data-jml="263" {{ ($item->paket_quran === 'lambatan' || $item->effective_halaman_awal === 342) ? 'selected' : '' }}>Lambatan — Halaman 342 s/d 604</option>
+                    </select>
+                    <input type="hidden" name="halaman_awal" id="edit_{{ $item->id }}_halaman_awal" value="{{ $item->effective_halaman_awal }}">
+                    <input type="hidden" name="halaman_akhir" id="edit_{{ $item->id }}_halaman_akhir" value="{{ $item->effective_halaman_akhir }}">
+                </div>
+
                 <div style="display:grid; grid-template-columns: 1fr 2fr; gap:12px;">
                     <div class="form-group">
                         <label class="form-label">Kode Materi</label>
-                        <input type="text" name="kode_materi" value="{{ $item->kode_materi }}" class="form-control">
+                        <input type="text" name="kode_materi" id="edit_{{ $item->id }}_kode_materi" value="{{ $item->kode_materi }}" class="form-control">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Nama Materi <span class="required-mark">*</span></label>
-                        <input type="text" name="nama_materi" value="{{ $item->nama_materi }}" class="form-control" required>
+                        <input type="text" name="nama_materi" id="edit_{{ $item->id }}_nama_materi" value="{{ $item->nama_materi }}" class="form-control" required>
                     </div>
                 </div>
 
                 <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
                     <div class="form-group">
                         <label class="form-label">Jumlah Halaman <span class="required-mark">*</span></label>
-                        <input type="number" name="jumlah_halaman" min="1" value="{{ $item->jumlah_halaman }}" class="form-control" required>
+                        <input type="number" name="jumlah_halaman" id="edit_{{ $item->id }}_jumlah_halaman" min="1" value="{{ $item->jumlah_halaman }}" class="form-control" required>
                     </div>
 
                     <div class="form-group" id="edit_{{ $item->id }}_baris_wrap" style="{{ $item->isAlHadist() ? '' : 'display:none;' }}">
-                        <label class="form-label">Jumlah Baris <span class="required-mark">*</span></label>
+                        <label class="form-label">Jumlah Baris per Halaman <span class="required-mark">*</span></label>
                         <input type="number" name="jumlah_baris" id="edit_{{ $item->id }}_jumlah_baris" min="0" value="{{ (int) $item->jumlah_baris }}" class="form-control">
                     </div>
                 </div>
@@ -470,53 +470,48 @@ function toggleBarisField(prefix) {
         sel = document.getElementById('edit_kategori_' + prefix.replace('edit_', ''));
     }
     var wrap = document.getElementById(prefix + '_baris_wrap');
+    var paketWrap = document.getElementById(prefix + '_paket_quran_wrap');
     var input = document.getElementById(prefix + '_jumlah_baris');
-    var inputHal = document.getElementById(prefix + '_jumlah_halaman');
     if (!sel || !wrap) return;
 
     if (sel.value === 'al_hadist') {
         wrap.style.display = '';
+        if (paketWrap) paketWrap.style.display = 'none';
         if (input) input.setAttribute('required', 'required');
     } else {
         wrap.style.display = 'none';
+        if (paketWrap) paketWrap.style.display = '';
         if (input) input.removeAttribute('required');
-        if (prefix === 'add' && inputHal && !inputHal.value) {
-            inputHal.value = 604;
+    }
+}
+
+function applyPaketQuran(prefix) {
+    var sel = document.getElementById(prefix + '_paket_quran');
+    if (!sel) return;
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt) return;
+
+    var inHal = document.getElementById(prefix + '_jumlah_halaman');
+    var inAwal = document.getElementById(prefix + '_halaman_awal');
+    var inAkhir = document.getElementById(prefix + '_halaman_akhir');
+    var inNama = document.getElementById(prefix + '_nama_materi');
+    var inKode = document.getElementById(prefix + '_kode_materi');
+
+    if (inHal) inHal.value = opt.getAttribute('data-jml') || 604;
+    if (inAwal) inAwal.value = opt.getAttribute('data-awal') || 1;
+    if (inAkhir) inAkhir.value = opt.getAttribute('data-akhir') || 604;
+    if (prefix === 'add') {
+        if (inNama && (!inNama.value || inNama.value.indexOf("Al-Qur'an") === 0)) {
+            inNama.value = opt.getAttribute('data-nama') || '';
+        }
+        if (inKode && (!inKode.value || inKode.value.indexOf('QUR-') === 0)) {
+            inKode.value = opt.getAttribute('data-kode') || '';
         }
     }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
     toggleBarisField('add');
-
-    document.querySelectorAll('[data-modal-target]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var m = document.getElementById(this.getAttribute('data-modal-target'));
-            if (m) {
-                m.classList.add('is-active');
-                document.body.style.overflow = 'hidden';
-            }
-        });
-    });
-
-    document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var m = this.closest('.app-modal');
-            if (m) {
-                m.classList.remove('is-active');
-                document.body.style.overflow = '';
-            }
-        });
-    });
-
-    document.querySelectorAll('.app-modal').forEach(function (m) {
-        m.addEventListener('click', function (e) {
-            if (e.target === this) {
-                this.classList.remove('is-active');
-                document.body.style.overflow = '';
-            }
-        });
-    });
 });
 </script>
 @endsection

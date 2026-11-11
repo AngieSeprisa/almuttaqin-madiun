@@ -6,6 +6,71 @@ class MushafMadinah
 {
     public const TOTAL_HALAMAN = 604;
 
+    public const PAKET_CEPATAN  = 'cepatan';
+    public const PAKET_LAMBATAN = 'lambatan';
+    public const PAKET_REGULER  = 'reguler';
+    public const PAKET_KUSTOM   = 'kustom';
+
+    /**
+     * Paket standar pengajian makna Al-Qur'an Mushaf Madinah (604 Halaman):
+     * - Cepatan  : Halaman 1 – 341 (341 Halaman, QS. Al-Fatihah s/d Al-Hajj)
+     * - Lambatan : Halaman 342 – 604 (263 Halaman, QS. Al-Mu'minun s/d An-Nas)
+     * - Reguler  : Halaman 1 – 604 (604 Halaman, Mushaf Penuh)
+     */
+    public static function daftarPaketQuran(): array
+    {
+        return [
+            self::PAKET_CEPATAN => [
+                'key'            => self::PAKET_CEPATAN,
+                'kode'           => 'QUR-CPT',
+                'label'          => "Al-Qur'an Cepatan",
+                'halaman_awal'   => 1,
+                'halaman_akhir'  => 341,
+                'jumlah_halaman' => 341,
+                'surat_awal'     => 1,
+                'surat_akhir'    => 22,
+                'info'           => 'Hal. 1–341 • QS. Al-Fatihah s/d Al-Hajj',
+            ],
+            self::PAKET_LAMBATAN => [
+                'key'            => self::PAKET_LAMBATAN,
+                'kode'           => 'QUR-LMB',
+                'label'          => "Al-Qur'an Lambatan",
+                'halaman_awal'   => 342,
+                'halaman_akhir'  => 604,
+                'jumlah_halaman' => 263,
+                'surat_awal'     => 23,
+                'surat_akhir'    => 114,
+                'info'           => "Hal. 342–604 • QS. Al-Mu'minun s/d An-Nas",
+            ],
+            self::PAKET_REGULER => [
+                'key'            => self::PAKET_REGULER,
+                'kode'           => 'QUR-REG',
+                'label'          => "Al-Qur'an Reguler",
+                'halaman_awal'   => 1,
+                'halaman_akhir'  => 604,
+                'jumlah_halaman' => 604,
+                'surat_awal'     => 1,
+                'surat_akhir'    => 114,
+                'info'           => 'Hal. 1–604 • Mushaf Madinah Penuh',
+            ],
+        ];
+    }
+
+    /**
+     * Daftar sesi pengajian pondok yang sinkron dengan Rekap Absensi Pengajian.
+     */
+    public static function daftarSesiPengajian(): array
+    {
+        return [
+            'bada_subuh'   => 'Bada Subuh',
+            'pagi_1'       => 'Pagi 1',
+            'pagi_2'       => 'Pagi 2',
+            'siang'        => 'Siang',
+            'bada_maghrib' => 'Bada Maghrib',
+            'malam'        => 'Malam',
+        ];
+    }
+
     /**
      * Daftar 114 Surat Al-Qur'an sesuai Mushaf Madinah (604 Halaman)
      * Format: nomor => [nama, jumlah_ayat, halaman_awal, halaman_akhir]
@@ -150,6 +215,23 @@ class MushafMadinah
     }
 
     /**
+     * Ambil daftar surat yang berada dalam rentang halaman Mushaf Madinah tertentu.
+     */
+    public static function suratDalamRentang(int $halamanAwal = 1, int $halamanAkhir = 604): array
+    {
+        $awal = max(1, min(self::TOTAL_HALAMAN, $halamanAwal));
+        $akhir = max($awal, min(self::TOTAL_HALAMAN, $halamanAkhir));
+
+        $result = [];
+        foreach (self::daftarSurat() as $nomor => $s) {
+            if ($s['halaman_akhir'] >= $awal && $s['halaman_awal'] <= $akhir) {
+                $result[$nomor] = $s;
+            }
+        }
+        return $result;
+    }
+
+    /**
      * Estimasi nomor halaman Mushaf Madinah (1–604) berdasarkan nomor surat dan nomor ayat.
      */
     public static function estimasiHalaman(int $suratNomor, int $ayat): int
@@ -172,4 +254,3 @@ class MushafMadinah
         return (int) round($halAwal + $ratio * ($halAkhir - $halAwal));
     }
 }
-

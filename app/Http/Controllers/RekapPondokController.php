@@ -9,6 +9,7 @@ use App\Models\MasterSesi;
 use App\Models\PerizinanHaid;
 use App\Models\PerizinanSakit;
 use App\Models\PerizinanSambang;
+use App\Models\PondokJurnalMengaji;
 use App\Models\Presensi;
 use App\Models\Siswa;
 use Carbon\Carbon;
@@ -1623,7 +1624,7 @@ class RekapPondokController extends Controller
             'malam'        => ['label' => 'MALAM',        'short' => 'MALAM'],
         ];
 
-        // Cari tanggal-tanggal yang memiliki tap pada bulan ini
+        // Cari tanggal-tanggal yang memiliki tap RFID maupun Jurnal Mengaji pada bulan ini
         $datesWithData = [];
         foreach ($presensisBySantri as $sId => $dates) {
             foreach ($dates as $d => $taps) {
@@ -1632,6 +1633,31 @@ class RekapPondokController extends Controller
                     $datesWithData[$d][$slot] = true;
                 }
             }
+        }
+
+        // Integrasikan data Absensi dari Jurnal Mengaji Pondok
+        $jurnalAbsensiBySantri = [];
+        try {
+            $jurnalQuery = PondokJurnalMengaji::with('absensis')
+                ->whereBetween('tanggal', [$startDate->toDateString(), $endDate->toDateString()])
+                ->orderBy('id', 'asc');
+
+            if ($selectedKelas) {
+                $jurnalQuery->where('kelas_pengajian_id', $selectedKelas->id);
+            }
+
+            $jurnalRecords = $jurnalQuery->get();
+            foreach ($jurnalRecords as $jm) {
+                $dStr = Carbon::parse($jm->tanggal)->toDateString();
+                $slot = $jm->sesi_pengajian ?: 'bada_maghrib';
+                $datesWithData[$dStr][$slot] = true;
+
+                foreach ($jm->absensis as $abs) {
+                    $jurnalAbsensiBySantri[$abs->siswa_id][$dStr][$slot] = $abs->status;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Abaikan jika tabel belum dimigrasikan
         }
 
         // Jika belum ada data tap aktual, susun jadwal representatif seperti Gambar 1
@@ -1710,6 +1736,8 @@ class RekapPondokController extends Controller
                     $slotKey = $sess['key'];
                     $cellKey = "{$dStr}_{$slotKey}";
 
+                    $jurnalStatus = $jurnalAbsensiBySantri[$siswa->id][$dStr][$slotKey] ?? null;
+
                     $matchedTap = null;
                     foreach ($tapsToday as $tap) {
                         $detected = self::detectSlotPengajian($tap->sesi, $tap->waktu_tap);
@@ -1719,7 +1747,21 @@ class RekapPondokController extends Controller
                         }
                     }
 
-                    if ($matchedTap) {
+                    if ($jurnalStatus) {
+                        if ($jurnalStatus === 'terlambat') {
+                            $row['total_t']++;
+                            $row['cells'][$cellKey] = ['code' => 'T', 'badge' => 'status-badge-t'];
+                        } elseif (in_array($jurnalStatus, ['izin', 'sakit'], true)) {
+                            $row['total_i']++;
+                            $row['cells'][$cellKey] = ['code' => 'I', 'badge' => 'status-badge-i'];
+                        } elseif ($jurnalStatus === 'alpa') {
+                            $row['total_a']++;
+                            $row['cells'][$cellKey] = ['code' => 'A', 'badge' => 'status-badge-a'];
+                        } else {
+                            $row['total_h']++;
+                            $row['cells'][$cellKey] = ['code' => 'H', 'badge' => 'status-badge-h'];
+                        }
+                    } elseif ($matchedTap) {
                         $isLate = ($matchedTap->status_kehadiran === 'terlambat');
                         if ($isLate) {
                             $row['total_t']++;

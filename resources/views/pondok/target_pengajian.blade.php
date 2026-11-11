@@ -147,47 +147,39 @@
     </div>
     @endif
 
-    {{-- Filter Target Pengajian Per Tanggal & Kelas --}}
-    <div class="form-section-card" style="padding:14px 16px;">
-        <form action="{{ route('pondok.target.index') }}" method="GET" style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <input type="date" name="tanggal" value="{{ request('tanggal') }}" class="form-control" style="width:auto; height:36px; font-size:13px;" onchange="this.form.submit()" aria-label="Filter Tanggal">
+    {{-- Filter Card (Otomatis diintegrasikan ke dalam Toolbar Tabel Untitled UI oleh app.js) --}}
+    <div class="filter-card" style="display:none;">
+        <form action="{{ route('pondok.target.index') }}" method="GET">
+            <input type="date" name="tanggal" value="{{ request('tanggal') }}" class="form-control" aria-label="Tanggal" onchange="this.form.submit()">
 
-                <select name="kelas_pengajian_id" class="form-select" style="width:auto; min-width:190px; height:36px; font-size:13px;" onchange="this.form.submit()" aria-label="Filter Kelas">
-                    <option value="">Semua Kelas Pengajian</option>
-                    @foreach($kelasList as $kls)
-                        <option value="{{ $kls->id }}" {{ (string) request('kelas_pengajian_id') === (string) $kls->id ? 'selected' : '' }}>
-                            {{ $kls->nama_kelas }}
-                        </option>
-                    @endforeach
-                </select>
+            <select name="kelas_pengajian_id" class="form-select" aria-label="Kelas Pengajian" onchange="this.form.submit()">
+                <option value="">Semua Kelas Pengajian</option>
+                @foreach($kelasList as $kls)
+                    <option value="{{ $kls->id }}" {{ (string) request('kelas_pengajian_id') === (string) $kls->id ? 'selected' : '' }}>
+                        {{ $kls->nama_kelas }}
+                    </option>
+                @endforeach
+            </select>
 
-                <select name="kategori" class="form-select" style="width:auto; min-width:150px; height:36px; font-size:13px;" onchange="this.form.submit()" aria-label="Filter Kategori">
-                    <option value="">Semua Kategori</option>
-                    <option value="al_quran" {{ request('kategori') === 'al_quran' ? 'selected' : '' }}>Al-Qur'an</option>
-                    <option value="al_hadist" {{ request('kategori') === 'al_hadist' ? 'selected' : '' }}>Al-Hadist</option>
-                </select>
+            <select name="kategori" class="form-select" aria-label="Kategori Materi" onchange="this.form.submit()">
+                <option value="">Semua Kategori</option>
+                <option value="al_quran" {{ request('kategori') === 'al_quran' ? 'selected' : '' }}>Al-Qur'an</option>
+                <option value="al_hadist" {{ request('kategori') === 'al_hadist' ? 'selected' : '' }}>Al-Hadist</option>
+            </select>
 
-                @if(request()->hasAny(['tanggal', 'kelas_pengajian_id', 'kategori', 'search']))
-                    <a href="{{ route('pondok.target.index') }}" class="btn btn-secondary" style="height:36px; padding:0 12px; display:inline-flex; align-items:center;">Reset</a>
-                @endif
-            </div>
-
-            <div style="display:flex; align-items:center; gap:8px;">
-                <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Cari materi / kelas..." style="height:36px; font-size:13px; width:210px;">
-                <button type="submit" class="btn btn-primary" style="height:36px; padding:0 12px;">Cari</button>
-            </div>
+            <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari materi atau kelas...">
+            <a href="{{ route('pondok.target.index') }}" class="filter-btn-reset" title="Reset Filter">Reset</a>
         </form>
     </div>
 
-    {{-- Tabel Target Pengajian --}}
+    {{-- Tabel Target Pengajian (Custom Blade Tailwind Table - Untitled UI Style) --}}
     <div class="table-card">
         <div class="table-wrapper">
             <table class="modern-table">
                 <thead>
                     <tr>
                         <th style="width:50px; text-align:center;">No</th>
-                        <th>Tanggal</th>
+                        <th>Tanggal & Sesi</th>
                         <th>Kelas Pengajian</th>
                         <th>Materi</th>
                         <th>Target Materi</th>
@@ -207,6 +199,7 @@
                         <td style="text-align:center; font-weight:600; color:var(--text-secondary);">{{ $idx + 1 }}</td>
                         <td>
                             <div style="font-weight:700; color:var(--text-primary);">{{ $hari }}, {{ $dt->format('d/m/Y') }}</div>
+                            <span style="font-size:11.5px; color:var(--text-secondary); font-weight:600;">{{ $item->sesi_label }}</span>
                         </td>
                         <td>
                             <span class="badge-lembaga" style="background:rgba(37, 99, 235, 0.1); color:#1d4ed8; font-weight:700;">
@@ -219,7 +212,7 @@
                                 @if($item->materi?->isAlHadist())
                                     <span class="tp-badge-hadist">Al-Hadist</span>
                                 @else
-                                    <span class="tp-badge-quran">Al-Qur'an</span>
+                                    <span class="tp-badge-quran">Al-Qur'an • {{ $item->materi?->rentang_halaman_label ?? 'Hal. 1–604' }}</span>
                                 @endif
                             </div>
                         </td>
@@ -287,7 +280,7 @@
 
 {{-- MODAL TAMBAH TARGET PENGAJIAN --}}
 <div class="app-modal" id="modalTambahTarget" role="dialog" aria-modal="true">
-    <div class="modal-dialog" style="max-width:520px;">
+    <div class="modal-dialog" style="max-width:540px;">
         <form action="{{ route('pondok.target.store') }}" method="POST">
             @csrf
             <div class="modal-header">
@@ -303,6 +296,19 @@
                     </div>
 
                     <div class="form-group">
+                        <label class="form-label">Sesi Pengajian</label>
+                        <select name="sesi_pengajian" class="form-select">
+                            @foreach($sesiList as $sKey => $sLabel)
+                                <option value="{{ $sKey }}" {{ old('sesi_pengajian', 'bada_maghrib') === $sKey ? 'selected' : '' }}>
+                                    {{ $sLabel }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                    <div class="form-group">
                         <label class="form-label">Kelas Pengajian <span class="required-mark">*</span></label>
                         <select name="kelas_pengajian_id" class="form-select" required>
                             <option value="">Pilih Kelas</option>
@@ -313,22 +319,24 @@
                             @endforeach
                         </select>
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
-                    <select name="pondok_materi_id" id="target_add_materi" class="form-select" required onchange="syncTargetForm('add')">
-                        <option value="" data-kategori="al_quran" data-halaman="604" data-baris="15">Pilih Materi</option>
-                        @foreach($materiList as $m)
-                            <option value="{{ $m->id }}"
-                                    data-kategori="{{ $m->kategori }}"
-                                    data-halaman="{{ (int) $m->jumlah_halaman }}"
-                                    data-baris="{{ (int) $m->jumlah_baris }}"
-                                    {{ (string) old('pondok_materi_id') === (string) $m->id ? 'selected' : '' }}>
-                                {{ $m->nama_materi }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <div class="form-group">
+                        <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
+                        <select name="pondok_materi_id" id="target_add_materi" class="form-select" required onchange="syncTargetForm('add')">
+                            <option value="" data-kategori="al_quran" data-hal-awal="1" data-hal-akhir="604" data-halaman="604" data-baris="16">Pilih Materi</option>
+                            @foreach($materiList as $m)
+                                <option value="{{ $m->id }}"
+                                        data-kategori="{{ $m->kategori }}"
+                                        data-hal-awal="{{ $m->effective_halaman_awal }}"
+                                        data-hal-akhir="{{ $m->effective_halaman_akhir }}"
+                                        data-halaman="{{ (int) $m->jumlah_halaman }}"
+                                        data-baris="{{ (int) $m->jumlah_baris }}"
+                                        {{ (string) old('pondok_materi_id') === (string) $m->id ? 'selected' : '' }}>
+                                    {{ $m->nama_materi }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
 
                 {{-- SEKSI AL-QUR'AN: NAMA SURAT & AYAT (MUSHAF MADINAH 604 HALAMAN) --}}
@@ -356,7 +364,7 @@
                     </div>
 
                     <div class="tp-mushaf-strip">
-                        <span>Mushaf Madinah</span>
+                        <span id="target_add_mushaf_range_lbl">Mushaf Madinah • Hal. 1–604</span>
                         <span id="target_add_mushaf_info" style="color:#047857; font-weight:700;">Halaman 1 / 604</span>
                     </div>
                 </div>
@@ -398,7 +406,7 @@
 {{-- MODAL EDIT & HAPUS TARGET --}}
 @foreach($targets as $item)
 <div class="app-modal" id="modalEditTarget{{ $item->id }}" role="dialog" aria-modal="true">
-    <div class="modal-dialog" style="max-width:520px;">
+    <div class="modal-dialog" style="max-width:540px;">
         <form action="{{ route('pondok.target.update', $item->id) }}" method="POST">
             @csrf
             @method('PUT')
@@ -415,6 +423,19 @@
                     </div>
 
                     <div class="form-group">
+                        <label class="form-label">Sesi Pengajian</label>
+                        <select name="sesi_pengajian" class="form-select">
+                            @foreach($sesiList as $sKey => $sLabel)
+                                <option value="{{ $sKey }}" {{ ($item->sesi_pengajian ?: 'bada_maghrib') === $sKey ? 'selected' : '' }}>
+                                    {{ $sLabel }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                    <div class="form-group">
                         <label class="form-label">Kelas Pengajian <span class="required-mark">*</span></label>
                         <select name="kelas_pengajian_id" class="form-select" required>
                             @foreach($kelasList as $kls)
@@ -424,21 +445,23 @@
                             @endforeach
                         </select>
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
-                    <select name="pondok_materi_id" id="target_edit_{{ $item->id }}_materi" class="form-select" required onchange="syncTargetForm('edit_{{ $item->id }}')">
-                        @foreach($materiList as $m)
-                            <option value="{{ $m->id }}"
-                                    data-kategori="{{ $m->kategori }}"
-                                    data-halaman="{{ (int) $m->jumlah_halaman }}"
-                                    data-baris="{{ (int) $m->jumlah_baris }}"
-                                    {{ (int) $item->pondok_materi_id === (int) $m->id ? 'selected' : '' }}>
-                                {{ $m->nama_materi }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <div class="form-group">
+                        <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
+                        <select name="pondok_materi_id" id="target_edit_{{ $item->id }}_materi" class="form-select" required onchange="syncTargetForm('edit_{{ $item->id }}')">
+                            @foreach($materiList as $m)
+                                <option value="{{ $m->id }}"
+                                        data-kategori="{{ $m->kategori }}"
+                                        data-hal-awal="{{ $m->effective_halaman_awal }}"
+                                        data-hal-akhir="{{ $m->effective_halaman_akhir }}"
+                                        data-halaman="{{ (int) $m->jumlah_halaman }}"
+                                        data-baris="{{ (int) $m->jumlah_baris }}"
+                                        {{ (int) $item->pondok_materi_id === (int) $m->id ? 'selected' : '' }}>
+                                    {{ $m->nama_materi }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
 
                 {{-- SEKSI AL-QUR'AN --}}
@@ -466,7 +489,7 @@
                     </div>
 
                     <div class="tp-mushaf-strip">
-                        <span>Mushaf Madinah</span>
+                        <span id="target_edit_{{ $item->id }}_mushaf_range_lbl">Mushaf Madinah • {{ $item->materi?->rentang_halaman_label ?? 'Hal. 1–604' }}</span>
                         <span id="target_edit_{{ $item->id }}_mushaf_info" style="color:#047857; font-weight:700;">Halaman {{ (int) ($item->target_halaman ?: 1) }} / 604</span>
                     </div>
                 </div>
@@ -541,10 +564,13 @@ function syncTargetForm(prefix) {
     var kat = opt ? opt.getAttribute('data-kategori') : 'al_quran';
     var maxHal = parseInt((opt && opt.getAttribute('data-halaman')) || '1', 10) || 1;
     var maxBar = parseInt((opt && opt.getAttribute('data-baris')) || '1', 10) || 1;
+    var halAwal = parseInt((opt && opt.getAttribute('data-hal-awal')) || '1', 10) || 1;
+    var halAkhir = parseInt((opt && opt.getAttribute('data-hal-akhir')) || '604', 10) || 604;
 
     var inHal = document.getElementById('target_' + prefix + '_halaman');
     var inBar = document.getElementById('target_' + prefix + '_baris');
     var hInfo = document.getElementById('target_' + prefix + '_hadist_info');
+    var rangeLbl = document.getElementById('target_' + prefix + '_mushaf_range_lbl');
 
     if (kat === 'al_hadist') {
         qSec.style.display = 'none';
@@ -563,7 +589,36 @@ function syncTargetForm(prefix) {
     } else {
         qSec.style.display = 'flex';
         hSec.style.display = 'none';
+        if (rangeLbl) {
+            rangeLbl.textContent = 'Mushaf Madinah • Hal. ' + halAwal + '–' + halAkhir;
+        }
+        filterSuratOptionsByRange(prefix, halAwal, halAkhir);
         updateAyatLimit(prefix);
+    }
+}
+
+function filterSuratOptionsByRange(prefix, halAwal, halAkhir) {
+    var selSurat = document.getElementById('target_' + prefix + '_surat');
+    if (!selSurat) return;
+
+    var firstValidVal = null;
+    var currentValid = false;
+
+    for (var i = 0; i < selSurat.options.length; i++) {
+        var o = selSurat.options[i];
+        var sAwal = parseInt(o.getAttribute('data-hal-awal') || '1', 10) || 1;
+        var sAkhir = parseInt(o.getAttribute('data-hal-akhir') || '604', 10) || 604;
+        var inRange = (sAkhir >= halAwal && sAwal <= halAkhir);
+        o.hidden = !inRange;
+        o.disabled = !inRange;
+        if (inRange) {
+            if (!firstValidVal) firstValidVal = o.value;
+            if (o.value === selSurat.value) currentValid = true;
+        }
+    }
+
+    if (!currentValid && firstValidVal) {
+        selSurat.value = firstValidVal;
     }
 }
 
@@ -605,35 +660,6 @@ function updateMushafPageInfo(prefix) {
 
 document.addEventListener('DOMContentLoaded', function () {
     syncTargetForm('add');
-
-    document.querySelectorAll('[data-modal-target]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var m = document.getElementById(this.getAttribute('data-modal-target'));
-            if (m) {
-                m.classList.add('is-active');
-                document.body.style.overflow = 'hidden';
-            }
-        });
-    });
-
-    document.querySelectorAll('[data-modal-close]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var m = this.closest('.app-modal');
-            if (m) {
-                m.classList.remove('is-active');
-                document.body.style.overflow = '';
-            }
-        });
-    });
-
-    document.querySelectorAll('.app-modal').forEach(function (m) {
-        m.addEventListener('click', function (e) {
-            if (e.target === this) {
-                this.classList.remove('is-active');
-                document.body.style.overflow = '';
-            }
-        });
-    });
 });
 </script>
 @endsection

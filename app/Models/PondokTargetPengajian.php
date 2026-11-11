@@ -16,6 +16,7 @@ class PondokTargetPengajian extends Model
 
     protected $fillable = [
         'tanggal',
+        'sesi_pengajian',
         'kelas_pengajian_id',
         'pondok_materi_id',
         'surat_nomor',
@@ -64,6 +65,13 @@ class PondokTargetPengajian extends Model
     public function jurnals(): HasMany
     {
         return $this->hasMany(PondokJurnalMengaji::class, 'target_pengajian_id');
+    }
+
+    public function getSesiLabelAttribute(): string
+    {
+        $map = MushafMadinah::daftarSesiPengajian();
+        $key = $this->sesi_pengajian ?: 'bada_maghrib';
+        return $map[$key] ?? ucwords(str_replace('_', ' ', $key));
     }
 
     public function getTargetLabelAttribute(): string

@@ -45,6 +45,14 @@
                 $bcParent = 'Pondok';
                 $bcParentRoute = route('pondok.jurnal.index');
                 $bcChild = 'Jurnal Mengaji';
+            } elseif (request()->routeIs('pondok.rekap-jurnal*')) {
+                $bcParent = 'Pondok';
+                $bcParentRoute = route('pondok.rekap-jurnal');
+                $bcChild = 'Rekap Jurnal';
+            } elseif (request()->routeIs('pondok.rekap-absensi*')) {
+                $bcParent = 'Pondok';
+                $bcParentRoute = route('pondok.rekap-absensi');
+                $bcChild = 'Rekap Absensi';
             } elseif (request()->routeIs('rekap.sholat.*')) {
                 $customBreadcrumbHtml = null;
                 $breadcrumbsList = [

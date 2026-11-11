@@ -277,6 +277,7 @@ Route::middleware('auth')->group(function () {
             // 1. Daftar Materi Pondok (Al-Qur'an & Al-Hadist)
             Route::get('/materi', [PondokPengajianController::class, 'materiIndex'])->name('materi.index');
             Route::post('/materi', [PondokPengajianController::class, 'storeMateri'])->name('materi.store');
+            Route::post('/materi/muat-standar', [PondokPengajianController::class, 'muatStandarMateri'])->name('materi.muat-standar');
             Route::put('/materi/{materi}', [PondokPengajianController::class, 'updateMateri'])->name('materi.update');
             Route::delete('/materi/{materi}', [PondokPengajianController::class, 'destroyMateri'])->name('materi.destroy');
 
@@ -286,11 +287,13 @@ Route::middleware('auth')->group(function () {
             Route::put('/target-pengajian/{target}', [PondokPengajianController::class, 'updateTarget'])->name('target.update');
             Route::delete('/target-pengajian/{target}', [PondokPengajianController::class, 'destroyTarget'])->name('target.destroy');
 
-            // 3. Jurnal Mengaji (Pencapaian Pengajian Per Kelas & Indikator Ketercapaian)
+            // 3. Jurnal Mengaji & Absensi Pengajian + Rekap Jurnal
             Route::get('/jurnal-mengaji', [PondokPengajianController::class, 'jurnalIndex'])->name('jurnal.index');
             Route::post('/jurnal-mengaji', [PondokPengajianController::class, 'storeJurnal'])->name('jurnal.store');
             Route::put('/jurnal-mengaji/{jurnal}', [PondokPengajianController::class, 'updateJurnal'])->name('jurnal.update');
             Route::delete('/jurnal-mengaji/{jurnal}', [PondokPengajianController::class, 'destroyJurnal'])->name('jurnal.destroy');
+            Route::get('/rekap-jurnal', [PondokPengajianController::class, 'rekapJurnal'])->name('rekap-jurnal');
+            Route::get('/rekap-absensi', [RekapPondokController::class, 'pengajian'])->name('rekap-absensi');
         });
 
     // Menu Jadwal Pelajaran Multi-Jenjang (SMP & SMA)
