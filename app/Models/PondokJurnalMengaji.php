@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\MushafMadinah;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,8 +24,14 @@ class PondokJurnalMengaji extends Model
         'target_pengajian_id',
         'pengajar_id',
         'nama_pengajar',
+        'target_surat_nomor',
+        'target_nama_surat',
+        'target_ayat',
         'target_halaman',
         'target_baris',
+        'capaian_surat_nomor',
+        'capaian_nama_surat',
+        'capaian_ayat',
         'capaian_halaman',
         'capaian_baris',
         'halaman_awal',
@@ -36,13 +43,17 @@ class PondokJurnalMengaji extends Model
     protected function casts(): array
     {
         return [
-            'tanggal'         => 'date',
-            'target_halaman'  => 'integer',
-            'target_baris'    => 'integer',
-            'capaian_halaman' => 'integer',
-            'capaian_baris'   => 'integer',
-            'halaman_awal'    => 'integer',
-            'halaman_akhir'   => 'integer',
+            'tanggal'             => 'date',
+            'target_surat_nomor'  => 'integer',
+            'target_ayat'         => 'integer',
+            'target_halaman'      => 'integer',
+            'target_baris'        => 'integer',
+            'capaian_surat_nomor' => 'integer',
+            'capaian_ayat'        => 'integer',
+            'capaian_halaman'     => 'integer',
+            'capaian_baris'       => 'integer',
+            'halaman_awal'        => 'integer',
+            'halaman_akhir'       => 'integer',
         ];
     }
 
@@ -68,16 +79,24 @@ class PondokJurnalMengaji extends Model
 
     /**
      * Hitung indikator ketercapaian: tercapai | kurang | terlampaui
+     * - Al-Qur'an : jika ada surat & ayat, bandingkan [surat_nomor, ayat]; jika tidak, bandingkan halaman.
+     * - Al-Hadist : bandingkan [halaman, baris].
      */
     public static function hitungStatusKetercapaian(
         string $kategori,
         int $targetHalaman,
         int $targetBaris,
         int $capaianHalaman,
-        int $capaianBaris
+        int $capaianBaris,
+        ?int $targetSuratNomor = null,
+        ?int $targetAyat = null,
+        ?int $capaianSuratNomor = null,
+        ?int $capaianAyat = null
     ): string {
         if ($kategori === PondokMateri::KATEGORI_AL_HADIST) {
             $cmp = [$capaianHalaman, $capaianBaris] <=> [$targetHalaman, $targetBaris];
+        } elseif ($targetSuratNomor && $targetAyat && $capaianSuratNomor && $capaianAyat) {
+            $cmp = [$capaianSuratNomor, $capaianAyat] <=> [$targetSuratNomor, $targetAyat];
         } else {
             $cmp = $capaianHalaman <=> $targetHalaman;
         }
@@ -104,43 +123,64 @@ class PondokJurnalMengaji extends Model
     public function getTargetLabelAttribute(): string
     {
         $kategori = $this->materi?->kategori ?? PondokMateri::KATEGORI_AL_QURAN;
-        $hal = (int) $this->target_halaman;
 
         if ($kategori === PondokMateri::KATEGORI_AL_HADIST) {
+            $hal = (int) $this->target_halaman;
             $baris = (int) ($this->target_baris ?? 0);
-            return "{$hal} Halaman • {$baris} Baris";
+            return "Halaman {$hal} • Baris {$baris}";
         }
 
+        if ($this->target_nama_surat && $this->target_ayat) {
+            $hal = (int) ($this->target_halaman ?: MushafMadinah::estimasiHalaman((int) $this->target_surat_nomor, (int) $this->target_ayat));
+            return "QS. {$this->target_nama_surat} Ayat {$this->target_ayat} • Hal. {$hal}";
+        }
+
+        $hal = (int) $this->target_halaman;
         return "{$hal} Halaman";
     }
 
     public function getCapaianLabelAttribute(): string
     {
         $kategori = $this->materi?->kategori ?? PondokMateri::KATEGORI_AL_QURAN;
-        $hal = (int) $this->capaian_halaman;
-        $rangeStr = '';
-
-        if ($this->halaman_awal && $this->halaman_akhir) {
-            $rangeStr = " (Hal. {$this->halaman_awal}–{$this->halaman_akhir})";
-        }
 
         if ($kategori === PondokMateri::KATEGORI_AL_HADIST) {
+            $hal = (int) $this->capaian_halaman;
             $baris = (int) ($this->capaian_baris ?? 0);
-            return "{$hal} Halaman • {$baris} Baris{$rangeStr}";
+            return "Halaman {$hal} • Baris {$baris}";
         }
 
-        return "{$hal} Halaman{$rangeStr}";
+        if ($this->capaian_nama_surat && $this->capaian_ayat) {
+            $hal = (int) ($this->capaian_halaman ?: MushafMadinah::estimasiHalaman((int) $this->capaian_surat_nomor, (int) $this->capaian_ayat));
+            return "QS. {$this->capaian_nama_surat} Ayat {$this->capaian_ayat} • Hal. {$hal}";
+        }
+
+        $hal = (int) $this->capaian_halaman;
+        return "{$hal} Halaman";
     }
 
     public function getSelisihLabelAttribute(): string
     {
+        if ($this->status_ketercapaian === self::STATUS_TERCAPAI) {
+            return 'Sesuai Target';
+        }
+
         $kategori = $this->materi?->kategori ?? PondokMateri::KATEGORI_AL_QURAN;
+
+        if ($kategori === PondokMateri::KATEGORI_AL_QURAN && $this->target_surat_nomor && $this->capaian_surat_nomor) {
+            if ((int) $this->target_surat_nomor === (int) $this->capaian_surat_nomor) {
+                $diffAyat = (int) $this->capaian_ayat - (int) $this->target_ayat;
+                $sign = $diffAyat > 0 ? '+' : '';
+                return "{$sign}{$diffAyat} Ayat";
+            }
+            $diffHal = (int) $this->capaian_halaman - (int) $this->target_halaman;
+            if ($diffHal !== 0) {
+                $sign = $diffHal > 0 ? '+' : '';
+                return "{$sign}{$diffHal} Hal";
+            }
+        }
+
         $diffHal = (int) $this->capaian_halaman - (int) $this->target_halaman;
         $diffBaris = (int) ($this->capaian_baris ?? 0) - (int) ($this->target_baris ?? 0);
-
-        if ($this->status_ketercapaian === self::STATUS_TERCAPAI) {
-            return '100% Sesuai Target';
-        }
 
         $parts = [];
         if ($diffHal !== 0) {
@@ -155,4 +195,3 @@ class PondokJurnalMengaji extends Model
         return !empty($parts) ? implode(', ', $parts) : 'Sesuai Target';
     }
 }
-

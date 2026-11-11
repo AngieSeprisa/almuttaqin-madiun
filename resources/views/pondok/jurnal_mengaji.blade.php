@@ -338,26 +338,27 @@
         <form action="{{ route('pondok.jurnal.store') }}" method="POST">
             @csrf
             <div class="modal-header">
-                <h3 class="modal-title">Input Jurnal Mengaji & Pencapaian Kelas</h3>
+                <h3 class="modal-title">Input Jurnal Mengaji</h3>
                 <button type="button" class="modal-close-btn" data-modal-close aria-label="Tutup">&times;</button>
             </div>
 
             <div class="modal-body" style="text-align:left; display:flex; flex-direction:column; gap:14px;">
-                {{-- Pilih dari Target Pengajian yang sudah dijadwalkan --}}
                 <div class="form-group">
-                    <label class="form-label">Acuan Target Pengajian (Opsional - Otomatis Isi Kelas & Target)</label>
+                    <label class="form-label">Acuan Target Pengajian</label>
                     <select name="target_pengajian_id" id="jm_add_target_ref" class="form-select" onchange="applySelectedTargetRef('add')">
-                        <option value="">-- Pilih Target Pengajian Terjadwal / Isi Manual di Bawah --</option>
+                        <option value="">Pilih Target Pengajian</option>
                         @foreach($targetList as $t)
                             <option value="{{ $t->id }}"
                                     data-tanggal="{{ \Carbon\Carbon::parse($t->tanggal)->format('Y-m-d') }}"
                                     data-kelas="{{ $t->kelas_pengajian_id }}"
                                     data-materi="{{ $t->pondok_materi_id }}"
                                     data-kategori="{{ $t->materi?->kategori ?? 'al_quran' }}"
+                                    data-surat="{{ (int) ($t->surat_nomor ?: 1) }}"
+                                    data-ayat="{{ (int) ($t->ayat ?: 1) }}"
                                     data-target-hal="{{ (int) $t->target_halaman }}"
                                     data-target-baris="{{ (int) $t->target_baris }}"
                                     {{ (string) request('target_id') === (string) $t->id ? 'selected' : '' }}>
-                                {{ \Carbon\Carbon::parse($t->tanggal)->format('d/m/Y') }} — {{ $t->kelasPengajian?->nama_kelas }} — {{ $t->materi?->nama_materi }} (Target: {{ $t->target_label }})
+                                {{ \Carbon\Carbon::parse($t->tanggal)->format('d/m/Y') }} — {{ $t->kelasPengajian?->nama_kelas }} — {{ $t->materi?->nama_materi }}
                             </option>
                         @endforeach
                     </select>
@@ -372,7 +373,7 @@
                     <div class="form-group">
                         <label class="form-label">Kelas Pengajian <span class="required-mark">*</span></label>
                         <select name="kelas_pengajian_id" id="jm_add_kelas" class="form-select" required>
-                            <option value="">-- Pilih Kelas --</option>
+                            <option value="">Pilih Kelas</option>
                             @foreach($kelasList as $kls)
                                 <option value="{{ $kls->id }}" {{ (string) old('kelas_pengajian_id') === (string) $kls->id ? 'selected' : '' }}>
                                     {{ $kls->nama_kelas }}
@@ -386,65 +387,106 @@
                     <div class="form-group">
                         <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
                         <select name="pondok_materi_id" id="jm_add_materi" class="form-select" required onchange="syncJurnalMateriMode('add')">
-                            <option value="" data-kategori="al_quran">-- Pilih Materi --</option>
+                            <option value="" data-kategori="al_quran" data-halaman="604" data-baris="15">Pilih Materi</option>
                             @foreach($materiList as $m)
                                 <option value="{{ $m->id }}"
                                         data-kategori="{{ $m->kategori }}"
+                                        data-halaman="{{ (int) $m->jumlah_halaman }}"
+                                        data-baris="{{ (int) $m->jumlah_baris }}"
                                         {{ (string) old('pondok_materi_id') === (string) $m->id ? 'selected' : '' }}>
-                                    [{{ $m->kategori_label }}] {{ $m->nama_materi }}
+                                    {{ $m->nama_materi }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Ustadz / Pengajar</label>
+                        <label class="form-label">Pengajar</label>
                         <input type="text" name="nama_pengajar" value="{{ old('nama_pengajar', auth()->user()?->name) }}" class="form-control" placeholder="Nama pengajar...">
                     </div>
                 </div>
 
-                {{-- Perbandingan Target vs Pencapaian --}}
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                {{-- SEKSI AL-QUR'AN: TARGET & CAPAIAN SURAT + AYAT --}}
+                <div id="jm_add_quran_wrap" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Target Halaman</label>
-                            <input type="number" name="target_halaman" id="jm_add_target_hal" min="0" value="{{ old('target_halaman', 2) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                            <label class="form-label" style="font-size:12px;">Nama Surat</label>
+                            <select name="target_surat_nomor" id="jm_add_target_surat" class="form-select" onchange="updateLiveIndikator('add')">
+                                @foreach($daftarSurat as $srt)
+                                    <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}">
+                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
-                        <div class="form-group" id="jm_add_target_baris_wrap" style="margin:0; display:none;">
-                            <label class="form-label" style="font-size:12px;">Target Baris (Al-Hadist)</label>
-                            <input type="number" name="target_baris" id="jm_add_target_baris" min="0" value="{{ old('target_baris', 0) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Ayat</label>
+                            <input type="number" name="target_ayat" id="jm_add_target_ayat" min="1" value="{{ old('target_ayat', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
                         </div>
                     </div>
 
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Capaian Halaman <span class="required-mark">*</span></label>
-                            <input type="number" name="capaian_halaman" id="jm_add_capaian_hal" min="0" value="{{ old('capaian_halaman', 2) }}" class="form-control" required oninput="updateLiveIndikator('add')">
+                            <label class="form-label" style="font-size:12px;">Nama Surat <span class="required-mark">*</span></label>
+                            <select name="capaian_surat_nomor" id="jm_add_capaian_surat" class="form-select" onchange="updateLiveIndikator('add')">
+                                @foreach($daftarSurat as $srt)
+                                    <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}">
+                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
-                        <div class="form-group" id="jm_add_capaian_baris_wrap" style="margin:0; display:none;">
-                            <label class="form-label" style="font-size:12px;">Capaian Baris (Al-Hadist)</label>
-                            <input type="number" name="capaian_baris" id="jm_add_capaian_baris" min="0" value="{{ old('capaian_baris', 0) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Ayat <span class="required-mark">*</span></label>
+                            <input type="number" name="capaian_ayat" id="jm_add_capaian_ayat" min="1" value="{{ old('capaian_ayat', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        </div>
+                    </div>
+                </div>
+
+                {{-- SEKSI AL-HADIST: TARGET & CAPAIAN HALAMAN + BARIS --}}
+                <div id="jm_add_hadist_wrap" style="display:none; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Halaman</label>
+                            <input type="number" name="target_halaman" id="jm_add_target_hal" min="0" value="{{ old('target_halaman', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Baris</label>
+                            <input type="number" name="target_baris" id="jm_add_target_baris" min="0" value="{{ old('target_baris', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        </div>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Halaman <span class="required-mark">*</span></label>
+                            <input type="number" name="capaian_halaman" id="jm_add_capaian_hal" min="0" value="{{ old('capaian_halaman', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Baris <span class="required-mark">*</span></label>
+                            <input type="number" name="capaian_baris" id="jm_add_capaian_baris" min="0" value="{{ old('capaian_baris', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
                         </div>
                     </div>
                 </div>
 
                 {{-- Live Preview Indikator Ketercapaian --}}
                 <div class="jm-live-preview">
-                    <span style="font-size:12.5px; font-weight:600; color:var(--text-secondary);">Indikator Ketercapaian Materi:</span>
+                    <span style="font-size:12.5px; font-weight:600; color:var(--text-secondary);">Indikator Ketercapaian Materi</span>
                     <span id="jm_add_live_badge" class="jm-indikator-badge status-tercapai">✓ Tercapai</span>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Catatan Evaluasi Pengajian (Opsional)</label>
-                    <textarea name="catatan" rows="2" class="form-control" placeholder="Catatan kelancaran bacaan / kendala kelas...">{{ old('catatan') }}</textarea>
+                    <label class="form-label">Catatan</label>
+                    <textarea name="catatan" rows="2" class="form-control" placeholder="Catatan evaluasi pengajian kelas...">{{ old('catatan') }}</textarea>
                 </div>
             </div>
 
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-modal-close>Batal</button>
-                <button type="submit" class="btn btn-primary">Simpan Jurnal Mengaji</button>
+                <button type="submit" class="btn btn-primary">Simpan Jurnal</button>
             </div>
         </form>
     </div>
@@ -487,27 +529,67 @@
                             @foreach($materiList as $m)
                                 <option value="{{ $m->id }}"
                                         data-kategori="{{ $m->kategori }}"
+                                        data-halaman="{{ (int) $m->jumlah_halaman }}"
+                                        data-baris="{{ (int) $m->jumlah_baris }}"
                                         {{ (int) $item->pondok_materi_id === (int) $m->id ? 'selected' : '' }}>
-                                    [{{ $m->kategori_label }}] {{ $m->nama_materi }}
+                                    {{ $m->nama_materi }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Ustadz / Pengajar</label>
+                        <label class="form-label">Pengajar</label>
                         <input type="text" name="nama_pengajar" value="{{ $item->nama_pengajar }}" class="form-control">
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                <div id="jm_edit_{{ $item->id }}_quran_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'none' : 'grid' }}; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Target Halaman</label>
+                            <label class="form-label" style="font-size:12px;">Nama Surat</label>
+                            <select name="target_surat_nomor" id="jm_edit_{{ $item->id }}_target_surat" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
+                                @foreach($daftarSurat as $srt)
+                                    <option value="{{ $srt['nomor'] }}" {{ (int) ($item->target_surat_nomor ?: 1) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Ayat</label>
+                            <input type="number" name="target_ayat" id="jm_edit_{{ $item->id }}_target_ayat" min="1" value="{{ (int) ($item->target_ayat ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                        </div>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Nama Surat <span class="required-mark">*</span></label>
+                            <select name="capaian_surat_nomor" id="jm_edit_{{ $item->id }}_capaian_surat" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
+                                @foreach($daftarSurat as $srt)
+                                    <option value="{{ $srt['nomor'] }}" {{ (int) ($item->capaian_surat_nomor ?: 1) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Ayat <span class="required-mark">*</span></label>
+                            <input type="number" name="capaian_ayat" id="jm_edit_{{ $item->id }}_capaian_ayat" min="1" value="{{ (int) ($item->capaian_ayat ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="jm_edit_{{ $item->id }}_hadist_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'grid' : 'none' }}; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Halaman</label>
                             <input type="number" name="target_halaman" id="jm_edit_{{ $item->id }}_target_hal" min="0" value="{{ (int) $item->target_halaman }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
                         </div>
-                        <div class="form-group" id="jm_edit_{{ $item->id }}_target_baris_wrap" style="margin:0; {{ $item->materi?->isAlHadist() ? '' : 'display:none;' }}">
-                            <label class="form-label" style="font-size:12px;">Target Baris (Al-Hadist)</label>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Baris</label>
                             <input type="number" name="target_baris" id="jm_edit_{{ $item->id }}_target_baris" min="0" value="{{ (int) $item->target_baris }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
                         </div>
                     </div>
@@ -515,25 +597,25 @@
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Capaian Halaman <span class="required-mark">*</span></label>
-                            <input type="number" name="capaian_halaman" id="jm_edit_{{ $item->id }}_capaian_hal" min="0" value="{{ (int) $item->capaian_halaman }}" class="form-control" required oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                            <label class="form-label" style="font-size:12px;">Halaman <span class="required-mark">*</span></label>
+                            <input type="number" name="capaian_halaman" id="jm_edit_{{ $item->id }}_capaian_hal" min="0" value="{{ (int) $item->capaian_halaman }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
                         </div>
-                        <div class="form-group" id="jm_edit_{{ $item->id }}_capaian_baris_wrap" style="margin:0; {{ $item->materi?->isAlHadist() ? '' : 'display:none;' }}">
-                            <label class="form-label" style="font-size:12px;">Capaian Baris (Al-Hadist)</label>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Baris <span class="required-mark">*</span></label>
                             <input type="number" name="capaian_baris" id="jm_edit_{{ $item->id }}_capaian_baris" min="0" value="{{ (int) $item->capaian_baris }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
                         </div>
                     </div>
                 </div>
 
                 <div class="jm-live-preview">
-                    <span style="font-size:12.5px; font-weight:600; color:var(--text-secondary);">Indikator Ketercapaian Materi:</span>
+                    <span style="font-size:12.5px; font-weight:600; color:var(--text-secondary);">Indikator Ketercapaian Materi</span>
                     <span id="jm_edit_{{ $item->id }}_live_badge" class="jm-indikator-badge status-{{ $item->status_ketercapaian }}">
                         {{ $item->status_label }}
                     </span>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Catatan Evaluasi Pengajian (Opsional)</label>
+                    <label class="form-label">Catatan</label>
                     <textarea name="catatan" rows="2" class="form-control">{{ $item->catatan }}</textarea>
                 </div>
             </div>
@@ -579,30 +661,38 @@ function getMateriKategori(prefix) {
 
 function syncJurnalMateriMode(prefix) {
     var kat = getMateriKategori(prefix);
-    var tWrap = document.getElementById('jm_' + prefix + '_target_baris_wrap');
-    var cWrap = document.getElementById('jm_' + prefix + '_capaian_baris_wrap');
-    if (tWrap) tWrap.style.display = (kat === 'al_hadist') ? '' : 'none';
-    if (cWrap) cWrap.style.display = (kat === 'al_hadist') ? '' : 'none';
+    var qWrap = document.getElementById('jm_' + prefix + '_quran_wrap');
+    var hWrap = document.getElementById('jm_' + prefix + '_hadist_wrap');
+    if (qWrap) qWrap.style.display = (kat === 'al_hadist') ? 'none' : 'grid';
+    if (hWrap) hWrap.style.display = (kat === 'al_hadist') ? 'grid' : 'none';
     updateLiveIndikator(prefix);
 }
 
 function updateLiveIndikator(prefix) {
     var kat = getMateriKategori(prefix);
-    var tHal = parseInt((document.getElementById('jm_' + prefix + '_target_hal') || {}).value || '0', 10) || 0;
-    var cHal = parseInt((document.getElementById('jm_' + prefix + '_capaian_hal') || {}).value || '0', 10) || 0;
-    var tBaris = parseInt((document.getElementById('jm_' + prefix + '_target_baris') || {}).value || '0', 10) || 0;
-    var cBaris = parseInt((document.getElementById('jm_' + prefix + '_capaian_baris') || {}).value || '0', 10) || 0;
-
     var cmp = 0;
+
     if (kat === 'al_hadist') {
+        var tHal = parseInt((document.getElementById('jm_' + prefix + '_target_hal') || {}).value || '0', 10) || 0;
+        var cHal = parseInt((document.getElementById('jm_' + prefix + '_capaian_hal') || {}).value || '0', 10) || 0;
+        var tBaris = parseInt((document.getElementById('jm_' + prefix + '_target_baris') || {}).value || '0', 10) || 0;
+        var cBaris = parseInt((document.getElementById('jm_' + prefix + '_capaian_baris') || {}).value || '0', 10) || 0;
+
         if (cHal !== tHal) {
             cmp = cHal > tHal ? 1 : -1;
         } else if (cBaris !== tBaris) {
             cmp = cBaris > tBaris ? 1 : -1;
         }
     } else {
-        if (cHal !== tHal) {
-            cmp = cHal > tHal ? 1 : -1;
+        var tSurat = parseInt((document.getElementById('jm_' + prefix + '_target_surat') || {}).value || '1', 10) || 1;
+        var cSurat = parseInt((document.getElementById('jm_' + prefix + '_capaian_surat') || {}).value || '1', 10) || 1;
+        var tAyat = parseInt((document.getElementById('jm_' + prefix + '_target_ayat') || {}).value || '1', 10) || 1;
+        var cAyat = parseInt((document.getElementById('jm_' + prefix + '_capaian_ayat') || {}).value || '1', 10) || 1;
+
+        if (cSurat !== tSurat) {
+            cmp = cSurat > tSurat ? 1 : -1;
+        } else if (cAyat !== tAyat) {
+            cmp = cAyat > tAyat ? 1 : -1;
         }
     }
 
@@ -631,6 +721,10 @@ function applySelectedTargetRef(prefix) {
     var elTgl = document.getElementById('jm_' + prefix + '_tanggal');
     var elKls = document.getElementById('jm_' + prefix + '_kelas');
     var elMat = document.getElementById('jm_' + prefix + '_materi');
+    var elTSurat = document.getElementById('jm_' + prefix + '_target_surat');
+    var elTAyat = document.getElementById('jm_' + prefix + '_target_ayat');
+    var elCSurat = document.getElementById('jm_' + prefix + '_capaian_surat');
+    var elCAyat = document.getElementById('jm_' + prefix + '_capaian_ayat');
     var elTHal = document.getElementById('jm_' + prefix + '_target_hal');
     var elTBar = document.getElementById('jm_' + prefix + '_target_baris');
     var elCHal = document.getElementById('jm_' + prefix + '_capaian_hal');
@@ -639,10 +733,18 @@ function applySelectedTargetRef(prefix) {
     if (elTgl && opt.getAttribute('data-tanggal')) elTgl.value = opt.getAttribute('data-tanggal');
     if (elKls && opt.getAttribute('data-kelas')) elKls.value = opt.getAttribute('data-kelas');
     if (elMat && opt.getAttribute('data-materi')) elMat.value = opt.getAttribute('data-materi');
-    if (elTHal) elTHal.value = opt.getAttribute('data-target-hal') || 0;
-    if (elTBar) elTBar.value = opt.getAttribute('data-target-baris') || 0;
-    if (elCHal) elCHal.value = opt.getAttribute('data-target-hal') || 0;
-    if (elCBar) elCBar.value = opt.getAttribute('data-target-baris') || 0;
+
+    var srt = opt.getAttribute('data-surat') || '1';
+    var ayt = opt.getAttribute('data-ayat') || '1';
+    if (elTSurat) elTSurat.value = srt;
+    if (elTAyat) elTAyat.value = ayt;
+    if (elCSurat) elCSurat.value = srt;
+    if (elCAyat) elCAyat.value = ayt;
+
+    if (elTHal) elTHal.value = opt.getAttribute('data-target-hal') || 1;
+    if (elTBar) elTBar.value = opt.getAttribute('data-target-baris') || 1;
+    if (elCHal) elCHal.value = opt.getAttribute('data-target-hal') || 1;
+    if (elCBar) elCBar.value = opt.getAttribute('data-target-baris') || 1;
 
     syncJurnalMateriMode(prefix);
 }
@@ -691,4 +793,3 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 @endsection
-

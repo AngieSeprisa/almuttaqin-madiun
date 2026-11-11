@@ -89,6 +89,25 @@
         color: #4338ca;
         border: 1px solid #c7d2fe;
     }
+
+    .tp-mushaf-strip {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        font-size: 12px;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .dark-mode .tp-mushaf-strip {
+        background: #0f172a;
+        border-color: #334155;
+        color: #cbd5e1;
+    }
 </style>
 @endpush
 
@@ -170,7 +189,7 @@
                         <th style="width:50px; text-align:center;">No</th>
                         <th>Tanggal</th>
                         <th>Kelas Pengajian</th>
-                        <th>Materi & Kategori</th>
+                        <th>Materi</th>
                         <th>Target Materi</th>
                         <th>Status Jurnal</th>
                         <th>Keterangan</th>
@@ -268,7 +287,7 @@
 
 {{-- MODAL TAMBAH TARGET PENGAJIAN --}}
 <div class="app-modal" id="modalTambahTarget" role="dialog" aria-modal="true">
-    <div class="modal-dialog" style="max-width:540px;">
+    <div class="modal-dialog" style="max-width:520px;">
         <form action="{{ route('pondok.target.store') }}" method="POST">
             @csrf
             <div class="modal-header">
@@ -286,7 +305,7 @@
                     <div class="form-group">
                         <label class="form-label">Kelas Pengajian <span class="required-mark">*</span></label>
                         <select name="kelas_pengajian_id" class="form-select" required>
-                            <option value="">-- Pilih Kelas --</option>
+                            <option value="">Pilih Kelas</option>
                             @foreach($kelasList as $kls)
                                 <option value="{{ $kls->id }}" {{ (string) old('kelas_pengajian_id') === (string) $kls->id ? 'selected' : '' }}>
                                     {{ $kls->nama_kelas }}
@@ -298,43 +317,72 @@
 
                 <div class="form-group">
                     <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
-                    <select name="pondok_materi_id" id="target_add_materi" class="form-select" required onchange="syncTargetMateriMode('add')">
-                        <option value="" data-kategori="al_quran">-- Pilih Materi --</option>
+                    <select name="pondok_materi_id" id="target_add_materi" class="form-select" required onchange="syncTargetForm('add')">
+                        <option value="" data-kategori="al_quran" data-halaman="604" data-baris="15">Pilih Materi</option>
                         @foreach($materiList as $m)
                             <option value="{{ $m->id }}"
                                     data-kategori="{{ $m->kategori }}"
+                                    data-halaman="{{ (int) $m->jumlah_halaman }}"
+                                    data-baris="{{ (int) $m->jumlah_baris }}"
                                     {{ (string) old('pondok_materi_id') === (string) $m->id ? 'selected' : '' }}>
-                                [{{ $m->kategori_label }}] {{ $m->nama_materi }} ({{ $m->volume_label }})
+                                {{ $m->nama_materi }}
                             </option>
                         @endforeach
                     </select>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
-                    <div class="form-group">
-                        <label class="form-label">Target Jumlah Halaman <span class="required-mark">*</span></label>
-                        <input type="number" name="target_halaman" id="target_add_halaman" min="0" value="{{ old('target_halaman', 2) }}" class="form-control" required>
+                {{-- SEKSI AL-QUR'AN: NAMA SURAT & AYAT (MUSHAF MADINAH 604 HALAMAN) --}}
+                <div id="target_add_quran_section" style="display:flex; flex-direction:column; gap:12px;">
+                    <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Nama Surat <span class="required-mark">*</span></label>
+                            <select name="surat_nomor" id="target_add_surat" class="form-select" onchange="updateAyatLimit('add')">
+                                @foreach($daftarSurat as $srt)
+                                    <option value="{{ $srt['nomor'] }}"
+                                            data-ayat="{{ $srt['jumlah_ayat'] }}"
+                                            data-hal-awal="{{ $srt['halaman_awal'] }}"
+                                            data-hal-akhir="{{ $srt['halaman_akhir'] }}"
+                                            {{ (int) old('surat_nomor', 1) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Ayat <span class="required-mark">*</span></label>
+                            <input type="number" name="ayat" id="target_add_ayat" min="1" max="7" value="{{ old('ayat', 1) }}" class="form-control" oninput="updateMushafPageInfo('add')">
+                        </div>
                     </div>
 
-                    <div class="form-group" id="target_add_baris_wrap" style="display:none;">
-                        <label class="form-label">Target Jumlah Baris (Al-Hadist) <span class="required-mark">*</span></label>
-                        <input type="number" name="target_baris" id="target_add_baris" min="0" value="{{ old('target_baris', 0) }}" class="form-control">
+                    <div class="tp-mushaf-strip">
+                        <span>Mushaf Madinah</span>
+                        <span id="target_add_mushaf_info" style="color:#047857; font-weight:700;">Halaman 1 / 604</span>
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
-                    <div class="form-group">
-                        <label class="form-label">Halaman Awal (Opsional)</label>
-                        <input type="number" name="halaman_awal" min="1" value="{{ old('halaman_awal') }}" class="form-control" placeholder="Contoh: 1">
+                {{-- SEKSI AL-HADIST: HALAMAN & BARIS SESUAI MATERI PONDOK --}}
+                <div id="target_add_hadist_section" style="display:none; flex-direction:column; gap:12px;">
+                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Halaman <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman" id="target_add_halaman" min="1" value="{{ old('halaman', 1) }}" class="form-control">
+                        </div>
+
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Baris <span class="required-mark">*</span></label>
+                            <input type="number" name="baris" id="target_add_baris" min="1" value="{{ old('baris', 1) }}" class="form-control">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Halaman Akhir (Opsional)</label>
-                        <input type="number" name="halaman_akhir" min="1" value="{{ old('halaman_akhir') }}" class="form-control" placeholder="Contoh: 5">
+
+                    <div class="tp-mushaf-strip">
+                        <span>Batas Materi</span>
+                        <span id="target_add_hadist_info" style="color:#1d4ed8; font-weight:700;">Maksimal 1 Halaman • 1 Baris</span>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Keterangan Target (Opsional)</label>
+                    <label class="form-label">Keterangan</label>
                     <textarea name="keterangan" rows="2" class="form-control" placeholder="Catatan target pengajian kelas...">{{ old('keterangan') }}</textarea>
                 </div>
             </div>
@@ -350,7 +398,7 @@
 {{-- MODAL EDIT & HAPUS TARGET --}}
 @foreach($targets as $item)
 <div class="app-modal" id="modalEditTarget{{ $item->id }}" role="dialog" aria-modal="true">
-    <div class="modal-dialog" style="max-width:540px;">
+    <div class="modal-dialog" style="max-width:520px;">
         <form action="{{ route('pondok.target.update', $item->id) }}" method="POST">
             @csrf
             @method('PUT')
@@ -380,42 +428,73 @@
 
                 <div class="form-group">
                     <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
-                    <select name="pondok_materi_id" id="target_edit_{{ $item->id }}_materi" class="form-select" required onchange="syncTargetMateriMode('edit_{{ $item->id }}')">
+                    <select name="pondok_materi_id" id="target_edit_{{ $item->id }}_materi" class="form-select" required onchange="syncTargetForm('edit_{{ $item->id }}')">
                         @foreach($materiList as $m)
                             <option value="{{ $m->id }}"
                                     data-kategori="{{ $m->kategori }}"
+                                    data-halaman="{{ (int) $m->jumlah_halaman }}"
+                                    data-baris="{{ (int) $m->jumlah_baris }}"
                                     {{ (int) $item->pondok_materi_id === (int) $m->id ? 'selected' : '' }}>
-                                [{{ $m->kategori_label }}] {{ $m->nama_materi }} ({{ $m->volume_label }})
+                                {{ $m->nama_materi }}
                             </option>
                         @endforeach
                     </select>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
-                    <div class="form-group">
-                        <label class="form-label">Target Jumlah Halaman <span class="required-mark">*</span></label>
-                        <input type="number" name="target_halaman" min="0" value="{{ (int) $item->target_halaman }}" class="form-control" required>
+                {{-- SEKSI AL-QUR'AN --}}
+                <div id="target_edit_{{ $item->id }}_quran_section" style="display:{{ $item->materi?->isAlHadist() ? 'none' : 'flex' }}; flex-direction:column; gap:12px;">
+                    <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Nama Surat <span class="required-mark">*</span></label>
+                            <select name="surat_nomor" id="target_edit_{{ $item->id }}_surat" class="form-select" onchange="updateAyatLimit('edit_{{ $item->id }}')">
+                                @foreach($daftarSurat as $srt)
+                                    <option value="{{ $srt['nomor'] }}"
+                                            data-ayat="{{ $srt['jumlah_ayat'] }}"
+                                            data-hal-awal="{{ $srt['halaman_awal'] }}"
+                                            data-hal-akhir="{{ $srt['halaman_akhir'] }}"
+                                            {{ (int) ($item->surat_nomor ?: 1) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Ayat <span class="required-mark">*</span></label>
+                            <input type="number" name="ayat" id="target_edit_{{ $item->id }}_ayat" min="1" value="{{ (int) ($item->ayat ?: 1) }}" class="form-control" oninput="updateMushafPageInfo('edit_{{ $item->id }}')">
+                        </div>
                     </div>
 
-                    <div class="form-group" id="target_edit_{{ $item->id }}_baris_wrap" style="{{ $item->materi?->isAlHadist() ? '' : 'display:none;' }}">
-                        <label class="form-label">Target Jumlah Baris (Al-Hadist) <span class="required-mark">*</span></label>
-                        <input type="number" name="target_baris" min="0" value="{{ (int) $item->target_baris }}" class="form-control">
+                    <div class="tp-mushaf-strip">
+                        <span>Mushaf Madinah</span>
+                        <span id="target_edit_{{ $item->id }}_mushaf_info" style="color:#047857; font-weight:700;">Halaman {{ (int) ($item->target_halaman ?: 1) }} / 604</span>
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
-                    <div class="form-group">
-                        <label class="form-label">Halaman Awal (Opsional)</label>
-                        <input type="number" name="halaman_awal" min="1" value="{{ $item->halaman_awal }}" class="form-control">
+                {{-- SEKSI AL-HADIST --}}
+                <div id="target_edit_{{ $item->id }}_hadist_section" style="display:{{ $item->materi?->isAlHadist() ? 'flex' : 'none' }}; flex-direction:column; gap:12px;">
+                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Halaman <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman" id="target_edit_{{ $item->id }}_halaman" min="1" max="{{ (int) ($item->materi?->jumlah_halaman ?: 999) }}" value="{{ (int) $item->target_halaman }}" class="form-control">
+                        </div>
+
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Baris <span class="required-mark">*</span></label>
+                            <input type="number" name="baris" id="target_edit_{{ $item->id }}_baris" min="1" max="{{ (int) ($item->materi?->jumlah_baris ?: 999) }}" value="{{ (int) $item->target_baris }}" class="form-control">
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Halaman Akhir (Opsional)</label>
-                        <input type="number" name="halaman_akhir" min="1" value="{{ $item->halaman_akhir }}" class="form-control">
+
+                    <div class="tp-mushaf-strip">
+                        <span>Batas Materi</span>
+                        <span id="target_edit_{{ $item->id }}_hadist_info" style="color:#1d4ed8; font-weight:700;">
+                            Maksimal {{ (int) ($item->materi?->jumlah_halaman ?: 1) }} Halaman • {{ (int) ($item->materi?->jumlah_baris ?: 1) }} Baris
+                        </span>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Keterangan Target (Opsional)</label>
+                    <label class="form-label">Keterangan</label>
                     <textarea name="keterangan" rows="2" class="form-control">{{ $item->keterangan }}</textarea>
                 </div>
             </div>
@@ -452,18 +531,80 @@
 @endforeach
 
 <script>
-function syncTargetMateriMode(prefix) {
+function syncTargetForm(prefix) {
     var sel = document.getElementById('target_' + prefix + '_materi');
-    var wrap = document.getElementById('target_' + prefix + '_baris_wrap');
-    if (!sel || !wrap) return;
+    var qSec = document.getElementById('target_' + prefix + '_quran_section');
+    var hSec = document.getElementById('target_' + prefix + '_hadist_section');
+    if (!sel || !qSec || !hSec) return;
 
     var opt = sel.options[sel.selectedIndex];
     var kat = opt ? opt.getAttribute('data-kategori') : 'al_quran';
-    wrap.style.display = (kat === 'al_hadist') ? '' : 'none';
+    var maxHal = parseInt((opt && opt.getAttribute('data-halaman')) || '1', 10) || 1;
+    var maxBar = parseInt((opt && opt.getAttribute('data-baris')) || '1', 10) || 1;
+
+    var inHal = document.getElementById('target_' + prefix + '_halaman');
+    var inBar = document.getElementById('target_' + prefix + '_baris');
+    var hInfo = document.getElementById('target_' + prefix + '_hadist_info');
+
+    if (kat === 'al_hadist') {
+        qSec.style.display = 'none';
+        hSec.style.display = 'flex';
+        if (inHal) {
+            inHal.max = maxHal;
+            if (parseInt(inHal.value || '0', 10) > maxHal) inHal.value = maxHal;
+        }
+        if (inBar) {
+            inBar.max = maxBar;
+            if (parseInt(inBar.value || '0', 10) > maxBar) inBar.value = maxBar;
+        }
+        if (hInfo) {
+            hInfo.textContent = 'Maksimal ' + maxHal + ' Halaman • ' + maxBar + ' Baris';
+        }
+    } else {
+        qSec.style.display = 'flex';
+        hSec.style.display = 'none';
+        updateAyatLimit(prefix);
+    }
+}
+
+function updateAyatLimit(prefix) {
+    var selSurat = document.getElementById('target_' + prefix + '_surat');
+    var inAyat = document.getElementById('target_' + prefix + '_ayat');
+    if (!selSurat || !inAyat) return;
+
+    var opt = selSurat.options[selSurat.selectedIndex];
+    var maxAyat = parseInt((opt && opt.getAttribute('data-ayat')) || '286', 10) || 286;
+    inAyat.max = maxAyat;
+    if (parseInt(inAyat.value || '1', 10) > maxAyat) {
+        inAyat.value = maxAyat;
+    }
+    updateMushafPageInfo(prefix);
+}
+
+function updateMushafPageInfo(prefix) {
+    var selSurat = document.getElementById('target_' + prefix + '_surat');
+    var inAyat = document.getElementById('target_' + prefix + '_ayat');
+    var infoEl = document.getElementById('target_' + prefix + '_mushaf_info');
+    if (!selSurat || !inAyat || !infoEl) return;
+
+    var opt = selSurat.options[selSurat.selectedIndex];
+    if (!opt) return;
+
+    var jmlAyat = parseInt(opt.getAttribute('data-ayat') || '1', 10) || 1;
+    var halAwal = parseInt(opt.getAttribute('data-hal-awal') || '1', 10) || 1;
+    var halAkhir = parseInt(opt.getAttribute('data-hal-akhir') || '1', 10) || 1;
+    var ayat = Math.max(1, Math.min(jmlAyat, parseInt(inAyat.value || '1', 10) || 1));
+
+    var estHal = halAwal;
+    if (halAkhir > halAwal && jmlAyat > 1) {
+        estHal = Math.round(halAwal + ((ayat - 1) / (jmlAyat - 1)) * (halAkhir - halAwal));
+    }
+
+    infoEl.textContent = 'Halaman ' + estHal + ' / 604 • Maks ' + jmlAyat + ' Ayat';
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    syncTargetMateriMode('add');
+    syncTargetForm('add');
 
     document.querySelectorAll('[data-modal-target]').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -496,4 +637,3 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 @endsection
-

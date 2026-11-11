@@ -208,15 +208,15 @@
             <div class="pm-kat-tabs">
                 <a href="{{ route('pondok.materi.index', array_filter(['search' => request('search')])) }}"
                    class="pm-kat-tab {{ !request('kategori') ? 'active' : '' }}">
-                    Semua ({{ $totalMateri }})
+                    Semua
                 </a>
                 <a href="{{ route('pondok.materi.index', array_filter(['kategori' => 'al_quran', 'search' => request('search')])) }}"
                    class="pm-kat-tab {{ request('kategori') === 'al_quran' ? 'active' : '' }}">
-                    Al-Qur'an ({{ $totalQuran }})
+                    Al-Qur'an
                 </a>
                 <a href="{{ route('pondok.materi.index', array_filter(['kategori' => 'al_hadist', 'search' => request('search')])) }}"
                    class="pm-kat-tab {{ request('kategori') === 'al_hadist' ? 'active' : '' }}">
-                    Al-Hadist ({{ $totalHadist }})
+                    Al-Hadist
                 </a>
             </div>
 
@@ -243,7 +243,7 @@
                         <th style="width:110px;">Kode</th>
                         <th>Nama Materi</th>
                         <th style="width:150px;">Kategori</th>
-                        <th>Detail Halaman / Baris</th>
+                        <th>Detail Materi</th>
                         <th>Keterangan</th>
                         <th style="width:110px; text-align:center;">Aksi</th>
                     </tr>
@@ -303,7 +303,7 @@
                         <td colspan="7" style="text-align:center; padding:44px 16px; color:var(--text-secondary);">
                             <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
                                 <span style="font-size:14px; font-weight:600;">Belum ada daftar materi pondok</span>
-                                <span style="font-size:12.5px;">Tambahkan materi Al-Qur'an (jumlah halaman) atau Al-Hadist (halaman & baris).</span>
+                                <span style="font-size:12.5px;">Tambahkan materi Al-Qur'an atau Al-Hadist.</span>
                                 <button type="button" class="btn btn-sm btn-primary" data-modal-target="modalTambahMateri" style="margin-top:4px;">
                                     + Tambah Materi Pertama
                                 </button>
@@ -336,8 +336,8 @@
                 <div class="form-group">
                     <label class="form-label">Kategori Materi <span class="required-mark">*</span></label>
                     <select name="kategori" id="add_kategori" class="form-select" required onchange="toggleBarisField('add')">
-                        <option value="al_quran" {{ old('kategori') === 'al_hadist' ? '' : 'selected' }}>Al-Qur'an (Ditampilkan Jumlah Halaman)</option>
-                        <option value="al_hadist" {{ old('kategori') === 'al_hadist' ? 'selected' : '' }}>Al-Hadist (Ditampilkan Halaman & Baris)</option>
+                        <option value="al_quran" {{ old('kategori') === 'al_hadist' ? '' : 'selected' }}>Al-Qur'an</option>
+                        <option value="al_hadist" {{ old('kategori') === 'al_hadist' ? 'selected' : '' }}>Al-Hadist</option>
                     </select>
                 </div>
 
@@ -347,26 +347,26 @@
                         <input type="text" name="kode_materi" value="{{ old('kode_materi') }}" class="form-control" placeholder="Otomatis">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Nama Materi / Kitab <span class="required-mark">*</span></label>
-                        <input type="text" name="nama_materi" value="{{ old('nama_materi') }}" class="form-control" placeholder="Contoh: Al-Qur'an Juz 1 / Kitab Sholat" required>
+                        <label class="form-label">Nama Materi <span class="required-mark">*</span></label>
+                        <input type="text" name="nama_materi" value="{{ old('nama_materi') }}" class="form-control" placeholder="Contoh: Al-Qur'an / K. Sholah" required>
                     </div>
                 </div>
 
                 <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
                     <div class="form-group">
                         <label class="form-label">Jumlah Halaman <span class="required-mark">*</span></label>
-                        <input type="number" name="jumlah_halaman" min="1" value="{{ old('jumlah_halaman', 20) }}" class="form-control" required placeholder="Contoh: 20">
+                        <input type="number" name="jumlah_halaman" id="add_jumlah_halaman" min="1" value="{{ old('jumlah_halaman', 604) }}" class="form-control" required>
                     </div>
 
                     <div class="form-group" id="add_baris_wrap" style="{{ old('kategori') === 'al_hadist' ? '' : 'display:none;' }}">
-                        <label class="form-label">Jumlah Baris (Al-Hadist) <span class="required-mark">*</span></label>
-                        <input type="number" name="jumlah_baris" id="add_jumlah_baris" min="0" value="{{ old('jumlah_baris', 0) }}" class="form-control" placeholder="Contoh: 450">
+                        <label class="form-label">Jumlah Baris <span class="required-mark">*</span></label>
+                        <input type="number" name="jumlah_baris" id="add_jumlah_baris" min="0" value="{{ old('jumlah_baris', 16) }}" class="form-control">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Keterangan (Opsional)</label>
-                    <textarea name="keterangan" rows="2" class="form-control" placeholder="Deskripsi singkat materi...">{{ old('keterangan') }}</textarea>
+                    <label class="form-label">Keterangan</label>
+                    <textarea name="keterangan" rows="2" class="form-control" placeholder="Catatan materi...">{{ old('keterangan') }}</textarea>
                 </div>
             </div>
 
@@ -398,8 +398,8 @@
                 <div class="form-group">
                     <label class="form-label">Kategori Materi <span class="required-mark">*</span></label>
                     <select name="kategori" id="edit_kategori_{{ $item->id }}" class="form-select" required onchange="toggleBarisField('edit_{{ $item->id }}')">
-                        <option value="al_quran" {{ $item->kategori === 'al_quran' ? 'selected' : '' }}>Al-Qur'an (Ditampilkan Jumlah Halaman)</option>
-                        <option value="al_hadist" {{ $item->kategori === 'al_hadist' ? 'selected' : '' }}>Al-Hadist (Ditampilkan Halaman & Baris)</option>
+                        <option value="al_quran" {{ $item->kategori === 'al_quran' ? 'selected' : '' }}>Al-Qur'an</option>
+                        <option value="al_hadist" {{ $item->kategori === 'al_hadist' ? 'selected' : '' }}>Al-Hadist</option>
                     </select>
                 </div>
 
@@ -409,7 +409,7 @@
                         <input type="text" name="kode_materi" value="{{ $item->kode_materi }}" class="form-control">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Nama Materi / Kitab <span class="required-mark">*</span></label>
+                        <label class="form-label">Nama Materi <span class="required-mark">*</span></label>
                         <input type="text" name="nama_materi" value="{{ $item->nama_materi }}" class="form-control" required>
                     </div>
                 </div>
@@ -421,13 +421,13 @@
                     </div>
 
                     <div class="form-group" id="edit_{{ $item->id }}_baris_wrap" style="{{ $item->isAlHadist() ? '' : 'display:none;' }}">
-                        <label class="form-label">Jumlah Baris (Al-Hadist) <span class="required-mark">*</span></label>
+                        <label class="form-label">Jumlah Baris <span class="required-mark">*</span></label>
                         <input type="number" name="jumlah_baris" id="edit_{{ $item->id }}_jumlah_baris" min="0" value="{{ (int) $item->jumlah_baris }}" class="form-control">
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Keterangan (Opsional)</label>
+                    <label class="form-label">Keterangan</label>
                     <textarea name="keterangan" rows="2" class="form-control">{{ $item->keterangan }}</textarea>
                 </div>
             </div>
@@ -451,7 +451,7 @@
             </div>
             <div class="modal-body" style="text-align:left;">
                 <p style="margin:0; font-size:13.5px;">
-                    Yakin ingin menghapus materi <strong>{{ $item->nama_materi }}</strong> ({{ $item->kategori_label }})?
+                    Yakin ingin menghapus materi <strong>{{ $item->nama_materi }}</strong>?
                 </p>
             </div>
             <div class="modal-footer">
@@ -471,6 +471,7 @@ function toggleBarisField(prefix) {
     }
     var wrap = document.getElementById(prefix + '_baris_wrap');
     var input = document.getElementById(prefix + '_jumlah_baris');
+    var inputHal = document.getElementById(prefix + '_jumlah_halaman');
     if (!sel || !wrap) return;
 
     if (sel.value === 'al_hadist') {
@@ -479,6 +480,9 @@ function toggleBarisField(prefix) {
     } else {
         wrap.style.display = 'none';
         if (input) input.removeAttribute('required');
+        if (prefix === 'add' && inputHal && !inputHal.value) {
+            inputHal.value = 604;
+        }
     }
 }
 
@@ -516,4 +520,3 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 @endsection
-

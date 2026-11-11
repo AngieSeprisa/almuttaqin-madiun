@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\MushafMadinah;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,9 @@ class PondokTargetPengajian extends Model
         'tanggal',
         'kelas_pengajian_id',
         'pondok_materi_id',
+        'surat_nomor',
+        'nama_surat',
+        'ayat',
         'target_halaman',
         'target_baris',
         'halaman_awal',
@@ -31,6 +35,8 @@ class PondokTargetPengajian extends Model
     {
         return [
             'tanggal'        => 'date',
+            'surat_nomor'    => 'integer',
+            'ayat'           => 'integer',
             'target_halaman' => 'integer',
             'target_baris'   => 'integer',
             'halaman_awal'   => 'integer',
@@ -63,19 +69,19 @@ class PondokTargetPengajian extends Model
     public function getTargetLabelAttribute(): string
     {
         $kategori = $this->materi?->kategori ?? PondokMateri::KATEGORI_AL_QURAN;
-        $hal = (int) $this->target_halaman;
-        $rangeStr = '';
-
-        if ($this->halaman_awal && $this->halaman_akhir) {
-            $rangeStr = " (Hal. {$this->halaman_awal}–{$this->halaman_akhir})";
-        }
 
         if ($kategori === PondokMateri::KATEGORI_AL_HADIST) {
+            $hal = (int) $this->target_halaman;
             $baris = (int) ($this->target_baris ?? 0);
-            return "{$hal} Halaman • {$baris} Baris{$rangeStr}";
+            return "Halaman {$hal} • Baris {$baris}";
         }
 
-        return "{$hal} Halaman{$rangeStr}";
+        if ($this->nama_surat && $this->ayat) {
+            $hal = (int) ($this->target_halaman ?: MushafMadinah::estimasiHalaman((int) $this->surat_nomor, (int) $this->ayat));
+            return "QS. {$this->nama_surat} Ayat {$this->ayat} • Hal. {$hal}";
+        }
+
+        $hal = (int) $this->target_halaman;
+        return "{$hal} Halaman";
     }
 }
-
