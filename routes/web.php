@@ -21,6 +21,7 @@ use App\Http\Controllers\PlottingMapelController;
 use App\Http\Controllers\PerizinanController;
 use App\Http\Controllers\PerizinanHaidController;
 use App\Http\Controllers\PlottingEkskulController;
+use App\Http\Controllers\PondokPengajianController;
 use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QuickSearchController;
@@ -267,6 +268,30 @@ Route::middleware('auth')->group(function () {
             Route::get('/siswa/{ekstrakurikuler}', [EkskulJurnalController::class, 'siswaByEkskul'])->name('siswa-by-ekskul');
         });
     });
+
+    // Menu Pondok (Daftar Materi, Target Pengajian, Jurnal Mengaji)
+    Route::middleware('permission:pondok|materi_pondok|target_pengajian|jurnal_mengaji|rekap_pondok|pengaturan_pondok,view')
+        ->prefix('pondok')
+        ->name('pondok.')
+        ->group(function () {
+            // 1. Daftar Materi Pondok (Al-Qur'an & Al-Hadist)
+            Route::get('/materi', [PondokPengajianController::class, 'materiIndex'])->name('materi.index');
+            Route::post('/materi', [PondokPengajianController::class, 'storeMateri'])->name('materi.store');
+            Route::put('/materi/{materi}', [PondokPengajianController::class, 'updateMateri'])->name('materi.update');
+            Route::delete('/materi/{materi}', [PondokPengajianController::class, 'destroyMateri'])->name('materi.destroy');
+
+            // 2. Target Pengajian (Per Tanggal & Per Kelas Pengajian)
+            Route::get('/target-pengajian', [PondokPengajianController::class, 'targetIndex'])->name('target.index');
+            Route::post('/target-pengajian', [PondokPengajianController::class, 'storeTarget'])->name('target.store');
+            Route::put('/target-pengajian/{target}', [PondokPengajianController::class, 'updateTarget'])->name('target.update');
+            Route::delete('/target-pengajian/{target}', [PondokPengajianController::class, 'destroyTarget'])->name('target.destroy');
+
+            // 3. Jurnal Mengaji (Pencapaian Pengajian Per Kelas & Indikator Ketercapaian)
+            Route::get('/jurnal-mengaji', [PondokPengajianController::class, 'jurnalIndex'])->name('jurnal.index');
+            Route::post('/jurnal-mengaji', [PondokPengajianController::class, 'storeJurnal'])->name('jurnal.store');
+            Route::put('/jurnal-mengaji/{jurnal}', [PondokPengajianController::class, 'updateJurnal'])->name('jurnal.update');
+            Route::delete('/jurnal-mengaji/{jurnal}', [PondokPengajianController::class, 'destroyJurnal'])->name('jurnal.destroy');
+        });
 
     // Menu Jadwal Pelajaran Multi-Jenjang (SMP & SMA)
     Route::middleware('permission:jadwal_pelajaran|sekolah,view')->prefix('jadwal-pelajaran')->name('jadwal-pelajaran.')->group(function () {

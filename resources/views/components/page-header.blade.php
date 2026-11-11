@@ -33,6 +33,18 @@
                 $bcParent = 'Sekolah';
                 $bcParentRoute = route('sekolah.rekap-jurnal');
                 $bcChild = 'Rekap Jurnal';
+            } elseif (request()->routeIs('pondok.materi.*')) {
+                $bcParent = 'Pondok';
+                $bcParentRoute = route('pondok.materi.index');
+                $bcChild = 'Daftar Materi';
+            } elseif (request()->routeIs('pondok.target.*')) {
+                $bcParent = 'Pondok';
+                $bcParentRoute = route('pondok.target.index');
+                $bcChild = 'Target Pengajian';
+            } elseif (request()->routeIs('pondok.jurnal.*')) {
+                $bcParent = 'Pondok';
+                $bcParentRoute = route('pondok.jurnal.index');
+                $bcChild = 'Jurnal Mengaji';
             } elseif (request()->routeIs('rekap.sholat.*')) {
                 $customBreadcrumbHtml = null;
                 $breadcrumbsList = [

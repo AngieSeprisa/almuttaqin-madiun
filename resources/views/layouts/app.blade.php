@@ -184,6 +184,42 @@
                 </div>
                 @endif
 
+                {{-- Menu Pondok dengan Submenu Daftar Materi, Target Pengajian & Jurnal Mengaji --}}
+                @if(!$authUser || $authUser->canDo('pondok', 'view') || $authUser->canDo('rekap_pondok', 'view') || $authUser->canDo('pengaturan_pondok', 'view'))
+                <div class="nav-group {{ request()->routeIs('pondok.*') ? 'open' : '' }}" id="navGroupPondok">
+                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('pondok.*') ? 'active' : '' }}" id="togglePondok" title="Pondok">
+                        <span class="nav-item-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                                <path d="M12 7v6"></path>
+                                <path d="M9 10h6"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-item-text">Pondok</span>
+                        <span class="nav-item-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="sidebar-subnav">
+                        <a href="{{ route('pondok.materi.index') }}" class="subnav-item {{ request()->routeIs('pondok.materi.*') ? 'active' : '' }}" title="Daftar Materi Pondok (Al-Qur'an & Al-Hadist)">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Daftar Materi</span>
+                        </a>
+                        <a href="{{ route('pondok.target.index') }}" class="subnav-item {{ request()->routeIs('pondok.target.*') ? 'active' : '' }}" title="Target Pengajian Per Tanggal & Kelas">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Target Pengajian</span>
+                        </a>
+                        <a href="{{ route('pondok.jurnal.index') }}" class="subnav-item {{ request()->routeIs('pondok.jurnal.*') ? 'active' : '' }}" title="Jurnal Mengaji & Ketercapaian Materi">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Jurnal Mengaji</span>
+                        </a>
+                    </div>
+                </div>
+                @endif
+
                 {{-- Menu Perizinan dengan Submenu Sambang & Sakit --}}
                 @if(!$authUser || $authUser->canDo('perizinan_sambang', 'view') || $authUser->canDo('perizinan_sakit', 'view'))
                 <div class="nav-group {{ request()->routeIs('perizinan.*') ? 'open' : '' }}" id="navGroupPerizinan">
