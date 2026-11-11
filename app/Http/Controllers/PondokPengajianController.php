@@ -520,13 +520,14 @@ class PondokPengajianController extends Controller
         $sesiList     = MushafMadinah::daftarSesiPengajian();
 
         // Ambil daftar santri aktif dikelompokkan per kelas_pengajian_id untuk form absensi pengajian
-        $activeSiswas = Siswa::where(function ($q) {
+        $activeSiswas = Siswa::with('pendaftaran')
+            ->where(function ($q) {
                 $q->whereNull('status')
                   ->orWhere('status', '')
                   ->orWhereNotIn('status', ['keluar', 'lulus', 'alumni', 'nonaktif', 'ditolak', 'Ditolak', 'Lulus']);
             })
             ->orderBy('nama_lengkap')
-            ->get(['id', 'nama_lengkap', 'kamar', 'kelas', 'kelas_pengajian_id']);
+            ->get(['id', 'pendaftaran_id', 'nama_lengkap', 'kamar', 'kelas', 'jenjang', 'kelas_pengajian_id']);
 
         $todayStr   = Carbon::today()->toDateString();
         $sakitIds   = [];
@@ -552,15 +553,7 @@ class PondokPengajianController extends Controller
             $sambangIds = [];
         }
 
-        $santriByKelas = [];
-        foreach ($kelasList as $kls) {
-            $santriByKelas[$kls->id] = [];
-        }
-        foreach ($activeSiswas as $sw) {
-            $kId = (int) ($sw->kelas_pengajian_id ?: 0);
-            if ($kId <= 0) {
-                continue;
-            }
+        $formatSantriItem = function ($sw) use ($sakitIds, $sambangIds) {
             $defaultStatus = 'hadir';
             $infoIzin = '';
             if (in_array($sw->id, $sakitIds, true)) {
@@ -571,7 +564,7 @@ class PondokPengajianController extends Controller
                 $infoIzin = 'Perizinan Sambang';
             }
 
-            $santriByKelas[$kId][] = [
+            return [
                 'id'             => $sw->id,
                 'nama_lengkap'   => RekapPondokController::cleanStudentName($sw->nama_lengkap),
                 'kamar'          => $sw->kamar ?: '-',
@@ -579,6 +572,46 @@ class PondokPengajianController extends Controller
                 'default_status' => $defaultStatus,
                 'info_izin'      => $infoIzin,
             ];
+        };
+
+        $santriByKelas = [];
+        foreach ($kelasList as $kls) {
+            $santriByKelas[$kls->id] = [];
+        }
+        foreach ($activeSiswas as $sw) {
+            $kId = (int) ($sw->kelas_pengajian_id ?: 0);
+            if ($kId <= 0 || !isset($santriByKelas[$kId])) {
+                continue;
+            }
+            $santriByKelas[$kId][] = $formatSantriItem($sw);
+        }
+
+        // Fallback untuk Kelas Reguler (atau kelas yang belum di-plot manual) agar santri tetap muncul di form absensi
+        foreach ($kelasList as $kls) {
+            if (!empty($santriByKelas[$kls->id])) {
+                continue;
+            }
+            $jenjangKls = strtolower(trim((string) ($kls->jenjang ?: '')));
+            $namaKls    = strtolower(trim((string) $kls->nama_kelas));
+            $isReguler  = ($jenjangKls === 'reguler' || str_contains($namaKls, 'reguler'));
+
+            foreach ($activeSiswas as $sw) {
+                $jenjangSw = strtolower(trim((string) ($sw->jenjang ?: ($sw->pendaftaran?->jenjang ?: ''))));
+                $kamarSw   = strtolower(trim((string) $sw->kamar));
+
+                if ($isReguler) {
+                    $matchReg = str_contains($jenjangSw, 'reguler')
+                        || str_contains($kamarSw, 'reguler')
+                        || (!str_contains($jenjangSw, 'smp') && !str_contains($jenjangSw, 'sma') && empty($sw->kelas_pengajian_id));
+                    if ($matchReg) {
+                        $santriByKelas[$kls->id][] = $formatSantriItem($sw);
+                    }
+                } elseif ($jenjangKls === 'smp' && empty($sw->kelas_pengajian_id)) {
+                    if (str_contains($jenjangSw, 'smp') || !empty($sw->kelas)) {
+                        $santriByKelas[$kls->id][] = $formatSantriItem($sw);
+                    }
+                }
+            }
         }
 
         $query = PondokJurnalMengaji::with(['kelasPengajian', 'materi', 'targetPengajian', 'pengajar', 'absensis.siswa']);
@@ -987,9 +1020,7 @@ class PondokPengajianController extends Controller
             'catatan'                   => $validated['catatan'] ?? null,
         ]);
 
-        if (array_key_exists('absensi', $validated)) {
-            $this->syncJurnalAbsensi($jurnal, $validated['absensi']);
-        }
+        $this->syncJurnalAbsensi($jurnal, $validated['absensi'] ?? null);
 
         return redirect()->route('pondok.jurnal.index')
             ->with('success', 'Jurnal & absensi pengajian berhasil diperbarui.');

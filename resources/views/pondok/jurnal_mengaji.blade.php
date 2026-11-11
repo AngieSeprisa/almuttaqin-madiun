@@ -207,17 +207,34 @@
         color: #ffffff;
     }
 
+    .app-modal .modal-body > * {
+        flex-shrink: 0;
+    }
+
     .jm-absensi-box {
-        border: 1px solid var(--border-light, #e2e8f0);
+        border: 1px solid #bfdbfe;
         border-radius: 12px;
         background: var(--card-bg, #ffffff);
-        overflow: hidden;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .dark-mode .jm-absensi-box {
+        border-color: #334155;
     }
 
     .jm-absensi-header {
         padding: 10px 14px;
         background: var(--bg-card-header, #f8fafc);
         border-bottom: 1px solid var(--border-light, #e2e8f0);
+        border-radius: 12px 12px 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .jm-absensi-header-top {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -225,9 +242,28 @@
         flex-wrap: wrap;
     }
 
+    .jm-absensi-counters {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .jm-abs-stat-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
     .jm-absensi-list {
-        max-height: 250px;
+        min-height: 120px;
+        max-height: 240px;
         overflow-y: auto;
+        border-radius: 0 0 12px 12px;
     }
 
     .jm-absensi-row {
@@ -494,7 +530,7 @@
                         </td>
                         <td style="text-align:center;">
                             @if($santriTotal > 0)
-                                <div style="display:flex; flex-direction:column; align-items:center; gap:3px;">
+                                <button type="button" onclick="openModalAndScrollAbsensi('{{ $item->id }}')" style="background:none; border:none; padding:0; cursor:pointer; display:inline-flex; flex-direction:column; align-items:center; gap:3px;" title="Klik untuk melihat / edit absensi santri">
                                     <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; {{ $isLengkap ? 'background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;' : 'background:#fffbeb; color:#b45309; border:1px solid #fde68a;' }}">
                                         {{ $isLengkap ? '✓ ' . $hadirTotal . '/' . $santriTotal : 'H: ' . $hadirTotal . '/' . $santriTotal }}
                                     </span>
@@ -503,9 +539,11 @@
                                             I:{{ (int) $item->total_izin }} S:{{ (int) $item->total_sakit }} A:{{ (int) $item->total_alpa }}
                                         </span>
                                     @endif
-                                </div>
+                                </button>
                             @else
-                                <span style="font-size:12px; color:var(--text-secondary);">-</span>
+                                <button type="button" onclick="openModalAndScrollAbsensi('{{ $item->id }}')" class="btn btn-sm btn-secondary" style="height:26px; padding:0 10px; font-size:11.5px; font-weight:600; color:#2563eb; border-color:#bfdbfe; background:#eff6ff;">
+                                    Isi Absensi
+                                </button>
                             @endif
                         </td>
                         <td style="font-size:12px; color:var(--text-secondary);">
@@ -695,18 +733,30 @@
                 </div>
 
                 {{-- SEKSI ABSENSI SANTRI PENGAJIAN --}}
-                <div class="jm-absensi-box">
+                <div class="jm-absensi-box" id="jm_add_absensi_box">
                     <div class="jm-absensi-header">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <strong style="font-size:12.5px; color:var(--text-primary);">Absensi Santri Pengajian</strong>
-                            <span id="jm_add_absensi_count" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#eff6ff; color:#1d4ed8;">0 Santri</span>
+                        <div class="jm-absensi-header-top">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Absensi Santri Pengajian</strong>
+                                <span id="jm_add_absensi_count" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#eff6ff; color:#1d4ed8;">0 Santri</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <input type="text" id="jm_add_absensi_search" class="form-control" placeholder="Cari nama santri..." oninput="filterAbsensiRows('add', this.value)" style="height:26px; width:145px; font-size:11.5px; padding:0 8px;">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="markAllHadir('add')" style="height:26px; padding:0 10px; font-size:11.5px;">
+                                    ✓ Hadirkan Semua
+                                </button>
+                            </div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-secondary" onclick="markAllHadir('add')" style="height:26px; padding:0 10px; font-size:11.5px;">
-                            ✓ Hadirkan Semua
-                        </button>
+                        <div class="jm-absensi-counters" id="jm_add_absensi_counters" style="display:none;">
+                            <span class="jm-abs-stat-pill" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">Hadir: <b id="jm_add_cnt_hadir">0</b></span>
+                            <span class="jm-abs-stat-pill" style="background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd;">Terlambat: <b id="jm_add_cnt_terlambat">0</b></span>
+                            <span class="jm-abs-stat-pill" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;">Izin: <b id="jm_add_cnt_izin">0</b></span>
+                            <span class="jm-abs-stat-pill" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;">Sakit: <b id="jm_add_cnt_sakit">0</b></span>
+                            <span class="jm-abs-stat-pill" style="background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">Alpa: <b id="jm_add_cnt_alpa">0</b></span>
+                        </div>
                     </div>
                     <div id="jm_add_absensi_container" class="jm-absensi-list">
-                        <div style="padding:20px 14px; text-align:center; font-size:12.5px; color:var(--text-secondary);">
+                        <div style="padding:24px 14px; text-align:center; font-size:12.5px; color:var(--text-secondary);">
                             Pilih Kelas Pengajian terlebih dahulu untuk menampilkan daftar absensi santri.
                         </div>
                     </div>
@@ -877,15 +927,27 @@
                 </div>
 
                 {{-- SEKSI ABSENSI SANTRI PENGAJIAN (EDIT) --}}
-                <div class="jm-absensi-box">
+                <div class="jm-absensi-box" id="jm_edit_{{ $item->id }}_absensi_box">
                     <div class="jm-absensi-header">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <strong style="font-size:12.5px; color:var(--text-primary);">Absensi Santri Pengajian</strong>
-                            <span id="jm_edit_{{ $item->id }}_absensi_count" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#eff6ff; color:#1d4ed8;">0 Santri</span>
+                        <div class="jm-absensi-header-top">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Absensi Santri Pengajian</strong>
+                                <span id="jm_edit_{{ $item->id }}_absensi_count" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#eff6ff; color:#1d4ed8;">0 Santri</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <input type="text" id="jm_edit_{{ $item->id }}_absensi_search" class="form-control" placeholder="Cari nama santri..." oninput="filterAbsensiRows('edit_{{ $item->id }}', this.value)" style="height:26px; width:145px; font-size:11.5px; padding:0 8px;">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="markAllHadir('edit_{{ $item->id }}')" style="height:26px; padding:0 10px; font-size:11.5px;">
+                                    ✓ Hadirkan Semua
+                                </button>
+                            </div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-secondary" onclick="markAllHadir('edit_{{ $item->id }}')" style="height:26px; padding:0 10px; font-size:11.5px;">
-                            ✓ Hadirkan Semua
-                        </button>
+                        <div class="jm-absensi-counters" id="jm_edit_{{ $item->id }}_absensi_counters" style="display:none;">
+                            <span class="jm-abs-stat-pill" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">Hadir: <b id="jm_edit_{{ $item->id }}_cnt_hadir">0</b></span>
+                            <span class="jm-abs-stat-pill" style="background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd;">Terlambat: <b id="jm_edit_{{ $item->id }}_cnt_terlambat">0</b></span>
+                            <span class="jm-abs-stat-pill" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;">Izin: <b id="jm_edit_{{ $item->id }}_cnt_izin">0</b></span>
+                            <span class="jm-abs-stat-pill" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a;">Sakit: <b id="jm_edit_{{ $item->id }}_cnt_sakit">0</b></span>
+                            <span class="jm-abs-stat-pill" style="background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">Alpa: <b id="jm_edit_{{ $item->id }}_cnt_alpa">0</b></span>
+                        </div>
                     </div>
                     <div id="jm_edit_{{ $item->id }}_absensi_container" class="jm-absensi-list" data-existing='@json($existingAbsensiMap)'></div>
                 </div>
@@ -1302,6 +1364,7 @@ function updateLiveIndikator(prefix) {
 function renderAbsensiList(prefix, kelasId, overrideMap) {
     var container = document.getElementById('jm_' + prefix + '_absensi_container');
     var countBadge = document.getElementById('jm_' + prefix + '_absensi_count');
+    var countersBar = document.getElementById('jm_' + prefix + '_absensi_counters');
     if (!container) return;
 
     var existingMap = overrideMap || {};
@@ -1319,12 +1382,14 @@ function renderAbsensiList(prefix, kelasId, overrideMap) {
     }
 
     if (!kelasId) {
-        container.innerHTML = '<div style="padding:20px 14px; text-align:center; font-size:12.5px; color:var(--text-secondary);">Pilih Kelas Pengajian terlebih dahulu untuk menampilkan daftar absensi santri.</div>';
+        if (countersBar) countersBar.style.display = 'none';
+        container.innerHTML = '<div style="padding:24px 14px; text-align:center; font-size:12.5px; color:var(--text-secondary);">Pilih Kelas Pengajian terlebih dahulu untuk menampilkan daftar absensi santri.</div>';
         return;
     }
 
     if (list.length === 0) {
-        container.innerHTML = '<div style="padding:20px 14px; text-align:center; font-size:12.5px; color:var(--text-secondary);">Belum ada santri yang di-plot pada kelas pengajian ini.</div>';
+        if (countersBar) countersBar.style.display = 'none';
+        container.innerHTML = '<div style="padding:20px 14px; text-align:center; font-size:12.5px; color:var(--text-secondary);">Belum ada santri pada kelas pengajian ini. Silakan atur melalui menu <a href="{{ route("plotting-pengajian.index") }}" style="color:#2563eb;font-weight:700;text-decoration:underline;">Plotting Kelas Pengajian</a>.</div>';
         return;
     }
 
@@ -1344,17 +1409,22 @@ function renderAbsensiList(prefix, kelasId, overrideMap) {
         if (sw.info_izin) {
             infoBadge = '<span style="font-size:10.5px; font-weight:600; color:#b45309; background:#fef3c7; padding:1px 6px; border-radius:999px; margin-left:6px;">' + sw.info_izin + '</span>';
         }
+        var metaInfo = [];
+        if (sw.kamar && sw.kamar !== '-') metaInfo.push('Kamar ' + sw.kamar);
+        if (sw.kelas && sw.kelas !== '-') metaInfo.push('Kelas ' + sw.kelas);
+        var metaStr = metaInfo.length ? '<div style="font-size:11px; color:var(--text-secondary);">' + metaInfo.join(' • ') + '</div>' : '';
 
-        html += '<div class="jm-absensi-row">';
+        html += '<div class="jm-absensi-row" data-santri-name="' + String(sw.nama_lengkap || '').toLowerCase() + '">';
         html += '  <div style="min-width:0; flex:1;">';
         html += '    <div style="font-size:13px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + (i + 1) + '. ' + sw.nama_lengkap + infoBadge + '</div>';
+        html += metaStr;
         html += '  </div>';
         html += '  <div class="jm-status-pills">';
         for (var j = 0; j < statuses.length; j++) {
             var st = statuses[j];
             var checked = (chosen === st.val) ? 'checked' : '';
             html += '<label class="jm-pill-label" title="' + st.title + '">';
-            html += '  <input type="radio" name="absensi[' + sw.id + ']" value="' + st.val + '" ' + checked + '>';
+            html += '  <input type="radio" name="absensi[' + sw.id + ']" value="' + st.val + '" ' + checked + ' onchange="updateAbsensiCounters(\'' + prefix + '\')">';
             html += '  <span class="jm-pill-btn">' + st.lbl + '</span>';
             html += '</label>';
         }
@@ -1363,6 +1433,39 @@ function renderAbsensiList(prefix, kelasId, overrideMap) {
     }
 
     container.innerHTML = html;
+    if (countersBar) countersBar.style.display = 'flex';
+    updateAbsensiCounters(prefix);
+}
+
+function updateAbsensiCounters(prefix) {
+    var container = document.getElementById('jm_' + prefix + '_absensi_container');
+    if (!container) return;
+
+    var counts = { hadir: 0, terlambat: 0, izin: 0, sakit: 0, alpa: 0 };
+    var checkedRadios = container.querySelectorAll('input[type="radio"]:checked');
+    for (var i = 0; i < checkedRadios.length; i++) {
+        var val = checkedRadios[i].value;
+        if (counts.hasOwnProperty(val)) {
+            counts[val]++;
+        }
+    }
+
+    var keys = ['hadir', 'terlambat', 'izin', 'sakit', 'alpa'];
+    for (var k = 0; k < keys.length; k++) {
+        var el = document.getElementById('jm_' + prefix + '_cnt_' + keys[k]);
+        if (el) el.textContent = counts[keys[k]];
+    }
+}
+
+function filterAbsensiRows(prefix, keyword) {
+    var container = document.getElementById('jm_' + prefix + '_absensi_container');
+    if (!container) return;
+    var q = String(keyword || '').trim().toLowerCase();
+    var rows = container.querySelectorAll('.jm-absensi-row');
+    for (var i = 0; i < rows.length; i++) {
+        var nm = rows[i].getAttribute('data-santri-name') || '';
+        rows[i].style.display = (!q || nm.indexOf(q) !== -1) ? 'flex' : 'none';
+    }
 }
 
 function markAllHadir(prefix) {
@@ -1371,6 +1474,19 @@ function markAllHadir(prefix) {
     var radios = container.querySelectorAll('input[type="radio"][value="hadir"]');
     for (var i = 0; i < radios.length; i++) {
         radios[i].checked = true;
+    }
+    updateAbsensiCounters(prefix);
+}
+
+function openModalAndScrollAbsensi(jurnalId) {
+    var modal = document.getElementById('modalEditJurnal' + jurnalId);
+    if (!modal) return;
+    modal.classList.add('active');
+    var box = document.getElementById('jm_edit_' + jurnalId + '_absensi_box');
+    if (box) {
+        setTimeout(function () {
+            box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 120);
     }
 }
 
