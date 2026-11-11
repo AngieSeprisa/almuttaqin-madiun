@@ -188,7 +188,7 @@ class PondokMateri extends Model
                 'halaman_akhir'  => 604,
                 'jumlah_halaman' => 604,
                 'jumlah_baris'   => null,
-                'keterangan'     => 'Makna Al-Qur\'an Halaman 1–604 • Mushaf Madinah Penuh',
+                'keterangan'     => 'Makna Al-Qur\'an Halaman 1–604',
             ],
 
             // 2. Kitab-Kitab Al-Hadist Pondok (25 Kitab Himpunan)

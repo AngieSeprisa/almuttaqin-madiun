@@ -184,10 +184,13 @@
                 </div>
                 @endif
 
-                {{-- Menu Pondok dengan Submenu Daftar Materi, Target Pengajian & Jurnal Mengaji --}}
+                {{-- Menu Pondok dengan Submenu Daftar Materi, Target Pengajian, Jurnal Mengaji & Rekap Jurnal --}}
                 @if(!$authUser || $authUser->canDo('pondok', 'view') || $authUser->canDo('rekap_pondok', 'view') || $authUser->canDo('pengaturan_pondok', 'view'))
-                <div class="nav-group {{ request()->routeIs('pondok.*') ? 'open' : '' }}" id="navGroupPondok">
-                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('pondok.*') ? 'active' : '' }}" id="togglePondok" title="Pondok">
+                @php
+                    $isPondokMenuActive = request()->routeIs('pondok.materi.*') || request()->routeIs('pondok.target.*') || request()->routeIs('pondok.jurnal.*') || request()->routeIs('pondok.rekap-jurnal*');
+                @endphp
+                <div class="nav-group {{ $isPondokMenuActive ? 'open' : '' }}" id="navGroupPondok">
+                    <button type="button" class="nav-item nav-item-has-sub {{ $isPondokMenuActive ? 'active' : '' }}" id="togglePondok" title="Pondok">
                         <span class="nav-item-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -219,10 +222,6 @@
                         <a href="{{ route('pondok.rekap-jurnal') }}" class="subnav-item {{ request()->routeIs('pondok.rekap-jurnal*') ? 'active' : '' }}" title="Rekap Jurnal Pengajian">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Rekap Jurnal</span>
-                        </a>
-                        <a href="{{ route('pondok.rekap-absensi') }}" class="subnav-item {{ request()->routeIs('pondok.rekap-absensi*') ? 'active' : '' }}" title="Rekap Absensi Pengajian">
-                            <span class="subnav-dot"></span>
-                            <span class="subnav-text">Rekap Absensi</span>
                         </a>
                     </div>
                 </div>
@@ -290,8 +289,8 @@
 
                 {{-- Menu Rekap dengan Submenu Sholat, Pengajian, Sekolah & Guru --}}
                 @if(!$authUser || $authUser->canDo('rekap_absensi', 'view') || $authUser->canDo('rekap_pondok', 'view') || $authUser->canDo('rekap_sholat', 'view') || $authUser->canDo('rekap_pengajian', 'view') || $authUser->canDo('sekolah', 'view'))
-                <div class="nav-group {{ request()->routeIs('rekap-absensi.*') || request()->routeIs('rekap.sholat.*') || request()->routeIs('rekap.pengajian.*') || request()->routeIs('rekap.pondok.*') || request()->routeIs('sekolah.rekap-absensi*') ? 'open' : '' }}" id="navGroupRekapAbsensi">
-                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('rekap-absensi.*') || request()->routeIs('rekap.sholat.*') || request()->routeIs('rekap.pengajian.*') || request()->routeIs('rekap.pondok.*') || request()->routeIs('sekolah.rekap-absensi*') ? 'active' : '' }}" id="toggleRekapAbsensi" title="Rekap">
+                <div class="nav-group {{ request()->routeIs('rekap-absensi.*') || request()->routeIs('rekap.sholat.*') || request()->routeIs('rekap.pengajian.*') || request()->routeIs('pondok.rekap-absensi*') || request()->routeIs('rekap.pondok.*') || request()->routeIs('sekolah.rekap-absensi*') ? 'open' : '' }}" id="navGroupRekapAbsensi">
+                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('rekap-absensi.*') || request()->routeIs('rekap.sholat.*') || request()->routeIs('rekap.pengajian.*') || request()->routeIs('pondok.rekap-absensi*') || request()->routeIs('rekap.pondok.*') || request()->routeIs('sekolah.rekap-absensi*') ? 'active' : '' }}" id="toggleRekapAbsensi" title="Rekap">
                         <span class="nav-item-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -317,7 +316,7 @@
                         @endif
 
                         @if(!$authUser || $authUser->canDo('rekap_absensi', 'view') || $authUser->canDo('rekap_pondok', 'view') || $authUser->canDo('rekap_pengajian', 'view') || $authUser->canDo('pengaturan_pondok', 'view'))
-                        <a href="{{ route('rekap.pengajian.index') }}" class="subnav-item {{ request()->routeIs('rekap.pengajian.*') ? 'active' : '' }}" title="Rekap Presensi Pengajian">
+                        <a href="{{ route('rekap.pengajian.index') }}" class="subnav-item {{ request()->routeIs('rekap.pengajian.*') || request()->routeIs('pondok.rekap-absensi*') ? 'active' : '' }}" title="Rekap Presensi Pengajian">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Pengajian</span>
                         </a>

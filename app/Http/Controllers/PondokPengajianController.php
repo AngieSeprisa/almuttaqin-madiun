@@ -296,6 +296,8 @@ class PondokPengajianController extends Controller
             'pondok_materi_id'   => ['required', 'exists:pondok_materis,id'],
             'surat_nomor'        => ['nullable', 'integer', 'min:1', 'max:114'],
             'ayat'               => ['nullable', 'integer', 'min:1', 'max:286'],
+            'surat_akhir_nomor'  => ['nullable', 'integer', 'min:1', 'max:114'],
+            'ayat_akhir'         => ['nullable', 'integer', 'min:1', 'max:286'],
             'target_halaman'     => ['nullable', 'integer', 'min:0'],
             'target_baris'       => ['nullable', 'integer', 'min:0'],
             'halaman'            => ['nullable', 'integer', 'min:1'],
@@ -309,9 +311,12 @@ class PondokPengajianController extends Controller
 
         $materi = PondokMateri::findOrFail($validated['pondok_materi_id']);
 
-        $suratNomor = null;
-        $namaSurat  = null;
-        $ayat       = null;
+        $suratNomor      = null;
+        $namaSurat       = null;
+        $ayat            = null;
+        $suratAkhirNomor = null;
+        $namaSuratAkhir  = null;
+        $ayatAkhir       = null;
 
         if ($materi->isAlQuran()) {
             if (!empty($validated['surat_nomor'])) {
@@ -320,7 +325,17 @@ class PondokPengajianController extends Controller
                 $namaSurat  = $suratData['nama'] ?? null;
                 $maxAyat    = (int) ($suratData['jumlah_ayat'] ?? 286);
                 $ayat       = max(1, min($maxAyat, (int) ($validated['ayat'] ?? 1)));
-                $targetHalaman = MushafMadinah::estimasiHalaman($suratNomor, $ayat);
+
+                $suratAkhirNomor = !empty($validated['surat_akhir_nomor'])
+                    ? (int) $validated['surat_akhir_nomor']
+                    : $suratNomor;
+                $suratAkhirData = MushafMadinah::getSurat($suratAkhirNomor);
+                $namaSuratAkhir = $suratAkhirData['nama'] ?? $namaSurat;
+                $maxAyatAkhir   = (int) ($suratAkhirData['jumlah_ayat'] ?? 286);
+                $rawAyatAkhir   = !empty($validated['ayat_akhir']) ? (int) $validated['ayat_akhir'] : $ayat;
+                $ayatAkhir      = max(1, min($maxAyatAkhir, $rawAyatAkhir));
+
+                $targetHalaman = MushafMadinah::estimasiHalaman($suratAkhirNomor, $ayatAkhir);
             } else {
                 $targetHalaman = (int) ($validated['target_halaman'] ?? $validated['halaman'] ?? $materi->effective_halaman_awal);
             }
@@ -343,6 +358,9 @@ class PondokPengajianController extends Controller
             'surat_nomor'        => $suratNomor,
             'nama_surat'         => $namaSurat,
             'ayat'               => $ayat,
+            'surat_akhir_nomor'  => $suratAkhirNomor,
+            'nama_surat_akhir'   => $namaSuratAkhir,
+            'ayat_akhir'         => $ayatAkhir,
             'target_halaman'     => $targetHalaman,
             'target_baris'       => $targetBaris,
             'keterangan'         => $validated['keterangan'] ?? null,
@@ -362,6 +380,8 @@ class PondokPengajianController extends Controller
             'pondok_materi_id'   => ['required', 'exists:pondok_materis,id'],
             'surat_nomor'        => ['nullable', 'integer', 'min:1', 'max:114'],
             'ayat'               => ['nullable', 'integer', 'min:1', 'max:286'],
+            'surat_akhir_nomor'  => ['nullable', 'integer', 'min:1', 'max:114'],
+            'ayat_akhir'         => ['nullable', 'integer', 'min:1', 'max:286'],
             'target_halaman'     => ['nullable', 'integer', 'min:0'],
             'target_baris'       => ['nullable', 'integer', 'min:0'],
             'halaman'            => ['nullable', 'integer', 'min:1'],
@@ -371,9 +391,12 @@ class PondokPengajianController extends Controller
 
         $materi = PondokMateri::findOrFail($validated['pondok_materi_id']);
 
-        $suratNomor = null;
-        $namaSurat  = null;
-        $ayat       = null;
+        $suratNomor      = null;
+        $namaSurat       = null;
+        $ayat            = null;
+        $suratAkhirNomor = null;
+        $namaSuratAkhir  = null;
+        $ayatAkhir       = null;
 
         if ($materi->isAlQuran()) {
             if (!empty($validated['surat_nomor'])) {
@@ -382,7 +405,17 @@ class PondokPengajianController extends Controller
                 $namaSurat  = $suratData['nama'] ?? null;
                 $maxAyat    = (int) ($suratData['jumlah_ayat'] ?? 286);
                 $ayat       = max(1, min($maxAyat, (int) ($validated['ayat'] ?? 1)));
-                $targetHalaman = MushafMadinah::estimasiHalaman($suratNomor, $ayat);
+
+                $suratAkhirNomor = !empty($validated['surat_akhir_nomor'])
+                    ? (int) $validated['surat_akhir_nomor']
+                    : $suratNomor;
+                $suratAkhirData = MushafMadinah::getSurat($suratAkhirNomor);
+                $namaSuratAkhir = $suratAkhirData['nama'] ?? $namaSurat;
+                $maxAyatAkhir   = (int) ($suratAkhirData['jumlah_ayat'] ?? 286);
+                $rawAyatAkhir   = !empty($validated['ayat_akhir']) ? (int) $validated['ayat_akhir'] : $ayat;
+                $ayatAkhir      = max(1, min($maxAyatAkhir, $rawAyatAkhir));
+
+                $targetHalaman = MushafMadinah::estimasiHalaman($suratAkhirNomor, $ayatAkhir);
             } else {
                 $targetHalaman = (int) ($validated['target_halaman'] ?? $validated['halaman'] ?? $target->target_halaman);
             }
@@ -405,6 +438,9 @@ class PondokPengajianController extends Controller
             'surat_nomor'        => $suratNomor,
             'nama_surat'         => $namaSurat,
             'ayat'               => $ayat,
+            'surat_akhir_nomor'  => $suratAkhirNomor,
+            'nama_surat_akhir'   => $namaSuratAkhir,
+            'ayat_akhir'         => $ayatAkhir,
             'target_halaman'     => $targetHalaman,
             'target_baris'       => $targetBaris,
             'keterangan'         => $validated['keterangan'] ?? null,
@@ -412,26 +448,32 @@ class PondokPengajianController extends Controller
 
         // Sinkronkan ulang status ketercapaian pada jurnal yang terhubung dengan target ini
         foreach ($target->jurnals as $jurnal) {
+            $cSuratEnd = (int) ($jurnal->capaian_surat_akhir_nomor ?: $jurnal->capaian_surat_nomor);
+            $cAyatEnd  = (int) ($jurnal->capaian_ayat_akhir ?: $jurnal->capaian_ayat);
+
             $newStatus = PondokJurnalMengaji::hitungStatusKetercapaian(
                 $materi->kategori,
                 $targetHalaman,
                 (int) ($targetBaris ?? 0),
                 (int) $jurnal->capaian_halaman,
                 (int) ($jurnal->capaian_baris ?? 0),
-                $suratNomor,
-                $ayat,
-                $jurnal->capaian_surat_nomor,
-                $jurnal->capaian_ayat
+                $suratAkhirNomor ?: $suratNomor,
+                $ayatAkhir ?: $ayat,
+                $cSuratEnd ?: null,
+                $cAyatEnd ?: null
             );
             $jurnal->update([
-                'pondok_materi_id'    => $materi->id,
-                'kelas_pengajian_id'  => $validated['kelas_pengajian_id'],
-                'target_surat_nomor'  => $suratNomor,
-                'target_nama_surat'   => $namaSurat,
-                'target_ayat'         => $ayat,
-                'target_halaman'      => $targetHalaman,
-                'target_baris'        => $targetBaris,
-                'status_ketercapaian' => $newStatus,
+                'pondok_materi_id'         => $materi->id,
+                'kelas_pengajian_id'       => $validated['kelas_pengajian_id'],
+                'target_surat_nomor'       => $suratNomor,
+                'target_nama_surat'        => $namaSurat,
+                'target_ayat'              => $ayat,
+                'target_surat_akhir_nomor' => $suratAkhirNomor,
+                'target_nama_surat_akhir'  => $namaSuratAkhir,
+                'target_ayat_akhir'        => $ayatAkhir,
+                'target_halaman'           => $targetHalaman,
+                'target_baris'             => $targetBaris,
+                'status_ketercapaian'      => $newStatus,
             ]);
         }
 
@@ -484,21 +526,31 @@ class PondokPengajianController extends Controller
                   ->orWhereNotIn('status', ['keluar', 'lulus', 'alumni', 'nonaktif', 'ditolak', 'Ditolak', 'Lulus']);
             })
             ->orderBy('nama_lengkap')
-            ->get(['id', 'nama_lengkap', 'nisn', 'kamar', 'kelas', 'kelas_pengajian_id']);
+            ->get(['id', 'nama_lengkap', 'kamar', 'kelas', 'kelas_pengajian_id']);
 
-        $todayStr = Carbon::today()->toDateString();
-        $sakitIds = PerizinanSakit::whereDate('tanggal_sakit', '<=', $todayStr)
-            ->where(function ($q) use ($todayStr) {
-                $q->whereNull('tanggal_sembuh')
-                  ->orWhereDate('tanggal_sembuh', '>=', $todayStr)
-                  ->orWhere('status', 'sakit');
-            })
-            ->pluck('siswa_id')
-            ->all();
-        $sambangIds = PerizinanSambang::whereDate('tanggal_mulai', '<=', $todayStr)
-            ->whereDate('tanggal_kembali', '>=', $todayStr)
-            ->pluck('siswa_id')
-            ->all();
+        $todayStr   = Carbon::today()->toDateString();
+        $sakitIds   = [];
+        $sambangIds = [];
+
+        try {
+            $sakitIds = PerizinanSakit::whereDate('tanggal_sakit', '<=', $todayStr)
+                ->where('status', 'sakit')
+                ->whereNotNull('siswa_id')
+                ->pluck('siswa_id')
+                ->all();
+        } catch (\Throwable $e) {
+            $sakitIds = [];
+        }
+
+        try {
+            $sambangIds = PerizinanSambang::whereDate('tanggal_mulai', '<=', $todayStr)
+                ->whereDate('tanggal_kembali', '>=', $todayStr)
+                ->whereNotNull('siswa_id')
+                ->pluck('siswa_id')
+                ->all();
+        } catch (\Throwable $e) {
+            $sambangIds = [];
+        }
 
         $santriByKelas = [];
         foreach ($kelasList as $kls) {
@@ -589,24 +641,28 @@ class PondokPengajianController extends Controller
     public function storeJurnal(Request $request)
     {
         $validated = $request->validate([
-            'tanggal'             => ['required', 'date'],
-            'sesi_pengajian'      => ['nullable', 'string', 'max:40'],
-            'kelas_pengajian_id'  => ['required', 'exists:master_kelas_pengajians,id'],
-            'pondok_materi_id'    => ['required', 'exists:pondok_materis,id'],
-            'target_pengajian_id' => ['nullable', 'exists:pondok_target_pengajians,id'],
-            'pengajar_id'         => ['nullable', 'exists:users,id'],
-            'nama_pengajar'       => ['nullable', 'string', 'max:150'],
-            'target_surat_nomor'  => ['nullable', 'integer', 'min:1', 'max:114'],
-            'target_ayat'         => ['nullable', 'integer', 'min:1', 'max:286'],
-            'target_halaman'      => ['nullable', 'integer', 'min:0'],
-            'target_baris'        => ['nullable', 'integer', 'min:0'],
-            'capaian_surat_nomor' => ['nullable', 'integer', 'min:1', 'max:114'],
-            'capaian_ayat'        => ['nullable', 'integer', 'min:1', 'max:286'],
-            'capaian_halaman'     => ['nullable', 'integer', 'min:0'],
-            'capaian_baris'       => ['nullable', 'integer', 'min:0'],
-            'catatan'             => ['nullable', 'string', 'max:1000'],
-            'absensi'             => ['nullable', 'array'],
-            'absensi.*'           => ['nullable', 'string', Rule::in(['hadir', 'terlambat', 'izin', 'sakit', 'alpa'])],
+            'tanggal'                   => ['required', 'date'],
+            'sesi_pengajian'            => ['nullable', 'string', 'max:40'],
+            'kelas_pengajian_id'        => ['required', 'exists:master_kelas_pengajians,id'],
+            'pondok_materi_id'          => ['required', 'exists:pondok_materis,id'],
+            'target_pengajian_id'       => ['nullable', 'exists:pondok_target_pengajians,id'],
+            'pengajar_id'               => ['nullable', 'exists:users,id'],
+            'nama_pengajar'             => ['nullable', 'string', 'max:150'],
+            'target_surat_nomor'        => ['nullable', 'integer', 'min:1', 'max:114'],
+            'target_ayat'               => ['nullable', 'integer', 'min:1', 'max:286'],
+            'target_surat_akhir_nomor'  => ['nullable', 'integer', 'min:1', 'max:114'],
+            'target_ayat_akhir'         => ['nullable', 'integer', 'min:1', 'max:286'],
+            'target_halaman'            => ['nullable', 'integer', 'min:0'],
+            'target_baris'              => ['nullable', 'integer', 'min:0'],
+            'capaian_surat_nomor'       => ['nullable', 'integer', 'min:1', 'max:114'],
+            'capaian_ayat'              => ['nullable', 'integer', 'min:1', 'max:286'],
+            'capaian_surat_akhir_nomor' => ['nullable', 'integer', 'min:1', 'max:114'],
+            'capaian_ayat_akhir'        => ['nullable', 'integer', 'min:1', 'max:286'],
+            'capaian_halaman'           => ['nullable', 'integer', 'min:0'],
+            'capaian_baris'             => ['nullable', 'integer', 'min:0'],
+            'catatan'                   => ['nullable', 'string', 'max:1000'],
+            'absensi'                   => ['nullable', 'array'],
+            'absensi.*'                 => ['nullable', 'string', Rule::in(['hadir', 'terlambat', 'izin', 'sakit', 'alpa'])],
         ], [
             'tanggal.required'            => 'Tanggal jurnal wajib diisi.',
             'kelas_pengajian_id.required' => 'Kelas pengajian wajib dipilih.',
@@ -627,12 +683,18 @@ class PondokPengajianController extends Controller
                 ->first();
         }
 
-        $targetSuratNomor  = null;
-        $targetNamaSurat   = null;
-        $targetAyat        = null;
-        $capaianSuratNomor = null;
-        $capaianNamaSurat  = null;
-        $capaianAyat       = null;
+        $targetSuratNomor       = null;
+        $targetNamaSurat        = null;
+        $targetAyat             = null;
+        $targetSuratAkhirNomor  = null;
+        $targetNamaSuratAkhir   = null;
+        $targetAyatAkhir        = null;
+        $capaianSuratNomor      = null;
+        $capaianNamaSurat       = null;
+        $capaianAyat            = null;
+        $capaianSuratAkhirNomor = null;
+        $capaianNamaSuratAkhir  = null;
+        $capaianAyatAkhir       = null;
 
         if ($materi->isAlQuran()) {
             $targetSuratNomor = !empty($validated['target_surat_nomor'])
@@ -644,7 +706,17 @@ class PondokPengajianController extends Controller
                 $targetAyat = !empty($validated['target_ayat'])
                     ? (int) $validated['target_ayat']
                     : ($targetModel?->ayat ?? 1);
-                $targetHalaman = MushafMadinah::estimasiHalaman($targetSuratNomor, $targetAyat);
+
+                $targetSuratAkhirNomor = !empty($validated['target_surat_akhir_nomor'])
+                    ? (int) $validated['target_surat_akhir_nomor']
+                    : ($targetModel?->surat_akhir_nomor ?: $targetSuratNomor);
+                $tSuratAkhir = MushafMadinah::getSurat($targetSuratAkhirNomor);
+                $targetNamaSuratAkhir = $tSuratAkhir['nama'] ?? $targetNamaSurat;
+                $targetAyatAkhir = !empty($validated['target_ayat_akhir'])
+                    ? (int) $validated['target_ayat_akhir']
+                    : ($targetModel?->ayat_akhir ?: $targetAyat);
+
+                $targetHalaman = MushafMadinah::estimasiHalaman($targetSuratAkhirNomor, $targetAyatAkhir);
             } else {
                 $targetHalaman = $targetModel
                     ? (int) $targetModel->target_halaman
@@ -656,7 +728,17 @@ class PondokPengajianController extends Controller
                 $cSurat = MushafMadinah::getSurat($capaianSuratNomor);
                 $capaianNamaSurat = $cSurat['nama'] ?? null;
                 $capaianAyat = max(1, (int) ($validated['capaian_ayat'] ?? 1));
-                $capaianHalaman = MushafMadinah::estimasiHalaman($capaianSuratNomor, $capaianAyat);
+
+                $capaianSuratAkhirNomor = !empty($validated['capaian_surat_akhir_nomor'])
+                    ? (int) $validated['capaian_surat_akhir_nomor']
+                    : $capaianSuratNomor;
+                $cSuratAkhir = MushafMadinah::getSurat($capaianSuratAkhirNomor);
+                $capaianNamaSuratAkhir = $cSuratAkhir['nama'] ?? $capaianNamaSurat;
+                $capaianAyatAkhir = !empty($validated['capaian_ayat_akhir'])
+                    ? max(1, (int) $validated['capaian_ayat_akhir'])
+                    : $capaianAyat;
+
+                $capaianHalaman = MushafMadinah::estimasiHalaman($capaianSuratAkhirNomor, $capaianAyatAkhir);
             } else {
                 $capaianHalaman = (int) ($validated['capaian_halaman'] ?? 0);
             }
@@ -681,10 +763,10 @@ class PondokPengajianController extends Controller
             $targetBaris,
             $capaianHalaman,
             $capaianBaris,
-            $targetSuratNomor,
-            $targetAyat,
-            $capaianSuratNomor,
-            $capaianAyat
+            $targetSuratAkhirNomor ?: $targetSuratNomor,
+            $targetAyatAkhir ?: $targetAyat,
+            $capaianSuratAkhirNomor ?: $capaianSuratNomor,
+            $capaianAyatAkhir ?: $capaianAyat
         );
 
         $pengajarUser = !empty($validated['pengajar_id']) ? User::find($validated['pengajar_id']) : Auth::user();
@@ -697,25 +779,31 @@ class PondokPengajianController extends Controller
             : ($targetModel?->sesi_pengajian ?: 'bada_maghrib');
 
         $jurnal = PondokJurnalMengaji::create([
-            'tanggal'             => $validated['tanggal'],
-            'sesi_pengajian'      => $sesiPengajian,
-            'kelas_pengajian_id'  => $validated['kelas_pengajian_id'],
-            'pondok_materi_id'    => $validated['pondok_materi_id'],
-            'target_pengajian_id' => $targetModel?->id,
-            'pengajar_id'         => $pengajarUser?->id,
-            'nama_pengajar'       => $namaPengajar,
-            'target_surat_nomor'  => $targetSuratNomor,
-            'target_nama_surat'   => $targetNamaSurat,
-            'target_ayat'         => $targetAyat,
-            'target_halaman'      => $targetHalaman,
-            'target_baris'        => $materi->isAlHadist() ? $targetBaris : null,
-            'capaian_surat_nomor' => $capaianSuratNomor,
-            'capaian_nama_surat'  => $capaianNamaSurat,
-            'capaian_ayat'        => $capaianAyat,
-            'capaian_halaman'     => $capaianHalaman,
-            'capaian_baris'       => $materi->isAlHadist() ? $capaianBaris : null,
-            'status_ketercapaian' => $statusKetercapaian,
-            'catatan'             => $validated['catatan'] ?? null,
+            'tanggal'                   => $validated['tanggal'],
+            'sesi_pengajian'            => $sesiPengajian,
+            'kelas_pengajian_id'        => $validated['kelas_pengajian_id'],
+            'pondok_materi_id'          => $validated['pondok_materi_id'],
+            'target_pengajian_id'       => $targetModel?->id,
+            'pengajar_id'               => $pengajarUser?->id,
+            'nama_pengajar'             => $namaPengajar,
+            'target_surat_nomor'        => $targetSuratNomor,
+            'target_nama_surat'         => $targetNamaSurat,
+            'target_ayat'               => $targetAyat,
+            'target_surat_akhir_nomor'  => $targetSuratAkhirNomor,
+            'target_nama_surat_akhir'   => $targetNamaSuratAkhir,
+            'target_ayat_akhir'         => $targetAyatAkhir,
+            'target_halaman'            => $targetHalaman,
+            'target_baris'              => $materi->isAlHadist() ? $targetBaris : null,
+            'capaian_surat_nomor'       => $capaianSuratNomor,
+            'capaian_nama_surat'        => $capaianNamaSurat,
+            'capaian_ayat'              => $capaianAyat,
+            'capaian_surat_akhir_nomor' => $capaianSuratAkhirNomor,
+            'capaian_nama_surat_akhir'  => $capaianNamaSuratAkhir,
+            'capaian_ayat_akhir'        => $capaianAyatAkhir,
+            'capaian_halaman'           => $capaianHalaman,
+            'capaian_baris'             => $materi->isAlHadist() ? $capaianBaris : null,
+            'status_ketercapaian'       => $statusKetercapaian,
+            'catatan'                   => $validated['catatan'] ?? null,
         ]);
 
         // Simpan absensi santri pengajian & sinkronkan rekap kehadiran
@@ -728,24 +816,28 @@ class PondokPengajianController extends Controller
     public function updateJurnal(Request $request, PondokJurnalMengaji $jurnal)
     {
         $validated = $request->validate([
-            'tanggal'             => ['required', 'date'],
-            'sesi_pengajian'      => ['nullable', 'string', 'max:40'],
-            'kelas_pengajian_id'  => ['required', 'exists:master_kelas_pengajians,id'],
-            'pondok_materi_id'    => ['required', 'exists:pondok_materis,id'],
-            'target_pengajian_id' => ['nullable', 'exists:pondok_target_pengajians,id'],
-            'pengajar_id'         => ['nullable', 'exists:users,id'],
-            'nama_pengajar'       => ['nullable', 'string', 'max:150'],
-            'target_surat_nomor'  => ['nullable', 'integer', 'min:1', 'max:114'],
-            'target_ayat'         => ['nullable', 'integer', 'min:1', 'max:286'],
-            'target_halaman'      => ['nullable', 'integer', 'min:0'],
-            'target_baris'        => ['nullable', 'integer', 'min:0'],
-            'capaian_surat_nomor' => ['nullable', 'integer', 'min:1', 'max:114'],
-            'capaian_ayat'        => ['nullable', 'integer', 'min:1', 'max:286'],
-            'capaian_halaman'     => ['nullable', 'integer', 'min:0'],
-            'capaian_baris'       => ['nullable', 'integer', 'min:0'],
-            'catatan'             => ['nullable', 'string', 'max:1000'],
-            'absensi'             => ['nullable', 'array'],
-            'absensi.*'           => ['nullable', 'string', Rule::in(['hadir', 'terlambat', 'izin', 'sakit', 'alpa'])],
+            'tanggal'                   => ['required', 'date'],
+            'sesi_pengajian'            => ['nullable', 'string', 'max:40'],
+            'kelas_pengajian_id'        => ['required', 'exists:master_kelas_pengajians,id'],
+            'pondok_materi_id'          => ['required', 'exists:pondok_materis,id'],
+            'target_pengajian_id'       => ['nullable', 'exists:pondok_target_pengajians,id'],
+            'pengajar_id'               => ['nullable', 'exists:users,id'],
+            'nama_pengajar'             => ['nullable', 'string', 'max:150'],
+            'target_surat_nomor'        => ['nullable', 'integer', 'min:1', 'max:114'],
+            'target_ayat'               => ['nullable', 'integer', 'min:1', 'max:286'],
+            'target_surat_akhir_nomor'  => ['nullable', 'integer', 'min:1', 'max:114'],
+            'target_ayat_akhir'         => ['nullable', 'integer', 'min:1', 'max:286'],
+            'target_halaman'            => ['nullable', 'integer', 'min:0'],
+            'target_baris'              => ['nullable', 'integer', 'min:0'],
+            'capaian_surat_nomor'       => ['nullable', 'integer', 'min:1', 'max:114'],
+            'capaian_ayat'              => ['nullable', 'integer', 'min:1', 'max:286'],
+            'capaian_surat_akhir_nomor' => ['nullable', 'integer', 'min:1', 'max:114'],
+            'capaian_ayat_akhir'        => ['nullable', 'integer', 'min:1', 'max:286'],
+            'capaian_halaman'           => ['nullable', 'integer', 'min:0'],
+            'capaian_baris'             => ['nullable', 'integer', 'min:0'],
+            'catatan'                   => ['nullable', 'string', 'max:1000'],
+            'absensi'                   => ['nullable', 'array'],
+            'absensi.*'                 => ['nullable', 'string', Rule::in(['hadir', 'terlambat', 'izin', 'sakit', 'alpa'])],
         ]);
 
         $materi = PondokMateri::findOrFail($validated['pondok_materi_id']);
@@ -762,12 +854,18 @@ class PondokPengajianController extends Controller
                 ->first();
         }
 
-        $targetSuratNomor  = null;
-        $targetNamaSurat   = null;
-        $targetAyat        = null;
-        $capaianSuratNomor = null;
-        $capaianNamaSurat  = null;
-        $capaianAyat       = null;
+        $targetSuratNomor       = null;
+        $targetNamaSurat        = null;
+        $targetAyat             = null;
+        $targetSuratAkhirNomor  = null;
+        $targetNamaSuratAkhir   = null;
+        $targetAyatAkhir        = null;
+        $capaianSuratNomor      = null;
+        $capaianNamaSurat       = null;
+        $capaianAyat            = null;
+        $capaianSuratAkhirNomor = null;
+        $capaianNamaSuratAkhir  = null;
+        $capaianAyatAkhir       = null;
 
         if ($materi->isAlQuran()) {
             $targetSuratNomor = !empty($validated['target_surat_nomor'])
@@ -779,7 +877,17 @@ class PondokPengajianController extends Controller
                 $targetAyat = !empty($validated['target_ayat'])
                     ? (int) $validated['target_ayat']
                     : ($targetModel?->ayat ?? $jurnal->target_ayat ?? 1);
-                $targetHalaman = MushafMadinah::estimasiHalaman($targetSuratNomor, $targetAyat);
+
+                $targetSuratAkhirNomor = !empty($validated['target_surat_akhir_nomor'])
+                    ? (int) $validated['target_surat_akhir_nomor']
+                    : ($targetModel?->surat_akhir_nomor ?: ($jurnal->target_surat_akhir_nomor ?: $targetSuratNomor));
+                $tSuratAkhir = MushafMadinah::getSurat($targetSuratAkhirNomor);
+                $targetNamaSuratAkhir = $tSuratAkhir['nama'] ?? $targetNamaSurat;
+                $targetAyatAkhir = !empty($validated['target_ayat_akhir'])
+                    ? (int) $validated['target_ayat_akhir']
+                    : ($targetModel?->ayat_akhir ?: ($jurnal->target_ayat_akhir ?: $targetAyat));
+
+                $targetHalaman = MushafMadinah::estimasiHalaman($targetSuratAkhirNomor, $targetAyatAkhir);
             } else {
                 $targetHalaman = isset($validated['target_halaman'])
                     ? (int) $validated['target_halaman']
@@ -791,7 +899,17 @@ class PondokPengajianController extends Controller
                 $cSurat = MushafMadinah::getSurat($capaianSuratNomor);
                 $capaianNamaSurat = $cSurat['nama'] ?? null;
                 $capaianAyat = max(1, (int) ($validated['capaian_ayat'] ?? 1));
-                $capaianHalaman = MushafMadinah::estimasiHalaman($capaianSuratNomor, $capaianAyat);
+
+                $capaianSuratAkhirNomor = !empty($validated['capaian_surat_akhir_nomor'])
+                    ? (int) $validated['capaian_surat_akhir_nomor']
+                    : $capaianSuratNomor;
+                $cSuratAkhir = MushafMadinah::getSurat($capaianSuratAkhirNomor);
+                $capaianNamaSuratAkhir = $cSuratAkhir['nama'] ?? $capaianNamaSurat;
+                $capaianAyatAkhir = !empty($validated['capaian_ayat_akhir'])
+                    ? max(1, (int) $validated['capaian_ayat_akhir'])
+                    : $capaianAyat;
+
+                $capaianHalaman = MushafMadinah::estimasiHalaman($capaianSuratAkhirNomor, $capaianAyatAkhir);
             } else {
                 $capaianHalaman = (int) ($validated['capaian_halaman'] ?? $jurnal->capaian_halaman);
             }
@@ -816,10 +934,10 @@ class PondokPengajianController extends Controller
             $targetBaris,
             $capaianHalaman,
             $capaianBaris,
-            $targetSuratNomor,
-            $targetAyat,
-            $capaianSuratNomor,
-            $capaianAyat
+            $targetSuratAkhirNomor ?: $targetSuratNomor,
+            $targetAyatAkhir ?: $targetAyat,
+            $capaianSuratAkhirNomor ?: $capaianSuratNomor,
+            $capaianAyatAkhir ?: $capaianAyat
         );
 
         $pengajarUser = !empty($validated['pengajar_id']) ? User::find($validated['pengajar_id']) : $jurnal->pengajar;
@@ -828,25 +946,31 @@ class PondokPengajianController extends Controller
             : ($pengajarUser?->name ?? $jurnal->nama_pengajar);
 
         $jurnal->update([
-            'tanggal'             => $validated['tanggal'],
-            'sesi_pengajian'      => $validated['sesi_pengajian'] ?? $jurnal->sesi_pengajian ?? 'bada_maghrib',
-            'kelas_pengajian_id'  => $validated['kelas_pengajian_id'],
-            'pondok_materi_id'    => $validated['pondok_materi_id'],
-            'target_pengajian_id' => $targetModel?->id,
-            'pengajar_id'         => $pengajarUser?->id,
-            'nama_pengajar'       => $namaPengajar,
-            'target_surat_nomor'  => $targetSuratNomor,
-            'target_nama_surat'   => $targetNamaSurat,
-            'target_ayat'         => $targetAyat,
-            'target_halaman'      => $targetHalaman,
-            'target_baris'        => $materi->isAlHadist() ? $targetBaris : null,
-            'capaian_surat_nomor' => $capaianSuratNomor,
-            'capaian_nama_surat'  => $capaianNamaSurat,
-            'capaian_ayat'        => $capaianAyat,
-            'capaian_halaman'     => $capaianHalaman,
-            'capaian_baris'       => $materi->isAlHadist() ? $capaianBaris : null,
-            'status_ketercapaian' => $statusKetercapaian,
-            'catatan'             => $validated['catatan'] ?? null,
+            'tanggal'                   => $validated['tanggal'],
+            'sesi_pengajian'            => $validated['sesi_pengajian'] ?? $jurnal->sesi_pengajian ?? 'bada_maghrib',
+            'kelas_pengajian_id'        => $validated['kelas_pengajian_id'],
+            'pondok_materi_id'          => $validated['pondok_materi_id'],
+            'target_pengajian_id'       => $targetModel?->id,
+            'pengajar_id'               => $pengajarUser?->id,
+            'nama_pengajar'             => $namaPengajar,
+            'target_surat_nomor'        => $targetSuratNomor,
+            'target_nama_surat'         => $targetNamaSurat,
+            'target_ayat'               => $targetAyat,
+            'target_surat_akhir_nomor'  => $targetSuratAkhirNomor,
+            'target_nama_surat_akhir'   => $targetNamaSuratAkhir,
+            'target_ayat_akhir'         => $targetAyatAkhir,
+            'target_halaman'            => $targetHalaman,
+            'target_baris'              => $materi->isAlHadist() ? $targetBaris : null,
+            'capaian_surat_nomor'       => $capaianSuratNomor,
+            'capaian_nama_surat'        => $capaianNamaSurat,
+            'capaian_ayat'              => $capaianAyat,
+            'capaian_surat_akhir_nomor' => $capaianSuratAkhirNomor,
+            'capaian_nama_surat_akhir'  => $capaianNamaSuratAkhir,
+            'capaian_ayat_akhir'        => $capaianAyatAkhir,
+            'capaian_halaman'           => $capaianHalaman,
+            'capaian_baris'             => $materi->isAlHadist() ? $capaianBaris : null,
+            'status_ketercapaian'       => $statusKetercapaian,
+            'catatan'                   => $validated['catatan'] ?? null,
         ]);
 
         if (array_key_exists('absensi', $validated)) {
@@ -870,19 +994,29 @@ class PondokPengajianController extends Controller
             })
             ->get(['id']);
 
-        $tglStr = Carbon::parse($jurnal->tanggal)->toDateString();
-        $sakitIds = PerizinanSakit::whereDate('tanggal_sakit', '<=', $tglStr)
-            ->where(function ($q) use ($tglStr) {
-                $q->whereNull('tanggal_sembuh')
-                  ->orWhereDate('tanggal_sembuh', '>=', $tglStr)
-                  ->orWhere('status', 'sakit');
-            })
-            ->pluck('siswa_id')
-            ->all();
-        $sambangIds = PerizinanSambang::whereDate('tanggal_mulai', '<=', $tglStr)
-            ->whereDate('tanggal_kembali', '>=', $tglStr)
-            ->pluck('siswa_id')
-            ->all();
+        $tglStr     = Carbon::parse($jurnal->tanggal)->toDateString();
+        $sakitIds   = [];
+        $sambangIds = [];
+
+        try {
+            $sakitIds = PerizinanSakit::whereDate('tanggal_sakit', '<=', $tglStr)
+                ->where('status', 'sakit')
+                ->whereNotNull('siswa_id')
+                ->pluck('siswa_id')
+                ->all();
+        } catch (\Throwable $e) {
+            $sakitIds = [];
+        }
+
+        try {
+            $sambangIds = PerizinanSambang::whereDate('tanggal_mulai', '<=', $tglStr)
+                ->whereDate('tanggal_kembali', '>=', $tglStr)
+                ->whereNotNull('siswa_id')
+                ->pluck('siswa_id')
+                ->all();
+        } catch (\Throwable $e) {
+            $sambangIds = [];
+        }
 
         $targetMap = [];
 

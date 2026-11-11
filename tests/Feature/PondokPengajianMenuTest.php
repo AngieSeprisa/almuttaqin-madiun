@@ -91,7 +91,10 @@ class PondokPengajianMenuTest extends TestCase
         $page->assertDontSee('Target Jumlah Baris');
         $page->assertDontSee('(Opsional)');
         $page->assertDontSee('(Al-Hadist)');
-        $page->assertSee('Nama Surat');
+        $page->assertDontSee('Sesi Pengajian');
+        $page->assertDontSee('Mushaf Madinah');
+        $page->assertSee('Awal Surat');
+        $page->assertSee('Akhir Surat');
         $page->assertSee('Ayat');
         $page->assertSee('Halaman');
         $page->assertSee('Baris');
@@ -122,22 +125,26 @@ class PondokPengajianMenuTest extends TestCase
             'jumlah_baris'   => 16,
         ]);
 
-        // 1. Buat Target Al-Qur'an (Surat Al-Baqarah Ayat 25 -> Hal. 5 Mushaf Madinah)
+        // 1. Buat Target Al-Qur'an (Awal Surat Al-Baqarah Ayat 1 s/d Akhir Surat Al-Baqarah Ayat 25)
         $this->actingAs($this->user)->post(route('pondok.target.store'), [
             'tanggal'            => '2026-11-11',
             'kelas_pengajian_id' => $kelasLambatan->id,
             'pondok_materi_id'   => $materiQuran->id,
             'surat_nomor'        => 2,
-            'ayat'               => 25,
+            'ayat'               => 1,
+            'surat_akhir_nomor'  => 2,
+            'ayat_akhir'         => 25,
         ])->assertRedirect(route('pondok.target.index'));
 
-        // 2. Buat Target Al-Qur'an Kelas Cepatan (Surat Al-Baqarah Ayat 50)
+        // 2. Buat Target Al-Qur'an Kelas Cepatan (Surat Al-Baqarah Ayat 26 s/d 50)
         $this->actingAs($this->user)->post(route('pondok.target.store'), [
             'tanggal'            => '2026-11-11',
             'kelas_pengajian_id' => $kelasCepatan->id,
             'pondok_materi_id'   => $materiQuran->id,
             'surat_nomor'        => 2,
-            'ayat'               => 50,
+            'ayat'               => 26,
+            'surat_akhir_nomor'  => 2,
+            'ayat_akhir'         => 50,
         ])->assertRedirect(route('pondok.target.index'));
 
         // 3. Buat Target Al-Hadist Kelas Reguler (K. Sholah Halaman 12 Baris 8)
@@ -154,41 +161,50 @@ class PondokPengajianMenuTest extends TestCase
         $targetReguler  = PondokTargetPengajian::where('kelas_pengajian_id', $kelasReguler->id)->firstOrFail();
 
         $this->assertSame('Al-Baqarah', $targetLambatan->nama_surat);
-        $this->assertSame(25, $targetLambatan->ayat);
+        $this->assertSame(1, $targetLambatan->ayat);
+        $this->assertSame('Al-Baqarah', $targetLambatan->nama_surat_akhir);
+        $this->assertSame(25, $targetLambatan->ayat_akhir);
         $this->assertSame(6, $targetLambatan->target_halaman);
 
         $this->assertSame(12, $targetReguler->target_halaman);
         $this->assertSame(8, $targetReguler->target_baris);
 
         $targetPage = $this->actingAs($this->user)->get(route('pondok.target.index'));
-        $targetPage->assertSee('QS. Al-Baqarah Ayat 25');
+        $targetPage->assertSee('QS. Al-Baqarah Ayat 1–25');
         $targetPage->assertSee('Halaman 12 • Baris 8');
 
-        // 4. Input Jurnal Mengaji Kelas 1 (Al-Qur'an): Surat 2 Ayat 25 == Target -> TERCAPAI
+        // 4. Input Jurnal Mengaji Kelas 1 (Al-Qur'an): Surat 2 Ayat 1–25 == Target -> TERCAPAI
         $this->actingAs($this->user)->post(route('pondok.jurnal.store'), [
-            'tanggal'             => '2026-11-11',
-            'kelas_pengajian_id'  => $kelasLambatan->id,
-            'pondok_materi_id'    => $materiQuran->id,
-            'target_pengajian_id' => $targetLambatan->id,
-            'capaian_surat_nomor' => 2,
-            'capaian_ayat'        => 25,
-            'catatan'             => 'Bacaan lancar sesuai target',
+            'tanggal'                   => '2026-11-11',
+            'sesi_pengajian'            => 'bada_maghrib',
+            'kelas_pengajian_id'        => $kelasLambatan->id,
+            'pondok_materi_id'          => $materiQuran->id,
+            'target_pengajian_id'       => $targetLambatan->id,
+            'capaian_surat_nomor'       => 2,
+            'capaian_ayat'              => 1,
+            'capaian_surat_akhir_nomor' => 2,
+            'capaian_ayat_akhir'        => 25,
+            'catatan'                   => 'Bacaan lancar sesuai target',
         ])->assertRedirect(route('pondok.jurnal.index'));
 
-        // 5. Input Jurnal Mengaji Kelas 2 (Al-Qur'an): Surat 2 Ayat 30 < Target Ayat 50 -> KURANG
+        // 5. Input Jurnal Mengaji Kelas 2 (Al-Qur'an): Surat 2 Ayat 26–30 < Target Ayat 50 -> KURANG
         $this->actingAs($this->user)->post(route('pondok.jurnal.store'), [
-            'tanggal'             => '2026-11-11',
-            'kelas_pengajian_id'  => $kelasCepatan->id,
-            'pondok_materi_id'    => $materiQuran->id,
-            'target_pengajian_id' => $targetCepatan->id,
-            'capaian_surat_nomor' => 2,
-            'capaian_ayat'        => 30,
-            'catatan'             => 'Perlu pengulangan tajwid',
+            'tanggal'                   => '2026-11-11',
+            'sesi_pengajian'            => 'malam',
+            'kelas_pengajian_id'        => $kelasCepatan->id,
+            'pondok_materi_id'          => $materiQuran->id,
+            'target_pengajian_id'       => $targetCepatan->id,
+            'capaian_surat_nomor'       => 2,
+            'capaian_ayat'              => 26,
+            'capaian_surat_akhir_nomor' => 2,
+            'capaian_ayat_akhir'        => 30,
+            'catatan'                   => 'Perlu pengulangan tajwid',
         ])->assertRedirect(route('pondok.jurnal.index'));
 
         // 6. Input Jurnal Mengaji Kelas 3 (Al-Hadist): Halaman 12 Baris 14 > Target Halaman 12 Baris 8 -> TERLAMPAUI
         $this->actingAs($this->user)->post(route('pondok.jurnal.store'), [
             'tanggal'             => '2026-11-11',
+            'sesi_pengajian'      => 'bada_subuh',
             'kelas_pengajian_id'  => $kelasReguler->id,
             'pondok_materi_id'    => $materiHadist->id,
             'target_pengajian_id' => $targetReguler->id,
@@ -210,13 +226,16 @@ class PondokPengajianMenuTest extends TestCase
             'status_ketercapaian' => PondokJurnalMengaji::STATUS_TERLAMPAUI,
         ]);
 
-        // 7. Verifikasi tampilan halaman Jurnal Mengaji menampilkan ketiga indikator dan capaian
+        // 7. Verifikasi tampilan halaman Jurnal Mengaji menampilkan ketiga indikator, Sesi Pengajian, dan capaian
         $jurnalPage = $this->actingAs($this->user)->get(route('pondok.jurnal.index'));
         $jurnalPage->assertStatus(200);
+        $jurnalPage->assertSee('Sesi Pengajian');
+        $jurnalPage->assertSee('Awal Surat');
+        $jurnalPage->assertSee('Akhir Surat');
         $jurnalPage->assertSee('✓ Tercapai');
         $jurnalPage->assertSee('! Kurang');
         $jurnalPage->assertSee('↑ Terlampaui');
-        $jurnalPage->assertSee('QS. Al-Baqarah Ayat 25');
+        $jurnalPage->assertSee('QS. Al-Baqarah Ayat 1–25');
         $jurnalPage->assertSee('Halaman 12 • Baris 14');
     }
 

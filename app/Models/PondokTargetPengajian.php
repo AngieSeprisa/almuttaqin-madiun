@@ -22,6 +22,9 @@ class PondokTargetPengajian extends Model
         'surat_nomor',
         'nama_surat',
         'ayat',
+        'surat_akhir_nomor',
+        'nama_surat_akhir',
+        'ayat_akhir',
         'target_halaman',
         'target_baris',
         'halaman_awal',
@@ -35,15 +38,17 @@ class PondokTargetPengajian extends Model
     protected function casts(): array
     {
         return [
-            'tanggal'        => 'date',
-            'surat_nomor'    => 'integer',
-            'ayat'           => 'integer',
-            'target_halaman' => 'integer',
-            'target_baris'   => 'integer',
-            'halaman_awal'   => 'integer',
-            'halaman_akhir'  => 'integer',
-            'baris_awal'     => 'integer',
-            'baris_akhir'    => 'integer',
+            'tanggal'           => 'date',
+            'surat_nomor'       => 'integer',
+            'ayat'              => 'integer',
+            'surat_akhir_nomor' => 'integer',
+            'ayat_akhir'        => 'integer',
+            'target_halaman'    => 'integer',
+            'target_baris'      => 'integer',
+            'halaman_awal'      => 'integer',
+            'halaman_akhir'     => 'integer',
+            'baris_awal'        => 'integer',
+            'baris_akhir'       => 'integer',
         ];
     }
 
@@ -85,8 +90,19 @@ class PondokTargetPengajian extends Model
         }
 
         if ($this->nama_surat && $this->ayat) {
-            $hal = (int) ($this->target_halaman ?: MushafMadinah::estimasiHalaman((int) $this->surat_nomor, (int) $this->ayat));
-            return "QS. {$this->nama_surat} Ayat {$this->ayat} • Hal. {$hal}";
+            $sAwal  = $this->nama_surat;
+            $aAwal  = (int) $this->ayat;
+            $sAkhir = $this->nama_surat_akhir ?: $sAwal;
+            $aAkhir = (int) ($this->ayat_akhir ?: $aAwal);
+
+            if ($sAkhir === $sAwal) {
+                if ($aAkhir === $aAwal) {
+                    return "QS. {$sAwal} Ayat {$aAwal}";
+                }
+                return "QS. {$sAwal} Ayat {$aAwal}–{$aAkhir}";
+            }
+
+            return "QS. {$sAwal}: {$aAwal} – {$sAkhir}: {$aAkhir}";
         }
 
         $hal = (int) $this->target_halaman;

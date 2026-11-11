@@ -51,7 +51,7 @@ class MushafMadinah
                 'jumlah_halaman' => 604,
                 'surat_awal'     => 1,
                 'surat_akhir'    => 114,
-                'info'           => 'Hal. 1–604 • Mushaf Madinah Penuh',
+                'info'           => 'Hal. 1–604 • QS. Al-Fatihah s/d An-Nas',
             ],
         ];
     }

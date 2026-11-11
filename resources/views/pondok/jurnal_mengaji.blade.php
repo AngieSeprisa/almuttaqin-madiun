@@ -4,7 +4,7 @@
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <a href="{{ route('pondok.rekap-absensi') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
+    <a href="{{ route('rekap.pengajian.index') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
         <span>Rekap Absensi</span>
     </a>
     <a href="{{ route('pondok.target.index') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
@@ -127,7 +127,6 @@
         border-color: #334155;
     }
 
-    /* Absensi Santri di dalam Modal Jurnal */
     .jm-absensi-box {
         border: 1px solid var(--border-light, #e2e8f0);
         border-radius: 12px;
@@ -149,7 +148,6 @@
     .jm-absensi-list {
         max-height: 250px;
         overflow-y: auto;
-        divide-y: 1px solid var(--border-light, #f1f5f9);
     }
 
     .jm-absensi-row {
@@ -472,7 +470,7 @@
 
 {{-- MODAL INPUT JURNAL MENGAJI + ABSENSI SANTRI --}}
 <div class="app-modal" id="modalTambahJurnalMengaji" role="dialog" aria-modal="true">
-    <div class="modal-dialog" style="max-width:640px;">
+    <div class="modal-dialog" style="max-width:650px;">
         <form action="{{ route('pondok.jurnal.store') }}" method="POST">
             @csrf
             <div class="modal-header">
@@ -488,12 +486,13 @@
                         @foreach($targetList as $t)
                             <option value="{{ $t->id }}"
                                     data-tanggal="{{ \Carbon\Carbon::parse($t->tanggal)->format('Y-m-d') }}"
-                                    data-sesi="{{ $t->sesi_pengajian ?: 'bada_maghrib' }}"
                                     data-kelas="{{ $t->kelas_pengajian_id }}"
                                     data-materi="{{ $t->pondok_materi_id }}"
                                     data-kategori="{{ $t->materi?->kategori ?? 'al_quran' }}"
                                     data-surat="{{ (int) ($t->surat_nomor ?: 1) }}"
                                     data-ayat="{{ (int) ($t->ayat ?: 1) }}"
+                                    data-surat-akhir="{{ (int) ($t->surat_akhir_nomor ?: ($t->surat_nomor ?: 1)) }}"
+                                    data-ayat-akhir="{{ (int) ($t->ayat_akhir ?: ($t->ayat ?: 1)) }}"
                                     data-target-hal="{{ (int) $t->target_halaman }}"
                                     data-target-baris="{{ (int) $t->target_baris }}"
                                     {{ (string) request('target_id') === (string) $t->id ? 'selected' : '' }}>
@@ -558,41 +557,77 @@
                     </div>
                 </div>
 
-                {{-- SEKSI AL-QUR'AN: TARGET & CAPAIAN SURAT + AYAT --}}
+                {{-- SEKSI AL-QUR'AN: TARGET & CAPAIAN AWAL SURAT + AKHIR SURAT --}}
                 <div id="jm_add_quran_wrap" style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Nama Surat</label>
-                            <select name="target_surat_nomor" id="jm_add_target_surat" class="form-select" onchange="updateLiveIndikator('add')">
-                                @foreach($daftarSurat as $srt)
-                                    <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}">
-                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
-                                    </option>
-                                @endforeach
-                            </select>
+                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Awal Surat</label>
+                                <select name="target_surat_nomor" id="jm_add_target_surat" class="form-select" onchange="onJurnalAwalSuratChanged('add', 'target')">
+                                    @foreach($daftarSurat as $srt)
+                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}">
+                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Ayat</label>
+                                <input type="number" name="target_ayat" id="jm_add_target_ayat" min="1" value="{{ old('target_ayat', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                            </div>
                         </div>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Ayat</label>
-                            <input type="number" name="target_ayat" id="jm_add_target_ayat" min="1" value="{{ old('target_ayat', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Akhir Surat</label>
+                                <select name="target_surat_akhir_nomor" id="jm_add_target_surat_akhir" class="form-select" onchange="updateLiveIndikator('add')">
+                                    @foreach($daftarSurat as $srt)
+                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}">
+                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Ayat</label>
+                                <input type="number" name="target_ayat_akhir" id="jm_add_target_ayat_akhir" min="1" value="{{ old('target_ayat_akhir', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                            </div>
                         </div>
                     </div>
 
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Nama Surat <span class="required-mark">*</span></label>
-                            <select name="capaian_surat_nomor" id="jm_add_capaian_surat" class="form-select" onchange="updateLiveIndikator('add')">
-                                @foreach($daftarSurat as $srt)
-                                    <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}">
-                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
-                                    </option>
-                                @endforeach
-                            </select>
+                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Awal Surat <span class="required-mark">*</span></label>
+                                <select name="capaian_surat_nomor" id="jm_add_capaian_surat" class="form-select" onchange="onJurnalAwalSuratChanged('add', 'capaian')">
+                                    @foreach($daftarSurat as $srt)
+                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}">
+                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Ayat <span class="required-mark">*</span></label>
+                                <input type="number" name="capaian_ayat" id="jm_add_capaian_ayat" min="1" value="{{ old('capaian_ayat', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                            </div>
                         </div>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Ayat <span class="required-mark">*</span></label>
-                            <input type="number" name="capaian_ayat" id="jm_add_capaian_ayat" min="1" value="{{ old('capaian_ayat', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Akhir Surat <span class="required-mark">*</span></label>
+                                <select name="capaian_surat_akhir_nomor" id="jm_add_capaian_surat_akhir" class="form-select" onchange="updateLiveIndikator('add')">
+                                    @foreach($daftarSurat as $srt)
+                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}">
+                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Ayat <span class="required-mark">*</span></label>
+                                <input type="number" name="capaian_ayat_akhir" id="jm_add_capaian_ayat_akhir" min="1" value="{{ old('capaian_ayat_akhir', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -668,7 +703,7 @@
     $existingAbsensiMap = $item->absensis->pluck('status', 'siswa_id')->toArray();
 @endphp
 <div class="app-modal" id="modalEditJurnal{{ $item->id }}" role="dialog" aria-modal="true">
-    <div class="modal-dialog" style="max-width:640px;">
+    <div class="modal-dialog" style="max-width:650px;">
         <form action="{{ route('pondok.jurnal.update', $item->id) }}" method="POST">
             @csrf
             @method('PUT')
@@ -731,37 +766,73 @@
                 <div id="jm_edit_{{ $item->id }}_quran_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'none' : 'grid' }}; grid-template-columns: repeat(2, 1fr); gap:12px; padding:12px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <strong style="font-size:12px; color:#64748b; text-transform:uppercase;">Target Materi</strong>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Nama Surat</label>
-                            <select name="target_surat_nomor" id="jm_edit_{{ $item->id }}_target_surat" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
-                                @foreach($daftarSurat as $srt)
-                                    <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}" {{ (int) ($item->target_surat_nomor ?: 1) === (int) $srt['nomor'] ? 'selected' : '' }}>
-                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
-                                    </option>
-                                @endforeach
-                            </select>
+                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Awal Surat</label>
+                                <select name="target_surat_nomor" id="jm_edit_{{ $item->id }}_target_surat" class="form-select" onchange="onJurnalAwalSuratChanged('edit_{{ $item->id }}', 'target')">
+                                    @foreach($daftarSurat as $srt)
+                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}" {{ (int) ($item->target_surat_nomor ?: 1) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Ayat</label>
+                                <input type="number" name="target_ayat" id="jm_edit_{{ $item->id }}_target_ayat" min="1" value="{{ (int) ($item->target_ayat ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                            </div>
                         </div>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Ayat</label>
-                            <input type="number" name="target_ayat" id="jm_edit_{{ $item->id }}_target_ayat" min="1" value="{{ (int) ($item->target_ayat ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Akhir Surat</label>
+                                <select name="target_surat_akhir_nomor" id="jm_edit_{{ $item->id }}_target_surat_akhir" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
+                                    @foreach($daftarSurat as $srt)
+                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}" {{ (int) ($item->target_surat_akhir_nomor ?: ($item->target_surat_nomor ?: 1)) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Ayat</label>
+                                <input type="number" name="target_ayat_akhir" id="jm_edit_{{ $item->id }}_target_ayat_akhir" min="1" value="{{ (int) ($item->target_ayat_akhir ?: ($item->target_ayat ?: 1)) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                            </div>
                         </div>
                     </div>
 
                     <div style="display:flex; flex-direction:column; gap:10px;">
                         <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Nama Surat <span class="required-mark">*</span></label>
-                            <select name="capaian_surat_nomor" id="jm_edit_{{ $item->id }}_capaian_surat" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
-                                @foreach($daftarSurat as $srt)
-                                    <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}" {{ (int) ($item->capaian_surat_nomor ?: 1) === (int) $srt['nomor'] ? 'selected' : '' }}>
-                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
-                                    </option>
-                                @endforeach
-                            </select>
+                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Awal Surat <span class="required-mark">*</span></label>
+                                <select name="capaian_surat_nomor" id="jm_edit_{{ $item->id }}_capaian_surat" class="form-select" onchange="onJurnalAwalSuratChanged('edit_{{ $item->id }}', 'capaian')">
+                                    @foreach($daftarSurat as $srt)
+                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}" {{ (int) ($item->capaian_surat_nomor ?: 1) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Ayat <span class="required-mark">*</span></label>
+                                <input type="number" name="capaian_ayat" id="jm_edit_{{ $item->id }}_capaian_ayat" min="1" value="{{ (int) ($item->capaian_ayat ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                            </div>
                         </div>
-                        <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Ayat <span class="required-mark">*</span></label>
-                            <input type="number" name="capaian_ayat" id="jm_edit_{{ $item->id }}_capaian_ayat" min="1" value="{{ (int) ($item->capaian_ayat ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                        <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:8px;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Akhir Surat <span class="required-mark">*</span></label>
+                                <select name="capaian_surat_akhir_nomor" id="jm_edit_{{ $item->id }}_capaian_surat_akhir" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
+                                    @foreach($daftarSurat as $srt)
+                                        <option value="{{ $srt['nomor'] }}" data-ayat="{{ $srt['jumlah_ayat'] }}" data-hal-awal="{{ $srt['halaman_awal'] }}" data-hal-akhir="{{ $srt['halaman_akhir'] }}" {{ (int) ($item->capaian_surat_akhir_nomor ?: ($item->capaian_surat_nomor ?: 1)) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                            {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Ayat <span class="required-mark">*</span></label>
+                                <input type="number" name="capaian_ayat_akhir" id="jm_edit_{{ $item->id }}_capaian_ayat_akhir" min="1" value="{{ (int) ($item->capaian_ayat_akhir ?: ($item->capaian_ayat ?: 1)) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -883,6 +954,15 @@ function filterJurnalSuratOptions(selectEl, halAwal, halAkhir) {
     }
 }
 
+function onJurnalAwalSuratChanged(prefix, group) {
+    var selAwal = document.getElementById('jm_' + prefix + '_' + group + '_surat');
+    var selAkhir = document.getElementById('jm_' + prefix + '_' + group + '_surat_akhir');
+    if (selAwal && selAkhir) {
+        selAkhir.value = selAwal.value;
+    }
+    updateLiveIndikator(prefix);
+}
+
 function syncJurnalMateriMode(prefix) {
     var sel = document.getElementById('jm_' + prefix + '_materi');
     var opt = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex] : null;
@@ -897,7 +977,9 @@ function syncJurnalMateriMode(prefix) {
 
     if (kat !== 'al_hadist') {
         filterJurnalSuratOptions(document.getElementById('jm_' + prefix + '_target_surat'), halAwal, halAkhir);
+        filterJurnalSuratOptions(document.getElementById('jm_' + prefix + '_target_surat_akhir'), halAwal, halAkhir);
         filterJurnalSuratOptions(document.getElementById('jm_' + prefix + '_capaian_surat'), halAwal, halAkhir);
+        filterJurnalSuratOptions(document.getElementById('jm_' + prefix + '_capaian_surat_akhir'), halAwal, halAkhir);
     }
 
     updateLiveIndikator(prefix);
@@ -919,10 +1001,10 @@ function updateLiveIndikator(prefix) {
             cmp = cBaris > tBaris ? 1 : -1;
         }
     } else {
-        var tSurat = parseInt((document.getElementById('jm_' + prefix + '_target_surat') || {}).value || '1', 10) || 1;
-        var cSurat = parseInt((document.getElementById('jm_' + prefix + '_capaian_surat') || {}).value || '1', 10) || 1;
-        var tAyat = parseInt((document.getElementById('jm_' + prefix + '_target_ayat') || {}).value || '1', 10) || 1;
-        var cAyat = parseInt((document.getElementById('jm_' + prefix + '_capaian_ayat') || {}).value || '1', 10) || 1;
+        var tSurat = parseInt((document.getElementById('jm_' + prefix + '_target_surat_akhir') || document.getElementById('jm_' + prefix + '_target_surat') || {}).value || '1', 10) || 1;
+        var cSurat = parseInt((document.getElementById('jm_' + prefix + '_capaian_surat_akhir') || document.getElementById('jm_' + prefix + '_capaian_surat') || {}).value || '1', 10) || 1;
+        var tAyat = parseInt((document.getElementById('jm_' + prefix + '_target_ayat_akhir') || document.getElementById('jm_' + prefix + '_target_ayat') || {}).value || '1', 10) || 1;
+        var cAyat = parseInt((document.getElementById('jm_' + prefix + '_capaian_ayat_akhir') || document.getElementById('jm_' + prefix + '_capaian_ayat') || {}).value || '1', 10) || 1;
 
         if (cSurat !== tSurat) {
             cmp = cSurat > tSurat ? 1 : -1;
@@ -1029,20 +1111,22 @@ function applySelectedTargetRef(prefix) {
     if (!opt) return;
 
     var elTgl = document.getElementById('jm_' + prefix + '_tanggal');
-    var elSesi = document.getElementById('jm_' + prefix + '_sesi');
     var elKls = document.getElementById('jm_' + prefix + '_kelas');
     var elMat = document.getElementById('jm_' + prefix + '_materi');
     var elTSurat = document.getElementById('jm_' + prefix + '_target_surat');
     var elTAyat = document.getElementById('jm_' + prefix + '_target_ayat');
+    var elTSuratAkhir = document.getElementById('jm_' + prefix + '_target_surat_akhir');
+    var elTAyatAkhir = document.getElementById('jm_' + prefix + '_target_ayat_akhir');
     var elCSurat = document.getElementById('jm_' + prefix + '_capaian_surat');
     var elCAyat = document.getElementById('jm_' + prefix + '_capaian_ayat');
+    var elCSuratAkhir = document.getElementById('jm_' + prefix + '_capaian_surat_akhir');
+    var elCAyatAkhir = document.getElementById('jm_' + prefix + '_capaian_ayat_akhir');
     var elTHal = document.getElementById('jm_' + prefix + '_target_hal');
     var elTBar = document.getElementById('jm_' + prefix + '_target_baris');
     var elCHal = document.getElementById('jm_' + prefix + '_capaian_hal');
     var elCBar = document.getElementById('jm_' + prefix + '_capaian_baris');
 
     if (elTgl && opt.getAttribute('data-tanggal')) elTgl.value = opt.getAttribute('data-tanggal');
-    if (elSesi && opt.getAttribute('data-sesi')) elSesi.value = opt.getAttribute('data-sesi');
     if (elKls && opt.getAttribute('data-kelas')) {
         elKls.value = opt.getAttribute('data-kelas');
         renderAbsensiList(prefix, elKls.value);
@@ -1053,10 +1137,18 @@ function applySelectedTargetRef(prefix) {
 
     var srt = opt.getAttribute('data-surat') || '1';
     var ayt = opt.getAttribute('data-ayat') || '1';
+    var srtAkhir = opt.getAttribute('data-surat-akhir') || srt;
+    var aytAkhir = opt.getAttribute('data-ayat-akhir') || ayt;
+
     if (elTSurat) elTSurat.value = srt;
     if (elTAyat) elTAyat.value = ayt;
+    if (elTSuratAkhir) elTSuratAkhir.value = srtAkhir;
+    if (elTAyatAkhir) elTAyatAkhir.value = aytAkhir;
+
     if (elCSurat) elCSurat.value = srt;
     if (elCAyat) elCAyat.value = ayt;
+    if (elCSuratAkhir) elCSuratAkhir.value = srtAkhir;
+    if (elCAyatAkhir) elCAyatAkhir.value = aytAkhir;
 
     if (elTHal) elTHal.value = opt.getAttribute('data-target-hal') || 1;
     if (elTBar) elTBar.value = opt.getAttribute('data-target-baris') || 1;

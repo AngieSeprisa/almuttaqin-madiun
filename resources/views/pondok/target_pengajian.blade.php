@@ -89,25 +89,6 @@
         color: #4338ca;
         border: 1px solid #c7d2fe;
     }
-
-    .tp-mushaf-strip {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 8px 12px;
-        border-radius: 10px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        font-size: 12px;
-        font-weight: 600;
-        color: #475569;
-    }
-
-    .dark-mode .tp-mushaf-strip {
-        background: #0f172a;
-        border-color: #334155;
-        color: #cbd5e1;
-    }
 </style>
 @endpush
 
@@ -179,7 +160,7 @@
                 <thead>
                     <tr>
                         <th style="width:50px; text-align:center;">No</th>
-                        <th>Tanggal & Sesi</th>
+                        <th>Tanggal Target</th>
                         <th>Kelas Pengajian</th>
                         <th>Materi</th>
                         <th>Target Materi</th>
@@ -199,7 +180,6 @@
                         <td style="text-align:center; font-weight:600; color:var(--text-secondary);">{{ $idx + 1 }}</td>
                         <td>
                             <div style="font-weight:700; color:var(--text-primary);">{{ $hari }}, {{ $dt->format('d/m/Y') }}</div>
-                            <span style="font-size:11.5px; color:var(--text-secondary); font-weight:600;">{{ $item->sesi_label }}</span>
                         </td>
                         <td>
                             <span class="badge-lembaga" style="background:rgba(37, 99, 235, 0.1); color:#1d4ed8; font-weight:700;">
@@ -212,7 +192,7 @@
                                 @if($item->materi?->isAlHadist())
                                     <span class="tp-badge-hadist">Al-Hadist</span>
                                 @else
-                                    <span class="tp-badge-quran">Al-Qur'an • {{ $item->materi?->rentang_halaman_label ?? 'Hal. 1–604' }}</span>
+                                    <span class="tp-badge-quran">Al-Qur'an</span>
                                 @endif
                             </div>
                         </td>
@@ -296,19 +276,6 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Sesi Pengajian</label>
-                        <select name="sesi_pengajian" class="form-select">
-                            @foreach($sesiList as $sKey => $sLabel)
-                                <option value="{{ $sKey }}" {{ old('sesi_pengajian', 'bada_maghrib') === $sKey ? 'selected' : '' }}>
-                                    {{ $sLabel }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
-                    <div class="form-group">
                         <label class="form-label">Kelas Pengajian <span class="required-mark">*</span></label>
                         <select name="kelas_pengajian_id" class="form-select" required>
                             <option value="">Pilih Kelas</option>
@@ -319,32 +286,32 @@
                             @endforeach
                         </select>
                     </div>
-
-                    <div class="form-group">
-                        <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
-                        <select name="pondok_materi_id" id="target_add_materi" class="form-select" required onchange="syncTargetForm('add')">
-                            <option value="" data-kategori="al_quran" data-hal-awal="1" data-hal-akhir="604" data-halaman="604" data-baris="16">Pilih Materi</option>
-                            @foreach($materiList as $m)
-                                <option value="{{ $m->id }}"
-                                        data-kategori="{{ $m->kategori }}"
-                                        data-hal-awal="{{ $m->effective_halaman_awal }}"
-                                        data-hal-akhir="{{ $m->effective_halaman_akhir }}"
-                                        data-halaman="{{ (int) $m->jumlah_halaman }}"
-                                        data-baris="{{ (int) $m->jumlah_baris }}"
-                                        {{ (string) old('pondok_materi_id') === (string) $m->id ? 'selected' : '' }}>
-                                    {{ $m->nama_materi }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
                 </div>
 
-                {{-- SEKSI AL-QUR'AN: NAMA SURAT & AYAT (MUSHAF MADINAH 604 HALAMAN) --}}
+                <div class="form-group">
+                    <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
+                    <select name="pondok_materi_id" id="target_add_materi" class="form-select" required onchange="syncTargetForm('add')">
+                        <option value="" data-kategori="al_quran" data-hal-awal="1" data-hal-akhir="604" data-halaman="604" data-baris="16">Pilih Materi</option>
+                        @foreach($materiList as $m)
+                            <option value="{{ $m->id }}"
+                                    data-kategori="{{ $m->kategori }}"
+                                    data-hal-awal="{{ $m->effective_halaman_awal }}"
+                                    data-hal-akhir="{{ $m->effective_halaman_akhir }}"
+                                    data-halaman="{{ (int) $m->jumlah_halaman }}"
+                                    data-baris="{{ (int) $m->jumlah_baris }}"
+                                    {{ (string) old('pondok_materi_id') === (string) $m->id ? 'selected' : '' }}>
+                                {{ $m->nama_materi }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- SEKSI AL-QUR'AN: AWAL SURAT & AKHIR SURAT --}}
                 <div id="target_add_quran_section" style="display:flex; flex-direction:column; gap:12px;">
                     <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label">Nama Surat <span class="required-mark">*</span></label>
-                            <select name="surat_nomor" id="target_add_surat" class="form-select" onchange="updateAyatLimit('add')">
+                            <label class="form-label">Awal Surat <span class="required-mark">*</span></label>
+                            <select name="surat_nomor" id="target_add_surat" class="form-select" onchange="onAwalSuratChanged('add')">
                                 @foreach($daftarSurat as $srt)
                                     <option value="{{ $srt['nomor'] }}"
                                             data-ayat="{{ $srt['jumlah_ayat'] }}"
@@ -359,13 +326,30 @@
 
                         <div class="form-group" style="margin:0;">
                             <label class="form-label">Ayat <span class="required-mark">*</span></label>
-                            <input type="number" name="ayat" id="target_add_ayat" min="1" max="7" value="{{ old('ayat', 1) }}" class="form-control" oninput="updateMushafPageInfo('add')">
+                            <input type="number" name="ayat" id="target_add_ayat" min="1" max="7" value="{{ old('ayat', 1) }}" class="form-control">
                         </div>
                     </div>
 
-                    <div class="tp-mushaf-strip">
-                        <span id="target_add_mushaf_range_lbl">Mushaf Madinah • Hal. 1–604</span>
-                        <span id="target_add_mushaf_info" style="color:#047857; font-weight:700;">Halaman 1 / 604</span>
+                    <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Akhir Surat <span class="required-mark">*</span></label>
+                            <select name="surat_akhir_nomor" id="target_add_surat_akhir" class="form-select" onchange="updateAyatLimit('add')">
+                                @foreach($daftarSurat as $srt)
+                                    <option value="{{ $srt['nomor'] }}"
+                                            data-ayat="{{ $srt['jumlah_ayat'] }}"
+                                            data-hal-awal="{{ $srt['halaman_awal'] }}"
+                                            data-hal-akhir="{{ $srt['halaman_akhir'] }}"
+                                            {{ (int) old('surat_akhir_nomor', old('surat_nomor', 1)) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Ayat <span class="required-mark">*</span></label>
+                            <input type="number" name="ayat_akhir" id="target_add_ayat_akhir" min="1" max="7" value="{{ old('ayat_akhir', old('ayat', 1)) }}" class="form-control">
+                        </div>
                     </div>
                 </div>
 
@@ -381,11 +365,6 @@
                             <label class="form-label">Baris <span class="required-mark">*</span></label>
                             <input type="number" name="baris" id="target_add_baris" min="1" value="{{ old('baris', 1) }}" class="form-control">
                         </div>
-                    </div>
-
-                    <div class="tp-mushaf-strip">
-                        <span>Batas Materi</span>
-                        <span id="target_add_hadist_info" style="color:#1d4ed8; font-weight:700;">Maksimal 1 Halaman • 1 Baris</span>
                     </div>
                 </div>
 
@@ -423,19 +402,6 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Sesi Pengajian</label>
-                        <select name="sesi_pengajian" class="form-select">
-                            @foreach($sesiList as $sKey => $sLabel)
-                                <option value="{{ $sKey }}" {{ ($item->sesi_pengajian ?: 'bada_maghrib') === $sKey ? 'selected' : '' }}>
-                                    {{ $sLabel }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
-                    <div class="form-group">
                         <label class="form-label">Kelas Pengajian <span class="required-mark">*</span></label>
                         <select name="kelas_pengajian_id" class="form-select" required>
                             @foreach($kelasList as $kls)
@@ -445,31 +411,31 @@
                             @endforeach
                         </select>
                     </div>
+                </div>
 
-                    <div class="form-group">
-                        <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
-                        <select name="pondok_materi_id" id="target_edit_{{ $item->id }}_materi" class="form-select" required onchange="syncTargetForm('edit_{{ $item->id }}')">
-                            @foreach($materiList as $m)
-                                <option value="{{ $m->id }}"
-                                        data-kategori="{{ $m->kategori }}"
-                                        data-hal-awal="{{ $m->effective_halaman_awal }}"
-                                        data-hal-akhir="{{ $m->effective_halaman_akhir }}"
-                                        data-halaman="{{ (int) $m->jumlah_halaman }}"
-                                        data-baris="{{ (int) $m->jumlah_baris }}"
-                                        {{ (int) $item->pondok_materi_id === (int) $m->id ? 'selected' : '' }}>
-                                    {{ $m->nama_materi }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
+                    <select name="pondok_materi_id" id="target_edit_{{ $item->id }}_materi" class="form-select" required onchange="syncTargetForm('edit_{{ $item->id }}')">
+                        @foreach($materiList as $m)
+                            <option value="{{ $m->id }}"
+                                    data-kategori="{{ $m->kategori }}"
+                                    data-hal-awal="{{ $m->effective_halaman_awal }}"
+                                    data-hal-akhir="{{ $m->effective_halaman_akhir }}"
+                                    data-halaman="{{ (int) $m->jumlah_halaman }}"
+                                    data-baris="{{ (int) $m->jumlah_baris }}"
+                                    {{ (int) $item->pondok_materi_id === (int) $m->id ? 'selected' : '' }}>
+                                {{ $m->nama_materi }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
 
                 {{-- SEKSI AL-QUR'AN --}}
                 <div id="target_edit_{{ $item->id }}_quran_section" style="display:{{ $item->materi?->isAlHadist() ? 'none' : 'flex' }}; flex-direction:column; gap:12px;">
                     <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label">Nama Surat <span class="required-mark">*</span></label>
-                            <select name="surat_nomor" id="target_edit_{{ $item->id }}_surat" class="form-select" onchange="updateAyatLimit('edit_{{ $item->id }}')">
+                            <label class="form-label">Awal Surat <span class="required-mark">*</span></label>
+                            <select name="surat_nomor" id="target_edit_{{ $item->id }}_surat" class="form-select" onchange="onAwalSuratChanged('edit_{{ $item->id }}')">
                                 @foreach($daftarSurat as $srt)
                                     <option value="{{ $srt['nomor'] }}"
                                             data-ayat="{{ $srt['jumlah_ayat'] }}"
@@ -484,13 +450,30 @@
 
                         <div class="form-group" style="margin:0;">
                             <label class="form-label">Ayat <span class="required-mark">*</span></label>
-                            <input type="number" name="ayat" id="target_edit_{{ $item->id }}_ayat" min="1" value="{{ (int) ($item->ayat ?: 1) }}" class="form-control" oninput="updateMushafPageInfo('edit_{{ $item->id }}')">
+                            <input type="number" name="ayat" id="target_edit_{{ $item->id }}_ayat" min="1" value="{{ (int) ($item->ayat ?: 1) }}" class="form-control">
                         </div>
                     </div>
 
-                    <div class="tp-mushaf-strip">
-                        <span id="target_edit_{{ $item->id }}_mushaf_range_lbl">Mushaf Madinah • {{ $item->materi?->rentang_halaman_label ?? 'Hal. 1–604' }}</span>
-                        <span id="target_edit_{{ $item->id }}_mushaf_info" style="color:#047857; font-weight:700;">Halaman {{ (int) ($item->target_halaman ?: 1) }} / 604</span>
+                    <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Akhir Surat <span class="required-mark">*</span></label>
+                            <select name="surat_akhir_nomor" id="target_edit_{{ $item->id }}_surat_akhir" class="form-select" onchange="updateAyatLimit('edit_{{ $item->id }}')">
+                                @foreach($daftarSurat as $srt)
+                                    <option value="{{ $srt['nomor'] }}"
+                                            data-ayat="{{ $srt['jumlah_ayat'] }}"
+                                            data-hal-awal="{{ $srt['halaman_awal'] }}"
+                                            data-hal-akhir="{{ $srt['halaman_akhir'] }}"
+                                            {{ (int) ($item->surat_akhir_nomor ?: ($item->surat_nomor ?: 1)) === (int) $srt['nomor'] ? 'selected' : '' }}>
+                                        {{ $srt['nomor'] }}. {{ $srt['nama'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Ayat <span class="required-mark">*</span></label>
+                            <input type="number" name="ayat_akhir" id="target_edit_{{ $item->id }}_ayat_akhir" min="1" value="{{ (int) ($item->ayat_akhir ?: ($item->ayat ?: 1)) }}" class="form-control">
+                        </div>
                     </div>
                 </div>
 
@@ -506,13 +489,6 @@
                             <label class="form-label">Baris <span class="required-mark">*</span></label>
                             <input type="number" name="baris" id="target_edit_{{ $item->id }}_baris" min="1" max="{{ (int) ($item->materi?->jumlah_baris ?: 999) }}" value="{{ (int) $item->target_baris }}" class="form-control">
                         </div>
-                    </div>
-
-                    <div class="tp-mushaf-strip">
-                        <span>Batas Materi</span>
-                        <span id="target_edit_{{ $item->id }}_hadist_info" style="color:#1d4ed8; font-weight:700;">
-                            Maksimal {{ (int) ($item->materi?->jumlah_halaman ?: 1) }} Halaman • {{ (int) ($item->materi?->jumlah_baris ?: 1) }} Baris
-                        </span>
                     </div>
                 </div>
 
@@ -569,8 +545,6 @@ function syncTargetForm(prefix) {
 
     var inHal = document.getElementById('target_' + prefix + '_halaman');
     var inBar = document.getElementById('target_' + prefix + '_baris');
-    var hInfo = document.getElementById('target_' + prefix + '_hadist_info');
-    var rangeLbl = document.getElementById('target_' + prefix + '_mushaf_range_lbl');
 
     if (kat === 'al_hadist') {
         qSec.style.display = 'none';
@@ -583,22 +557,16 @@ function syncTargetForm(prefix) {
             inBar.max = maxBar;
             if (parseInt(inBar.value || '0', 10) > maxBar) inBar.value = maxBar;
         }
-        if (hInfo) {
-            hInfo.textContent = 'Maksimal ' + maxHal + ' Halaman • ' + maxBar + ' Baris';
-        }
     } else {
         qSec.style.display = 'flex';
         hSec.style.display = 'none';
-        if (rangeLbl) {
-            rangeLbl.textContent = 'Mushaf Madinah • Hal. ' + halAwal + '–' + halAkhir;
-        }
-        filterSuratOptionsByRange(prefix, halAwal, halAkhir);
+        filterSuratSelectByRange(document.getElementById('target_' + prefix + '_surat'), halAwal, halAkhir);
+        filterSuratSelectByRange(document.getElementById('target_' + prefix + '_surat_akhir'), halAwal, halAkhir);
         updateAyatLimit(prefix);
     }
 }
 
-function filterSuratOptionsByRange(prefix, halAwal, halAkhir) {
-    var selSurat = document.getElementById('target_' + prefix + '_surat');
+function filterSuratSelectByRange(selSurat, halAwal, halAkhir) {
     if (!selSurat) return;
 
     var firstValidVal = null;
@@ -622,40 +590,37 @@ function filterSuratOptionsByRange(prefix, halAwal, halAkhir) {
     }
 }
 
+function onAwalSuratChanged(prefix) {
+    var selAwal = document.getElementById('target_' + prefix + '_surat');
+    var selAkhir = document.getElementById('target_' + prefix + '_surat_akhir');
+    if (selAwal && selAkhir) {
+        selAkhir.value = selAwal.value;
+    }
+    updateAyatLimit(prefix);
+}
+
 function updateAyatLimit(prefix) {
     var selSurat = document.getElementById('target_' + prefix + '_surat');
     var inAyat = document.getElementById('target_' + prefix + '_ayat');
-    if (!selSurat || !inAyat) return;
-
-    var opt = selSurat.options[selSurat.selectedIndex];
-    var maxAyat = parseInt((opt && opt.getAttribute('data-ayat')) || '286', 10) || 286;
-    inAyat.max = maxAyat;
-    if (parseInt(inAyat.value || '1', 10) > maxAyat) {
-        inAyat.value = maxAyat;
-    }
-    updateMushafPageInfo(prefix);
-}
-
-function updateMushafPageInfo(prefix) {
-    var selSurat = document.getElementById('target_' + prefix + '_surat');
-    var inAyat = document.getElementById('target_' + prefix + '_ayat');
-    var infoEl = document.getElementById('target_' + prefix + '_mushaf_info');
-    if (!selSurat || !inAyat || !infoEl) return;
-
-    var opt = selSurat.options[selSurat.selectedIndex];
-    if (!opt) return;
-
-    var jmlAyat = parseInt(opt.getAttribute('data-ayat') || '1', 10) || 1;
-    var halAwal = parseInt(opt.getAttribute('data-hal-awal') || '1', 10) || 1;
-    var halAkhir = parseInt(opt.getAttribute('data-hal-akhir') || '1', 10) || 1;
-    var ayat = Math.max(1, Math.min(jmlAyat, parseInt(inAyat.value || '1', 10) || 1));
-
-    var estHal = halAwal;
-    if (halAkhir > halAwal && jmlAyat > 1) {
-        estHal = Math.round(halAwal + ((ayat - 1) / (jmlAyat - 1)) * (halAkhir - halAwal));
+    if (selSurat && inAyat) {
+        var opt = selSurat.options[selSurat.selectedIndex];
+        var maxAyat = parseInt((opt && opt.getAttribute('data-ayat')) || '286', 10) || 286;
+        inAyat.max = maxAyat;
+        if (parseInt(inAyat.value || '1', 10) > maxAyat) {
+            inAyat.value = maxAyat;
+        }
     }
 
-    infoEl.textContent = 'Halaman ' + estHal + ' / 604 • Maks ' + jmlAyat + ' Ayat';
+    var selSuratAkhir = document.getElementById('target_' + prefix + '_surat_akhir');
+    var inAyatAkhir = document.getElementById('target_' + prefix + '_ayat_akhir');
+    if (selSuratAkhir && inAyatAkhir) {
+        var optAkhir = selSuratAkhir.options[selSuratAkhir.selectedIndex];
+        var maxAyatAkhir = parseInt((optAkhir && optAkhir.getAttribute('data-ayat')) || '286', 10) || 286;
+        inAyatAkhir.max = maxAyatAkhir;
+        if (parseInt(inAyatAkhir.value || '1', 10) > maxAyatAkhir) {
+            inAyatAkhir.value = maxAyatAkhir;
+        }
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {

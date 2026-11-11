@@ -29,11 +29,17 @@ class PondokJurnalMengaji extends Model
         'target_surat_nomor',
         'target_nama_surat',
         'target_ayat',
+        'target_surat_akhir_nomor',
+        'target_nama_surat_akhir',
+        'target_ayat_akhir',
         'target_halaman',
         'target_baris',
         'capaian_surat_nomor',
         'capaian_nama_surat',
         'capaian_ayat',
+        'capaian_surat_akhir_nomor',
+        'capaian_nama_surat_akhir',
+        'capaian_ayat_akhir',
         'capaian_halaman',
         'capaian_baris',
         'halaman_awal',
@@ -51,23 +57,27 @@ class PondokJurnalMengaji extends Model
     protected function casts(): array
     {
         return [
-            'tanggal'             => 'date',
-            'target_surat_nomor'  => 'integer',
-            'target_ayat'         => 'integer',
-            'target_halaman'      => 'integer',
-            'target_baris'        => 'integer',
-            'capaian_surat_nomor' => 'integer',
-            'capaian_ayat'        => 'integer',
-            'capaian_halaman'     => 'integer',
-            'capaian_baris'       => 'integer',
-            'halaman_awal'        => 'integer',
-            'halaman_akhir'       => 'integer',
-            'total_santri'        => 'integer',
-            'total_hadir'         => 'integer',
-            'total_terlambat'     => 'integer',
-            'total_izin'          => 'integer',
-            'total_sakit'         => 'integer',
-            'total_alpa'          => 'integer',
+            'tanggal'                   => 'date',
+            'target_surat_nomor'        => 'integer',
+            'target_ayat'               => 'integer',
+            'target_surat_akhir_nomor'  => 'integer',
+            'target_ayat_akhir'         => 'integer',
+            'target_halaman'            => 'integer',
+            'target_baris'              => 'integer',
+            'capaian_surat_nomor'       => 'integer',
+            'capaian_ayat'              => 'integer',
+            'capaian_surat_akhir_nomor' => 'integer',
+            'capaian_ayat_akhir'        => 'integer',
+            'capaian_halaman'           => 'integer',
+            'capaian_baris'             => 'integer',
+            'halaman_awal'              => 'integer',
+            'halaman_akhir'             => 'integer',
+            'total_santri'              => 'integer',
+            'total_hadir'               => 'integer',
+            'total_terlambat'           => 'integer',
+            'total_izin'                => 'integer',
+            'total_sakit'               => 'integer',
+            'total_alpa'                => 'integer',
         ];
     }
 
@@ -105,7 +115,7 @@ class PondokJurnalMengaji extends Model
 
     /**
      * Hitung indikator ketercapaian: tercapai | kurang | terlampaui
-     * - Al-Qur'an : jika ada surat & ayat, bandingkan [surat_nomor, ayat]; jika tidak, bandingkan halaman.
+     * - Al-Qur'an : jika ada surat & ayat, bandingkan batas akhir [surat_nomor, ayat]; jika tidak, bandingkan halaman.
      * - Al-Hadist : bandingkan [halaman, baris].
      */
     public static function hitungStatusKetercapaian(
@@ -157,8 +167,19 @@ class PondokJurnalMengaji extends Model
         }
 
         if ($this->target_nama_surat && $this->target_ayat) {
-            $hal = (int) ($this->target_halaman ?: MushafMadinah::estimasiHalaman((int) $this->target_surat_nomor, (int) $this->target_ayat));
-            return "QS. {$this->target_nama_surat} Ayat {$this->target_ayat} • Hal. {$hal}";
+            $sAwal  = $this->target_nama_surat;
+            $aAwal  = (int) $this->target_ayat;
+            $sAkhir = $this->target_nama_surat_akhir ?: $sAwal;
+            $aAkhir = (int) ($this->target_ayat_akhir ?: $aAwal);
+
+            if ($sAkhir === $sAwal) {
+                if ($aAkhir === $aAwal) {
+                    return "QS. {$sAwal} Ayat {$aAwal}";
+                }
+                return "QS. {$sAwal} Ayat {$aAwal}–{$aAkhir}";
+            }
+
+            return "QS. {$sAwal}: {$aAwal} – {$sAkhir}: {$aAkhir}";
         }
 
         $hal = (int) $this->target_halaman;
@@ -176,8 +197,19 @@ class PondokJurnalMengaji extends Model
         }
 
         if ($this->capaian_nama_surat && $this->capaian_ayat) {
-            $hal = (int) ($this->capaian_halaman ?: MushafMadinah::estimasiHalaman((int) $this->capaian_surat_nomor, (int) $this->capaian_ayat));
-            return "QS. {$this->capaian_nama_surat} Ayat {$this->capaian_ayat} • Hal. {$hal}";
+            $sAwal  = $this->capaian_nama_surat;
+            $aAwal  = (int) $this->capaian_ayat;
+            $sAkhir = $this->capaian_nama_surat_akhir ?: $sAwal;
+            $aAkhir = (int) ($this->capaian_ayat_akhir ?: $aAwal);
+
+            if ($sAkhir === $sAwal) {
+                if ($aAkhir === $aAwal) {
+                    return "QS. {$sAwal} Ayat {$aAwal}";
+                }
+                return "QS. {$sAwal} Ayat {$aAwal}–{$aAkhir}";
+            }
+
+            return "QS. {$sAwal}: {$aAwal} – {$sAkhir}: {$aAkhir}";
         }
 
         $hal = (int) $this->capaian_halaman;
@@ -192,9 +224,14 @@ class PondokJurnalMengaji extends Model
 
         $kategori = $this->materi?->kategori ?? PondokMateri::KATEGORI_AL_QURAN;
 
-        if ($kategori === PondokMateri::KATEGORI_AL_QURAN && $this->target_surat_nomor && $this->capaian_surat_nomor) {
-            if ((int) $this->target_surat_nomor === (int) $this->capaian_surat_nomor) {
-                $diffAyat = (int) $this->capaian_ayat - (int) $this->target_ayat;
+        $tSuratEnd = (int) ($this->target_surat_akhir_nomor ?: $this->target_surat_nomor);
+        $tAyatEnd  = (int) ($this->target_ayat_akhir ?: $this->target_ayat);
+        $cSuratEnd = (int) ($this->capaian_surat_akhir_nomor ?: $this->capaian_surat_nomor);
+        $cAyatEnd  = (int) ($this->capaian_ayat_akhir ?: $this->capaian_ayat);
+
+        if ($kategori === PondokMateri::KATEGORI_AL_QURAN && $tSuratEnd && $cSuratEnd) {
+            if ($tSuratEnd === $cSuratEnd) {
+                $diffAyat = $cAyatEnd - $tAyatEnd;
                 $sign = $diffAyat > 0 ? '+' : '';
                 return "{$sign}{$diffAyat} Ayat";
             }
