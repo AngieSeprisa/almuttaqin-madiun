@@ -207,8 +207,70 @@
         color: #ffffff;
     }
 
+    .app-modal .modal-body {
+        overflow-x: hidden;
+    }
+
     .app-modal .modal-body > * {
         flex-shrink: 0;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .app-modal .form-group {
+        min-width: 0;
+    }
+
+    .app-modal .fi-select-wrap,
+    .app-modal .fi-select-btn,
+    .app-modal .form-control,
+    .app-modal .form-select {
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    .jm-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .jm-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .jm-quran-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .jm-surat-pair {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(68px, 0.85fr);
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .jm-hadist-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .jm-absensi-tools {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .jm-absensi-search-input {
+        height: 26px;
+        width: 145px;
+        font-size: 11.5px;
+        padding: 0 8px;
     }
 
     .jm-absensi-box {
@@ -263,7 +325,122 @@
         min-height: 120px;
         max-height: 240px;
         overflow-y: auto;
+        overflow-x: hidden;
         border-radius: 0 0 12px 12px;
+    }
+
+    @media (max-width: 640px) {
+        .app-modal .modal-dialog {
+            width: calc(100vw - 16px) !important;
+            max-width: calc(100vw - 16px) !important;
+            margin: 8px auto !important;
+        }
+
+        .app-modal .modal-header {
+            padding: 12px 14px;
+        }
+
+        .app-modal .modal-title {
+            font-size: 15px;
+        }
+
+        .app-modal .modal-body {
+            padding: 12px 14px !important;
+            gap: 11px !important;
+            max-height: 78vh !important;
+        }
+
+        .app-modal .modal-footer {
+            padding: 10px 14px;
+            gap: 8px;
+        }
+
+        .jm-target-card {
+            padding: 10px 12px;
+            gap: 6px;
+        }
+
+        .jm-target-card-top {
+            gap: 8px;
+        }
+
+        .jm-target-card-title {
+            font-size: 13.5px;
+        }
+
+        .jm-target-card-sub {
+            font-size: 11.5px;
+        }
+
+        .jm-indikator-badge {
+            padding: 3px 9px;
+            font-size: 11px;
+        }
+
+        .jm-grid-3 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .jm-grid-3 > .form-group:nth-child(3) {
+            grid-column: 1 / -1;
+        }
+
+        .jm-grid-2 {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 8px;
+        }
+
+        .jm-quran-grid {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 8px;
+        }
+
+        .jm-surat-pair {
+            grid-template-columns: minmax(0, 1.6fr) minmax(64px, 0.8fr);
+            gap: 8px;
+        }
+
+        .jm-hadist-grid {
+            gap: 8px;
+        }
+
+        .jm-absensi-header {
+            padding: 9px 11px;
+            gap: 6px;
+        }
+
+        .jm-absensi-tools {
+            width: 100%;
+        }
+
+        .jm-absensi-search-input {
+            flex: 1;
+            width: auto;
+            min-width: 0;
+        }
+
+        .jm-abs-stat-pill {
+            padding: 1px 6px;
+            font-size: 10.5px;
+        }
+
+        .jm-absensi-row {
+            padding: 7px 10px;
+            gap: 6px;
+        }
+
+        .jm-status-pills {
+            gap: 3px;
+        }
+
+        .jm-pill-btn {
+            min-width: 24px;
+            height: 24px;
+            padding: 0 5px;
+            font-size: 11px;
+            border-radius: 6px;
+        }
     }
 
     .jm-absensi-row {
@@ -623,7 +800,7 @@
                     <div class="jm-target-switch-pills" id="jm_add_card_pills" style="display:none;"></div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
+                <div class="jm-grid-3">
                     <div class="form-group">
                         <label class="form-label">Tanggal <span class="required-mark">*</span></label>
                         <input type="date" name="tanggal" id="jm_add_tanggal" value="{{ old('tanggal', date('Y-m-d')) }}" class="form-control" required onchange="onJurnalKelasOrTanggalChanged('add', false)">
@@ -653,7 +830,7 @@
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                <div class="jm-grid-2">
                     <div class="form-group">
                         <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
                         <select name="pondok_materi_id" id="jm_add_materi" class="form-select" required onchange="onJurnalMateriChanged('add')">
@@ -681,8 +858,8 @@
                 {{-- SEKSI AL-QUR'AN: PENCAPAIAN KELAS (AWAL SURAT & AKHIR SURAT) --}}
                 <div id="jm_add_quran_wrap" style="display:flex; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
                     <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
-                        <div style="display:grid; grid-template-columns: 1.45fr 1fr; gap:8px;">
+                    <div class="jm-quran-grid">
+                        <div class="jm-surat-pair">
                             <div class="form-group" style="margin:0;">
                                 <label class="form-label" style="font-size:12px;">Awal Surat <span class="required-mark">*</span></label>
                                 <select name="capaian_surat_nomor" id="jm_add_capaian_surat" class="form-select" onchange="onJurnalAwalSuratChanged('add', 'capaian')">
@@ -698,7 +875,7 @@
                                 <input type="number" name="capaian_ayat" id="jm_add_capaian_ayat" min="1" value="{{ old('capaian_ayat', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
                             </div>
                         </div>
-                        <div style="display:grid; grid-template-columns: 1.45fr 1fr; gap:8px;">
+                        <div class="jm-surat-pair">
                             <div class="form-group" style="margin:0;">
                                 <label class="form-label" style="font-size:12px;">Akhir Surat <span class="required-mark">*</span></label>
                                 <select name="capaian_surat_akhir_nomor" id="jm_add_capaian_surat_akhir" class="form-select" onchange="updateLiveIndikator('add')">
@@ -720,7 +897,7 @@
                 {{-- SEKSI AL-HADIST: PENCAPAIAN KELAS (HALAMAN & BARIS) --}}
                 <div id="jm_add_hadist_wrap" style="display:none; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
                     <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                    <div class="jm-hadist-grid">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label" style="font-size:12px;">Halaman <span class="required-mark">*</span></label>
                             <input type="number" name="capaian_halaman" id="jm_add_capaian_hal" min="0" value="{{ old('capaian_halaman', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
@@ -740,9 +917,9 @@
                                 <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Absensi Santri Pengajian</strong>
                                 <span id="jm_add_absensi_count" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#eff6ff; color:#1d4ed8;">0 Santri</span>
                             </div>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <input type="text" id="jm_add_absensi_search" class="form-control" placeholder="Cari nama santri..." oninput="filterAbsensiRows('add', this.value)" style="height:26px; width:145px; font-size:11.5px; padding:0 8px;">
-                                <button type="button" class="btn btn-sm btn-secondary" onclick="markAllHadir('add')" style="height:26px; padding:0 10px; font-size:11.5px;">
+                            <div class="jm-absensi-tools">
+                                <input type="text" id="jm_add_absensi_search" class="form-control jm-absensi-search-input" placeholder="Cari nama santri..." oninput="filterAbsensiRows('add', this.value)">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="markAllHadir('add')" style="height:26px; padding:0 10px; font-size:11.5px; flex-shrink:0;">
                                     ✓ Hadirkan Semua
                                 </button>
                             </div>
@@ -824,7 +1001,7 @@
                     <div class="jm-target-switch-pills" id="jm_edit_{{ $item->id }}_card_pills" style="display:none;"></div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
+                <div class="jm-grid-3">
                     <div class="form-group">
                         <label class="form-label">Tanggal <span class="required-mark">*</span></label>
                         <input type="date" name="tanggal" id="jm_edit_{{ $item->id }}_tanggal" value="{{ \Carbon\Carbon::parse($item->tanggal)->format('Y-m-d') }}" class="form-control" required onchange="onJurnalKelasOrTanggalChanged('edit_{{ $item->id }}', false)">
@@ -851,7 +1028,7 @@
                     </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                <div class="jm-grid-2">
                     <div class="form-group">
                         <label class="form-label">Materi Pondok <span class="required-mark">*</span></label>
                         <select name="pondok_materi_id" id="jm_edit_{{ $item->id }}_materi" class="form-select" required onchange="onJurnalMateriChanged('edit_{{ $item->id }}')">
@@ -876,8 +1053,8 @@
 
                 <div id="jm_edit_{{ $item->id }}_quran_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'none' : 'flex' }}; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
                     <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
-                        <div style="display:grid; grid-template-columns: 1.45fr 1fr; gap:8px;">
+                    <div class="jm-quran-grid">
+                        <div class="jm-surat-pair">
                             <div class="form-group" style="margin:0;">
                                 <label class="form-label" style="font-size:12px;">Awal Surat <span class="required-mark">*</span></label>
                                 <select name="capaian_surat_nomor" id="jm_edit_{{ $item->id }}_capaian_surat" class="form-select" onchange="onJurnalAwalSuratChanged('edit_{{ $item->id }}', 'capaian')">
@@ -893,7 +1070,7 @@
                                 <input type="number" name="capaian_ayat" id="jm_edit_{{ $item->id }}_capaian_ayat" min="1" value="{{ (int) ($item->capaian_ayat ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
                             </div>
                         </div>
-                        <div style="display:grid; grid-template-columns: 1.45fr 1fr; gap:8px;">
+                        <div class="jm-surat-pair">
                             <div class="form-group" style="margin:0;">
                                 <label class="form-label" style="font-size:12px;">Akhir Surat <span class="required-mark">*</span></label>
                                 <select name="capaian_surat_akhir_nomor" id="jm_edit_{{ $item->id }}_capaian_surat_akhir" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
@@ -914,7 +1091,7 @@
 
                 <div id="jm_edit_{{ $item->id }}_hadist_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'flex' : 'none' }}; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
                     <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                    <div class="jm-hadist-grid">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label" style="font-size:12px;">Halaman <span class="required-mark">*</span></label>
                             <input type="number" name="capaian_halaman" id="jm_edit_{{ $item->id }}_capaian_hal" min="0" value="{{ (int) $item->capaian_halaman }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
@@ -934,9 +1111,9 @@
                                 <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Absensi Santri Pengajian</strong>
                                 <span id="jm_edit_{{ $item->id }}_absensi_count" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:#eff6ff; color:#1d4ed8;">0 Santri</span>
                             </div>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <input type="text" id="jm_edit_{{ $item->id }}_absensi_search" class="form-control" placeholder="Cari nama santri..." oninput="filterAbsensiRows('edit_{{ $item->id }}', this.value)" style="height:26px; width:145px; font-size:11.5px; padding:0 8px;">
-                                <button type="button" class="btn btn-sm btn-secondary" onclick="markAllHadir('edit_{{ $item->id }}')" style="height:26px; padding:0 10px; font-size:11.5px;">
+                            <div class="jm-absensi-tools">
+                                <input type="text" id="jm_edit_{{ $item->id }}_absensi_search" class="form-control jm-absensi-search-input" placeholder="Cari nama santri..." oninput="filterAbsensiRows('edit_{{ $item->id }}', this.value)">
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="markAllHadir('edit_{{ $item->id }}')" style="height:26px; padding:0 10px; font-size:11.5px; flex-shrink:0;">
                                     ✓ Hadirkan Semua
                                 </button>
                             </div>

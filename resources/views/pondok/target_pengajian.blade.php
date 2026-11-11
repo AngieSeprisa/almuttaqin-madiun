@@ -89,6 +89,54 @@
         color: #4338ca;
         border: 1px solid #c7d2fe;
     }
+
+    .app-modal .modal-body {
+        overflow-x: hidden;
+    }
+
+    .app-modal .form-group,
+    .app-modal .fi-select-wrap,
+    .app-modal .fi-select-btn,
+    .app-modal .form-control,
+    .app-modal .form-select {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .tp-grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .tp-surat-pair {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(72px, 0.95fr);
+        gap: 12px;
+    }
+
+    @media (max-width: 640px) {
+        .app-modal .modal-dialog {
+            width: calc(100vw - 16px) !important;
+            max-width: calc(100vw - 16px) !important;
+            margin: 8px auto !important;
+        }
+
+        .app-modal .modal-body {
+            padding: 12px 14px !important;
+            gap: 11px !important;
+        }
+
+        .tp-grid-2 {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 10px;
+        }
+
+        .tp-surat-pair {
+            grid-template-columns: minmax(0, 1.55fr) minmax(68px, 0.85fr);
+            gap: 8px;
+        }
+    }
 </style>
 @endpush
 
@@ -269,7 +317,7 @@
             </div>
 
             <div class="modal-body" style="text-align:left; display:flex; flex-direction:column; gap:14px;">
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                <div class="tp-grid-2">
                     <div class="form-group">
                         <label class="form-label">Tanggal Target <span class="required-mark">*</span></label>
                         <input type="date" name="tanggal" value="{{ old('tanggal', date('Y-m-d')) }}" class="form-control" required>
@@ -308,7 +356,7 @@
 
                 {{-- SEKSI AL-QUR'AN: AWAL SURAT & AKHIR SURAT --}}
                 <div id="target_add_quran_section" style="display:flex; flex-direction:column; gap:12px;">
-                    <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
+                    <div class="tp-surat-pair">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label">Awal Surat <span class="required-mark">*</span></label>
                             <select name="surat_nomor" id="target_add_surat" class="form-select" onchange="onAwalSuratChanged('add')">
@@ -330,7 +378,7 @@
                         </div>
                     </div>
 
-                    <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
+                    <div class="tp-surat-pair">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label">Akhir Surat <span class="required-mark">*</span></label>
                             <select name="surat_akhir_nomor" id="target_add_surat_akhir" class="form-select" onchange="updateAyatLimit('add')">
@@ -355,7 +403,7 @@
 
                 {{-- SEKSI AL-HADIST: HALAMAN & BARIS SESUAI MATERI PONDOK --}}
                 <div id="target_add_hadist_section" style="display:none; flex-direction:column; gap:12px;">
-                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                    <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px;">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label">Halaman <span class="required-mark">*</span></label>
                             <input type="number" name="halaman" id="target_add_halaman" min="1" value="{{ old('halaman', 1) }}" class="form-control">
@@ -395,7 +443,7 @@
             </div>
 
             <div class="modal-body" style="text-align:left; display:flex; flex-direction:column; gap:14px;">
-                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                <div class="tp-grid-2">
                     <div class="form-group">
                         <label class="form-label">Tanggal Target <span class="required-mark">*</span></label>
                         <input type="date" name="tanggal" value="{{ \Carbon\Carbon::parse($item->tanggal)->format('Y-m-d') }}" class="form-control" required>
@@ -432,7 +480,7 @@
 
                 {{-- SEKSI AL-QUR'AN --}}
                 <div id="target_edit_{{ $item->id }}_quran_section" style="display:{{ $item->materi?->isAlHadist() ? 'none' : 'flex' }}; flex-direction:column; gap:12px;">
-                    <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
+                    <div class="tp-surat-pair">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label">Awal Surat <span class="required-mark">*</span></label>
                             <select name="surat_nomor" id="target_edit_{{ $item->id }}_surat" class="form-select" onchange="onAwalSuratChanged('edit_{{ $item->id }}')">
@@ -454,7 +502,7 @@
                         </div>
                     </div>
 
-                    <div style="display:grid; grid-template-columns: 1.4fr 1fr; gap:12px;">
+                    <div class="tp-surat-pair">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label">Akhir Surat <span class="required-mark">*</span></label>
                             <select name="surat_akhir_nomor" id="target_edit_{{ $item->id }}_surat_akhir" class="form-select" onchange="updateAyatLimit('edit_{{ $item->id }}')">
@@ -479,7 +527,7 @@
 
                 {{-- SEKSI AL-HADIST --}}
                 <div id="target_edit_{{ $item->id }}_hadist_section" style="display:{{ $item->materi?->isAlHadist() ? 'flex' : 'none' }}; flex-direction:column; gap:12px;">
-                    <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                    <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px;">
                         <div class="form-group" style="margin:0;">
                             <label class="form-label">Halaman <span class="required-mark">*</span></label>
                             <input type="number" name="halaman" id="target_edit_{{ $item->id }}_halaman" min="1" max="{{ (int) ($item->materi?->jumlah_halaman ?: 999) }}" value="{{ (int) $item->target_halaman }}" class="form-control">
