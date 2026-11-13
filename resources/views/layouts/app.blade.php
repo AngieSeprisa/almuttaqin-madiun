@@ -184,7 +184,7 @@
                 </div>
                 @endif
 
-                {{-- Menu Pondok dengan Submenu Daftar Materi, Target Pengajian, Jurnal Mengaji & Rekap Jurnal --}}
+                {{-- Menu Pondok dengan Submenu Daftar Materi, Target Pengajian & Jurnal Mengaji --}}
                 @if(!$authUser || $authUser->canDo('pondok', 'view') || $authUser->canDo('rekap_pondok', 'view') || $authUser->canDo('pengaturan_pondok', 'view'))
                 @php
                     $isPondokMenuActive = request()->routeIs('pondok.materi.*') || request()->routeIs('pondok.target.*') || request()->routeIs('pondok.jurnal.*') || request()->routeIs('pondok.rekap-jurnal*');

@@ -41,14 +41,10 @@
                 $bcParent = 'Pondok';
                 $bcParentRoute = route('pondok.target.index');
                 $bcChild = 'Target Pengajian';
-            } elseif (request()->routeIs('pondok.jurnal.*')) {
+            } elseif (request()->routeIs('pondok.jurnal.*') || request()->routeIs('pondok.rekap-jurnal*')) {
                 $bcParent = 'Pondok';
                 $bcParentRoute = route('pondok.jurnal.index');
                 $bcChild = 'Jurnal Mengaji';
-            } elseif (request()->routeIs('pondok.rekap-jurnal*')) {
-                $bcParent = 'Pondok';
-                $bcParentRoute = route('pondok.rekap-jurnal');
-                $bcChild = 'Rekap Jurnal';
             } elseif (request()->routeIs('rekap.sholat.*')) {
                 $customBreadcrumbHtml = null;
                 $breadcrumbsList = [
