@@ -524,7 +524,8 @@
         border: 1px solid var(--border-light, #e2e8f0);
         border-radius: 10px;
         background: var(--bg-card, #ffffff);
-        overflow: hidden;
+        overflow: visible;
+        position: relative;
         transition: border-color .15s ease, box-shadow .15s ease;
     }
 
@@ -617,6 +618,53 @@
         padding: 12px;
         border-top: 1px solid var(--border-light, #e2e8f0);
         background: var(--bg-card-header, #f8fafc);
+        border-radius: 0 0 10px 10px;
+    }
+
+    .jm-next-body .fi-select-wrap.is-open {
+        z-index: 1060;
+    }
+
+    @media (max-width: 640px) {
+        .jm-next-toggle {
+            padding: 10px;
+            gap: 10px;
+        }
+
+        .jm-next-body {
+            padding: 10px;
+        }
+
+        .jm-next-body .jm-hadist-grid {
+            gap: 8px;
+        }
+
+        .app-modal .fi-select-popover {
+            max-height: 240px;
+        }
+
+        .app-modal .fi-select-options-list {
+            max-height: 190px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .app-modal .fi-select-option {
+            min-height: 40px;
+            padding-top: 9px;
+            padding-bottom: 9px;
+            font-size: 13px;
+        }
+
+        .app-modal .fi-select-option-label {
+            white-space: normal;
+            word-break: break-word;
+            line-height: 1.35;
+        }
+
+        .app-modal .fi-select-search-input {
+            font-size: 14px;
+        }
     }
 
     .dark-mode .jm-switch-track {

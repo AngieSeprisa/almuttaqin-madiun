@@ -2019,13 +2019,32 @@ document.addEventListener('DOMContentLoaded', function () {
         searchInput.value = '';
         filterOptions('');
 
-        // Auto position: check if space below is limited
+        // Auto position: hitung ruang terhadap kontainer scroll terdekat (mis. modal-body) atau viewport
         var rect = wrap.getBoundingClientRect();
-        var spaceBelow = window.innerHeight - rect.bottom;
-        if (spaceBelow < 250 && rect.top > 250) {
+        var scrollParent = wrap.closest('.modal-body');
+        var boundTop = 0;
+        var boundBottom = window.innerHeight;
+        if (scrollParent) {
+          var pRect = scrollParent.getBoundingClientRect();
+          boundTop = Math.max(boundTop, pRect.top);
+          boundBottom = Math.min(boundBottom, pRect.bottom);
+        }
+        var spaceBelow = boundBottom - rect.bottom;
+        var spaceAbove = rect.top - boundTop;
+        if (spaceBelow < 250 && spaceAbove > 250) {
           popover.classList.add('is-dropup');
         } else {
           popover.classList.remove('is-dropup');
+          // Jika popover terpotong di bawah kontainer scroll, gulirkan agar terlihat penuh
+          if (scrollParent) {
+            requestAnimationFrame(function () {
+              var popRect = popover.getBoundingClientRect();
+              var overflowBottom = popRect.bottom - boundBottom;
+              if (overflowBottom > 0) {
+                scrollParent.scrollTop += overflowBottom + 8;
+              }
+            });
+          }
         }
 
         if (isSearchable) {
