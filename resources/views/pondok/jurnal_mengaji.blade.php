@@ -518,6 +518,127 @@
         border-color: #dc2626;
         color: #ffffff;
     }
+
+    /* ===== Opsi Lanjut Materi Berikutnya (toggle switch) ===== */
+    .jm-next-box {
+        border: 1px solid var(--border-light, #e2e8f0);
+        border-radius: 10px;
+        background: var(--bg-card, #ffffff);
+        overflow: hidden;
+        transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    .jm-next-box.is-active {
+        border-color: #bfdbfe;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, .06);
+    }
+
+    .jm-next-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        margin: 0;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .jm-next-toggle-text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .jm-next-toggle-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary, #0f172a);
+    }
+
+    .jm-next-toggle-desc {
+        font-size: 11.5px;
+        color: var(--text-muted, #64748b);
+        line-height: 1.4;
+    }
+
+    .jm-switch {
+        position: relative;
+        flex-shrink: 0;
+        width: 36px;
+        height: 20px;
+    }
+
+    .jm-switch input {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .jm-switch-track {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: #e2e8f0;
+        transition: background .18s ease;
+    }
+
+    .jm-switch-track::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, .2);
+        transition: transform .18s ease;
+    }
+
+    .jm-switch input:checked + .jm-switch-track {
+        background: #2563eb;
+    }
+
+    .jm-switch input:checked + .jm-switch-track::after {
+        transform: translateX(16px);
+    }
+
+    .jm-switch input:focus-visible + .jm-switch-track {
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, .25);
+    }
+
+    .jm-next-body {
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+        border-top: 1px solid var(--border-light, #e2e8f0);
+        background: var(--bg-card-header, #f8fafc);
+    }
+
+    .dark-mode .jm-switch-track {
+        background: #334155;
+    }
+
+    .dark-mode .jm-next-box.is-active {
+        border-color: #1e40af;
+    }
+
+    .jm-khatam-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: .02em;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
 </style>
 @endpush
 
@@ -672,7 +793,7 @@
                             </span>
                             @if($item->is_khatam && $item->lanjutanMateri)
                                 <div style="font-size:11.5px; font-weight:600; color:#475569; margin-top:3px;">
-                                    ➔ Lanjut: <span style="color:#2563eb; font-weight:700;">{{ $item->lanjutanMateri->nama_materi }}</span>
+                                    Lanjut: <span style="color:#2563eb; font-weight:700;">{{ $item->lanjutanMateri->nama_materi }}</span>
                                 </div>
                             @endif
                         </td>
@@ -683,10 +804,8 @@
                         </td>
                         <td>
                             @if($item->is_khatam)
-                                <div style="margin-bottom:3px;">
-                                    <span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10.5px; font-weight:800; padding:1px 7px; border-radius:999px;">
-                                        🏆 KHATAM
-                                    </span>
+                                <div style="margin-bottom:4px;">
+                                    <span class="jm-khatam-badge">Khatam</span>
                                 </div>
                             @endif
                             <span style="font-size:13px; font-weight:700; color:var(--text-primary); line-height:1.4;">
@@ -933,47 +1052,42 @@
                         </div>
                     </div>
 
-                    {{-- OPSI KHATAM & LANJUT KE HADIST BERIKUTNYA --}}
-                    <div style="margin-top:4px; padding:10px 12px; border-radius:10px; background:#fff; border:1px dashed #cbd5e1;">
-                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0; user-select:none;">
-                            <input type="checkbox" name="is_khatam" id="jm_add_is_khatam" value="1" onchange="toggleHadistKhatam('add')" style="width:16px; height:16px; accent-color:#2563eb; cursor:pointer;">
-                            <span style="font-size:12.5px; font-weight:700; color:#1e293b;">
-                                🏆 Khatam Hadist saat ini & Lanjut ke Hadist Berikutnya
+                    {{-- OPSI LANJUT MATERI BERIKUTNYA --}}
+                    <div class="jm-next-box" id="jm_add_next_box">
+                        <label class="jm-next-toggle" for="jm_add_is_khatam">
+                            <span class="jm-next-toggle-text">
+                                <span class="jm-next-toggle-title">Lanjut materi berikutnya</span>
+                                <span class="jm-next-toggle-desc">Aktifkan jika materi ini khatam dan dilanjutkan ke materi berikutnya pada sesi yang sama.</span>
+                            </span>
+                            <span class="jm-switch">
+                                <input type="checkbox" name="is_khatam" id="jm_add_is_khatam" value="1" onchange="toggleHadistKhatam('add')">
+                                <span class="jm-switch-track"></span>
                             </span>
                         </label>
 
-                        {{-- Form Hadist Lanjutan --}}
-                        <div id="jm_add_khatam_section" style="display:none; flex-direction:column; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
+                        <div class="jm-next-body" id="jm_add_khatam_section">
+                            <input type="hidden" name="lanjutan_halaman_awal" id="jm_add_lanjutan_halaman_awal" value="1">
+                            <input type="hidden" name="lanjutan_baris_awal" id="jm_add_lanjutan_baris_awal" value="1">
+
                             <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Materi Hadist Lanjutan <span class="required-mark">*</span></label>
+                                <label class="form-label" style="font-size:12px;">Materi Berikutnya <span class="required-mark">*</span></label>
                                 <select name="lanjutan_materi_id" id="jm_add_lanjutan_materi" class="form-select" onchange="updateLiveIndikator('add')">
-                                    <option value="">Pilih Hadist Selanjutnya</option>
+                                    <option value="">Pilih materi berikutnya</option>
                                     @foreach($materiList->where('kategori', 'al_hadist') as $mh)
                                         <option value="{{ $mh->id }}" data-halaman="{{ $mh->jumlah_halaman }}" data-baris="{{ $mh->jumlah_baris }}">
-                                            {{ $mh->nama_materi }} ({{ $mh->jumlah_halaman }} Hal • {{ $mh->jumlah_baris ?: 16 }} Baris)
+                                            {{ $mh->nama_materi }}
                                         </option>
                                     @endforeach
                                 </select>
                             </div>
 
-                            <div class="jm-surat-pair">
+                            <div class="jm-hadist-grid">
                                 <div class="form-group" style="margin:0;">
-                                    <label class="form-label" style="font-size:12px;">Halaman Awal Lanjutan <span class="required-mark">*</span></label>
-                                    <input type="number" name="lanjutan_halaman_awal" id="jm_add_lanjutan_halaman_awal" min="1" value="1" class="form-control" oninput="updateLiveIndikator('add')">
-                                </div>
-                                <div class="form-group" style="margin:0;">
-                                    <label class="form-label" style="font-size:12px;">Baris Awal Lanjutan <span class="required-mark">*</span></label>
-                                    <input type="number" name="lanjutan_baris_awal" id="jm_add_lanjutan_baris_awal" min="1" value="1" class="form-control" oninput="updateLiveIndikator('add')">
-                                </div>
-                            </div>
-
-                            <div class="jm-surat-pair">
-                                <div class="form-group" style="margin:0;">
-                                    <label class="form-label" style="font-size:12px;">Halaman Akhir Lanjutan <span class="required-mark">*</span></label>
+                                    <label class="form-label" style="font-size:12px;">Halaman Akhir <span class="required-mark">*</span></label>
                                     <input type="number" name="lanjutan_halaman_akhir" id="jm_add_lanjutan_halaman_akhir" min="1" value="1" class="form-control" oninput="updateLiveIndikator('add')">
                                 </div>
                                 <div class="form-group" style="margin:0;">
-                                    <label class="form-label" style="font-size:12px;">Baris Akhir Lanjutan <span class="required-mark">*</span></label>
+                                    <label class="form-label" style="font-size:12px;">Baris Akhir <span class="required-mark">*</span></label>
                                     <input type="number" name="lanjutan_baris_akhir" id="jm_add_lanjutan_baris_akhir" min="1" value="1" class="form-control" oninput="updateLiveIndikator('add')">
                                 </div>
                             </div>
@@ -1195,47 +1309,42 @@
                         </div>
                     </div>
 
-                    {{-- OPSI KHATAM & LANJUT KE HADIST BERIKUTNYA --}}
-                    <div style="margin-top:4px; padding:10px 12px; border-radius:10px; background:#fff; border:1px dashed #cbd5e1;">
-                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0; user-select:none;">
-                            <input type="checkbox" name="is_khatam" id="jm_edit_{{ $item->id }}_is_khatam" value="1" {{ $item->is_khatam ? 'checked' : '' }} onchange="toggleHadistKhatam('edit_{{ $item->id }}')" style="width:16px; height:16px; accent-color:#2563eb; cursor:pointer;">
-                            <span style="font-size:12.5px; font-weight:700; color:#1e293b;">
-                                🏆 Khatam Hadist saat ini & Lanjut ke Hadist Berikutnya
+                    {{-- OPSI LANJUT MATERI BERIKUTNYA --}}
+                    <div class="jm-next-box {{ $item->is_khatam ? 'is-active' : '' }}" id="jm_edit_{{ $item->id }}_next_box">
+                        <label class="jm-next-toggle" for="jm_edit_{{ $item->id }}_is_khatam">
+                            <span class="jm-next-toggle-text">
+                                <span class="jm-next-toggle-title">Lanjut materi berikutnya</span>
+                                <span class="jm-next-toggle-desc">Aktifkan jika materi ini khatam dan dilanjutkan ke materi berikutnya pada sesi yang sama.</span>
+                            </span>
+                            <span class="jm-switch">
+                                <input type="checkbox" name="is_khatam" id="jm_edit_{{ $item->id }}_is_khatam" value="1" {{ $item->is_khatam ? 'checked' : '' }} onchange="toggleHadistKhatam('edit_{{ $item->id }}')">
+                                <span class="jm-switch-track"></span>
                             </span>
                         </label>
 
-                        {{-- Form Hadist Lanjutan --}}
-                        <div id="jm_edit_{{ $item->id }}_khatam_section" style="display:{{ $item->is_khatam ? 'flex' : 'none' }}; flex-direction:column; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
+                        <div class="jm-next-body" id="jm_edit_{{ $item->id }}_khatam_section" style="display:{{ $item->is_khatam ? 'flex' : 'none' }};">
+                            <input type="hidden" name="lanjutan_halaman_awal" id="jm_edit_{{ $item->id }}_lanjutan_halaman_awal" value="{{ (int) ($item->lanjutan_halaman_awal ?: 1) }}">
+                            <input type="hidden" name="lanjutan_baris_awal" id="jm_edit_{{ $item->id }}_lanjutan_baris_awal" value="{{ (int) ($item->lanjutan_baris_awal ?: 1) }}">
+
                             <div class="form-group" style="margin:0;">
-                                <label class="form-label" style="font-size:12px;">Materi Hadist Lanjutan <span class="required-mark">*</span></label>
+                                <label class="form-label" style="font-size:12px;">Materi Berikutnya <span class="required-mark">*</span></label>
                                 <select name="lanjutan_materi_id" id="jm_edit_{{ $item->id }}_lanjutan_materi" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
-                                    <option value="">Pilih Hadist Selanjutnya</option>
+                                    <option value="">Pilih materi berikutnya</option>
                                     @foreach($materiList->where('kategori', 'al_hadist') as $mh)
                                         <option value="{{ $mh->id }}" {{ (int) $item->lanjutan_materi_id === (int) $mh->id ? 'selected' : '' }} data-halaman="{{ $mh->jumlah_halaman }}" data-baris="{{ $mh->jumlah_baris }}">
-                                            {{ $mh->nama_materi }} ({{ $mh->jumlah_halaman }} Hal • {{ $mh->jumlah_baris ?: 16 }} Baris)
+                                            {{ $mh->nama_materi }}
                                         </option>
                                     @endforeach
                                 </select>
                             </div>
 
-                            <div class="jm-surat-pair">
+                            <div class="jm-hadist-grid">
                                 <div class="form-group" style="margin:0;">
-                                    <label class="form-label" style="font-size:12px;">Halaman Awal Lanjutan <span class="required-mark">*</span></label>
-                                    <input type="number" name="lanjutan_halaman_awal" id="jm_edit_{{ $item->id }}_lanjutan_halaman_awal" min="1" value="{{ (int) ($item->lanjutan_halaman_awal ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
-                                </div>
-                                <div class="form-group" style="margin:0;">
-                                    <label class="form-label" style="font-size:12px;">Baris Awal Lanjutan <span class="required-mark">*</span></label>
-                                    <input type="number" name="lanjutan_baris_awal" id="jm_edit_{{ $item->id }}_lanjutan_baris_awal" min="1" value="{{ (int) ($item->lanjutan_baris_awal ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
-                                </div>
-                            </div>
-
-                            <div class="jm-surat-pair">
-                                <div class="form-group" style="margin:0;">
-                                    <label class="form-label" style="font-size:12px;">Halaman Akhir Lanjutan <span class="required-mark">*</span></label>
+                                    <label class="form-label" style="font-size:12px;">Halaman Akhir <span class="required-mark">*</span></label>
                                     <input type="number" name="lanjutan_halaman_akhir" id="jm_edit_{{ $item->id }}_lanjutan_halaman_akhir" min="1" value="{{ (int) ($item->lanjutan_halaman_akhir ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
                                 </div>
                                 <div class="form-group" style="margin:0;">
-                                    <label class="form-label" style="font-size:12px;">Baris Akhir Lanjutan <span class="required-mark">*</span></label>
+                                    <label class="form-label" style="font-size:12px;">Baris Akhir <span class="required-mark">*</span></label>
                                     <input type="number" name="lanjutan_baris_akhir" id="jm_edit_{{ $item->id }}_lanjutan_baris_akhir" min="1" value="{{ (int) ($item->lanjutan_baris_akhir ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
                                 </div>
                             </div>
@@ -1400,8 +1509,13 @@ function onJurnalHadistAwalChanged(prefix) {
 function toggleHadistKhatam(prefix) {
     var chk = document.getElementById('jm_' + prefix + '_is_khatam');
     var sec = document.getElementById('jm_' + prefix + '_khatam_section');
+    var box = document.getElementById('jm_' + prefix + '_next_box');
+    var on = !!(chk && chk.checked);
     if (sec) {
-        sec.style.display = (chk && chk.checked) ? 'flex' : 'none';
+        sec.style.display = on ? 'flex' : 'none';
+    }
+    if (box) {
+        box.classList.toggle('is-active', on);
     }
     updateLiveIndikator(prefix);
 }

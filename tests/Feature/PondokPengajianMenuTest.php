@@ -405,8 +405,6 @@ class PondokPengajianMenuTest extends TestCase
             'baris_akhir'            => 16,
             'is_khatam'              => 1,
             'lanjutan_materi_id'     => $kitab2->id,
-            'lanjutan_halaman_awal'  => 1,
-            'lanjutan_baris_awal'    => 1,
             'lanjutan_halaman_akhir' => 2,
             'lanjutan_baris_akhir'   => 8,
             'catatan'                => 'Alhamdulillah khatam kitab sholah dan masuk kitab shaum',
@@ -415,18 +413,22 @@ class PondokPengajianMenuTest extends TestCase
         $jurnal = PondokJurnalMengaji::where('kelas_pengajian_id', $kelas->id)->latest('id')->firstOrFail();
         $this->assertTrue((bool) $jurnal->is_khatam);
         $this->assertSame($kitab2->id, $jurnal->lanjutan_materi_id);
+        $this->assertSame(1, $jurnal->lanjutan_halaman_awal);
+        $this->assertSame(1, $jurnal->lanjutan_baris_awal);
         $this->assertSame(PondokJurnalMengaji::STATUS_TERLAMPAUI, $jurnal->status_ketercapaian);
-        $this->assertStringContainsString('Khatam', $jurnal->capaian_label);
-        $this->assertStringContainsString('Kitabus Shaum', $jurnal->capaian_label);
+        $this->assertStringContainsString('Lanjut Kitabus Shaum s/d Hal. 2 Baris 8', $jurnal->capaian_label);
 
-        // 3. Verifikasi halaman jurnal mengaji menampilkan badge KHATAM dan materi lanjutan
+        // 3. Verifikasi halaman jurnal mengaji menampilkan badge Khatam, toggle lanjut materi, dan materi lanjutan
         $response = $this->actingAs($this->user)->get(route('pondok.jurnal.index'));
         $response->assertStatus(200);
-        $response->assertSee('KHATAM');
+        $response->assertSee('jm-khatam-badge', false);
         $response->assertSee('Kitabus Sholah');
         $response->assertSee('Kitabus Shaum');
         $response->assertSee('Halaman Awal');
         $response->assertSee('Halaman Akhir');
-        $response->assertSee('Khatam Hadist saat ini & Lanjut ke Hadist Berikutnya', false);
+        $response->assertSee('Lanjut materi berikutnya');
+        $response->assertSee('Materi Berikutnya');
+        $response->assertDontSee('Halaman Awal Lanjutan');
+        $response->assertDontSee('Khatam Hadist saat ini', false);
     }
 }

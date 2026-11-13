@@ -248,25 +248,14 @@ class PondokJurnalMengaji extends Model
             }
 
             if ($this->is_khatam) {
-                $khatamText = "Khatam ({$baseText})";
                 if ($this->lanjutan_materi_id && $this->lanjutanMateri) {
-                    $lName = $this->lanjutanMateri->nama_materi;
-                    $lhAwal = (int) ($this->lanjutan_halaman_awal ?: 1);
-                    $lbAwal = (int) ($this->lanjutan_baris_awal ?: 1);
-                    $lhAkhir = (int) ($this->lanjutan_halaman_akhir ?: $lhAwal);
-                    $lbAkhir = (int) ($this->lanjutan_baris_akhir ?: $lbAwal);
+                    $lName   = $this->lanjutanMateri->nama_materi;
+                    $lhAkhir = (int) ($this->lanjutan_halaman_akhir ?: 1);
+                    $lbAkhir = (int) ($this->lanjutan_baris_akhir ?: 1);
 
-                    if ($lhAwal === $lhAkhir && $lbAwal === $lbAkhir) {
-                        $lanjutPart = "Hal. {$lhAwal} Baris {$lbAwal}";
-                    } elseif ($lhAwal === $lhAkhir) {
-                        $lanjutPart = "Hal. {$lhAwal} (Baris {$lbAwal}–{$lbAkhir})";
-                    } else {
-                        $lanjutPart = "Hal. {$lhAwal} Baris {$lbAwal} – Hal. {$lhAkhir} Baris {$lbAkhir}";
-                    }
-
-                    return "{$khatamText} ➔ Lanjut {$lName}: {$lanjutPart}";
+                    return "{$baseText} · Lanjut {$lName} s/d Hal. {$lhAkhir} Baris {$lbAkhir}";
                 }
-                return $khatamText;
+                return $baseText;
             }
 
             return $baseText;
