@@ -3,21 +3,13 @@
 @section('title', 'Jurnal Mengaji Pondok')
 
 @section('header-actions')
-<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <a href="{{ route('rekap.pengajian.index') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
-        <span>Rekap Absensi</span>
-    </a>
-    <a href="{{ route('pondok.target.index') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none;">
-        <span>Target Pengajian</span>
-    </a>
-    <button type="button" class="btn btn-primary" data-modal-target="modalTambahJurnalMengaji" style="display:inline-flex; align-items:center; gap:6px;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-        <span>Input Jurnal Mengaji</span>
-    </button>
-</div>
+<button type="button" class="btn btn-primary" data-modal-target="modalTambahJurnalMengaji" style="display:inline-flex; align-items:center; gap:6px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+    <span>Input Jurnal Mengaji</span>
+</button>
 @endsection
 
 @push('styles')
