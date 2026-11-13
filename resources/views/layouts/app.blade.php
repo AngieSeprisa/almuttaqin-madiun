@@ -219,10 +219,6 @@
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Jurnal Mengaji</span>
                         </a>
-                        <a href="{{ route('pondok.rekap-jurnal') }}" class="subnav-item {{ request()->routeIs('pondok.rekap-jurnal*') ? 'active' : '' }}" title="Rekap Jurnal Pengajian">
-                            <span class="subnav-dot"></span>
-                            <span class="subnav-text">Rekap Jurnal</span>
-                        </a>
                     </div>
                 </div>
                 @endif

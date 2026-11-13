@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', !empty($isRekapPage) ? 'Rekap Jurnal Pengajian' : 'Jurnal Mengaji Pondok')
+@section('title', 'Jurnal Mengaji Pondok')
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -540,7 +540,7 @@
         'Friday'    => 'Jumat',
         'Saturday'  => 'Sabtu',
     ];
-    $currentRoute = !empty($isRekapPage) ? route('pondok.rekap-jurnal') : route('pondok.jurnal.index');
+    $currentRoute = route('pondok.jurnal.index');
 @endphp
 
 <div style="display:flex; flex-direction:column; gap:16px; width:100%;">

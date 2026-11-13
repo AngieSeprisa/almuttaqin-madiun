@@ -500,7 +500,7 @@ class PondokPengajianController extends Controller
 
     public function rekapJurnal(Request $request)
     {
-        return $this->renderJurnalPage($request, true);
+        return redirect()->route('pondok.jurnal.index', $request->query());
     }
 
     protected function renderJurnalPage(Request $request, bool $isRekapPage = false)

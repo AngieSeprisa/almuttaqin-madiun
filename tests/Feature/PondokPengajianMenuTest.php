@@ -38,6 +38,7 @@ class PondokPengajianMenuTest extends TestCase
         $response->assertSee(route('pondok.materi.index'), false);
         $response->assertSee(route('pondok.target.index'), false);
         $response->assertSee(route('pondok.jurnal.index'), false);
+        $response->assertDontSee(route('pondok.rekap-jurnal'), false);
     }
 
     public function test_crud_daftar_materi_al_quran_dan_al_hadist(): void
@@ -331,10 +332,13 @@ class PondokPengajianMenuTest extends TestCase
         $this->assertSame(1, $jurnal->total_izin);
         $this->assertSame(1, $jurnal->total_alpa);
 
-        // 4. Pastikan halaman Rekap Jurnal menampilkan badge kehadiran "H: 1/3"
-        $rekapJurnalPage = $this->actingAs($this->user)->get(route('pondok.rekap-jurnal'));
-        $rekapJurnalPage->assertStatus(200);
-        $rekapJurnalPage->assertSee('H: 1/3');
+        // 4. Pastikan akses route rekap-jurnal diarahkan (redirect) ke Jurnal Mengaji dan data kehadiran "H: 1/3" tampil di Jurnal Mengaji
+        $rekapJurnalRedirect = $this->actingAs($this->user)->get(route('pondok.rekap-jurnal'));
+        $rekapJurnalRedirect->assertRedirect(route('pondok.jurnal.index'));
+
+        $jurnalPage = $this->actingAs($this->user)->get(route('pondok.jurnal.index'));
+        $jurnalPage->assertStatus(200);
+        $jurnalPage->assertSee('H: 1/3');
 
         // 5. Pastikan absensi santri dari Jurnal Mengaji tersinkron ke Rekap Absensi Pengajian
         $rekapAbsensiPage = $this->actingAs($this->user)->get(route('pondok.rekap-absensi', [
