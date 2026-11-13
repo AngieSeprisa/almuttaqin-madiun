@@ -545,23 +545,11 @@
         user-select: none;
     }
 
-    .jm-next-toggle-text {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-    }
-
     .jm-next-toggle-title {
         font-size: 13px;
         font-weight: 600;
         color: var(--text-primary, #0f172a);
-    }
-
-    .jm-next-toggle-desc {
-        font-size: 11.5px;
-        color: var(--text-muted, #64748b);
-        line-height: 1.4;
+        min-width: 0;
     }
 
     .jm-switch {
@@ -1103,10 +1091,7 @@
                     {{-- OPSI LANJUT MATERI BERIKUTNYA --}}
                     <div class="jm-next-box" id="jm_add_next_box">
                         <label class="jm-next-toggle" for="jm_add_is_khatam">
-                            <span class="jm-next-toggle-text">
-                                <span class="jm-next-toggle-title">Lanjut materi berikutnya</span>
-                                <span class="jm-next-toggle-desc">Aktifkan jika materi ini khatam dan dilanjutkan ke materi berikutnya pada sesi yang sama.</span>
-                            </span>
+                            <span class="jm-next-toggle-title">Lanjut materi berikutnya</span>
                             <span class="jm-switch">
                                 <input type="checkbox" name="is_khatam" id="jm_add_is_khatam" value="1" onchange="toggleHadistKhatam('add')">
                                 <span class="jm-switch-track"></span>
@@ -1360,10 +1345,7 @@
                     {{-- OPSI LANJUT MATERI BERIKUTNYA --}}
                     <div class="jm-next-box {{ $item->is_khatam ? 'is-active' : '' }}" id="jm_edit_{{ $item->id }}_next_box">
                         <label class="jm-next-toggle" for="jm_edit_{{ $item->id }}_is_khatam">
-                            <span class="jm-next-toggle-text">
-                                <span class="jm-next-toggle-title">Lanjut materi berikutnya</span>
-                                <span class="jm-next-toggle-desc">Aktifkan jika materi ini khatam dan dilanjutkan ke materi berikutnya pada sesi yang sama.</span>
-                            </span>
+                            <span class="jm-next-toggle-title">Lanjut materi berikutnya</span>
                             <span class="jm-switch">
                                 <input type="checkbox" name="is_khatam" id="jm_edit_{{ $item->id }}_is_khatam" value="1" {{ $item->is_khatam ? 'checked' : '' }} onchange="toggleHadistKhatam('edit_{{ $item->id }}')">
                                 <span class="jm-switch-track"></span>
