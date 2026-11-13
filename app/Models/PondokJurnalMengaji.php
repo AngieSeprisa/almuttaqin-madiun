@@ -34,6 +34,10 @@ class PondokJurnalMengaji extends Model
         'target_ayat_akhir',
         'target_halaman',
         'target_baris',
+        'target_halaman_awal',
+        'target_halaman_akhir',
+        'target_baris_awal',
+        'target_baris_akhir',
         'capaian_surat_nomor',
         'capaian_nama_surat',
         'capaian_ayat',
@@ -44,6 +48,14 @@ class PondokJurnalMengaji extends Model
         'capaian_baris',
         'halaman_awal',
         'halaman_akhir',
+        'baris_awal',
+        'baris_akhir',
+        'is_khatam',
+        'lanjutan_materi_id',
+        'lanjutan_halaman_awal',
+        'lanjutan_baris_awal',
+        'lanjutan_halaman_akhir',
+        'lanjutan_baris_akhir',
         'status_ketercapaian',
         'total_santri',
         'total_hadir',
@@ -64,6 +76,10 @@ class PondokJurnalMengaji extends Model
             'target_ayat_akhir'         => 'integer',
             'target_halaman'            => 'integer',
             'target_baris'              => 'integer',
+            'target_halaman_awal'       => 'integer',
+            'target_halaman_akhir'      => 'integer',
+            'target_baris_awal'         => 'integer',
+            'target_baris_akhir'        => 'integer',
             'capaian_surat_nomor'       => 'integer',
             'capaian_ayat'              => 'integer',
             'capaian_surat_akhir_nomor' => 'integer',
@@ -72,6 +88,14 @@ class PondokJurnalMengaji extends Model
             'capaian_baris'             => 'integer',
             'halaman_awal'              => 'integer',
             'halaman_akhir'             => 'integer',
+            'baris_awal'                => 'integer',
+            'baris_akhir'               => 'integer',
+            'is_khatam'                 => 'boolean',
+            'lanjutan_materi_id'        => 'integer',
+            'lanjutan_halaman_awal'     => 'integer',
+            'lanjutan_baris_awal'       => 'integer',
+            'lanjutan_halaman_akhir'    => 'integer',
+            'lanjutan_baris_akhir'      => 'integer',
             'total_santri'              => 'integer',
             'total_hadir'               => 'integer',
             'total_terlambat'           => 'integer',
@@ -94,6 +118,11 @@ class PondokJurnalMengaji extends Model
     public function targetPengajian(): BelongsTo
     {
         return $this->belongsTo(PondokTargetPengajian::class, 'target_pengajian_id');
+    }
+
+    public function lanjutanMateri(): BelongsTo
+    {
+        return $this->belongsTo(PondokMateri::class, 'lanjutan_materi_id');
     }
 
     public function pengajar(): BelongsTo
@@ -127,8 +156,13 @@ class PondokJurnalMengaji extends Model
         ?int $targetSuratNomor = null,
         ?int $targetAyat = null,
         ?int $capaianSuratNomor = null,
-        ?int $capaianAyat = null
+        ?int $capaianAyat = null,
+        bool $isKhatam = false
     ): string {
+        if ($isKhatam) {
+            return self::STATUS_TERLAMPAUI;
+        }
+
         if ($kategori === PondokMateri::KATEGORI_AL_HADIST) {
             $cmp = [$capaianHalaman, $capaianBaris] <=> [$targetHalaman, $targetBaris];
         } elseif ($targetSuratNomor && $targetAyat && $capaianSuratNomor && $capaianAyat) {
@@ -161,9 +195,18 @@ class PondokJurnalMengaji extends Model
         $kategori = $this->materi?->kategori ?? PondokMateri::KATEGORI_AL_QURAN;
 
         if ($kategori === PondokMateri::KATEGORI_AL_HADIST) {
-            $hal = (int) $this->target_halaman;
-            $baris = (int) ($this->target_baris ?? 0);
-            return "Halaman {$hal} • Baris {$baris}";
+            $hAwal = (int) ($this->target_halaman_awal ?: $this->targetPengajian?->halaman_awal ?: $this->target_halaman ?: 1);
+            $bAwal = (int) ($this->target_baris_awal ?: $this->targetPengajian?->baris_awal ?: $this->target_baris ?: 1);
+            $hAkhir = (int) ($this->target_halaman_akhir ?: $this->targetPengajian?->halaman_akhir ?: $this->target_halaman ?: $hAwal);
+            $bAkhir = (int) ($this->target_baris_akhir ?: $this->targetPengajian?->baris_akhir ?: $this->target_baris ?: $bAwal);
+
+            if ($hAwal === $hAkhir) {
+                if ($bAwal === $bAkhir) {
+                    return "Hal. {$hAwal} Baris {$bAwal}";
+                }
+                return "Hal. {$hAwal} (Baris {$bAwal}–{$bAkhir})";
+            }
+            return "Hal. {$hAwal} Baris {$bAwal} – Hal. {$hAkhir} Baris {$bAkhir}";
         }
 
         if ($this->target_nama_surat && $this->target_ayat) {
@@ -191,9 +234,42 @@ class PondokJurnalMengaji extends Model
         $kategori = $this->materi?->kategori ?? PondokMateri::KATEGORI_AL_QURAN;
 
         if ($kategori === PondokMateri::KATEGORI_AL_HADIST) {
-            $hal = (int) $this->capaian_halaman;
-            $baris = (int) ($this->capaian_baris ?? 0);
-            return "Halaman {$hal} • Baris {$baris}";
+            $hAwal = (int) ($this->halaman_awal ?: $this->capaian_halaman ?: 1);
+            $bAwal = (int) ($this->baris_awal ?: $this->capaian_baris ?: 1);
+            $hAkhir = (int) ($this->halaman_akhir ?: $this->capaian_halaman ?: $hAwal);
+            $bAkhir = (int) ($this->baris_akhir ?: $this->capaian_baris ?: $bAwal);
+
+            if ($hAwal === $hAkhir && $bAwal === $bAkhir) {
+                $baseText = "Hal. {$hAwal} Baris {$bAwal}";
+            } elseif ($hAwal === $hAkhir) {
+                $baseText = "Hal. {$hAwal} (Baris {$bAwal}–{$bAkhir})";
+            } else {
+                $baseText = "Hal. {$hAwal} Baris {$bAwal} – Hal. {$hAkhir} Baris {$bAkhir}";
+            }
+
+            if ($this->is_khatam) {
+                $khatamText = "Khatam ({$baseText})";
+                if ($this->lanjutan_materi_id && $this->lanjutanMateri) {
+                    $lName = $this->lanjutanMateri->nama_materi;
+                    $lhAwal = (int) ($this->lanjutan_halaman_awal ?: 1);
+                    $lbAwal = (int) ($this->lanjutan_baris_awal ?: 1);
+                    $lhAkhir = (int) ($this->lanjutan_halaman_akhir ?: $lhAwal);
+                    $lbAkhir = (int) ($this->lanjutan_baris_akhir ?: $lbAwal);
+
+                    if ($lhAwal === $lhAkhir && $lbAwal === $lbAkhir) {
+                        $lanjutPart = "Hal. {$lhAwal} Baris {$lbAwal}";
+                    } elseif ($lhAwal === $lhAkhir) {
+                        $lanjutPart = "Hal. {$lhAwal} (Baris {$lbAwal}–{$lbAkhir})";
+                    } else {
+                        $lanjutPart = "Hal. {$lhAwal} Baris {$lbAwal} – Hal. {$lhAkhir} Baris {$lbAkhir}";
+                    }
+
+                    return "{$khatamText} ➔ Lanjut {$lName}: {$lanjutPart}";
+                }
+                return $khatamText;
+            }
+
+            return $baseText;
         }
 
         if ($this->capaian_nama_surat && $this->capaian_ayat) {

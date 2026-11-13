@@ -396,17 +396,26 @@
                     </div>
                 </div>
 
-                {{-- SEKSI AL-HADIST: HALAMAN & BARIS SESUAI MATERI PONDOK --}}
+                {{-- SEKSI AL-HADIST: HALAMAN AWAL & AKHIR BESERTA BARIS --}}
                 <div id="target_add_hadist_section" style="display:none; flex-direction:column; gap:12px;">
-                    <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px;">
+                    <div class="tp-surat-pair">
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label">Halaman <span class="required-mark">*</span></label>
-                            <input type="number" name="halaman" id="target_add_halaman" min="1" value="{{ old('halaman', 1) }}" class="form-control">
+                            <label class="form-label">Halaman Awal <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman_awal" id="target_add_halaman_awal" min="1" value="{{ old('halaman_awal', 1) }}" class="form-control" onchange="syncHadistRange('add')">
                         </div>
-
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label">Baris <span class="required-mark">*</span></label>
-                            <input type="number" name="baris" id="target_add_baris" min="1" value="{{ old('baris', 1) }}" class="form-control">
+                            <label class="form-label">Baris Awal <span class="required-mark">*</span></label>
+                            <input type="number" name="baris_awal" id="target_add_baris_awal" min="1" value="{{ old('baris_awal', 1) }}" class="form-control">
+                        </div>
+                    </div>
+                    <div class="tp-surat-pair">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Halaman Akhir <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman_akhir" id="target_add_halaman_akhir" min="1" value="{{ old('halaman_akhir', 1) }}" class="form-control">
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Baris Akhir <span class="required-mark">*</span></label>
+                            <input type="number" name="baris_akhir" id="target_add_baris_akhir" min="1" value="{{ old('baris_akhir', 1) }}" class="form-control">
                         </div>
                     </div>
                 </div>
@@ -522,15 +531,24 @@
 
                 {{-- SEKSI AL-HADIST --}}
                 <div id="target_edit_{{ $item->id }}_hadist_section" style="display:{{ $item->materi?->isAlHadist() ? 'flex' : 'none' }}; flex-direction:column; gap:12px;">
-                    <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px;">
+                    <div class="tp-surat-pair">
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label">Halaman <span class="required-mark">*</span></label>
-                            <input type="number" name="halaman" id="target_edit_{{ $item->id }}_halaman" min="1" max="{{ (int) ($item->materi?->jumlah_halaman ?: 999) }}" value="{{ (int) $item->target_halaman }}" class="form-control">
+                            <label class="form-label">Halaman Awal <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman_awal" id="target_edit_{{ $item->id }}_halaman_awal" min="1" max="{{ (int) ($item->materi?->jumlah_halaman ?: 999) }}" value="{{ (int) ($item->halaman_awal ?: $item->target_halaman ?: 1) }}" class="form-control" onchange="syncHadistRange('edit_{{ $item->id }}')">
                         </div>
-
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label">Baris <span class="required-mark">*</span></label>
-                            <input type="number" name="baris" id="target_edit_{{ $item->id }}_baris" min="1" max="{{ (int) ($item->materi?->jumlah_baris ?: 999) }}" value="{{ (int) $item->target_baris }}" class="form-control">
+                            <label class="form-label">Baris Awal <span class="required-mark">*</span></label>
+                            <input type="number" name="baris_awal" id="target_edit_{{ $item->id }}_baris_awal" min="1" max="{{ (int) ($item->materi?->jumlah_baris ?: 99) }}" value="{{ (int) ($item->baris_awal ?: $item->target_baris ?: 1) }}" class="form-control">
+                        </div>
+                    </div>
+                    <div class="tp-surat-pair">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Halaman Akhir <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman_akhir" id="target_edit_{{ $item->id }}_halaman_akhir" min="1" max="{{ (int) ($item->materi?->jumlah_halaman ?: 999) }}" value="{{ (int) ($item->halaman_akhir ?: $item->target_halaman ?: 1) }}" class="form-control">
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label">Baris Akhir <span class="required-mark">*</span></label>
+                            <input type="number" name="baris_akhir" id="target_edit_{{ $item->id }}_baris_akhir" min="1" max="{{ (int) ($item->materi?->jumlah_baris ?: 99) }}" value="{{ (int) ($item->baris_akhir ?: $item->target_baris ?: 1) }}" class="form-control">
                         </div>
                     </div>
                 </div>
@@ -586,26 +604,44 @@ function syncTargetForm(prefix) {
     var halAwal = parseInt((opt && opt.getAttribute('data-hal-awal')) || '1', 10) || 1;
     var halAkhir = parseInt((opt && opt.getAttribute('data-hal-akhir')) || '604', 10) || 604;
 
-    var inHal = document.getElementById('target_' + prefix + '_halaman');
-    var inBar = document.getElementById('target_' + prefix + '_baris');
+    var inHalAwal = document.getElementById('target_' + prefix + '_halaman_awal');
+    var inBarAwal = document.getElementById('target_' + prefix + '_baris_awal');
+    var inHalAkhir = document.getElementById('target_' + prefix + '_halaman_akhir');
+    var inBarAkhir = document.getElementById('target_' + prefix + '_baris_akhir');
 
     if (kat === 'al_hadist') {
         qSec.style.display = 'none';
         hSec.style.display = 'flex';
-        if (inHal) {
-            inHal.max = maxHal;
-            if (parseInt(inHal.value || '0', 10) > maxHal) inHal.value = maxHal;
-        }
-        if (inBar) {
-            inBar.max = maxBar;
-            if (parseInt(inBar.value || '0', 10) > maxBar) inBar.value = maxBar;
-        }
+        [inHalAwal, inHalAkhir].forEach(function(el) {
+            if (el) {
+                el.max = maxHal;
+                if (parseInt(el.value || '0', 10) > maxHal) el.value = maxHal;
+            }
+        });
+        [inBarAwal, inBarAkhir].forEach(function(el) {
+            if (el) {
+                el.max = maxBar;
+                if (parseInt(el.value || '0', 10) > maxBar) el.value = maxBar;
+            }
+        });
     } else {
         qSec.style.display = 'flex';
         hSec.style.display = 'none';
         filterSuratSelectByRange(document.getElementById('target_' + prefix + '_surat'), halAwal, halAkhir);
         filterSuratSelectByRange(document.getElementById('target_' + prefix + '_surat_akhir'), halAwal, halAkhir);
         updateAyatLimit(prefix);
+    }
+}
+
+function syncHadistRange(prefix) {
+    var inHalAwal = document.getElementById('target_' + prefix + '_halaman_awal');
+    var inHalAkhir = document.getElementById('target_' + prefix + '_halaman_akhir');
+    if (inHalAwal && inHalAkhir) {
+        var vAwal = parseInt(inHalAwal.value || '1', 10);
+        var vAkhir = parseInt(inHalAkhir.value || '1', 10);
+        if (vAkhir < vAwal || !inHalAkhir.value) {
+            inHalAkhir.value = vAwal;
+        }
     }
 }
 

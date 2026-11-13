@@ -84,9 +84,18 @@ class PondokTargetPengajian extends Model
         $kategori = $this->materi?->kategori ?? PondokMateri::KATEGORI_AL_QURAN;
 
         if ($kategori === PondokMateri::KATEGORI_AL_HADIST) {
-            $hal = (int) $this->target_halaman;
-            $baris = (int) ($this->target_baris ?? 0);
-            return "Halaman {$hal} • Baris {$baris}";
+            $hAwal = (int) ($this->halaman_awal ?: $this->target_halaman ?: 1);
+            $bAwal = (int) ($this->baris_awal ?: $this->target_baris ?: 1);
+            $hAkhir = (int) ($this->halaman_akhir ?: $hAwal);
+            $bAkhir = (int) ($this->baris_akhir ?: $bAwal);
+
+            if ($hAwal === $hAkhir) {
+                if ($bAwal === $bAkhir) {
+                    return "Hal. {$hAwal} Baris {$bAwal}";
+                }
+                return "Hal. {$hAwal} (Baris {$bAwal}–{$bAkhir})";
+            }
+            return "Hal. {$hAwal} Baris {$bAwal} – Hal. {$hAkhir} Baris {$bAkhir}";
         }
 
         if ($this->nama_surat && $this->ayat) {

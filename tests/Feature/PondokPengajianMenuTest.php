@@ -172,7 +172,7 @@ class PondokPengajianMenuTest extends TestCase
 
         $targetPage = $this->actingAs($this->user)->get(route('pondok.target.index'));
         $targetPage->assertSee('QS. Al-Baqarah Ayat 1–25');
-        $targetPage->assertSee('Halaman 12 • Baris 8');
+        $targetPage->assertSee('Hal. 12 Baris 8');
 
         // 4. Input Jurnal Mengaji Kelas 1 (Al-Qur'an): Surat 2 Ayat 1–25 == Target -> TERCAPAI
         $this->actingAs($this->user)->post(route('pondok.jurnal.store'), [
@@ -237,7 +237,7 @@ class PondokPengajianMenuTest extends TestCase
         $jurnalPage->assertSee('! Kurang');
         $jurnalPage->assertSee('↑ Terlampaui');
         $jurnalPage->assertSee('QS. Al-Baqarah Ayat 1–25');
-        $jurnalPage->assertSee('Halaman 12 • Baris 14');
+        $jurnalPage->assertSee('Hal. 12 Baris 14');
     }
 
     public function test_muat_standar_materi_dan_sinkronisasi_absensi_jurnal_ke_rekap_absensi_pengajian(): void
@@ -350,5 +350,83 @@ class PondokPengajianMenuTest extends TestCase
         $rekapAbsensiPage->assertSee('Ahmad Fauzi');
         $rekapAbsensiPage->assertSee('Budi Santoso');
         $rekapAbsensiPage->assertSee('Chandra Wijaya');
+    }
+
+    public function test_target_dan_jurnal_hadist_range_serta_opsi_khatam_lanjut_hadist_berikutnya(): void
+    {
+        MasterKelasPengajian::seedStandar();
+        $kelas = MasterKelasPengajian::where('kode_kelas', 'KLS_REGULER')->firstOrFail();
+
+        $kitab1 = PondokMateri::create([
+            'kode_materi'    => 'HAD-01',
+            'nama_materi'    => 'Kitabus Sholah',
+            'kategori'       => 'al_hadist',
+            'jumlah_halaman' => 144,
+            'jumlah_baris'   => 16,
+        ]);
+
+        $kitab2 = PondokMateri::create([
+            'kode_materi'    => 'HAD-02',
+            'nama_materi'    => 'Kitabus Shaum',
+            'kategori'       => 'al_hadist',
+            'jumlah_halaman' => 88,
+            'jumlah_baris'   => 16,
+        ]);
+
+        // 1. Buat Target Hadist dengan range: Hal 140 Baris 1 s/d Hal 144 Baris 16 (khatam target)
+        $this->actingAs($this->user)->post(route('pondok.target.store'), [
+            'tanggal'            => '2026-11-13',
+            'kelas_pengajian_id' => $kelas->id,
+            'pondok_materi_id'   => $kitab1->id,
+            'halaman_awal'       => 140,
+            'baris_awal'         => 1,
+            'halaman_akhir'      => 144,
+            'baris_akhir'        => 16,
+            'keterangan'         => 'Target khatam K. Sholah',
+        ])->assertRedirect(route('pondok.target.index'));
+
+        $target = PondokTargetPengajian::where('kelas_pengajian_id', $kelas->id)->latest('id')->firstOrFail();
+        $this->assertSame(140, $target->halaman_awal);
+        $this->assertSame(1, $target->baris_awal);
+        $this->assertSame(144, $target->halaman_akhir);
+        $this->assertSame(16, $target->baris_akhir);
+        $this->assertStringContainsString('Hal. 140 Baris 1 – Hal. 144 Baris 16', $target->target_label);
+
+        // 2. Buat Jurnal dengan kondisi: Khatam Kitabus Sholah dan lanjut Kitabus Shaum Hal 1 Baris 1 s/d Hal 2 Baris 8
+        $this->actingAs($this->user)->post(route('pondok.jurnal.store'), [
+            'tanggal'                => '2026-11-13',
+            'sesi_pengajian'         => 'bada_maghrib',
+            'kelas_pengajian_id'     => $kelas->id,
+            'pondok_materi_id'       => $kitab1->id,
+            'target_pengajian_id'    => $target->id,
+            'halaman_awal'           => 140,
+            'baris_awal'             => 1,
+            'halaman_akhir'          => 144,
+            'baris_akhir'            => 16,
+            'is_khatam'              => 1,
+            'lanjutan_materi_id'     => $kitab2->id,
+            'lanjutan_halaman_awal'  => 1,
+            'lanjutan_baris_awal'    => 1,
+            'lanjutan_halaman_akhir' => 2,
+            'lanjutan_baris_akhir'   => 8,
+            'catatan'                => 'Alhamdulillah khatam kitab sholah dan masuk kitab shaum',
+        ])->assertRedirect(route('pondok.jurnal.index'));
+
+        $jurnal = PondokJurnalMengaji::where('kelas_pengajian_id', $kelas->id)->latest('id')->firstOrFail();
+        $this->assertTrue((bool) $jurnal->is_khatam);
+        $this->assertSame($kitab2->id, $jurnal->lanjutan_materi_id);
+        $this->assertSame(PondokJurnalMengaji::STATUS_TERLAMPAUI, $jurnal->status_ketercapaian);
+        $this->assertStringContainsString('Khatam', $jurnal->capaian_label);
+        $this->assertStringContainsString('Kitabus Shaum', $jurnal->capaian_label);
+
+        // 3. Verifikasi halaman jurnal mengaji menampilkan badge KHATAM dan materi lanjutan
+        $response = $this->actingAs($this->user)->get(route('pondok.jurnal.index'));
+        $response->assertStatus(200);
+        $response->assertSee('KHATAM');
+        $response->assertSee('Kitabus Sholah');
+        $response->assertSee('Kitabus Shaum');
+        $response->assertSee('Halaman Awal');
+        $response->assertSee('Halaman Akhir');
+        $response->assertSee('Khatam Hadist saat ini & Lanjut ke Hadist Berikutnya', false);
     }
 }

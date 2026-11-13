@@ -302,6 +302,10 @@ class PondokPengajianController extends Controller
             'target_baris'       => ['nullable', 'integer', 'min:0'],
             'halaman'            => ['nullable', 'integer', 'min:1'],
             'baris'              => ['nullable', 'integer', 'min:0'],
+            'halaman_awal'       => ['nullable', 'integer', 'min:1'],
+            'baris_awal'         => ['nullable', 'integer', 'min:1'],
+            'halaman_akhir'      => ['nullable', 'integer', 'min:1'],
+            'baris_akhir'        => ['nullable', 'integer', 'min:1'],
             'keterangan'         => ['nullable', 'string', 'max:1000'],
         ], [
             'tanggal.required'            => 'Tanggal target pengajian wajib diisi.',
@@ -341,13 +345,21 @@ class PondokPengajianController extends Controller
             }
             $targetBaris = null;
         } else {
-            $rawHal = $validated['halaman'] ?? $validated['target_halaman'] ?? 1;
-            $rawBar = $validated['baris'] ?? $validated['target_baris'] ?? 1;
+            $rawHalAwal  = $validated['halaman_awal'] ?? $validated['halaman'] ?? $validated['target_halaman'] ?? 1;
+            $rawBarAwal  = $validated['baris_awal'] ?? $validated['baris'] ?? $validated['target_baris'] ?? 1;
+            $rawHalAkhir = $validated['halaman_akhir'] ?? $rawHalAwal;
+            $rawBarAkhir = $validated['baris_akhir'] ?? $rawBarAwal;
+
             $maxHal = max(1, (int) $materi->jumlah_halaman);
             $maxBar = max(1, (int) ($materi->jumlah_baris ?: 9999));
 
-            $targetHalaman = max(1, min($maxHal, (int) $rawHal));
-            $targetBaris   = max(0, min($maxBar, (int) $rawBar));
+            $hAwal  = max(1, min($maxHal, (int) $rawHalAwal));
+            $bAwal  = max(1, min($maxBar, (int) $rawBarAwal));
+            $hAkhir = max($hAwal, min($maxHal, (int) $rawHalAkhir));
+            $bAkhir = ($hAkhir === $hAwal) ? max($bAwal, min($maxBar, (int) $rawBarAkhir)) : max(1, min($maxBar, (int) $rawBarAkhir));
+
+            $targetHalaman = $hAkhir;
+            $targetBaris   = $bAkhir;
         }
 
         PondokTargetPengajian::create([
@@ -361,6 +373,10 @@ class PondokPengajianController extends Controller
             'surat_akhir_nomor'  => $suratAkhirNomor,
             'nama_surat_akhir'   => $namaSuratAkhir,
             'ayat_akhir'         => $ayatAkhir,
+            'halaman_awal'       => $materi->isAlHadist() ? $hAwal : null,
+            'baris_awal'         => $materi->isAlHadist() ? $bAwal : null,
+            'halaman_akhir'      => $materi->isAlHadist() ? $hAkhir : null,
+            'baris_akhir'        => $materi->isAlHadist() ? $bAkhir : null,
             'target_halaman'     => $targetHalaman,
             'target_baris'       => $targetBaris,
             'keterangan'         => $validated['keterangan'] ?? null,
@@ -386,6 +402,10 @@ class PondokPengajianController extends Controller
             'target_baris'       => ['nullable', 'integer', 'min:0'],
             'halaman'            => ['nullable', 'integer', 'min:1'],
             'baris'              => ['nullable', 'integer', 'min:0'],
+            'halaman_awal'       => ['nullable', 'integer', 'min:1'],
+            'baris_awal'         => ['nullable', 'integer', 'min:1'],
+            'halaman_akhir'      => ['nullable', 'integer', 'min:1'],
+            'baris_akhir'        => ['nullable', 'integer', 'min:1'],
             'keterangan'         => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -421,13 +441,21 @@ class PondokPengajianController extends Controller
             }
             $targetBaris = null;
         } else {
-            $rawHal = $validated['halaman'] ?? $validated['target_halaman'] ?? $target->target_halaman;
-            $rawBar = $validated['baris'] ?? $validated['target_baris'] ?? $target->target_baris;
+            $rawHalAwal  = $validated['halaman_awal'] ?? $validated['halaman'] ?? $validated['target_halaman'] ?? $target->halaman_awal ?? $target->target_halaman ?? 1;
+            $rawBarAwal  = $validated['baris_awal'] ?? $validated['baris'] ?? $validated['target_baris'] ?? $target->baris_awal ?? $target->target_baris ?? 1;
+            $rawHalAkhir = $validated['halaman_akhir'] ?? $target->halaman_akhir ?? $rawHalAwal;
+            $rawBarAkhir = $validated['baris_akhir'] ?? $target->baris_akhir ?? $rawBarAwal;
+
             $maxHal = max(1, (int) $materi->jumlah_halaman);
             $maxBar = max(1, (int) ($materi->jumlah_baris ?: 9999));
 
-            $targetHalaman = max(1, min($maxHal, (int) $rawHal));
-            $targetBaris   = max(0, min($maxBar, (int) $rawBar));
+            $hAwal  = max(1, min($maxHal, (int) $rawHalAwal));
+            $bAwal  = max(1, min($maxBar, (int) $rawBarAwal));
+            $hAkhir = max($hAwal, min($maxHal, (int) $rawHalAkhir));
+            $bAkhir = ($hAkhir === $hAwal) ? max($bAwal, min($maxBar, (int) $rawBarAkhir)) : max(1, min($maxBar, (int) $rawBarAkhir));
+
+            $targetHalaman = $hAkhir;
+            $targetBaris   = $bAkhir;
         }
 
         $target->update([
@@ -441,6 +469,10 @@ class PondokPengajianController extends Controller
             'surat_akhir_nomor'  => $suratAkhirNomor,
             'nama_surat_akhir'   => $namaSuratAkhir,
             'ayat_akhir'         => $ayatAkhir,
+            'halaman_awal'       => $materi->isAlHadist() ? $hAwal : null,
+            'baris_awal'         => $materi->isAlHadist() ? $bAwal : null,
+            'halaman_akhir'      => $materi->isAlHadist() ? $hAkhir : null,
+            'baris_akhir'        => $materi->isAlHadist() ? $bAkhir : null,
             'target_halaman'     => $targetHalaman,
             'target_baris'       => $targetBaris,
             'keterangan'         => $validated['keterangan'] ?? null,
@@ -687,6 +719,20 @@ class PondokPengajianController extends Controller
             'target_ayat_akhir'         => ['nullable', 'integer', 'min:1', 'max:286'],
             'target_halaman'            => ['nullable', 'integer', 'min:0'],
             'target_baris'              => ['nullable', 'integer', 'min:0'],
+            'target_halaman_awal'       => ['nullable', 'integer', 'min:1'],
+            'target_baris_awal'         => ['nullable', 'integer', 'min:1'],
+            'target_halaman_akhir'      => ['nullable', 'integer', 'min:1'],
+            'target_baris_akhir'        => ['nullable', 'integer', 'min:1'],
+            'halaman_awal'              => ['nullable', 'integer', 'min:1'],
+            'baris_awal'                => ['nullable', 'integer', 'min:1'],
+            'halaman_akhir'             => ['nullable', 'integer', 'min:1'],
+            'baris_akhir'               => ['nullable', 'integer', 'min:1'],
+            'is_khatam'                 => ['nullable', 'boolean'],
+            'lanjutan_materi_id'        => ['nullable', 'exists:pondok_materis,id'],
+            'lanjutan_halaman_awal'     => ['nullable', 'integer', 'min:1'],
+            'lanjutan_baris_awal'       => ['nullable', 'integer', 'min:1'],
+            'lanjutan_halaman_akhir'    => ['nullable', 'integer', 'min:1'],
+            'lanjutan_baris_akhir'      => ['nullable', 'integer', 'min:1'],
             'capaian_surat_nomor'       => ['nullable', 'integer', 'min:1', 'max:114'],
             'capaian_ayat'              => ['nullable', 'integer', 'min:1', 'max:286'],
             'capaian_surat_akhir_nomor' => ['nullable', 'integer', 'min:1', 'max:114'],
@@ -786,15 +832,33 @@ class PondokPengajianController extends Controller
             $targetBaris  = 0;
             $capaianBaris = 0;
         } else {
-            $targetHalaman = $targetModel
-                ? (int) $targetModel->target_halaman
-                : (int) ($validated['target_halaman'] ?? 0);
-            $targetBaris = $targetModel
-                ? (int) ($targetModel->target_baris ?? 0)
-                : (int) ($validated['target_baris'] ?? 0);
+            $targetHAwal  = (int) ($validated['target_halaman_awal'] ?? $targetModel?->halaman_awal ?: $targetModel?->target_halaman ?: 1);
+            $targetBAwal  = (int) ($validated['target_baris_awal'] ?? $targetModel?->baris_awal ?: $targetModel?->target_baris ?: 1);
+            $targetHAkhir = (int) ($validated['target_halaman_akhir'] ?? $targetModel?->halaman_akhir ?: $targetModel?->target_halaman ?: $targetHAwal);
+            $targetBAkhir = (int) ($validated['target_baris_akhir'] ?? $targetModel?->baris_akhir ?: $targetModel?->target_baris ?: $targetBAwal);
 
-            $capaianHalaman = (int) ($validated['capaian_halaman'] ?? 0);
-            $capaianBaris   = (int) ($validated['capaian_baris'] ?? 0);
+            $targetHalaman = $targetHAkhir;
+            $targetBaris   = $targetBAkhir;
+
+            $rawCapaianHAwal  = $validated['halaman_awal'] ?? $validated['capaian_halaman'] ?? 1;
+            $rawCapaianBAwal  = $validated['baris_awal'] ?? $validated['capaian_baris'] ?? 1;
+            $rawCapaianHAkhir = $validated['halaman_akhir'] ?? $validated['capaian_halaman'] ?? $rawCapaianHAwal;
+            $rawCapaianBAkhir = $validated['baris_akhir'] ?? $validated['capaian_baris'] ?? $rawCapaianBAwal;
+
+            $capaianHAwal  = max(1, (int) $rawCapaianHAwal);
+            $capaianBAwal  = max(1, (int) $rawCapaianBAwal);
+            $capaianHAkhir = max(1, (int) $rawCapaianHAkhir);
+            $capaianBAkhir = max(1, (int) $rawCapaianBAkhir);
+
+            $capaianHalaman = $capaianHAkhir;
+            $capaianBaris   = $capaianBAkhir;
+
+            $isKhatam          = !empty($validated['is_khatam']);
+            $lanjutanMateriId  = $isKhatam ? ($validated['lanjutan_materi_id'] ?? null) : null;
+            $lanjutanHAwal     = $isKhatam ? (int) ($validated['lanjutan_halaman_awal'] ?? 1) : null;
+            $lanjutanBAwal     = $isKhatam ? (int) ($validated['lanjutan_baris_awal'] ?? 1) : null;
+            $lanjutanHAkhir    = $isKhatam ? (int) ($validated['lanjutan_halaman_akhir'] ?? $lanjutanHAwal) : null;
+            $lanjutanBAkhir    = $isKhatam ? (int) ($validated['lanjutan_baris_akhir'] ?? $lanjutanBAwal) : null;
         }
 
         $statusKetercapaian = PondokJurnalMengaji::hitungStatusKetercapaian(
@@ -806,7 +870,8 @@ class PondokPengajianController extends Controller
             $targetSuratAkhirNomor ?: $targetSuratNomor,
             $targetAyatAkhir ?: $targetAyat,
             $capaianSuratAkhirNomor ?: $capaianSuratNomor,
-            $capaianAyatAkhir ?: $capaianAyat
+            $capaianAyatAkhir ?: $capaianAyat,
+            $isKhatam ?? false
         );
 
         $pengajarUser = !empty($validated['pengajar_id']) ? User::find($validated['pengajar_id']) : Auth::user();
@@ -834,6 +899,10 @@ class PondokPengajianController extends Controller
             'target_ayat_akhir'         => $targetAyatAkhir,
             'target_halaman'            => $targetHalaman,
             'target_baris'              => $materi->isAlHadist() ? $targetBaris : null,
+            'target_halaman_awal'       => $materi->isAlHadist() ? $targetHAwal : null,
+            'target_halaman_akhir'      => $materi->isAlHadist() ? $targetHAkhir : null,
+            'target_baris_awal'         => $materi->isAlHadist() ? $targetBAwal : null,
+            'target_baris_akhir'        => $materi->isAlHadist() ? $targetBAkhir : null,
             'capaian_surat_nomor'       => $capaianSuratNomor,
             'capaian_nama_surat'        => $capaianNamaSurat,
             'capaian_ayat'              => $capaianAyat,
@@ -842,6 +911,16 @@ class PondokPengajianController extends Controller
             'capaian_ayat_akhir'        => $capaianAyatAkhir,
             'capaian_halaman'           => $capaianHalaman,
             'capaian_baris'             => $materi->isAlHadist() ? $capaianBaris : null,
+            'halaman_awal'              => $materi->isAlHadist() ? $capaianHAwal : null,
+            'halaman_akhir'             => $materi->isAlHadist() ? $capaianHAkhir : null,
+            'baris_awal'                => $materi->isAlHadist() ? $capaianBAwal : null,
+            'baris_akhir'               => $materi->isAlHadist() ? $capaianBAkhir : null,
+            'is_khatam'                 => $isKhatam ?? false,
+            'lanjutan_materi_id'        => $lanjutanMateriId ?? null,
+            'lanjutan_halaman_awal'     => $lanjutanHAwal ?? null,
+            'lanjutan_baris_awal'       => $lanjutanBAwal ?? null,
+            'lanjutan_halaman_akhir'    => $lanjutanHAkhir ?? null,
+            'lanjutan_baris_akhir'      => $lanjutanBAkhir ?? null,
             'status_ketercapaian'       => $statusKetercapaian,
             'catatan'                   => $validated['catatan'] ?? null,
         ]);
@@ -869,6 +948,20 @@ class PondokPengajianController extends Controller
             'target_ayat_akhir'         => ['nullable', 'integer', 'min:1', 'max:286'],
             'target_halaman'            => ['nullable', 'integer', 'min:0'],
             'target_baris'              => ['nullable', 'integer', 'min:0'],
+            'target_halaman_awal'       => ['nullable', 'integer', 'min:1'],
+            'target_baris_awal'         => ['nullable', 'integer', 'min:1'],
+            'target_halaman_akhir'      => ['nullable', 'integer', 'min:1'],
+            'target_baris_akhir'        => ['nullable', 'integer', 'min:1'],
+            'halaman_awal'              => ['nullable', 'integer', 'min:1'],
+            'baris_awal'                => ['nullable', 'integer', 'min:1'],
+            'halaman_akhir'             => ['nullable', 'integer', 'min:1'],
+            'baris_akhir'               => ['nullable', 'integer', 'min:1'],
+            'is_khatam'                 => ['nullable', 'boolean'],
+            'lanjutan_materi_id'        => ['nullable', 'exists:pondok_materis,id'],
+            'lanjutan_halaman_awal'     => ['nullable', 'integer', 'min:1'],
+            'lanjutan_baris_awal'       => ['nullable', 'integer', 'min:1'],
+            'lanjutan_halaman_akhir'    => ['nullable', 'integer', 'min:1'],
+            'lanjutan_baris_akhir'      => ['nullable', 'integer', 'min:1'],
             'capaian_surat_nomor'       => ['nullable', 'integer', 'min:1', 'max:114'],
             'capaian_ayat'              => ['nullable', 'integer', 'min:1', 'max:286'],
             'capaian_surat_akhir_nomor' => ['nullable', 'integer', 'min:1', 'max:114'],
@@ -964,15 +1057,33 @@ class PondokPengajianController extends Controller
             $targetBaris  = 0;
             $capaianBaris = 0;
         } else {
-            $targetHalaman = isset($validated['target_halaman'])
-                ? (int) $validated['target_halaman']
-                : ($targetModel ? (int) $targetModel->target_halaman : (int) $jurnal->target_halaman);
-            $targetBaris = isset($validated['target_baris'])
-                ? (int) $validated['target_baris']
-                : ($targetModel ? (int) ($targetModel->target_baris ?? 0) : (int) ($jurnal->target_baris ?? 0));
+            $targetHAwal  = (int) ($validated['target_halaman_awal'] ?? $targetModel?->halaman_awal ?: ($jurnal->target_halaman_awal ?: $jurnal->target_halaman ?: 1));
+            $targetBAwal  = (int) ($validated['target_baris_awal'] ?? $targetModel?->baris_awal ?: ($jurnal->target_baris_awal ?: $jurnal->target_baris ?: 1));
+            $targetHAkhir = (int) ($validated['target_halaman_akhir'] ?? $targetModel?->halaman_akhir ?: ($jurnal->target_halaman_akhir ?: $jurnal->target_halaman ?: $targetHAwal));
+            $targetBAkhir = (int) ($validated['target_baris_akhir'] ?? $targetModel?->baris_akhir ?: ($jurnal->target_baris_akhir ?: $jurnal->target_baris ?: $targetBAwal));
 
-            $capaianHalaman = (int) ($validated['capaian_halaman'] ?? $jurnal->capaian_halaman);
-            $capaianBaris   = (int) ($validated['capaian_baris'] ?? $jurnal->capaian_baris);
+            $targetHalaman = $targetHAkhir;
+            $targetBaris   = $targetBAkhir;
+
+            $rawCapaianHAwal  = $validated['halaman_awal'] ?? $validated['capaian_halaman'] ?? ($jurnal->halaman_awal ?: $jurnal->capaian_halaman ?: 1);
+            $rawCapaianBAwal  = $validated['baris_awal'] ?? $validated['capaian_baris'] ?? ($jurnal->baris_awal ?: $jurnal->capaian_baris ?: 1);
+            $rawCapaianHAkhir = $validated['halaman_akhir'] ?? $validated['capaian_halaman'] ?? ($jurnal->halaman_akhir ?: $jurnal->capaian_halaman ?: $rawCapaianHAwal);
+            $rawCapaianBAkhir = $validated['baris_akhir'] ?? $validated['capaian_baris'] ?? ($jurnal->baris_akhir ?: $jurnal->capaian_baris ?: $rawCapaianBAwal);
+
+            $capaianHAwal  = max(1, (int) $rawCapaianHAwal);
+            $capaianBAwal  = max(1, (int) $rawCapaianBAwal);
+            $capaianHAkhir = max(1, (int) $rawCapaianHAkhir);
+            $capaianBAkhir = max(1, (int) $rawCapaianBAkhir);
+
+            $capaianHalaman = $capaianHAkhir;
+            $capaianBaris   = $capaianBAkhir;
+
+            $isKhatam          = !empty($validated['is_khatam']);
+            $lanjutanMateriId  = $isKhatam ? ($validated['lanjutan_materi_id'] ?? null) : null;
+            $lanjutanHAwal     = $isKhatam ? (int) ($validated['lanjutan_halaman_awal'] ?? 1) : null;
+            $lanjutanBAwal     = $isKhatam ? (int) ($validated['lanjutan_baris_awal'] ?? 1) : null;
+            $lanjutanHAkhir    = $isKhatam ? (int) ($validated['lanjutan_halaman_akhir'] ?? $lanjutanHAwal) : null;
+            $lanjutanBAkhir    = $isKhatam ? (int) ($validated['lanjutan_baris_akhir'] ?? $lanjutanBAwal) : null;
         }
 
         $statusKetercapaian = PondokJurnalMengaji::hitungStatusKetercapaian(
@@ -984,7 +1095,8 @@ class PondokPengajianController extends Controller
             $targetSuratAkhirNomor ?: $targetSuratNomor,
             $targetAyatAkhir ?: $targetAyat,
             $capaianSuratAkhirNomor ?: $capaianSuratNomor,
-            $capaianAyatAkhir ?: $capaianAyat
+            $capaianAyatAkhir ?: $capaianAyat,
+            $isKhatam ?? false
         );
 
         $pengajarUser = !empty($validated['pengajar_id']) ? User::find($validated['pengajar_id']) : $jurnal->pengajar;
@@ -1008,6 +1120,10 @@ class PondokPengajianController extends Controller
             'target_ayat_akhir'         => $targetAyatAkhir,
             'target_halaman'            => $targetHalaman,
             'target_baris'              => $materi->isAlHadist() ? $targetBaris : null,
+            'target_halaman_awal'       => $materi->isAlHadist() ? $targetHAwal : null,
+            'target_halaman_akhir'      => $materi->isAlHadist() ? $targetHAkhir : null,
+            'target_baris_awal'         => $materi->isAlHadist() ? $targetBAwal : null,
+            'target_baris_akhir'        => $materi->isAlHadist() ? $targetBAkhir : null,
             'capaian_surat_nomor'       => $capaianSuratNomor,
             'capaian_nama_surat'        => $capaianNamaSurat,
             'capaian_ayat'              => $capaianAyat,
@@ -1016,6 +1132,16 @@ class PondokPengajianController extends Controller
             'capaian_ayat_akhir'        => $capaianAyatAkhir,
             'capaian_halaman'           => $capaianHalaman,
             'capaian_baris'             => $materi->isAlHadist() ? $capaianBaris : null,
+            'halaman_awal'              => $materi->isAlHadist() ? $capaianHAwal : null,
+            'halaman_akhir'             => $materi->isAlHadist() ? $capaianHAkhir : null,
+            'baris_awal'                => $materi->isAlHadist() ? $capaianBAwal : null,
+            'baris_akhir'               => $materi->isAlHadist() ? $capaianBAkhir : null,
+            'is_khatam'                 => $isKhatam ?? false,
+            'lanjutan_materi_id'        => $lanjutanMateriId ?? null,
+            'lanjutan_halaman_awal'     => $lanjutanHAwal ?? null,
+            'lanjutan_baris_awal'       => $lanjutanBAwal ?? null,
+            'lanjutan_halaman_akhir'    => $lanjutanHAkhir ?? null,
+            'lanjutan_baris_akhir'      => $lanjutanBAkhir ?? null,
             'status_ketercapaian'       => $statusKetercapaian,
             'catatan'                   => $validated['catatan'] ?? null,
         ]);

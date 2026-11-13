@@ -670,6 +670,11 @@
                             <span style="font-size:11.5px; font-weight:600; color:{{ $item->materi?->isAlHadist() ? '#1d4ed8' : '#047857' }};">
                                 {{ $item->materi?->kategori_label ?? "Al-Qur'an" }}
                             </span>
+                            @if($item->is_khatam && $item->lanjutanMateri)
+                                <div style="font-size:11.5px; font-weight:600; color:#475569; margin-top:3px;">
+                                    ➔ Lanjut: <span style="color:#2563eb; font-weight:700;">{{ $item->lanjutanMateri->nama_materi }}</span>
+                                </div>
+                            @endif
                         </td>
                         <td>
                             <span style="font-size:12.5px; font-weight:600; color:var(--text-secondary);">
@@ -677,7 +682,14 @@
                             </span>
                         </td>
                         <td>
-                            <span style="font-size:13px; font-weight:700; color:var(--text-primary);">
+                            @if($item->is_khatam)
+                                <div style="margin-bottom:3px;">
+                                    <span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10.5px; font-weight:800; padding:1px 7px; border-radius:999px;">
+                                        🏆 KHATAM
+                                    </span>
+                                </div>
+                            @endif
+                            <span style="font-size:13px; font-weight:700; color:var(--text-primary); line-height:1.4;">
                                 {{ $item->capaian_label }}
                             </span>
                         </td>
@@ -775,6 +787,10 @@
                     <input type="hidden" name="target_ayat_akhir" id="jm_add_target_ayat_akhir" value="{{ old('target_ayat_akhir', 1) }}">
                     <input type="hidden" name="target_halaman" id="jm_add_target_hal" value="{{ old('target_halaman', 1) }}">
                     <input type="hidden" name="target_baris" id="jm_add_target_baris" value="{{ old('target_baris', 1) }}">
+                    <input type="hidden" name="target_halaman_awal" id="jm_add_target_hal_awal" value="{{ old('target_halaman_awal', 1) }}">
+                    <input type="hidden" name="target_baris_awal" id="jm_add_target_baris_awal" value="{{ old('target_baris_awal', 1) }}">
+                    <input type="hidden" name="target_halaman_akhir" id="jm_add_target_hal_akhir" value="{{ old('target_halaman_akhir', 1) }}">
+                    <input type="hidden" name="target_baris_akhir" id="jm_add_target_baris_akhir" value="{{ old('target_baris_akhir', 1) }}">
 
                     <div class="jm-target-card-top">
                         <div style="min-width:0; flex:1;">
@@ -886,17 +902,81 @@
                     </div>
                 </div>
 
-                {{-- SEKSI AL-HADIST: PENCAPAIAN KELAS (HALAMAN & BARIS) --}}
-                <div id="jm_add_hadist_wrap" style="display:none; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
-                    <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                    <div class="jm-hadist-grid">
+                {{-- SEKSI AL-HADIST: PENCAPAIAN KELAS (AWAL & AKHIR) --}}
+                <div id="jm_add_hadist_wrap" style="display:none; flex-direction:column; gap:12px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                        <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas (Al-Hadist)</strong>
+                        <span style="font-size:11px; color:var(--text-muted);">Tentukan halaman & baris awal s/d akhir</span>
+                    </div>
+
+                    {{-- Baris Awal Hadist --}}
+                    <div class="jm-surat-pair">
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Halaman <span class="required-mark">*</span></label>
-                            <input type="number" name="capaian_halaman" id="jm_add_capaian_hal" min="0" value="{{ old('capaian_halaman', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                            <label class="form-label" style="font-size:12px;">Halaman Awal <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman_awal" id="jm_add_halaman_awal" min="1" value="{{ old('halaman_awal', 1) }}" class="form-control" oninput="onJurnalHadistAwalChanged('add')">
                         </div>
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Baris <span class="required-mark">*</span></label>
-                            <input type="number" name="capaian_baris" id="jm_add_capaian_baris" min="0" value="{{ old('capaian_baris', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                            <label class="form-label" style="font-size:12px;">Baris Awal <span class="required-mark">*</span></label>
+                            <input type="number" name="baris_awal" id="jm_add_baris_awal" min="1" value="{{ old('baris_awal', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        </div>
+                    </div>
+
+                    {{-- Baris Akhir Hadist --}}
+                    <div class="jm-surat-pair">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Halaman Akhir <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman_akhir" id="jm_add_halaman_akhir" min="1" value="{{ old('halaman_akhir', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Baris Akhir <span class="required-mark">*</span></label>
+                            <input type="number" name="baris_akhir" id="jm_add_baris_akhir" min="1" value="{{ old('baris_akhir', 1) }}" class="form-control" oninput="updateLiveIndikator('add')">
+                        </div>
+                    </div>
+
+                    {{-- OPSI KHATAM & LANJUT KE HADIST BERIKUTNYA --}}
+                    <div style="margin-top:4px; padding:10px 12px; border-radius:10px; background:#fff; border:1px dashed #cbd5e1;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0; user-select:none;">
+                            <input type="checkbox" name="is_khatam" id="jm_add_is_khatam" value="1" onchange="toggleHadistKhatam('add')" style="width:16px; height:16px; accent-color:#2563eb; cursor:pointer;">
+                            <span style="font-size:12.5px; font-weight:700; color:#1e293b;">
+                                🏆 Khatam Hadist saat ini & Lanjut ke Hadist Berikutnya
+                            </span>
+                        </label>
+
+                        {{-- Form Hadist Lanjutan --}}
+                        <div id="jm_add_khatam_section" style="display:none; flex-direction:column; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Materi Hadist Lanjutan <span class="required-mark">*</span></label>
+                                <select name="lanjutan_materi_id" id="jm_add_lanjutan_materi" class="form-select" onchange="updateLiveIndikator('add')">
+                                    <option value="">Pilih Hadist Selanjutnya</option>
+                                    @foreach($materiList->where('kategori', 'al_hadist') as $mh)
+                                        <option value="{{ $mh->id }}" data-halaman="{{ $mh->jumlah_halaman }}" data-baris="{{ $mh->jumlah_baris }}">
+                                            {{ $mh->nama_materi }} ({{ $mh->jumlah_halaman }} Hal • {{ $mh->jumlah_baris ?: 16 }} Baris)
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="jm-surat-pair">
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label" style="font-size:12px;">Halaman Awal Lanjutan <span class="required-mark">*</span></label>
+                                    <input type="number" name="lanjutan_halaman_awal" id="jm_add_lanjutan_halaman_awal" min="1" value="1" class="form-control" oninput="updateLiveIndikator('add')">
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label" style="font-size:12px;">Baris Awal Lanjutan <span class="required-mark">*</span></label>
+                                    <input type="number" name="lanjutan_baris_awal" id="jm_add_lanjutan_baris_awal" min="1" value="1" class="form-control" oninput="updateLiveIndikator('add')">
+                                </div>
+                            </div>
+
+                            <div class="jm-surat-pair">
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label" style="font-size:12px;">Halaman Akhir Lanjutan <span class="required-mark">*</span></label>
+                                    <input type="number" name="lanjutan_halaman_akhir" id="jm_add_lanjutan_halaman_akhir" min="1" value="1" class="form-control" oninput="updateLiveIndikator('add')">
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label" style="font-size:12px;">Baris Akhir Lanjutan <span class="required-mark">*</span></label>
+                                    <input type="number" name="lanjutan_baris_akhir" id="jm_add_lanjutan_baris_akhir" min="1" value="1" class="form-control" oninput="updateLiveIndikator('add')">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -970,6 +1050,10 @@
                     <input type="hidden" name="target_ayat_akhir" id="jm_edit_{{ $item->id }}_target_ayat_akhir" value="{{ (int) ($item->target_ayat_akhir ?: ($item->target_ayat ?: 1)) }}">
                     <input type="hidden" name="target_halaman" id="jm_edit_{{ $item->id }}_target_hal" value="{{ (int) $item->target_halaman }}">
                     <input type="hidden" name="target_baris" id="jm_edit_{{ $item->id }}_target_baris" value="{{ (int) $item->target_baris }}">
+                    <input type="hidden" name="target_halaman_awal" id="jm_edit_{{ $item->id }}_target_hal_awal" value="{{ (int) ($item->target_halaman_awal ?: $item->targetPengajian?->halaman_awal ?: $item->target_halaman ?: 1) }}">
+                    <input type="hidden" name="target_baris_awal" id="jm_edit_{{ $item->id }}_target_baris_awal" value="{{ (int) ($item->target_baris_awal ?: $item->targetPengajian?->baris_awal ?: $item->target_baris ?: 1) }}">
+                    <input type="hidden" name="target_halaman_akhir" id="jm_edit_{{ $item->id }}_target_hal_akhir" value="{{ (int) ($item->target_halaman_akhir ?: $item->targetPengajian?->halaman_akhir ?: $item->target_halaman ?: 1) }}">
+                    <input type="hidden" name="target_baris_akhir" id="jm_edit_{{ $item->id }}_target_baris_akhir" value="{{ (int) ($item->target_baris_akhir ?: $item->targetPengajian?->baris_akhir ?: $item->target_baris ?: 1) }}">
 
                     <div class="jm-target-card-top">
                         <div style="min-width:0; flex:1;">
@@ -1081,16 +1165,80 @@
                     </div>
                 </div>
 
-                <div id="jm_edit_{{ $item->id }}_hadist_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'flex' : 'none' }}; flex-direction:column; gap:10px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
-                    <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas</strong>
-                    <div class="jm-hadist-grid">
+                <div id="jm_edit_{{ $item->id }}_hadist_wrap" style="display:{{ $item->materi?->isAlHadist() ? 'flex' : 'none' }}; flex-direction:column; gap:12px; padding:12px 14px; border-radius:12px; background:var(--bg-card-header); border:1px solid var(--border-light);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;">
+                        <strong style="font-size:12px; color:#2563eb; text-transform:uppercase;">Pencapaian Kelas (Al-Hadist)</strong>
+                        <span style="font-size:11px; color:var(--text-muted);">Tentukan halaman & baris awal s/d akhir</span>
+                    </div>
+
+                    {{-- Baris Awal Hadist --}}
+                    <div class="jm-surat-pair">
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Halaman <span class="required-mark">*</span></label>
-                            <input type="number" name="capaian_halaman" id="jm_edit_{{ $item->id }}_capaian_hal" min="0" value="{{ (int) $item->capaian_halaman }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                            <label class="form-label" style="font-size:12px;">Halaman Awal <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman_awal" id="jm_edit_{{ $item->id }}_halaman_awal" min="1" value="{{ (int) ($item->halaman_awal ?: $item->capaian_halaman ?: 1) }}" class="form-control" oninput="onJurnalHadistAwalChanged('edit_{{ $item->id }}')">
                         </div>
                         <div class="form-group" style="margin:0;">
-                            <label class="form-label" style="font-size:12px;">Baris <span class="required-mark">*</span></label>
-                            <input type="number" name="capaian_baris" id="jm_edit_{{ $item->id }}_capaian_baris" min="0" value="{{ (int) $item->capaian_baris }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                            <label class="form-label" style="font-size:12px;">Baris Awal <span class="required-mark">*</span></label>
+                            <input type="number" name="baris_awal" id="jm_edit_{{ $item->id }}_baris_awal" min="1" value="{{ (int) ($item->baris_awal ?: $item->capaian_baris ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                        </div>
+                    </div>
+
+                    {{-- Baris Akhir Hadist --}}
+                    <div class="jm-surat-pair">
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Halaman Akhir <span class="required-mark">*</span></label>
+                            <input type="number" name="halaman_akhir" id="jm_edit_{{ $item->id }}_halaman_akhir" min="1" value="{{ (int) ($item->halaman_akhir ?: $item->capaian_halaman ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                        </div>
+                        <div class="form-group" style="margin:0;">
+                            <label class="form-label" style="font-size:12px;">Baris Akhir <span class="required-mark">*</span></label>
+                            <input type="number" name="baris_akhir" id="jm_edit_{{ $item->id }}_baris_akhir" min="1" value="{{ (int) ($item->baris_akhir ?: $item->capaian_baris ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                        </div>
+                    </div>
+
+                    {{-- OPSI KHATAM & LANJUT KE HADIST BERIKUTNYA --}}
+                    <div style="margin-top:4px; padding:10px 12px; border-radius:10px; background:#fff; border:1px dashed #cbd5e1;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0; user-select:none;">
+                            <input type="checkbox" name="is_khatam" id="jm_edit_{{ $item->id }}_is_khatam" value="1" {{ $item->is_khatam ? 'checked' : '' }} onchange="toggleHadistKhatam('edit_{{ $item->id }}')" style="width:16px; height:16px; accent-color:#2563eb; cursor:pointer;">
+                            <span style="font-size:12.5px; font-weight:700; color:#1e293b;">
+                                🏆 Khatam Hadist saat ini & Lanjut ke Hadist Berikutnya
+                            </span>
+                        </label>
+
+                        {{-- Form Hadist Lanjutan --}}
+                        <div id="jm_edit_{{ $item->id }}_khatam_section" style="display:{{ $item->is_khatam ? 'flex' : 'none' }}; flex-direction:column; gap:10px; margin-top:10px; padding-top:10px; border-top:1px solid #e2e8f0;">
+                            <div class="form-group" style="margin:0;">
+                                <label class="form-label" style="font-size:12px;">Materi Hadist Lanjutan <span class="required-mark">*</span></label>
+                                <select name="lanjutan_materi_id" id="jm_edit_{{ $item->id }}_lanjutan_materi" class="form-select" onchange="updateLiveIndikator('edit_{{ $item->id }}')">
+                                    <option value="">Pilih Hadist Selanjutnya</option>
+                                    @foreach($materiList->where('kategori', 'al_hadist') as $mh)
+                                        <option value="{{ $mh->id }}" {{ (int) $item->lanjutan_materi_id === (int) $mh->id ? 'selected' : '' }} data-halaman="{{ $mh->jumlah_halaman }}" data-baris="{{ $mh->jumlah_baris }}">
+                                            {{ $mh->nama_materi }} ({{ $mh->jumlah_halaman }} Hal • {{ $mh->jumlah_baris ?: 16 }} Baris)
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="jm-surat-pair">
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label" style="font-size:12px;">Halaman Awal Lanjutan <span class="required-mark">*</span></label>
+                                    <input type="number" name="lanjutan_halaman_awal" id="jm_edit_{{ $item->id }}_lanjutan_halaman_awal" min="1" value="{{ (int) ($item->lanjutan_halaman_awal ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label" style="font-size:12px;">Baris Awal Lanjutan <span class="required-mark">*</span></label>
+                                    <input type="number" name="lanjutan_baris_awal" id="jm_edit_{{ $item->id }}_lanjutan_baris_awal" min="1" value="{{ (int) ($item->lanjutan_baris_awal ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                                </div>
+                            </div>
+
+                            <div class="jm-surat-pair">
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label" style="font-size:12px;">Halaman Akhir Lanjutan <span class="required-mark">*</span></label>
+                                    <input type="number" name="lanjutan_halaman_akhir" id="jm_edit_{{ $item->id }}_lanjutan_halaman_akhir" min="1" value="{{ (int) ($item->lanjutan_halaman_akhir ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label class="form-label" style="font-size:12px;">Baris Akhir Lanjutan <span class="required-mark">*</span></label>
+                                    <input type="number" name="lanjutan_baris_akhir" id="jm_edit_{{ $item->id }}_lanjutan_baris_akhir" min="1" value="{{ (int) ($item->lanjutan_baris_akhir ?: 1) }}" class="form-control" oninput="updateLiveIndikator('edit_{{ $item->id }}')">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1169,11 +1317,15 @@
             'materi_id'         => (int) $t->pondok_materi_id,
             'nama_materi'       => $t->materi?->nama_materi ?? '-',
             'kategori'          => $t->materi?->kategori ?? 'al_quran',
-            'target_label'      => $t->ringkasan_target,
+            'target_label'      => $t->target_label,
             'surat_nomor'       => (int) ($t->surat_nomor ?: 1),
             'ayat'              => (int) ($t->ayat ?: 1),
             'surat_akhir_nomor' => (int) ($t->surat_akhir_nomor ?: ($t->surat_nomor ?: 1)),
             'ayat_akhir'        => (int) ($t->ayat_akhir ?: ($t->ayat ?: 1)),
+            'halaman_awal'      => (int) ($t->halaman_awal ?: $t->target_halaman ?: 1),
+            'baris_awal'        => (int) ($t->baris_awal ?: $t->target_baris ?: 1),
+            'halaman_akhir'     => (int) ($t->halaman_akhir ?: $t->target_halaman ?: 1),
+            'baris_akhir'       => (int) ($t->baris_akhir ?: $t->target_baris ?: 1),
             'target_halaman'    => (int) $t->target_halaman,
             'target_baris'      => (int) ($t->target_baris ?? 0),
             'keterangan'        => $t->keterangan ?: '',
@@ -1232,6 +1384,28 @@ function onJurnalAwalSuratChanged(prefix, group) {
     updateLiveIndikator(prefix);
 }
 
+function onJurnalHadistAwalChanged(prefix) {
+    var elAwal = document.getElementById('jm_' + prefix + '_halaman_awal');
+    var elAkhir = document.getElementById('jm_' + prefix + '_halaman_akhir');
+    if (elAwal && elAkhir) {
+        var vAwal = parseInt(elAwal.value || '1', 10);
+        var vAkhir = parseInt(elAkhir.value || '1', 10);
+        if (vAkhir < vAwal || !elAkhir.value) {
+            elAkhir.value = vAwal;
+        }
+    }
+    updateLiveIndikator(prefix);
+}
+
+function toggleHadistKhatam(prefix) {
+    var chk = document.getElementById('jm_' + prefix + '_is_khatam');
+    var sec = document.getElementById('jm_' + prefix + '_khatam_section');
+    if (sec) {
+        sec.style.display = (chk && chk.checked) ? 'flex' : 'none';
+    }
+    updateLiveIndikator(prefix);
+}
+
 function syncJurnalMateriMode(prefix) {
     var sel = document.getElementById('jm_' + prefix + '_materi');
     var opt = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex] : null;
@@ -1261,6 +1435,10 @@ function applyTargetToForm(prefix, targetObj, autoFillCapaian, candidateTargets)
     var elTAyatAkhir = document.getElementById('jm_' + prefix + '_target_ayat_akhir');
     var elTHal = document.getElementById('jm_' + prefix + '_target_hal');
     var elTBar = document.getElementById('jm_' + prefix + '_target_baris');
+    var elTHalAwal = document.getElementById('jm_' + prefix + '_target_hal_awal');
+    var elTBarAwal = document.getElementById('jm_' + prefix + '_target_baris_awal');
+    var elTHalAkhir = document.getElementById('jm_' + prefix + '_target_hal_akhir');
+    var elTBarAkhir = document.getElementById('jm_' + prefix + '_target_baris_akhir');
 
     var elCSurat = document.getElementById('jm_' + prefix + '_capaian_surat');
     var elCAyat = document.getElementById('jm_' + prefix + '_capaian_ayat');
@@ -1268,6 +1446,10 @@ function applyTargetToForm(prefix, targetObj, autoFillCapaian, candidateTargets)
     var elCAyatAkhir = document.getElementById('jm_' + prefix + '_capaian_ayat_akhir');
     var elCHal = document.getElementById('jm_' + prefix + '_capaian_hal');
     var elCBar = document.getElementById('jm_' + prefix + '_capaian_baris');
+    var elCHalAwal = document.getElementById('jm_' + prefix + '_halaman_awal');
+    var elCBarAwal = document.getElementById('jm_' + prefix + '_baris_awal');
+    var elCHalAkhir = document.getElementById('jm_' + prefix + '_halaman_akhir');
+    var elCBarAkhir = document.getElementById('jm_' + prefix + '_baris_akhir');
 
     var titleEl = document.getElementById('jm_' + prefix + '_card_title');
     var subEl = document.getElementById('jm_' + prefix + '_card_sub');
@@ -1300,8 +1482,12 @@ function applyTargetToForm(prefix, targetObj, autoFillCapaian, candidateTargets)
     if (elTAyat) elTAyat.value = targetObj.ayat || 1;
     if (elTSuratAkhir) elTSuratAkhir.value = targetObj.surat_akhir_nomor || targetObj.surat_nomor || 1;
     if (elTAyatAkhir) elTAyatAkhir.value = targetObj.ayat_akhir || targetObj.ayat || 1;
-    if (elTHal) elTHal.value = targetObj.target_halaman || 1;
-    if (elTBar) elTBar.value = targetObj.target_baris || 0;
+    if (elTHal) elTHal.value = targetObj.target_halaman || targetObj.halaman_akhir || 1;
+    if (elTBar) elTBar.value = targetObj.target_baris || targetObj.baris_akhir || 0;
+    if (elTHalAwal) elTHalAwal.value = targetObj.halaman_awal || 1;
+    if (elTBarAwal) elTBarAwal.value = targetObj.baris_awal || 1;
+    if (elTHalAkhir) elTHalAkhir.value = targetObj.halaman_akhir || targetObj.halaman_awal || 1;
+    if (elTBarAkhir) elTBarAkhir.value = targetObj.baris_akhir || targetObj.baris_awal || 1;
 
     if (datePill) {
         datePill.textContent = targetObj.tanggal_label;
@@ -1350,8 +1536,17 @@ function applyTargetToForm(prefix, targetObj, autoFillCapaian, candidateTargets)
 
     if (autoFillCapaian) {
         if (targetObj.kategori === 'al_hadist') {
-            if (elCHal) elCHal.value = targetObj.target_halaman || 1;
-            if (elCBar) elCBar.value = targetObj.target_baris || 1;
+            var hAwal = targetObj.halaman_awal || targetObj.target_halaman || 1;
+            var bAwal = targetObj.baris_awal || targetObj.target_baris || 1;
+            var hAkhir = targetObj.halaman_akhir || targetObj.halaman_awal || targetObj.target_halaman || 1;
+            var bAkhir = targetObj.baris_akhir || targetObj.baris_awal || targetObj.target_baris || 1;
+
+            if (elCHalAwal) elCHalAwal.value = hAwal;
+            if (elCBarAwal) elCBarAwal.value = bAwal;
+            if (elCHalAkhir) elCHalAkhir.value = hAkhir;
+            if (elCBarAkhir) elCBarAkhir.value = bAkhir;
+            if (elCHal) elCHal.value = hAkhir;
+            if (elCBar) elCBar.value = bAkhir;
         } else {
             var sAwal = String(targetObj.surat_nomor || 1);
             var sAkhir = String(targetObj.surat_akhir_nomor || targetObj.surat_nomor || 1);
@@ -1487,14 +1682,24 @@ function onJurnalMateriChanged(prefix) {
 }
 
 function updateLiveIndikator(prefix) {
+    var badge = document.getElementById('jm_' + prefix + '_live_badge');
+    var isKhatamChk = document.getElementById('jm_' + prefix + '_is_khatam');
+    if (isKhatamChk && isKhatamChk.checked) {
+        if (badge) {
+            badge.className = 'jm-indikator-badge status-terlampaui';
+            badge.textContent = '↑ Terlampaui (Khatam)';
+        }
+        return;
+    }
+
     var kat = getMateriKategori(prefix);
     var cmp = 0;
 
     if (kat === 'al_hadist') {
-        var tHal = parseInt((document.getElementById('jm_' + prefix + '_target_hal') || {}).value || '0', 10) || 0;
-        var cHal = parseInt((document.getElementById('jm_' + prefix + '_capaian_hal') || {}).value || '0', 10) || 0;
-        var tBaris = parseInt((document.getElementById('jm_' + prefix + '_target_baris') || {}).value || '0', 10) || 0;
-        var cBaris = parseInt((document.getElementById('jm_' + prefix + '_capaian_baris') || {}).value || '0', 10) || 0;
+        var tHal = parseInt((document.getElementById('jm_' + prefix + '_target_hal_akhir') || document.getElementById('jm_' + prefix + '_target_hal') || {}).value || '0', 10) || 0;
+        var cHal = parseInt((document.getElementById('jm_' + prefix + '_halaman_akhir') || document.getElementById('jm_' + prefix + '_capaian_hal') || {}).value || '0', 10) || 0;
+        var tBaris = parseInt((document.getElementById('jm_' + prefix + '_target_baris_akhir') || document.getElementById('jm_' + prefix + '_target_baris') || {}).value || '0', 10) || 0;
+        var cBaris = parseInt((document.getElementById('jm_' + prefix + '_baris_akhir') || document.getElementById('jm_' + prefix + '_capaian_baris') || {}).value || '0', 10) || 0;
 
         if (cHal !== tHal) {
             cmp = cHal > tHal ? 1 : -1;
@@ -1514,7 +1719,6 @@ function updateLiveIndikator(prefix) {
         }
     }
 
-    var badge = document.getElementById('jm_' + prefix + '_live_badge');
     if (!badge) return;
 
     badge.className = 'jm-indikator-badge ';
