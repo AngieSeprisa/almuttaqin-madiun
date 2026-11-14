@@ -112,5 +112,25 @@ class SidebarUntitledUiTest extends TestCase
         $guruResponse->assertSee('nav-group open', false);
         $guruResponse->assertSee('subnav-item active', false);
     }
+
+    public function test_browser_tab_title_only_displays_menu_name_without_brand_title(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+
+        $beranda = $this->actingAs($yayasan)->get(route('beranda'));
+        $beranda->assertStatus(200);
+        $beranda->assertSee('<title>Beranda</title>', false);
+        $beranda->assertDontSee('<title>Beranda -', false);
+
+        $sambang = $this->actingAs($yayasan)->get(route('perizinan.sambang'));
+        $sambang->assertStatus(200);
+        $sambang->assertSee('<title>Perizinan Sambang</title>', false);
+        $sambang->assertDontSee('Perizinan Sambang - YAYASAN', false);
+
+        $sesi = $this->actingAs($yayasan)->get(route('pengaturan.sesi'));
+        $sesi->assertStatus(200);
+        $sesi->assertSee('<title>Pengaturan Sesi &amp; Perangkat Presensi RFID</title>', false);
+        $sesi->assertDontSee('Pengaturan Sesi &amp; Perangkat Presensi RFID -', false);
+    }
 }
 
