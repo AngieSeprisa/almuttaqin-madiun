@@ -136,3 +136,4 @@ class DataWargaTest extends TestCase
             ->assertDontSee('Santri Pindah Mutasi');
     }
 }
+

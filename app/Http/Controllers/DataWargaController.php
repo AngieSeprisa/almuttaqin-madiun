@@ -348,3 +348,4 @@ class DataWargaController extends Controller
             ->with('success', "{$siswa->nama_lengkap} dikembalikan ke daftar Siswa Aktif.");
     }
 }
+

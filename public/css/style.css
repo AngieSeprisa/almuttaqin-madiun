@@ -489,10 +489,16 @@ html.dark-mode .sidebar-nav::-webkit-scrollbar-thumb:hover {
 .nav-item-has-sub {
   width: 100%;
   border: none;
+  outline: none;
   background: transparent;
   text-align: left;
   cursor: pointer;
   font-family: inherit;
+}
+
+.nav-item-has-sub:focus,
+.nav-item-has-sub:focus-visible {
+  outline: none;
 }
 
 .nav-item-arrow {
