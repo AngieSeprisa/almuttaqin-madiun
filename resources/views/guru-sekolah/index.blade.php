@@ -5,7 +5,7 @@
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
     {{-- Tombol Tambah Guru (Filament Primary Button) --}}
-    @if(!auth()->check() || auth()->user()->isYayasan() || auth()->user()->canDo('guru_sekolah', 'create'))
+    @if(!auth()->check() || auth()->user()->canDo('guru_sekolah', 'create'))
     <button type="button" class="btn btn-primary" onclick="bukaModalTambahGuru()" style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; font-size:13px; border-radius:10px; font-weight:600;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -292,7 +292,7 @@
                         {{-- Aksi (Gaya tombol aksi persis menu Siswa) --}}
                         <td style="text-align:center;">
                             <div class="action-btn-group" style="justify-content:center;">
-                                @if($guru->mapel_status === 'menunggu')
+                                @if($guru->mapel_status === 'menunggu' && (!auth()->check() || auth()->user()->canDo('guru_sekolah', 'edit')))
                                     {{-- Tombol Approve --}}
                                     <form action="{{ route('guru-sekolah.approve', $guru->id) }}" method="POST" style="display:inline; margin:0;">
                                         @csrf
@@ -321,6 +321,7 @@
                                 </button>
 
                                 {{-- Tombol Ubah Guru --}}
+                                @if(!auth()->check() || auth()->user()->canDo('guru_sekolah', 'edit'))
                                 <button type="button" class="action-btn action-btn-edit" title="Ubah Data Guru" aria-label="Ubah Data Guru"
                                         onclick="bukaModalUbah({{ $guru->id }}, '{{ addslashes($guru->name) }}', {{ $guru->primary_lembaga_id ?: 'null' }}, '{{ addslashes($guru->mata_pelajaran ?? '') }}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -328,8 +329,10 @@
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                     </svg>
                                 </button>
+                                @endif
 
                                 {{-- Tombol Hapus dari Guru Sekolah --}}
+                                @if(!auth()->check() || auth()->user()->canDo('guru_sekolah', 'delete'))
                                 <form action="{{ route('guru-sekolah.destroy', $guru->id) }}" method="POST" style="display:inline; margin:0;" onsubmit="return confirm('Hapus {{ $guru->name }} dari daftar Guru Sekolah?')">
                                     @csrf
                                     @method('DELETE')
@@ -340,6 +343,7 @@
                                         </svg>
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -376,6 +380,7 @@
      - Mapel (diambil dari mapel di menu plotting mapel sesuai lembaga)
      - Bersih tanpa deskripsi, tampilan Filament seragam & scrollable
      ======================================================== --}}
+@if(!auth()->check() || auth()->user()->canDo('guru_sekolah', 'create'))
 <div id="modalTambahGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:flex-start; justify-content:center; padding:32px 16px; overflow-y:auto; backdrop-filter:blur(3px); -webkit-overflow-scrolling:touch;">
     <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:520px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:visible !important; text-align:left; position:relative; margin:auto;">
         <form action="{{ route('guru-sekolah.store') }}" method="POST" id="formTambahGuru" style="margin:0;">
@@ -451,10 +456,12 @@
         </form>
     </div>
 </div>
+@endif
 
 {{-- ========================================================
      MODAL 2: UBAH GURU SEKOLAH
      ======================================================== --}}
+@if(!auth()->check() || auth()->user()->canDo('guru_sekolah', 'edit'))
 <div id="modalUbahGuru" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:flex-start; justify-content:center; padding:32px 16px; overflow-y:auto; backdrop-filter:blur(3px); -webkit-overflow-scrolling:touch;">
     <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:520px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:visible !important; text-align:left; position:relative; margin:auto;">
         <form action="" method="POST" id="formUbahGuru" style="margin:0;">
@@ -535,10 +542,12 @@
         </form>
     </div>
 </div>
+@endif
 
 {{-- ========================================================
      MODAL 3: TOLAK PENGAJUAN MAPEL
      ======================================================== --}}
+@if(!auth()->check() || auth()->user()->canDo('guru_sekolah', 'edit'))
 <div id="modalTolakPengajuan" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:flex-start; justify-content:center; padding:32px 16px; overflow-y:auto; backdrop-filter:blur(3px); -webkit-overflow-scrolling:touch;">
     <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:460px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left; position:relative; margin:auto;">
         <form action="" method="POST" id="formTolakPengajuan" style="margin:0;">
@@ -566,6 +575,7 @@
         </form>
     </div>
 </div>
+@endif
 
 {{-- ========================================================
      MODAL 4: DETAIL GURU SEKOLAH

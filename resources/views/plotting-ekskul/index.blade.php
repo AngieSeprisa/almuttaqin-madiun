@@ -5,6 +5,7 @@
 @section('header-actions')
 <div class="pk-header-actions-wrap">
     {{-- Tombol Tambah Ekskul --}}
+    @if(!auth()->check() || auth()->user()->canDo('plotting_ekskul', 'create') || auth()->user()->canDo('ekskul', 'create'))
     <button type="button" class="pk-btn-add-kelas" onclick="openTambahEkskulModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="pk-btn-icon">
             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -12,6 +13,7 @@
         </svg>
         <span>Tambah Ekskul</span>
     </button>
+    @endif
 
     {{-- Switcher Jenjang untuk Yayasan --}}
     @if($isYayasan && $sekolahLembagas->count() > 1)
@@ -112,6 +114,7 @@
                         </button>
 
                         <div class="fi-ta-bulk-menu" id="menuBulkEkskul">
+                            @if(!auth()->check() || auth()->user()->canDo('plotting_ekskul', 'delete') || auth()->user()->canDo('ekskul', 'delete'))
                             <button type="button" class="fi-ta-bulk-item is-danger" onclick="confirmBulkDeleteEkskul()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="3 6 5 6 21 6"></polyline>
@@ -120,6 +123,7 @@
                                 <span>Hapus terpilih</span>
                             </button>
                             <div class="fi-ta-bulk-divider"></div>
+                            @endif
                             <button type="button" class="fi-ta-bulk-item" onclick="clearSelection('ekskul')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -312,6 +316,7 @@
                                     </button>
 
                                     {{-- Edit Ekskul --}}
+                                    @if(!auth()->check() || auth()->user()->canDo('plotting_ekskul', 'edit') || auth()->user()->canDo('ekskul', 'edit'))
                                     <button type="button"
                                             class="pk-action-btn is-edit"
                                             onclick="openEditEkskulModal({
@@ -325,8 +330,10 @@
                                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                         </svg>
                                     </button>
+                                    @endif
 
                                     {{-- Hapus Ekskul --}}
+                                    @if(!auth()->check() || auth()->user()->canDo('plotting_ekskul', 'delete') || auth()->user()->canDo('ekskul', 'delete'))
                                     <button type="button"
                                             class="pk-action-btn is-delete"
                                             onclick="confirmDeleteSingleEkskul({{ $item->id }}, '{{ addslashes($item->nama_ekskul) }}')"
@@ -336,6 +343,7 @@
                                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                         </svg>
                                     </button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -432,6 +440,7 @@
                         </button>
 
                         <div class="fi-ta-bulk-menu" id="menuBulkBelum">
+                            @if(!auth()->check() || auth()->user()->canDo('plotting_ekskul', 'edit') || auth()->user()->canDo('ekskul', 'edit'))
                             <button type="button" class="fi-ta-bulk-item is-primary" onclick="openAssignBulkModal()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="9 18 15 12 9 6"></polyline>
@@ -439,6 +448,7 @@
                                 <span>Masukkan ke Ekskul...</span>
                             </button>
                             <div class="fi-ta-bulk-divider"></div>
+                            @endif
                             <button type="button" class="fi-ta-bulk-item" onclick="clearSelection('belum')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -630,6 +640,7 @@
                                 @endif
                             </td>
                             <td class="fi-ta-td fi-ta-td-right">
+                                @if(!auth()->check() || auth()->user()->canDo('plotting_ekskul', 'edit') || auth()->user()->canDo('ekskul', 'edit'))
                                 <button type="button"
                                         class="pk-btn-mutasi-row"
                                         onclick="openAssignSingleModal({{ $siswa->id }}, '{{ addslashes($siswa->nama_lengkap) }}')"
@@ -639,6 +650,7 @@
                                         <polyline points="9 18 15 12 9 6"></polyline>
                                     </svg>
                                 </button>
+                                @endif
                             </td>
                         </tr>
                         @empty
@@ -779,6 +791,7 @@
                                     <span class="fi-ta-bulk-count" id="bulkCountModal" style="display:none;">0</span>
                                 </button>
                                 <div class="fi-ta-bulk-menu" id="menuBulkModal">
+                                    @if(!auth()->check() || auth()->user()->canDo('plotting_ekskul', 'edit') || auth()->user()->canDo('ekskul', 'edit'))
                                     <button type="button" class="fi-ta-bulk-item is-danger" onclick="keluarkanBulkModal()">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="3 6 5 6 21 6"></polyline>
@@ -786,12 +799,14 @@
                                         </svg>
                                         <span>Keluarkan dari Ekskul</span>
                                     </button>
+                                    @endif
                                 </div>
                             </div>
                         </div>
 
                         <div class="fi-ta-toolbar-right">
                             {{-- Tombol Tambah Siswa Baru ke Ekskul ini --}}
+                            @if(!auth()->check() || auth()->user()->canDo('plotting_ekskul', 'edit') || auth()->user()->canDo('ekskul', 'edit'))
                             <button type="button" class="pk-btn-secondary" style="padding: 5px 12px; font-size: 12px;" onclick="openTambahAnggotaModal()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13">
                                     <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -799,6 +814,7 @@
                                 </svg>
                                 <span>Tambah Siswa</span>
                             </button>
+                            @endif
 
                             <div class="fi-ta-search-wrap" style="width: 200px;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="fi-ta-search-icon">
@@ -1822,6 +1838,8 @@ function closeAnggotaModal() {
     currentActiveEkskulId = null;
 }
 
+const CAN_MUTATE_EKSKUL = {{ (!auth()->check() || auth()->user()->canDo('plotting_ekskul', 'edit') || auth()->user()->canDo('ekskul', 'edit')) ? 'true' : 'false' }};
+
 function renderModalAnggotaTable(list) {
     const tbody = document.getElementById('tbodyModalAnggota');
     if (!list || list.length === 0) {
@@ -1832,6 +1850,15 @@ function renderModalAnggotaTable(list) {
 
     let html = '';
     list.forEach(a => {
+        const deleteBtnHtml = CAN_MUTATE_EKSKUL ? `
+            <button type="button" class="pk-action-btn is-delete" onclick="keluarkanSingleModal(${a.siswa_id}, '${escapeJs(a.nama_lengkap)}')" title="Keluarkan dari ekskul">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        ` : '';
+
         html += `
             <tr class="fi-ta-row modal-anggota-row" data-siswa-id="${a.siswa_id}" data-nama="${(a.nama_lengkap || '').toLowerCase()}">
                 <td class="fi-ta-td-check">
@@ -1845,12 +1872,7 @@ function renderModalAnggotaTable(list) {
                     <span class="pk-badge-jenjang">${a.kelas || '-'}</span>
                 </td>
                 <td class="fi-ta-td fi-ta-td-right">
-                    <button type="button" class="pk-action-btn is-delete" onclick="keluarkanSingleModal(${a.siswa_id}, '${escapeJs(a.nama_lengkap)}')" title="Keluarkan dari ekskul">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
+                    ${deleteBtnHtml}
                 </td>
             </tr>
         `;

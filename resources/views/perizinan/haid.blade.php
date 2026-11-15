@@ -3,7 +3,7 @@
 @section('title', 'Perizinan Haid')
 
 @section('header-actions')
-@if(!auth()->check() || auth()->user()->canDo('perizinan_haid', 'create') || auth()->user()->canDo('rekap_pondok', 'edit'))
+@if(!auth()->check() || auth()->user()->canDo('perizinan_haid', 'create'))
 <a href="{{ route('perizinan.haid.create') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; font-size:13px; border-radius:10px; font-weight:600; background:#db2777; border-color:#db2777; box-shadow:0 1px 2px rgba(219, 39, 119, 0.2);">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -269,7 +269,7 @@
                             {{-- Aksi (Filament Action Buttons) --}}
                             <td style="padding:12px 16px; text-align:center;">
                                 <div style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
-                                    @if($isSedangHaid)
+                                    @if($isSedangHaid && (!auth()->check() || auth()->user()->canDo('perizinan_haid', 'edit')))
                                         {{-- Tombol 1-Klik Sudah Suci --}}
                                         <form action="{{ route('perizinan.haid.suci', $item->id) }}" method="POST" style="display:inline; margin:0;">
                                             @csrf
@@ -282,12 +282,15 @@
                                     @endif
 
                                     {{-- Tombol Edit Modal --}}
+                                    @if(!auth()->check() || auth()->user()->canDo('perizinan_haid', 'edit'))
                                     <button type="button" class="btn btn-secondary" onclick="openEditModal({{ $item->id }})" title="Edit"
                                             style="padding:5px 7px; border-radius:6px; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;">
                                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                                     </button>
+                                    @endif
 
                                     {{-- Tombol Hapus --}}
+                                    @if(!auth()->check() || auth()->user()->canDo('perizinan_haid', 'delete'))
                                     <form action="{{ route('perizinan.haid.destroy', $item->id) }}" method="POST" style="display:inline; margin:0;" onsubmit="return confirm('Hapus catatan haid untuk {{ $item->nama }}?')">
                                         @csrf
                                         @method('DELETE')
@@ -296,9 +299,11 @@
                                             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                                         </button>
                                     </form>
+                                    @endif
                                 </div>
 
                                 {{-- MODAL EDIT PERIZINAN HAID (FILAMENT CLEAN) --}}
+                                @if(!auth()->check() || auth()->user()->canDo('perizinan_haid', 'edit'))
                                 <div id="modalEditHaid{{ $item->id }}" class="clean-modal-backdrop" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9999; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(3px);">
                                     <div style="background:var(--bg-surface, #ffffff); border-radius:14px; max-width:480px; width:100%; border:1px solid var(--border-light, #e2e8f0); box-shadow:0 10px 25px rgba(0,0,0,0.15); overflow:hidden; text-align:left;">
                                         <form action="{{ route('perizinan.haid.update', $item->id) }}" method="POST" style="margin:0;">
@@ -344,6 +349,7 @@
                                         </form>
                                     </div>
                                 </div>
+                                @endif
                             </td>
                         </tr>
                     @empty

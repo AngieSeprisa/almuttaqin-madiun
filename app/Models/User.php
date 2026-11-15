@@ -306,6 +306,8 @@ class User extends Authenticatable
             'guru_warga', 'lulus_warga', 'mutasi_warga', 'nfc',
             'rekap_sholat', 'rekap_pengajian', 'rekap_sekolah', 'rekap_guru',
             'pengaturan_sesi', 'monitor_rfid', 'plotting_pengajian',
+            'guru_sekolah', 'plotting_mapel', 'plotting_kelas', 'plotting_ekskul',
+            'master_jam', 'master_lembaga', 'master_import_siswa', 'perizinan_haid',
         ];
         if ($perms->whereIn('menu_code', $granularCodes)->isNotEmpty()) {
             return false;

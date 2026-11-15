@@ -4,6 +4,7 @@
 
 @section('header-actions')
 <div class="mstr-header-actions">
+    @if(!auth()->check() || auth()->user()->canDo('master_jam', 'create'))
     <form action="{{ route('master.jam-pelajaran.muat-standar') }}" method="POST" class="d-inline" onsubmit="return confirm('Muat jadwal jam KBM standar (Senin-Jumat lengkap dengan jam 1-8, Upacara, Istirahat, dan Isoma)?');">
         @csrf
         <button type="submit" class="btn btn-secondary mstr-btn-action" title="Muat template standar Senin-Jumat">
@@ -20,6 +21,7 @@
         </svg>
         <span class="btn-text">Tambah Slot</span>
     </button>
+    @endif
 </div>
 @endsection
 
@@ -636,6 +638,7 @@
                         </td>
                         @endif
                         <td>
+                            @if(!auth()->check() || auth()->user()->canDo('master_jam', 'edit'))
                             <form action="{{ route('master.jam-pelajaran.toggle-status', $item->id) }}" method="POST" class="d-inline">
                                 @csrf
                                 @method('PATCH')
@@ -644,9 +647,16 @@
                                     {{ $item->is_active ? 'Aktif' : 'Non-Aktif' }}
                                 </button>
                             </form>
+                            @else
+                            <span class="mstr-badge {{ $item->is_active ? 'mstr-badge-aktif' : 'mstr-badge-nonaktif' }}">
+                                <span style="width:6px; height:6px; border-radius:50%; background:currentColor;"></span>
+                                {{ $item->is_active ? 'Aktif' : 'Non-Aktif' }}
+                            </span>
+                            @endif
                         </td>
                         <td style="text-align:right;">
                             <div class="mstr-actions-wrap" style="justify-content:flex-end;">
+                                @if(!auth()->check() || auth()->user()->canDo('master_jam', 'edit'))
                                 <button type="button" class="mstr-btn-icon" title="Edit Slot"
                                         onclick="bukaModalEditSlot({
                                             id: {{ $item->id }},
@@ -666,7 +676,9 @@
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 9.5-9.5z"></path>
                                     </svg>
                                 </button>
+                                @endif
 
+                                @if(!auth()->check() || auth()->user()->canDo('master_jam', 'delete'))
                                 <form action="{{ route('master.jam-pelajaran.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus slot {{ $item->label }} ({{ $item->hari }})?');">
                                     @csrf
                                     @method('DELETE')
@@ -677,6 +689,7 @@
                                         </svg>
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -736,6 +749,7 @@
             <div class="mobile-card-actions">
                 <span class="mobile-card-action-title">Aksi</span>
                 <div class="mobile-card-action-buttons">
+                    @if(!auth()->check() || auth()->user()->canDo('master_jam', 'edit'))
                     <button type="button" class="mobile-btn-pastel mobile-btn-edit" title="Edit Slot"
                             onclick="bukaModalEditSlot({
                                 id: {{ $item->id }},
@@ -755,7 +769,9 @@
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                     </button>
+                    @endif
 
+                    @if(!auth()->check() || auth()->user()->canDo('master_jam', 'delete'))
                     <form action="{{ route('master.jam-pelajaran.destroy', $item->id) }}" method="POST" style="margin:0; display:inline-block;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus slot {{ $item->label }} ({{ $item->hari }})?');">
                         @csrf
                         @method('DELETE')
@@ -766,6 +782,7 @@
                             </svg>
                         </button>
                     </form>
+                    @endif
                 </div>
             </div>
         </div>

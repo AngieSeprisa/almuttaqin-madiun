@@ -149,5 +149,81 @@ class UserPermissionMatrixTest extends TestCase
         $pinjamView = $this->actingAs($guru)->get(route('perpustakaan.pinjam.index'));
         $pinjamView->assertRedirect(route('beranda'));
     }
+
+    public function test_guru_sekolah_view_only_menyembunyikan_tombol_aksi_dan_memblokir_mutasi(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+        $adminSmp = User::where('role', 'admin_lembaga')->firstOrFail();
+        $smpLembaga = Lembaga::where('kode', 'smp')->first() ?? Lembaga::firstOrFail();
+
+        // Atur hak akses akun admin_lembaga menjadi VIEW ONLY pada guru_sekolah
+        $updateRes = $this->actingAs($yayasan)->put(route('pengguna.update', $adminSmp->id), [
+            'name'      => $adminSmp->name,
+            'email'     => $adminSmp->email,
+            'role'      => 'admin_lembaga',
+            'jabatan'   => 'Staff SMP',
+            'lembagas'  => [$smpLembaga->id],
+            'is_active' => 1,
+            'permissions' => [
+                'guru_sekolah' => [
+                    'view' => 1,
+                ],
+            ],
+        ]);
+        $updateRes->assertRedirect(route('pengguna.index'));
+
+        $adminSmp->refresh();
+
+        // canDo() harus strictly false untuk mutasi
+        $this->assertTrue($adminSmp->canDo('guru_sekolah', 'view'));
+        $this->assertFalse($adminSmp->canDo('guru_sekolah', 'create'));
+        $this->assertFalse($adminSmp->canDo('guru_sekolah', 'edit'));
+        $this->assertFalse($adminSmp->canDo('guru_sekolah', 'delete'));
+
+        // Buat user guru untuk dites
+        $targetGuru = User::create([
+            'name'        => 'Target Guru Test',
+            'email'       => 'targetguru@almuttaqin.id',
+            'password'    => bcrypt('password'),
+            'role'        => 'guru',
+            'primary_lembaga_id' => $smpLembaga->id,
+            'mata_pelajaran' => 'Matematika',
+            'mapel_status' => 'disetujui',
+            'is_active'   => 1,
+        ]);
+        $targetGuru->lembagas()->sync([$smpLembaga->id]);
+
+        // 1. GET /guru-sekolah harus 200 dan tidak menampilkan tombol Tambah Guru, Edit, maupun Hapus
+        $response = $this->actingAs($adminSmp)->get(route('guru-sekolah.index'));
+        $response->assertStatus(200);
+        $response->assertDontSee('onclick="bukaModalTambahGuru()"', false);
+        $response->assertDontSee('action-btn-edit', false);
+        $response->assertDontSee('action-btn-delete', false);
+        $response->assertDontSee('id="modalTambahGuru"', false);
+        $response->assertDontSee('id="modalUbahGuru"', false);
+        $response->assertDontSee('id="modalTolakPengajuan"', false);
+
+        // 2. POST store harus diblokir (redirect ke beranda atau 403 jika JSON)
+        $storeRes = $this->actingAs($adminSmp)->post(route('guru-sekolah.store'), [
+            'user_id' => $targetGuru->id,
+            'lembaga_id' => $smpLembaga->id,
+            'mata_pelajaran' => 'Matematika',
+        ]);
+        $storeRes->assertRedirect(route('beranda'));
+
+        $storeJsonRes = $this->actingAs($adminSmp)->postJson(route('guru-sekolah.store'), [
+            'user_id' => $targetGuru->id,
+            'lembaga_id' => $smpLembaga->id,
+            'mata_pelajaran' => 'Matematika',
+        ]);
+        $storeJsonRes->assertStatus(403);
+
+        // 3. DELETE destroy harus diblokir (redirect ke beranda atau 403 jika JSON)
+        $deleteRes = $this->actingAs($adminSmp)->delete(route('guru-sekolah.destroy', $targetGuru->id));
+        $deleteRes->assertRedirect(route('beranda'));
+
+        $deleteJsonRes = $this->actingAs($adminSmp)->deleteJson(route('guru-sekolah.destroy', $targetGuru->id));
+        $deleteJsonRes->assertStatus(403);
+    }
 }
 

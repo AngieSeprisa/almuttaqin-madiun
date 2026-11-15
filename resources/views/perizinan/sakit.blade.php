@@ -156,7 +156,7 @@
                         <td style="text-align:center;">
                             <div class="action-btn-group">
                                 {{-- Tombol Tandai Sembuh jika masih berstatus sakit --}}
-                                @if($item->status !== 'sembuh')
+                                @if($item->status !== 'sembuh' && (!auth()->check() || auth()->user()->canDo('perizinan_sakit', 'edit')))
                                 <form action="{{ route('perizinan.sakit.sembuh', $item->id) }}" method="POST" style="display:inline;">
                                     @csrf
                                     @method('PATCH')
@@ -176,14 +176,17 @@
                                 @endif
 
                                 {{-- Tombol Edit --}}
+                                @if(!auth()->check() || auth()->user()->canDo('perizinan_sakit', 'edit'))
                                 <button type="button" class="action-btn action-btn-edit" data-modal-target="modalEditSakit{{ $item->id }}" title="Edit Perizinan" aria-label="Edit Perizinan {{ $item->nama }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                     </svg>
                                 </button>
+                                @endif
 
                                 {{-- Tombol Hapus via SweetAlert2 --}}
+                                @if(!auth()->check() || auth()->user()->canDo('perizinan_sakit', 'delete'))
                                 <form action="{{ route('perizinan.sakit.destroy', $item->id) }}" method="POST" style="display:inline;">
                                     @csrf
                                     @method('DELETE')
@@ -203,9 +206,11 @@
                                         </svg>
                                     </button>
                                 </form>
+                                @endif
                             </div>
 
                             {{-- MODAL EDIT PERIZINAN SAKIT --}}
+                            @if(!auth()->check() || auth()->user()->canDo('perizinan_sakit', 'edit'))
                             <div class="app-modal" id="modalEditSakit{{ $item->id }}" role="dialog" aria-modal="true" aria-labelledby="modalEditSakitTitle{{ $item->id }}">
                                 <div class="modal-dialog">
                                     <form action="{{ route('perizinan.sakit.update', $item->id) }}" method="POST">
@@ -267,6 +272,7 @@
                                     </form>
                                 </div>
                             </div>
+                            @endif
                         </td>
                     </tr>
                     @empty
@@ -320,7 +326,7 @@
                 <span class="mobile-card-action-title">Aksi</span>
                 <div class="mobile-card-action-buttons">
                     {{-- Tombol Tandai Sembuh jika masih berstatus sakit --}}
-                    @if($item->status !== 'sembuh')
+                    @if($item->status !== 'sembuh' && (!auth()->check() || auth()->user()->canDo('perizinan_sakit', 'edit')))
                     <form action="{{ route('perizinan.sakit.sembuh', $item->id) }}" method="POST" style="display:inline; margin:0;">
                         @csrf
                         <button type="submit" class="mobile-btn-pastel mobile-btn-success" title="Tandai Sudah Sembuh" aria-label="Tandai Sembuh {{ $item->nama }}">
@@ -332,14 +338,17 @@
                     @endif
 
                     {{-- Tombol Edit --}}
+                    @if(!auth()->check() || auth()->user()->canDo('perizinan_sakit', 'edit'))
                     <button type="button" class="mobile-btn-pastel mobile-btn-edit" data-modal-target="modalEditSakit{{ $item->id }}" title="Edit Perizinan" aria-label="Edit Perizinan {{ $item->nama }}">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                     </button>
+                    @endif
 
                     {{-- Tombol Hapus --}}
+                    @if(!auth()->check() || auth()->user()->canDo('perizinan_sakit', 'delete'))
                     <form action="{{ route('perizinan.sakit.destroy', $item->id) }}" method="POST" style="display:inline; margin:0;">
                         @csrf
                         @method('DELETE')
@@ -357,6 +366,7 @@
                             </svg>
                         </button>
                     </form>
+                    @endif
                 </div>
             </div>
         </div>

@@ -344,7 +344,7 @@ class GuruSekolahController extends Controller
         /** @var User $authUser */
         $authUser = Auth::user();
 
-        if (!$authUser->isYayasan() && !$authUser->canDo('guru_sekolah', 'delete') && !$authUser->canDo('guru_sekolah', 'edit')) {
+        if (!$authUser->isYayasan() && !$authUser->canDo('guru_sekolah', 'delete')) {
             abort(403, 'Anda tidak memiliki hak untuk menghapus Guru Sekolah.');
         }
 

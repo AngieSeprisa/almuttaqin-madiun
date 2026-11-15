@@ -5,6 +5,7 @@
 @section('header-actions')
 <div class="pk-header-actions-wrap">
     {{-- Tombol Muat Standar --}}
+    @if(!auth()->check() || auth()->user()->canDo('plotting_kelas', 'create'))
     <form action="{{ route('plotting-kelas.muat-standar') }}" method="POST" class="d-inline" id="formMuatStandarKelas">
         @csrf
         <input type="hidden" name="lembaga_id" value="{{ $selectedLembaga->id }}">
@@ -32,6 +33,7 @@
         </svg>
         <span>Tambah Kelas</span>
     </button>
+    @endif
 
     {{-- Switcher Jenjang untuk Yayasan --}}
     @if($isYayasan && $sekolahLembagas->count() > 1)
@@ -133,6 +135,7 @@
                         </button>
 
                         <div class="fi-ta-bulk-menu" id="menuBulkKelas">
+                            @if(!auth()->check() || auth()->user()->canDo('plotting_kelas', 'delete'))
                             <button type="button" class="fi-ta-bulk-item is-danger" onclick="confirmBulkDeleteKelas()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="3 6 5 6 21 6"></polyline>
@@ -141,6 +144,7 @@
                                 <span>Hapus terpilih</span>
                             </button>
                             <div class="fi-ta-bulk-divider"></div>
+                            @endif
                             <button type="button" class="fi-ta-bulk-item" onclick="clearSelection('kelas')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -335,6 +339,7 @@
                                     </button>
 
                                     @if(isset($item->id))
+                                    @if(!auth()->check() || auth()->user()->canDo('plotting_kelas', 'edit'))
                                     <button type="button"
                                             class="fi-ta-act-link fi-ta-act-edit"
                                             title="Edit Ruang Kelas {{ $item->nama_kelas }}"
@@ -345,7 +350,9 @@
                                         </svg>
                                         <span class="pk-act-label">Edit</span>
                                     </button>
+                                    @endif
 
+                                    @if(!auth()->check() || auth()->user()->canDo('plotting_kelas', 'delete'))
                                     <button type="button"
                                             class="fi-ta-act-link fi-ta-act-delete"
                                             title="Hapus Ruang Kelas {{ $item->nama_kelas }}"
@@ -362,6 +369,7 @@
                                         @method('DELETE')
                                     </form>
                                     @endif
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -369,9 +377,11 @@
                         <tr class="js-empty-initial">
                             <td colspan="5" style="padding: 36px 16px; text-align: center; color: #6B7280;">
                                 <div style="margin-bottom: 10px;">Tidak ada ruang kelas yang terdaftar untuk jenjang {{ $jenjang }}.</div>
+                                @if(!auth()->check() || auth()->user()->canDo('plotting_kelas', 'create'))
                                 <button type="button" class="pk-btn-add-kelas" onclick="openTambahKelasModal()" style="display:inline-flex;">
                                     + Tambah Kelas Baru
                                 </button>
+                                @endif
                             </td>
                         </tr>
                         @endforelse
@@ -429,6 +439,7 @@
                         </button>
 
                         <div class="fi-ta-bulk-menu" id="menuBulkBelum">
+                            @if(!auth()->check() || auth()->user()->canDo('plotting_kelas', 'edit'))
                             <button type="button" class="fi-ta-bulk-item is-primary" onclick="openMutasiBulkBelum()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="9 18 15 12 9 6"></polyline>
@@ -436,6 +447,7 @@
                                 <span>Mutasi ke Kelas</span>
                             </button>
                             <div class="fi-ta-bulk-divider"></div>
+                            @endif
                             <button type="button" class="fi-ta-bulk-item is-danger" onclick="clearSelection('belum')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -599,6 +611,7 @@
                                 </div>
                             </td>
                             <td style="text-align: right; padding-right: 16px;">
+                                @if(!auth()->check() || auth()->user()->canDo('plotting_kelas', 'edit'))
                                 <button type="button"
                                         class="pk-btn-mutasi-row"
                                         onclick="openMutasiSingleModal({{ $siswa->id }}, '{{ addslashes($siswa->nama_lengkap) }}')"
@@ -608,6 +621,7 @@
                                         <polyline points="9 18 15 12 9 6"></polyline>
                                     </svg>
                                 </button>
+                                @endif
                             </td>
                         </tr>
                         @empty

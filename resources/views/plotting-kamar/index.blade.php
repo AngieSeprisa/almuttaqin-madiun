@@ -5,6 +5,7 @@
 @section('header-actions')
 <div class="pk-header-actions-wrap">
     {{-- Tombol Muat Standar --}}
+    @if(!auth()->check() || auth()->user()->canDo('plotting_kamar', 'create'))
     <form action="{{ route('plotting-kamar.muat-standar') }}" method="POST" class="d-inline" id="formMuatStandarKamar">
         @csrf
         <button type="button" class="pk-btn-secondary" title="Muat daftar kamar standar pondok pesantren"
@@ -30,6 +31,7 @@
         </svg>
         <span>Tambah Kamar</span>
     </button>
+    @endif
 </div>
 @endsection
 
@@ -119,6 +121,7 @@
                         </button>
 
                         <div class="fi-ta-bulk-menu" id="menuBulkKamar">
+                            @if(!auth()->check() || auth()->user()->canDo('plotting_kamar', 'delete'))
                             <button type="button" class="fi-ta-bulk-item is-danger" onclick="confirmBulkDeleteKamar()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="3 6 5 6 21 6"></polyline>
@@ -127,6 +130,7 @@
                                 <span>Hapus terpilih</span>
                             </button>
                             <div class="fi-ta-bulk-divider"></div>
+                            @endif
                             <button type="button" class="fi-ta-bulk-item" onclick="clearSelection('kamar')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -324,6 +328,7 @@
                                     </button>
 
                                     @if(isset($item->id))
+                                    @if(!auth()->check() || auth()->user()->canDo('plotting_kamar', 'edit'))
                                     <button type="button"
                                             class="fi-ta-act-link fi-ta-act-edit"
                                             title="Edit {{ $item->nama_kamar_display }}"
@@ -334,7 +339,9 @@
                                         </svg>
                                         <span class="pk-act-label">Edit</span>
                                     </button>
+                                    @endif
 
+                                    @if(!auth()->check() || auth()->user()->canDo('plotting_kamar', 'delete'))
                                     <button type="button"
                                             class="fi-ta-act-link fi-ta-act-delete"
                                             title="Hapus {{ $item->nama_kamar_display }}"
@@ -351,6 +358,7 @@
                                         @method('DELETE')
                                     </form>
                                     @endif
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -358,9 +366,11 @@
                         <tr class="js-empty-initial">
                             <td colspan="6" style="padding: 36px 16px; text-align: center; color: #6B7280;">
                                 <div style="margin-bottom: 10px;">Belum ada kamar asrama yang terdaftar di sistem.</div>
+                                @if(!auth()->check() || auth()->user()->canDo('plotting_kamar', 'create'))
                                 <button type="button" class="pk-btn-add-kelas" onclick="openTambahKamarModal()" style="display:inline-flex;">
                                     + Tambah Kamar Baru
                                 </button>
+                                @endif
                             </td>
                         </tr>
                         @endforelse
@@ -418,6 +428,7 @@
                         </button>
 
                         <div class="fi-ta-bulk-menu" id="menuBulkBelum">
+                            @if(!auth()->check() || auth()->user()->canDo('plotting_kamar', 'edit'))
                             <button type="button" class="fi-ta-bulk-item is-primary" onclick="openMutasiBulkBelum()">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -426,6 +437,7 @@
                                 <span>Tempatkan ke Kamar</span>
                             </button>
                             <div class="fi-ta-bulk-divider"></div>
+                            @endif
                             <button type="button" class="fi-ta-bulk-item is-danger" onclick="clearSelection('belum')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -589,6 +601,7 @@
                                 <span class="pk-status-pill">Belum Berkamar</span>
                             </td>
                             <td style="text-align: right; padding-right: 16px;">
+                                @if(!auth()->check() || auth()->user()->canDo('plotting_kamar', 'edit'))
                                 <button type="button"
                                         class="pk-btn-mutasi-row"
                                         onclick="openMutasiSingleModal({{ $siswa->id }}, '{{ addslashes($siswa->nama_lengkap) }}')"
@@ -598,6 +611,7 @@
                                         <polyline points="9 18 15 12 9 6"></polyline>
                                     </svg>
                                 </button>
+                                @endif
                             </td>
                         </tr>
                         @empty
@@ -712,6 +726,7 @@
                                     <span class="fi-ta-bulk-count" id="bulkCountModal" style="display:none;">0</span>
                                 </button>
                                 <div class="fi-ta-bulk-menu" id="menuBulkModal">
+                                    @if(!auth()->check() || auth()->user()->canDo('plotting_kamar', 'edit'))
                                     <button type="button" class="fi-ta-bulk-item is-primary" onclick="openMutasiBulkModal()">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <polyline points="9 18 15 12 9 6"></polyline>
@@ -725,6 +740,7 @@
                                         </svg>
                                         <span>Keluarkan dari Kamar</span>
                                     </button>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -1623,11 +1639,23 @@ function openAnggotaModal(namaKamar) {
             return;
         }
 
+        const canEditKamar = {{ (!auth()->check() || auth()->user()->canDo('plotting_kamar', 'edit')) ? 'true' : 'false' }};
         res.anggota.forEach((item) => {
             const tr = document.createElement('tr');
             tr.className = 'js-modal-anggota-row';
             const jenjangLabel = item.kelas && item.kelas !== '-' ? `${item.jenjang} • ${item.kelas}` : item.jenjang;
             const safeNamaJs = String(item.nama_lengkap || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+            const actionsHtml = canEditKamar ? `
+                <div class="fi-ta-row-actions">
+                    <button type="button" class="fi-ta-act-link fi-ta-act-edit" onclick="openMutasiSingleModal(${item.id}, '${safeNamaJs}')">
+                        Mutasi
+                    </button>
+                    <button type="button" class="fi-ta-act-link fi-ta-act-delete" onclick="unassignSiswa(${item.id}, '${safeNamaJs}')">
+                        Keluarkan
+                    </button>
+                </div>
+            ` : '';
 
             tr.innerHTML = `
                 <td class="fi-ta-td-check">
@@ -1637,14 +1665,7 @@ function openAnggotaModal(namaKamar) {
                 <td><span class="pk-jenjang-badge pk-jenjang-${escapeHtml(String(item.jenjang || 'reguler').toLowerCase())}">${escapeHtml(jenjangLabel)}</span></td>
                 <td class="pk-td-nisn" style="font-family:monospace; font-size:12px; color:#64748B;">${escapeHtml(item.nisn)}</td>
                 <td style="text-align:right; padding-right:16px;">
-                    <div class="fi-ta-row-actions">
-                        <button type="button" class="fi-ta-act-link fi-ta-act-edit" onclick="openMutasiSingleModal(${item.id}, '${safeNamaJs}')">
-                            Mutasi
-                        </button>
-                        <button type="button" class="fi-ta-act-link fi-ta-act-delete" onclick="unassignSiswa(${item.id}, '${safeNamaJs}')">
-                            Keluarkan
-                        </button>
-                    </div>
+                    ${actionsHtml}
                 </td>
             `;
             tbody.appendChild(tr);

@@ -16,6 +16,7 @@
     @endif
 
     {{-- Tombol Tambah Mata Pelajaran (Responsif Desktop & Mobile) --}}
+    @if(!auth()->check() || auth()->user()->canDo('plotting_mapel', 'create'))
     <button type="button" class="btn btn-primary mapel-btn-tambah" onclick="bukaModalTambahMapel()" title="Tambah Mata Pelajaran">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0;">
             <path d="M12 5v14M5 12h14"></path>
@@ -23,6 +24,7 @@
         <span class="btn-text-full">Tambah Mata Pelajaran</span>
         <span class="btn-text-short">Tambah</span>
     </button>
+    @endif
 </div>
 @endsection
 
@@ -568,6 +570,7 @@
                         {{-- Aksi Edit & Hapus --}}
                         <td style="padding:12px 16px; text-align:right;">
                             <div style="display:inline-flex; align-items:center; gap:5px;">
+                                @if(!auth()->check() || auth()->user()->canDo('plotting_mapel', 'edit'))
                                 <button type="button" class="btn btn-secondary" onclick="bukaModalEditMapel({{ json_encode($item) }})"
                                         style="padding:5px 9px; font-size:12px; border-radius:7px; display:inline-flex; align-items:center; gap:3px;" title="Edit Mata Pelajaran">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px; height:12px;">
@@ -576,7 +579,9 @@
                                     </svg>
                                     <span>Edit</span>
                                 </button>
+                                @endif
 
+                                @if(!auth()->check() || auth()->user()->canDo('plotting_mapel', 'delete'))
                                 <form action="{{ route('plotting-mapel.destroy', $item->id) }}" method="POST" style="margin:0; display:inline-block;"
                                       onsubmit="return confirm('Apakah Anda yakin ingin menghapus mata pelajaran {{ addslashes($item->mata_pelajaran ?: $item->nama_pelajaran) }}?');">
                                     @csrf
@@ -588,6 +593,7 @@
                                         </svg>
                                     </button>
                                 </form>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -607,9 +613,11 @@
                             <p style="font-size:12px; color:var(--text-secondary); max-width:360px; margin:0 auto 14px;">
                                 Belum ada mata pelajaran yang diatur untuk sekolah ini.
                             </p>
+                            @if(!auth()->check() || auth()->user()->canDo('plotting_mapel', 'create'))
                             <button type="button" class="btn btn-primary" onclick="bukaModalTambahMapel()" style="font-size:12.5px; padding:7px 14px; border-radius:8px;">
                                 Tambah Mata Pelajaran Baru
                             </button>
+                            @endif
                         </td>
                     </tr>
                     @endforelse
@@ -642,6 +650,7 @@
                 <div class="mobile-card-actions">
                     <span class="mobile-card-action-title">Aksi</span>
                     <div class="mobile-card-action-buttons">
+                        @if(!auth()->check() || auth()->user()->canDo('plotting_mapel', 'edit'))
                         <button type="button" class="mobile-btn-pastel mobile-btn-edit"
                                 onclick="bukaModalEditMapel({{ json_encode($item) }})"
                                 title="Edit Mata Pelajaran">
@@ -650,7 +659,9 @@
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 9.5-9.5z"></path>
                             </svg>
                         </button>
+                        @endif
 
+                        @if(!auth()->check() || auth()->user()->canDo('plotting_mapel', 'delete'))
                         <form action="{{ route('plotting-mapel.destroy', $item->id) }}" method="POST" style="margin:0; display:inline-block;"
                               onsubmit="return confirm('Apakah Anda yakin ingin menghapus mata pelajaran {{ addslashes($item->mata_pelajaran ?: $item->nama_pelajaran) }}?');">
                             @csrf
@@ -662,6 +673,7 @@
                                 </svg>
                             </button>
                         </form>
+                        @endif
                     </div>
                 </div>
             </div>

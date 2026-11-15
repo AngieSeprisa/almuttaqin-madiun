@@ -3,7 +3,7 @@
 @section('title', 'Master Lembaga')
 
 @section('header-actions')
-@if($isYayasan)
+@if($isYayasan || (auth()->check() && auth()->user()->canDo('master_lembaga', 'create')))
 <div class="mstr-header-actions">
     <button type="button" class="btn btn-primary mstr-btn-action" onclick="bukaModalTambahLembaga()" title="Tambah Lembaga Baru">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
@@ -527,7 +527,7 @@
 
             <div class="lembaga-card-footer">
                 <div>
-                    @if($isYayasan && strtolower($item->kode) !== 'yayasan')
+                    @if(($isYayasan || (auth()->check() && auth()->user()->canDo('master_lembaga', 'edit'))) && strtolower($item->kode) !== 'yayasan')
                     <form action="{{ route('master.lembaga.toggle-status', $item->id) }}" method="POST" class="d-inline">
                         @csrf
                         @method('PATCH')
@@ -544,8 +544,8 @@
                     @endif
                 </div>
 
-                @if($isYayasan)
                 <div style="display:flex; align-items:center; gap:8px;">
+                    @if($isYayasan || (auth()->check() && auth()->user()->canDo('master_lembaga', 'edit')))
                     <button type="button" class="mstr-btn-icon" title="Edit Lembaga"
                             onclick="bukaModalEditLembaga({
                                 id: {{ $item->id }},
@@ -562,8 +562,9 @@
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                         </svg>
                     </button>
+                    @endif
 
-                    @if(!$isCore)
+                    @if(!$isCore && ($isYayasan || (auth()->check() && auth()->user()->canDo('master_lembaga', 'delete'))))
                     <form action="{{ route('master.lembaga.destroy', $item->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus lembaga {{ $item->nama }}?');">
                         @csrf
                         @method('DELETE')
@@ -576,7 +577,6 @@
                     </form>
                     @endif
                 </div>
-                @endif
             </div>
         </div>
         @endforeach
