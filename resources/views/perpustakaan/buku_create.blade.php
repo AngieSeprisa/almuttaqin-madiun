@@ -45,7 +45,7 @@
                 </div>
                 <div>
                     <h2 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">1. Scan Barcode Buku (Kamera HP)</h2>
-                    <span style="font-size:12px; color:var(--text-muted);">Arahkan & tahan kamera sebentar pada barcode buku hingga terverifikasi penuh</span>
+                    <span style="font-size:12px; color:var(--text-muted);">Arahkan kamera ke barcode buku — begitu terbaca langsung otomatis tertulis ke Kode Buku</span>
                 </div>
             </div>
 
@@ -68,16 +68,16 @@
         </div>
 
         <div id="scannerWrapper" style="position:relative; width:100%; max-width:460px; margin:0 auto; border-radius:14px; overflow:hidden; background:#0B0F17; min-height:230px; display:flex; flex-direction:column; align-items:center; justify-content:center; border:2px dashed var(--border-light);">
-            {{-- Live Video Stream dengan ZBar WebAssembly + Verifikasi Stabil --}}
+            {{-- Live Video Stream dengan ZBar WebAssembly + BarcodeDetector --}}
             <video id="nativeBarcodeVideo" playsinline muted autoplay style="display:none; width:100%; max-height:290px; object-fit:cover;"></video>
 
-            {{-- Garis Panduan Fokus Barcode & Indikator Verifikasi --}}
+            {{-- Garis Panduan Fokus Barcode --}}
             <div id="scanTargetOverlay" style="display:none; position:absolute; inset:0; pointer-events:none; flex-direction:column; align-items:center; justify-content:center; gap:10px;">
                 <div id="scanTargetBox" style="width:80%; max-width:320px; height:125px; border:2.5px solid #38bdf8; border-radius:12px; box-shadow:0 0 0 9999px rgba(15,23,42,0.42); position:relative; transition: border-color 0.2s ease;">
                     <div id="scanLaserLine" style="position:absolute; left:10px; right:10px; top:50%; height:2px; background:#ef4444; box-shadow:0 0 8px #ef4444;"></div>
                 </div>
                 <div id="scanHoldStatus" style="z-index:2; background:rgba(15,23,42,0.82); color:#f8fafc; font-size:12px; font-weight:600; padding:5px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.15);">
-                    Arahkan & tahan kamera pada barcode...
+                    Arahkan kamera pada barcode buku...
                 </div>
             </div>
 
@@ -92,7 +92,7 @@
                     </svg>
                 </div>
                 <div id="scannerStatusTitle" style="font-size:14px; font-weight:600; color:#F1F5F9; margin-bottom:4px;">Menyiapkan Kamera Pemindai Barcode...</div>
-                <div id="scannerStatusDesc" style="font-size:12px; color:#94A3B8; max-width:320px; margin:0 auto;">Arahkan kamera HP ke barcode buku, angka barcode akan langsung tertulis otomatis setelah terbaca utuh.</div>
+                <div id="scannerStatusDesc" style="font-size:12px; color:#94A3B8; max-width:320px; margin:0 auto;">Arahkan kamera HP ke barcode buku, angka barcode akan langsung tertulis otomatis pada kolom Kode Buku di bawah.</div>
             </div>
         </div>
 
@@ -196,11 +196,15 @@
     </div>
 </div>
 
-{{-- ZBar WebAssembly + BarcodeDetector Polyfill --}}
+{{-- ZBar WebAssembly + BarcodeDetector Polyfill (Mendukung iOS Safari, Android Chrome, & Desktop) --}}
 <script src="{{ asset('js/vendor/zbar/zbar-wasm.js') }}" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js'"></script>
 <script src="{{ asset('js/vendor/zbar/barcode-detector-polyfill.js') }}" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js'"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.BarcodeDetector === 'undefined' && typeof barcodeDetectorPolyfill !== 'undefined') {
+        window.BarcodeDetector = barcodeDetectorPolyfill.BarcodeDetectorPolyfill;
+    }
+
     var nativeStream = null;
     var scanTimer = null;
     var isScanning = false;
@@ -208,14 +212,14 @@ document.addEventListener('DOMContentLoaded', function () {
     var currentFacingMode = 'environment';
     var cameraOpenedAt = 0;
 
-    // Konsensus multi-frame agar tidak salah baca / terpotong saat kamera baru diarahkan
-    var REQUIRED_CONSENSUS = 4;
+    // Konfirmasi 2x bacaan yang sama agar cepat (< 0.3 detik) namun tidak salah baca angka parsial
+    var REQUIRED_MATCHES = 2;
     var lastCandidateCode = '';
-    var candidateStreak = 0;
+    var candidateCount = 0;
 
     var scanCanvas = document.createElement('canvas');
     var scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
-    var configuredZbarScanner = null;
+    var nativeDetector = null;
 
     var btnToggleCamera = document.getElementById('btnToggleCamera');
     var camBtnText = document.getElementById('camBtnText');
@@ -255,56 +259,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Validasi keutuhan angka barcode (panjang standar & Check Digit Modulo-10 GS1 untuk EAN/UPC)
-    function isValidCompleteBarcode(raw) {
-        var code = String(raw || '').trim();
-        if (!code || code.length < 8) return false;
-
-        if (/^\d+$/.test(code)) {
-            if (code.length !== 8 && code.length !== 12 && code.length !== 13) {
-                return false;
-            }
-            var sum = 0;
-            var len = code.length;
-            for (var i = 0; i < len - 1; i++) {
-                var digit = parseInt(code.charAt(i), 10);
-                var posFromRight = (len - 1) - i;
-                var weight = (posFromRight % 2 === 1) ? 3 : 1;
-                sum += digit * weight;
-            }
-            var checkDigit = (10 - (sum % 10)) % 10;
-            return checkDigit === parseInt(code.charAt(len - 1), 10);
-        }
-
-        return code.length >= 8;
-    }
-
-    // Inisialisasi ZBarScanner khusus format utuh (Matikan I25/Codabar/Databar/EAN2/EAN5/UPCA agar angka tidak terpotong)
-    async function getConfiguredZbarScanner() {
-        if (configuredZbarScanner) return configuredZbarScanner;
-        if (typeof zbarWasm === 'undefined' || typeof zbarWasm.ZBarScanner === 'undefined') return null;
-
-        try {
-            var scanner = await zbarWasm.ZBarScanner.create();
-            var T = zbarWasm.ZBarSymbolType;
-            var C = zbarWasm.ZBarConfigType;
-
-            scanner.setConfig(T.ZBAR_NONE, C.ZBAR_CFG_ENABLE, 0);
-            scanner.setConfig(T.ZBAR_EAN13, C.ZBAR_CFG_ENABLE, 1);
-            scanner.setConfig(T.ZBAR_EAN8, C.ZBAR_CFG_ENABLE, 1);
-            scanner.setConfig(T.ZBAR_CODE128, C.ZBAR_CFG_ENABLE, 1);
-            scanner.setConfig(T.ZBAR_CODE39, C.ZBAR_CFG_ENABLE, 1);
-            scanner.setConfig(T.ZBAR_QRCODE, C.ZBAR_CFG_ENABLE, 1);
-
-            configuredZbarScanner = scanner;
-            return scanner;
-        } catch (e) {
-            return null;
-        }
-    }
-
+    // Ketika barcode terbaca oleh kamera: langsung otomatis ditulis ke Kode Buku tanpa klik apapun
     function applyScannedBarcode(code) {
-        var cleanCode = String(code || '').trim();
+        if (!code) return;
+        var cleanCode = String(code).trim();
         if (!cleanCode) return;
 
         if (inputKode) {
@@ -314,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(function () {
                 inputKode.style.borderColor = '';
                 inputKode.style.boxShadow = '';
-            }, 2200);
+            }, 2000);
         }
 
         if (inputBarcode) {
@@ -322,12 +280,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (scanBanner && scanText) {
-            scanText.textContent = 'Barcode terbaca lengkap & otomatis ditulis: ' + cleanCode;
+            scanText.textContent = 'Barcode terbaca & otomatis ditulis ke Kode Buku: ' + cleanCode;
             scanBanner.style.display = 'flex';
         }
 
         if (navigator.vibrate) {
-            try { navigator.vibrate([80, 40, 80]); } catch (e) {}
+            try { navigator.vibrate(100); } catch (e) {}
         }
 
         stopScanner();
@@ -337,16 +295,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    function resetConsensusUI() {
+    function resetCandidateState() {
         lastCandidateCode = '';
-        candidateStreak = 0;
+        candidateCount = 0;
         if (scanTargetBox) scanTargetBox.style.borderColor = '#38bdf8';
-        if (scanHoldStatus) scanHoldStatus.textContent = 'Arahkan & tahan kamera pada barcode...';
+        if (scanHoldStatus) scanHoldStatus.textContent = 'Arahkan kamera pada barcode buku...';
     }
 
     function setScanningUI(active) {
         isScanning = active;
-        resetConsensusUI();
+        resetCandidateState();
         if (active) {
             if (placeholder) placeholder.style.display = 'none';
             if (scanOverlay) scanOverlay.style.display = 'flex';
@@ -364,33 +322,65 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    async function decodeCenterFrame() {
-        var vw = nativeVideo.videoWidth;
-        var vh = nativeVideo.videoHeight;
-        if (!vw || !vh) return null;
+    function formatSymbolResult(rawVal, typeName, formatName) {
+        var val = String(rawVal || '').trim();
+        if (!val) return null;
 
-        var cropW = Math.round(vw * 0.8);
-        var cropH = Math.round(vh * 0.48);
-        var cropX = Math.round((vw - cropW) / 2);
-        var cropY = Math.round((vh - cropH) / 2);
-        var targetW = Math.min(840, cropW);
-        var targetH = Math.min(500, cropH);
+        var tName = String(typeName || '').toUpperCase();
+        var fName = String(formatName || '').toLowerCase();
 
+        // Abaikan bacaan parsial pendek dari I25 / EAN-2 / EAN-5 yang sering memotong barcode
+        if ((tName === 'ZBAR_I25' || fName === 'itf') && val.length < 10) {
+            return null;
+        }
+        if (tName === 'ZBAR_EAN2' || tName === 'ZBAR_EAN5' || fName === 'ean_2' || fName === 'ean_5') {
+            return null;
+        }
+
+        // Jika ZBar / BarcodeDetector mengembalikan UPC-A 12 digit (karena angka 0 di depan EAN-13 dipotong),
+        // kembalikan angka 0 di depannya agar sesuai 13 digit yang tertulis di sampul buku (misal 0412030089571)
+        if ((tName === 'ZBAR_UPCA' || fName === 'upc_a') && /^\d{12}$/.test(val)) {
+            val = '0' + val;
+        }
+
+        // Minimal 6 karakter agar tidak menangkap noise acak
+        if (val.length < 6) {
+            return null;
+        }
+
+        return val;
+    }
+
+    async function decodeRegion(sx, sy, sw, sh, targetW, targetH) {
+        if (sw <= 0 || sh <= 0) return null;
         scanCanvas.width = targetW;
         scanCanvas.height = targetH;
-        scanCtx.drawImage(nativeVideo, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
+        scanCtx.drawImage(nativeVideo, sx, sy, sw, sh, 0, 0, targetW, targetH);
         var imgData = scanCtx.getImageData(0, 0, targetW, targetH);
 
+        // 1. ZBar WebAssembly (Default Scanner — cepat & mendukung penuh ISBN-13, EAN-13, UPC-A, Code-128)
         if (typeof zbarWasm !== 'undefined' && typeof zbarWasm.scanImageData === 'function') {
             try {
-                var scanner = await getConfiguredZbarScanner();
-                var symbols = scanner
-                    ? await zbarWasm.scanImageData(imgData, scanner)
-                    : await zbarWasm.scanImageData(imgData);
+                var symbols = await zbarWasm.scanImageData(imgData);
                 if (symbols && symbols.length > 0) {
-                    var val = symbols[0].decode();
-                    if (val && isValidCompleteBarcode(val)) {
-                        return val.trim();
+                    for (var i = 0; i < symbols.length; i++) {
+                        var sym = symbols[i];
+                        var formatted = formatSymbolResult(sym.decode(), sym.typeName, '');
+                        if (formatted) return formatted;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // 2. BarcodeDetector (Native / Polyfill)
+        if (nativeDetector) {
+            try {
+                var codes = await nativeDetector.detect(imgData);
+                if (codes && codes.length > 0) {
+                    for (var j = 0; j < codes.length; j++) {
+                        var c = codes[j];
+                        var formattedCode = formatSymbolResult(c.rawValue, '', c.format);
+                        if (formattedCode) return formattedCode;
                     }
                 }
             } catch (e) {}
@@ -407,6 +397,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         try {
+            if (!nativeDetector && typeof window.BarcodeDetector !== 'undefined') {
+                try {
+                    nativeDetector = new window.BarcodeDetector();
+                } catch (e) {}
+            }
+
             nativeStream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: { ideal: currentFacingMode },
@@ -425,41 +421,48 @@ document.addEventListener('DOMContentLoaded', function () {
 
             scanTimer = setInterval(async function () {
                 if (!isScanning || isDecodingFrame || !nativeVideo || nativeVideo.readyState < 2) return;
+                if (Date.now() - cameraOpenedAt < 350) return;
 
-                // Tunggu 800ms pertama agar autofokus lensa HP stabil terlebih dahulu
-                if (Date.now() - cameraOpenedAt < 800) {
-                    return;
-                }
+                var vw = nativeVideo.videoWidth;
+                var vh = nativeVideo.videoHeight;
+                if (!vw || !vh) return;
 
                 isDecodingFrame = true;
                 try {
-                    var found = await decodeCenterFrame();
+                    // Pass 1: Area Tengah (Kotak Target Barcode)
+                    var cropW = Math.round(vw * 0.8);
+                    var cropH = Math.round(vh * 0.5);
+                    var cropX = Math.round((vw - cropW) / 2);
+                    var cropY = Math.round((vh - cropH) / 2);
+                    var found = await decodeRegion(cropX, cropY, cropW, cropH, Math.min(800, cropW), Math.min(500, cropH));
+
+                    // Pass 2: Full Frame
+                    if (!found) {
+                        found = await decodeRegion(0, 0, vw, vh, 640, Math.round(640 * (vh / vw)));
+                    }
+
                     if (found) {
                         if (found === lastCandidateCode) {
-                            candidateStreak++;
+                            candidateCount++;
                         } else {
                             lastCandidateCode = found;
-                            candidateStreak = 1;
+                            candidateCount = 1;
                         }
 
                         if (scanTargetBox) scanTargetBox.style.borderColor = '#10b981';
                         if (scanHoldStatus) {
-                            scanHoldStatus.textContent = 'Memverifikasi angka barcode: ' + found + ' (' + candidateStreak + '/' + REQUIRED_CONSENSUS + ')';
+                            scanHoldStatus.textContent = 'Mendeteksi: ' + found + '...';
                         }
 
-                        if (candidateStreak >= REQUIRED_CONSENSUS) {
+                        if (candidateCount >= REQUIRED_MATCHES) {
                             applyScannedBarcode(found);
-                        }
-                    } else {
-                        if (candidateStreak > 0) {
-                            resetConsensusUI();
                         }
                     }
                 } catch (e) {
                 } finally {
                     isDecodingFrame = false;
                 }
-            }, 220);
+            }, 115);
         } catch (err) {
             stopScanner();
         }

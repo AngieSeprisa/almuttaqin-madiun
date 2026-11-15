@@ -379,93 +379,73 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// Scanner Barcode Buku pada Form Pinjam (ZBar WebAssembly + Verifikasi Stabil Multi-Frame)
+// Scanner Barcode Buku pada Form Pinjam (ZBar WebAssembly + BarcodeDetector)
 let pinjamNativeStream = null;
 let pinjamNativeTimer = null;
 let isPinjamScanning = false;
 let isPinjamDecoding = false;
 let pinjamCameraOpenedAt = 0;
-let pinjamConfiguredScanner = null;
+let pinjamDetector = null;
 let pinjamScanCanvas = document.createElement('canvas');
 let pinjamScanCtx = pinjamScanCanvas.getContext('2d', { willReadFrequently: true });
 
-const PINJAM_REQUIRED_CONSENSUS = 4;
+const PINJAM_REQUIRED_MATCHES = 2;
 let pinjamLastCandidate = '';
-let pinjamCandidateStreak = 0;
+let pinjamCandidateCount = 0;
 
-function isValidCompletePinjamBarcode(raw) {
-    const code = String(raw || '').trim();
-    if (!code || code.length < 6) return false;
+function formatPinjamSymbolResult(rawVal, typeName, formatName) {
+    let val = String(rawVal || '').trim();
+    if (!val) return null;
 
-    if (/^\d+$/.test(code)) {
-        if (code.length !== 8 && code.length !== 12 && code.length !== 13) {
-            return false;
-        }
-        let sum = 0;
-        const len = code.length;
-        for (let i = 0; i < len - 1; i++) {
-            const digit = parseInt(code.charAt(i), 10);
-            const posFromRight = (len - 1) - i;
-            const weight = (posFromRight % 2 === 1) ? 3 : 1;
-            sum += digit * weight;
-        }
-        const checkDigit = (10 - (sum % 10)) % 10;
-        return checkDigit === parseInt(code.charAt(len - 1), 10);
-    }
+    const tName = String(typeName || '').toUpperCase();
+    const fName = String(formatName || '').toLowerCase();
 
-    return code.length >= 6;
-}
-
-async function getPinjamConfiguredScanner() {
-    if (pinjamConfiguredScanner) return pinjamConfiguredScanner;
-    if (typeof zbarWasm === 'undefined' || typeof zbarWasm.ZBarScanner === 'undefined') return null;
-
-    try {
-        const scanner = await zbarWasm.ZBarScanner.create();
-        const T = zbarWasm.ZBarSymbolType;
-        const C = zbarWasm.ZBarConfigType;
-
-        scanner.setConfig(T.ZBAR_NONE, C.ZBAR_CFG_ENABLE, 0);
-        scanner.setConfig(T.ZBAR_EAN13, C.ZBAR_CFG_ENABLE, 1);
-        scanner.setConfig(T.ZBAR_EAN8, C.ZBAR_CFG_ENABLE, 1);
-        scanner.setConfig(T.ZBAR_CODE128, C.ZBAR_CFG_ENABLE, 1);
-        scanner.setConfig(T.ZBAR_CODE39, C.ZBAR_CFG_ENABLE, 1);
-        scanner.setConfig(T.ZBAR_QRCODE, C.ZBAR_CFG_ENABLE, 1);
-
-        pinjamConfiguredScanner = scanner;
-        return scanner;
-    } catch (e) {
+    if ((tName === 'ZBAR_I25' || fName === 'itf') && val.length < 10) {
         return null;
     }
+    if (tName === 'ZBAR_EAN2' || tName === 'ZBAR_EAN5' || fName === 'ean_2' || fName === 'ean_5') {
+        return null;
+    }
+
+    if ((tName === 'ZBAR_UPCA' || fName === 'upc_a') && /^\d{12}$/.test(val)) {
+        val = '0' + val;
+    }
+
+    if (val.length < 6) {
+        return null;
+    }
+
+    return val;
 }
 
-async function decodePinjamCenter(video) {
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    if (!vw || !vh) return null;
-
-    const cropW = Math.round(vw * 0.8);
-    const cropH = Math.round(vh * 0.48);
-    const cropX = Math.round((vw - cropW) / 2);
-    const cropY = Math.round((vh - cropH) / 2);
-    const targetW = Math.min(840, cropW);
-    const targetH = Math.min(500, cropH);
-
+async function decodePinjamRegion(video, sx, sy, sw, sh, targetW, targetH) {
+    if (sw <= 0 || sh <= 0) return null;
     pinjamScanCanvas.width = targetW;
     pinjamScanCanvas.height = targetH;
-    pinjamScanCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
+    pinjamScanCtx.drawImage(video, sx, sy, sw, sh, 0, 0, targetW, targetH);
     const imgData = pinjamScanCtx.getImageData(0, 0, targetW, targetH);
 
     if (typeof zbarWasm !== 'undefined' && typeof zbarWasm.scanImageData === 'function') {
         try {
-            const scanner = await getPinjamConfiguredScanner();
-            const symbols = scanner
-                ? await zbarWasm.scanImageData(imgData, scanner)
-                : await zbarWasm.scanImageData(imgData);
+            const symbols = await zbarWasm.scanImageData(imgData);
             if (symbols && symbols.length > 0) {
-                const val = symbols[0].decode();
-                if (val && isValidCompletePinjamBarcode(val)) {
-                    return val.trim();
+                for (let i = 0; i < symbols.length; i++) {
+                    const sym = symbols[i];
+                    const formatted = formatPinjamSymbolResult(sym.decode(), sym.typeName, '');
+                    if (formatted) return formatted;
+                }
+            }
+        } catch (e) {}
+    }
+
+    if (pinjamDetector) {
+        try {
+            const codes = await pinjamDetector.detect(imgData);
+            if (codes && codes.length > 0) {
+                for (let j = 0; j < codes.length; j++) {
+                    const c = codes[j];
+                    const formattedCode = formatPinjamSymbolResult(c.rawValue, '', c.format);
+                    if (formattedCode) return formattedCode;
                 }
             }
         } catch (e) {}
@@ -476,11 +456,11 @@ async function decodePinjamCenter(video) {
 
 function resetPinjamConsensusUI() {
     pinjamLastCandidate = '';
-    pinjamCandidateStreak = 0;
+    pinjamCandidateCount = 0;
     const box = document.getElementById('pinjamTargetBox');
     const hold = document.getElementById('pinjamHoldStatus');
     if (box) box.style.borderColor = '#38bdf8';
-    if (hold) hold.textContent = 'Arahkan & tahan kamera pada barcode...';
+    if (hold) hold.textContent = 'Arahkan kamera pada barcode buku...';
 }
 
 async function togglePinjamScanner() {
@@ -504,6 +484,10 @@ async function togglePinjamScanner() {
     }
 
     try {
+        if (!pinjamDetector && typeof window.BarcodeDetector !== 'undefined') {
+            try { pinjamDetector = new window.BarcodeDetector(); } catch (e) {}
+        }
+
         pinjamNativeStream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: false
@@ -518,38 +502,47 @@ async function togglePinjamScanner() {
 
         pinjamNativeTimer = setInterval(async () => {
             if (!isPinjamScanning || isPinjamDecoding || !video || video.readyState < 2) return;
-            if (Date.now() - pinjamCameraOpenedAt < 800) return;
+            if (Date.now() - pinjamCameraOpenedAt < 350) return;
+
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            if (!vw || !vh) return;
 
             isPinjamDecoding = true;
             try {
-                const found = await decodePinjamCenter(video);
+                const cropW = Math.round(vw * 0.8);
+                const cropH = Math.round(vh * 0.5);
+                const cropX = Math.round((vw - cropW) / 2);
+                const cropY = Math.round((vh - cropH) / 2);
+
+                let found = await decodePinjamRegion(video, cropX, cropY, cropW, cropH, Math.min(800, cropW), Math.min(500, cropH));
+                if (!found) {
+                    found = await decodePinjamRegion(video, 0, 0, vw, vh, 640, Math.round(640 * (vh / vw)));
+                }
+
                 if (found) {
                     if (found === pinjamLastCandidate) {
-                        pinjamCandidateStreak++;
+                        pinjamCandidateCount++;
                     } else {
                         pinjamLastCandidate = found;
-                        pinjamCandidateStreak = 1;
+                        pinjamCandidateCount = 1;
                     }
 
                     if (box) box.style.borderColor = '#10b981';
                     if (hold) {
-                        hold.textContent = 'Memverifikasi angka barcode: ' + found + ' (' + pinjamCandidateStreak + '/' + PINJAM_REQUIRED_CONSENSUS + ')';
+                        hold.textContent = 'Mendeteksi: ' + found + '...';
                     }
 
-                    if (pinjamCandidateStreak >= PINJAM_REQUIRED_CONSENSUS) {
+                    if (pinjamCandidateCount >= PINJAM_REQUIRED_MATCHES) {
                         await stopPinjamScanner();
                         matchBookByScannedCode(found, false);
-                    }
-                } else {
-                    if (pinjamCandidateStreak > 0) {
-                        resetPinjamConsensusUI();
                     }
                 }
             } catch (e) {
             } finally {
                 isPinjamDecoding = false;
             }
-        }, 220);
+        }, 115);
     } catch (e) {
         showPinjamScanFeedback('Tidak dapat membuka kamera. Pastikan izin kamera diizinkan pada browser.', true);
     }
