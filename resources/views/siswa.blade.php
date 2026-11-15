@@ -917,7 +917,7 @@
                         <th data-col-hidden="true" style="display:none;">Kecamatan</th>
                         <th data-col-hidden="true" style="display:none;">Kabupaten / Kota</th>
                         <th data-col-hidden="true" style="display:none;">Provinsi</th>
-                        <th data-col-hidden="true" style="display:none;">No. HP / WA (PJ)</th>
+                        <th data-col-hidden="true" style="display:none;">No. HP / WA PJ</th>
                         <th data-col-hidden="true" style="display:none;">Nama PJ Biaya</th>
                         <th data-col-hidden="true" style="display:none;">Pendidikan Terakhir</th>
                         <th data-col-hidden="true" style="display:none;">Asal Sekolah</th>
@@ -993,7 +993,7 @@
                         <td style="display:none;">{{ $p?->tempat_lahir ?: '-' }}</td>
                         <td style="display:none;">{{ $p?->tanggal_lahir ? date('d/m/Y', strtotime($p->tanggal_lahir)) : '-' }}</td>
                         <td style="display:none;">{{ $p?->jenis_kelamin ?: '-' }}</td>
-                        <td style="display:none;">{{ $p?->anak_ke ? 'Ke-' . $p->anak_ke . ($p->jumlah_saudara ? ' (dari ' . $p->jumlah_saudara . ')' : '') : '-' }}</td>
+                        <td style="display:none;">{{ $p?->anak_ke ? 'Ke-' . $p->anak_ke . ($p->jumlah_saudara ? ' dari ' . $p->jumlah_saudara : '') : '-' }}</td>
                         <td style="display:none;">{{ $p?->tinggal_bersama ?: '-' }}</td>
                         <td style="display:none;">{{ $p?->alamat_jalan ?: '-' }}</td>
                         <td style="display:none;">{{ $p?->rt_rw ?: '-' }}</td>
@@ -1010,13 +1010,13 @@
                         <td style="display:none;">{{ $p?->penyakit_diderita ?: '-' }}</td>
                         <td style="display:none;">{{ $p?->alergi ?: '-' }}</td>
                         <td style="display:none;">{{ $p?->keahlian_prestasi ?: '-' }}</td>
-                        <td style="display:none;">{{ $p?->ayah_nama ? $p->ayah_nama . ($p->ayah_status === 'Meninggal' ? ' (Alm.)' : '') : '-' }}</td>
+                        <td style="display:none;">{{ $p?->ayah_nama ? $p->ayah_nama . ($p->ayah_status === 'Meninggal' ? ' Alm.' : '') : '-' }}</td>
                         <td style="display:none;">{{ $p?->ayah_pekerjaan ?: '-' }}</td>
                         <td style="display:none;">{{ $p?->ayah_hp ?: '-' }}</td>
-                        <td style="display:none;">{{ $p?->ibu_nama ? $p->ibu_nama . ($p->ibu_status === 'Meninggal' ? ' (Almh.)' : '') : '-' }}</td>
+                        <td style="display:none;">{{ $p?->ibu_nama ? $p->ibu_nama . ($p->ibu_status === 'Meninggal' ? ' Almh.' : '') : '-' }}</td>
                         <td style="display:none;">{{ $p?->ibu_pekerjaan ?: '-' }}</td>
                         <td style="display:none;">{{ $p?->ibu_hp ?: '-' }}</td>
-                        <td style="display:none;">{{ $p?->penerima_kip ? 'Ya' . ($p->nomor_kip ? ' (' . $p->nomor_kip . ')' : '') : 'Tidak' }}</td>
+                        <td style="display:none;">{{ $p?->penerima_kip ? 'Ya' . ($p->nomor_kip ? ' - ' . $p->nomor_kip : '') : 'Tidak' }}</td>
 
                         {{-- Kolom Aksi (Dipindahkan ke Tombol Aksi di Kiri Atas Toolbar) --}}
                         <td class="col-aksi-cell" style="text-align:center; display:none;">
@@ -1213,7 +1213,6 @@
                 </div>
                 <div class="sheet-action-text">
                     <span class="sheet-action-title">Lihat Formulir Siswa</span>
-                    <span class="sheet-action-desc">Buka biodata lengkap santri</span>
                 </div>
                 <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </a>
@@ -1228,7 +1227,6 @@
                 </div>
                 <div class="sheet-action-text">
                     <span class="sheet-action-title">Edit Data Siswa</span>
-                    <span class="sheet-action-desc">Ubah data identitas & kelengkapan</span>
                 </div>
                 <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </a>
@@ -1244,7 +1242,6 @@
                 </div>
                 <div class="sheet-action-text">
                     <span class="sheet-action-title">Cetak Formulir A4</span>
-                    <span class="sheet-action-desc">Cetak format kertas resmi santri</span>
                 </div>
                 <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </a>
@@ -1259,7 +1256,6 @@
                 </div>
                 <div class="sheet-action-text">
                     <span class="sheet-action-title">Pairing Kartu RFID</span>
-                    <span class="sheet-action-desc" id="sheetRfidDesc">Hubungkan kartu fisik santri</span>
                 </div>
                 <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
@@ -1276,7 +1272,6 @@
                 </div>
                 <div class="sheet-action-text">
                     <span class="sheet-action-title">Hapus Data Siswa</span>
-                    <span class="sheet-action-desc">Hapus data santri dari aplikasi</span>
                 </div>
                 <svg class="sheet-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
@@ -1405,16 +1400,14 @@ document.addEventListener('DOMContentLoaded', function () {
             html: `
                 <div style="text-align:left; font-size:13px; line-height:1.6; color:var(--text-main);">
                     <p style="margin-bottom:10px;">Santri: <strong>${nama}</strong></p>
-                    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">UID Kartu RFID (Hexadecimal):</label>
+                    <label style="display:block; font-size:12px; font-weight:600; margin-bottom:4px;">UID Kartu RFID:</label>
                     <div style="display:flex; gap:8px;">
                         <input id="swal_rfid_uid" class="swal2-input" style="margin:0; flex:1; text-transform:uppercase; font-family:monospace; font-size:14px; font-weight:600;" placeholder="Contoh: C1F8EFA7" value="${currentUid}">
                         <button type="button" id="btn_detect_rfid" class="btn btn-secondary" style="font-size:12px; padding:0 12px; white-space:nowrap; border-radius:8px;" title="Ambil tap kartu terakhir di alat">
                             📡 Cek Tap Terakhir
                         </button>
                     </div>
-                    <div id="detect_rfid_status" style="font-size:11.5px; color:#64748b; margin-top:8px;">
-                        💡 <em>Tip: Tap kartu baru di sensor RFID alat ESP32, lalu klik tombol "Cek Tap Terakhir".</em>
-                    </div>
+                    <div id="detect_rfid_status" style="font-size:11.5px; color:#64748b; margin-top:8px;"></div>
                 </div>
             `,
             showCancelButton: true,

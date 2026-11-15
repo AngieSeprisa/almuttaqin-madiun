@@ -18,7 +18,7 @@ class UserController extends Controller
     public static function systemMenus(): array
     {
         return [
-            'siswa'              => 'Data Siswa & Santri',
+            'siswa'              => 'Data Warga: Siswa, Guru, Lulus & Mutasi',
             'pendaftaran'        => 'Pendaftaran Baru',
             'perizinan_sambang'  => 'Perizinan Sambang',
             'perizinan_sakit'    => 'Perizinan Sakit',

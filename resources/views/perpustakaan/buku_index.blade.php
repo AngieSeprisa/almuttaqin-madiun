@@ -4,13 +4,6 @@
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <a href="{{ route('perpustakaan.pinjam.index') }}" class="btn btn-secondary">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-        </svg>
-        <span>Pinjam Buku</span>
-    </a>
     <a href="{{ route('perpustakaan.buku.create') }}" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -58,17 +51,14 @@
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:var(--text-secondary);">Total Judul Buku</div>
             <div style="font-size:26px; font-weight:800; color:var(--text-primary); margin-top:4px;">{{ number_format($totalJudul) }}</div>
-            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">{{ number_format($totalEksemplar) }} total eksemplar</div>
         </div>
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:#047857;">Stok Tersedia</div>
             <div style="font-size:26px; font-weight:800; color:#047857; margin-top:4px;">{{ number_format($totalTersedia) }}</div>
-            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Siap dipinjam</div>
         </div>
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:#2563eb;">Sedang Dipinjam</div>
             <div style="font-size:26px; font-weight:800; color:#2563eb; margin-top:4px;">{{ number_format($totalDipinjam) }}</div>
-            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Eksemplar dipinjam santri/siswa</div>
         </div>
     </div>
 
@@ -173,7 +163,7 @@
                                 </span>
                             @else
                                 <span class="status-pill status-melewati_batas" style="font-size:11.5px;">
-                                    Habis (0 / {{ $item->stok_total }})
+                                    Habis 0 / {{ $item->stok_total }}
                                 </span>
                             @endif
                         </td>
@@ -208,7 +198,7 @@
                                     <button type="button"
                                             class="action-btn action-btn-delete js-swal-confirm"
                                             data-title="Hapus Buku?"
-                                            data-html="Apakah Anda yakin ingin menghapus buku <strong>{{ $item->judul_buku }}</strong> ({{ $item->kode_buku }})?"
+                                            data-html="Apakah Anda yakin ingin menghapus buku <strong>{{ $item->judul_buku }}</strong> - {{ $item->kode_buku }}?"
                                             data-icon="warning"
                                             data-confirm-text="Ya, Hapus"
                                             data-confirm-color="#DC2626"
@@ -235,7 +225,7 @@
                                         </div>
                                         <div class="modal-body" style="text-align:left; display:flex; flex-direction:column; gap:12px;">
                                             <div class="form-group" style="margin:0;">
-                                                <label class="form-label">Kode Buku (Barcode) <span class="required-mark">*</span></label>
+                                                <label class="form-label">Kode Buku <span class="required-mark">*</span></label>
                                                 <input type="text" name="kode_buku" value="{{ $item->kode_buku ?: $item->barcode }}" class="form-control" style="font-family:monospace; font-weight:700;" required>
                                             </div>
                                             <div class="form-group" style="margin:0;">
@@ -283,14 +273,13 @@
                     @empty
                     <tr>
                         <td colspan="6" style="padding:36px 16px; text-align:center;">
-                            <div style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Belum ada data buku di perpustakaan</div>
-                            <div style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">Tambahkan koleksi buku dengan scan barcode menggunakan kamera HP dan kode buku otomatis.</div>
+                            <div style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:14px;">Belum ada data buku</div>
                             <a href="{{ route('perpustakaan.buku.create') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:15px;height:15px;">
                                     <line x1="12" y1="5" x2="12" y2="19"></line>
                                     <line x1="5" y1="12" x2="19" y2="12"></line>
                                 </svg>
-                                <span>Tambah Buku Pertama</span>
+                                <span>Tambah Buku</span>
                             </a>
                         </td>
                     </tr>

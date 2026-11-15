@@ -32,7 +32,7 @@ class PerpustakaanTest extends TestCase
         // 2. Halaman Tambah Buku menampilkan scanner barcode, input nama buku, dan kode buku otomatis
         $resCreate = $this->actingAs($user)->get(route('perpustakaan.buku.create'));
         $resCreate->assertStatus(200);
-        $resCreate->assertSee('Scan Barcode Buku (Kamera HP)');
+        $resCreate->assertSee('Scan Barcode Buku');
         $resCreate->assertSee('BK-0001');
 
         // 3. Endpoint generate kode buku otomatis

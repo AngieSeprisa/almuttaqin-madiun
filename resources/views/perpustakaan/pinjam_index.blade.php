@@ -4,13 +4,6 @@
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <a href="{{ route('perpustakaan.buku.index') }}" class="btn btn-secondary">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-        </svg>
-        <span>Daftar Buku</span>
-    </a>
     <a href="{{ route('perpustakaan.pinjam.create') }}" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -58,22 +51,18 @@
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:var(--text-secondary);">Total Peminjaman</div>
             <div style="font-size:26px; font-weight:800; color:var(--text-primary); margin-top:4px;">{{ number_format($totalTransaksi) }}</div>
-            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Seluruh riwayat pinjam buku</div>
         </div>
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:#2563eb;">Sedang Dipinjam</div>
             <div style="font-size:26px; font-weight:800; color:#2563eb; margin-top:4px;">{{ number_format($sedangDipinjam) }}</div>
-            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Belum dikembalikan</div>
         </div>
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:#047857;">Sudah Dikembalikan</div>
             <div style="font-size:26px; font-weight:800; color:#047857; margin-top:4px;">{{ number_format($sudahKembali) }}</div>
-            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Selesai dikembalikan</div>
         </div>
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:#dc2626;">Melewati Jatuh Tempo</div>
             <div style="font-size:26px; font-weight:800; color:#dc2626; margin-top:4px;">{{ number_format($terlambatCount) }}</div>
-            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">Perlu tindak lanjut pengembalian</div>
         </div>
     </div>
 
@@ -322,8 +311,7 @@
                     @empty
                         <tr>
                             <td colspan="8" style="padding:36px 16px; text-align:center;">
-                                <div style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Belum ada data peminjaman buku</div>
-                                <div style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">Klik tombol <strong>Pinjam Buku</strong> untuk mencatat peminjaman buku baru.</div>
+                                <div style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:14px;">Belum ada data peminjaman buku</div>
                                 <a href="{{ route('perpustakaan.pinjam.create') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:15px;height:15px;">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>

@@ -199,8 +199,13 @@ class User extends Authenticatable
             return true;
         }
 
-        // Menu NFC mengikuti perizinan modul siswa
-        if ($menuCode === 'nfc') {
+        // Menu NFC dan Data Warga mengikuti perizinan modul siswa
+        if (in_array($menuCode, ['nfc', 'data_warga', 'guru_warga', 'lulus_warga', 'mutasi_warga'], true)) {
+            $permSpecific = $this->permissions->firstWhere('menu_code', $menuCode);
+            if ($permSpecific) {
+                $field = 'can_' . $action;
+                return (bool) ($permSpecific->{$field} ?? false);
+            }
             return $this->canDo('siswa', $action);
         }
 

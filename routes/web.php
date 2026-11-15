@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\ClassroomController;
+use App\Http\Controllers\DataWargaController;
 use App\Http\Controllers\EkskulJurnalController;
 use App\Http\Controllers\GuruSekolahController;
 use App\Http\Controllers\ImportSiswaController;
@@ -84,6 +85,21 @@ Route::middleware('auth')->group(function () {
     Route::delete('/siswa/{id}', [SiswaController::class, 'destroy'])
         ->middleware('permission:siswa,delete')
         ->name('siswa.destroy');
+
+    // Menu Data Warga (Siswa, Guru, Lulus, Mutasi)
+    Route::middleware('permission:data_warga|siswa|guru_warga|lulus_warga|mutasi_warga|guru_sekolah,view')
+        ->prefix('data-warga')
+        ->name('data-warga.')
+        ->group(function () {
+            Route::get('/guru', [DataWargaController::class, 'guru'])->name('guru');
+            Route::get('/lulus', [DataWargaController::class, 'lulus'])->name('lulus');
+            Route::post('/lulus', [DataWargaController::class, 'storeLulus'])->name('lulus.store');
+            Route::put('/lulus/{siswa}', [DataWargaController::class, 'updateLulus'])->name('lulus.update');
+            Route::get('/mutasi', [DataWargaController::class, 'mutasi'])->name('mutasi');
+            Route::post('/mutasi', [DataWargaController::class, 'storeMutasi'])->name('mutasi.store');
+            Route::put('/mutasi/{siswa}', [DataWargaController::class, 'updateMutasi'])->name('mutasi.update');
+            Route::patch('/{siswa}/kembalikan-aktif', [DataWargaController::class, 'kembalikanAktif'])->name('kembalikan-aktif');
+        });
 
     // Menu Khusus Input Kartu NFC
     Route::middleware('permission:siswa|nfc,view')->group(function () {

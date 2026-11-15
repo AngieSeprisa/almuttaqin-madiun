@@ -25,6 +25,18 @@
                 $bcParent = 'Siswa';
                 $bcParentRoute = route('siswa');
                 $bcChild = 'Daftar';
+            } elseif (request()->routeIs('data-warga.guru*')) {
+                $bcParent = 'Data Warga';
+                $bcParentRoute = route('data-warga.guru');
+                $bcChild = 'Guru';
+            } elseif (request()->routeIs('data-warga.lulus*')) {
+                $bcParent = 'Data Warga';
+                $bcParentRoute = route('data-warga.lulus');
+                $bcChild = 'Lulus';
+            } elseif (request()->routeIs('data-warga.mutasi*')) {
+                $bcParent = 'Data Warga';
+                $bcParentRoute = route('data-warga.mutasi');
+                $bcChild = 'Mutasi';
             } elseif (request()->routeIs('sekolah.jurnal*')) {
                 $bcParent = 'Sekolah';
                 $bcParentRoute = route('sekolah.jurnal');

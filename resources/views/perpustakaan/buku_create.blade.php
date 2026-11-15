@@ -33,7 +33,7 @@
     </div>
     @endif
 
-    {{-- LANGKAH 1: SCAN BARCODE BUKU DENGAN KAMERA HP (OTOMATIS TERTULIS KE KODE BUKU) --}}
+    {{-- SCAN BARCODE BUKU --}}
     <div class="form-section-card" style="padding:22px 24px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
             <div style="display:flex; align-items:center; gap:10px;">
@@ -44,8 +44,7 @@
                     </svg>
                 </div>
                 <div>
-                    <h2 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">1. Scan Barcode Buku (Kamera HP)</h2>
-                    <span style="font-size:12px; color:var(--text-muted);">Arahkan kamera ke barcode buku — begitu terbaca langsung otomatis tertulis ke Kode Buku</span>
+                    <h2 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">Scan Barcode Buku</h2>
                 </div>
             </div>
 
@@ -91,8 +90,7 @@
                         <path d="M21 5v14"></path>
                     </svg>
                 </div>
-                <div id="scannerStatusTitle" style="font-size:14px; font-weight:600; color:#F1F5F9; margin-bottom:4px;">Menyiapkan Kamera Pemindai Barcode...</div>
-                <div id="scannerStatusDesc" style="font-size:12px; color:#94A3B8; max-width:320px; margin:0 auto;">Arahkan kamera HP ke barcode buku, angka barcode akan langsung tertulis otomatis pada kolom Kode Buku di bawah.</div>
+                <div id="scannerStatusTitle" style="font-size:14px; font-weight:600; color:#F1F5F9;">Menyiapkan Kamera Pemindai Barcode</div>
             </div>
         </div>
 
@@ -109,7 +107,7 @@
         </div>
     </div>
 
-    {{-- LANGKAH 2: DETAIL BUKU & KODE BUKU --}}
+    {{-- DETAIL BUKU & KODE BUKU --}}
     <div class="form-section-card" style="padding:24px 26px;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border-subtle);">
             <div style="width:36px; height:36px; border-radius:10px; background:rgba(37,99,235,0.1); color:#2563eb; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
@@ -119,8 +117,7 @@
                 </svg>
             </div>
             <div>
-                <h2 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">2. Informasi Buku</h2>
-                <span style="font-size:12px; color:var(--text-muted);">Kode buku otomatis terisi dari hasil scan barcode (atau kode otomatis jika tanpa barcode)</span>
+                <h2 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">Informasi Buku</h2>
             </div>
         </div>
 
@@ -128,9 +125,9 @@
             @csrf
             <input type="hidden" name="barcode" id="input_barcode" value="{{ old('barcode') }}">
 
-            {{-- Kode Buku (Hasil Scan Barcode / Otomatis) --}}
+            {{-- Kode Buku --}}
             <div class="form-group" style="margin:0;">
-                <label for="kode_buku" class="form-label">Kode Buku (Barcode) <span class="required-mark">*</span></label>
+                <label for="kode_buku" class="form-label">Kode Buku <span class="required-mark">*</span></label>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="text"
                            name="kode_buku"
@@ -144,7 +141,7 @@
                             id="btnGenerateKode"
                             class="btn btn-secondary"
                             style="white-space:nowrap; padding:9px 12px; font-size:12.5px;"
-                            title="Buat Kode Buku Otomatis (Jika Buku Tidak Ada Barcode)">
+                            title="Buat Kode Buku Otomatis">
                         Kode Otomatis
                     </button>
                 </div>

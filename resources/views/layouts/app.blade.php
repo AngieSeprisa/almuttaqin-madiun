@@ -118,19 +118,64 @@
                     <span class="nav-item-text">Beranda</span>
                 </a>
 
-                @if(!$authUser || $authUser->canDo('siswa', 'view'))
-                <a href="{{ route('siswa') }}" class="nav-item {{ request()->routeIs('siswa*') ? 'active' : '' }}" title="Siswa">
-                    <span class="nav-item-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                @php
+                    $canSiswaWarga  = !$authUser || $authUser->canDo('siswa', 'view') || $authUser->canDo('data_warga', 'view');
+                    $canGuruWarga   = !$authUser || $authUser->canDo('guru_warga', 'view') || $authUser->canDo('guru_sekolah', 'view') || $authUser->canDo('siswa', 'view') || $authUser->canDo('data_warga', 'view');
+                    $canLulusWarga  = !$authUser || $authUser->canDo('lulus_warga', 'view') || $authUser->canDo('siswa', 'view') || $authUser->canDo('data_warga', 'view');
+                    $canMutasiWarga = !$authUser || $authUser->canDo('mutasi_warga', 'view') || $authUser->canDo('siswa', 'view') || $authUser->canDo('data_warga', 'view');
+                    $showDataWargaGroup = $canSiswaWarga || $canGuruWarga || $canLulusWarga || $canMutasiWarga;
+                @endphp
+                @if($showDataWargaGroup)
+                <div class="nav-group {{ request()->routeIs('siswa*') || request()->routeIs('data-warga.*') ? 'open' : '' }}" id="navGroupDataWarga">
+                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('siswa*') || request()->routeIs('data-warga.*') ? 'active-parent' : '' }}" id="toggleDataWarga" title="Data Warga">
+                        <span class="nav-item-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-item-text">Data Warga</span>
+                        <svg class="nav-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
-                    </span>
-                    <span class="nav-item-text">Siswa</span>
-                </a>
+                    </button>
 
+                    <div class="subnav-list">
+                        @if($canSiswaWarga)
+                        <a href="{{ route('siswa') }}"
+                           class="subnav-item {{ request()->routeIs('siswa*') ? 'active' : '' }}" title="Siswa">
+                            <span class="subnav-dot" style="background: #2563EB;"></span>
+                            <span>Siswa</span>
+                        </a>
+                        @endif
+                        @if($canGuruWarga)
+                        <a href="{{ route('data-warga.guru') }}"
+                           class="subnav-item {{ request()->routeIs('data-warga.guru*') ? 'active' : '' }}" title="Guru">
+                            <span class="subnav-dot" style="background: #0EA5E9;"></span>
+                            <span>Guru</span>
+                        </a>
+                        @endif
+                        @if($canLulusWarga)
+                        <a href="{{ route('data-warga.lulus') }}"
+                           class="subnav-item {{ request()->routeIs('data-warga.lulus*') ? 'active' : '' }}" title="Lulus">
+                            <span class="subnav-dot" style="background: #10B981;"></span>
+                            <span>Lulus</span>
+                        </a>
+                        @endif
+                        @if($canMutasiWarga)
+                        <a href="{{ route('data-warga.mutasi') }}"
+                           class="subnav-item {{ request()->routeIs('data-warga.mutasi*') ? 'active' : '' }}" title="Mutasi">
+                            <span class="subnav-dot" style="background: #F59E0B;"></span>
+                            <span>Mutasi</span>
+                        </a>
+                        @endif
+                    </div>
+                </div>
+                @endif
+
+                @if(!$authUser || $authUser->canDo('siswa', 'view'))
                 <a href="{{ route('nfc.index') }}" class="nav-item {{ request()->routeIs('nfc.*') ? 'active' : '' }}" title="Input NFC">
                     <span class="nav-item-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

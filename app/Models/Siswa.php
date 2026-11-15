@@ -16,7 +16,18 @@ class Siswa extends Model
         'jenis_kelamin',
         'kelas_pengajian_id',
         'status',
+        'kategori_lulus',
+        'tahun_lulus',
+        'tanggal_lulus',
+        'tanggal_mutasi',
+        'tujuan_mutasi',
+        'keterangan_status',
         'pendaftaran_id',
+    ];
+
+    protected $casts = [
+        'tanggal_lulus'  => 'date',
+        'tanggal_mutasi' => 'date',
     ];
 
     /**

@@ -56,7 +56,6 @@
                 </div>
                 <div>
                     <h2 style="font-size:17px; font-weight:700; color:var(--text-primary); margin:0;">Formulir Peminjaman Buku</h2>
-                    <p style="font-size:12.5px; color:var(--text-secondary); margin:2px 0 0;">Scan barcode buku atau pilih buku dari daftar, lengkapi data peminjam, lalu klik Simpan</p>
                 </div>
             </div>
 
@@ -72,7 +71,7 @@
         {{-- Area Scanner Barcode Buku --}}
         <div id="pinjamScannerWrap" style="display:none; margin-bottom:20px; padding:16px; border-radius:12px; background:#f8fafc; border:1px dashed #cbd5e1;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                <span style="font-size:13px; font-weight:700; color:var(--text-primary);">Arahkan & Tahan Kamera pada Barcode Buku Hingga Terverifikasi</span>
+                <span style="font-size:13px; font-weight:700; color:var(--text-primary);">Scan Barcode Buku</span>
                 <button type="button" class="btn btn-sm btn-secondary" onclick="stopPinjamScanner()">Tutup Kamera</button>
             </div>
             <div style="width:100%; max-width:420px; margin:0 auto; border-radius:10px; overflow:hidden; background:#0f172a; position:relative; min-height:220px; display:flex; align-items:center; justify-content:center;">
@@ -82,7 +81,7 @@
                         <div style="position:absolute; left:10px; right:10px; top:50%; height:2px; background:#ef4444; box-shadow:0 0 8px #ef4444;"></div>
                     </div>
                     <div id="pinjamHoldStatus" style="z-index:2; background:rgba(15,23,42,0.82); color:#f8fafc; font-size:12px; font-weight:600; padding:5px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.15);">
-                        Arahkan & tahan kamera pada barcode...
+                        Arahkan kamera pada barcode buku...
                     </div>
                 </div>
             </div>
@@ -94,9 +93,9 @@
             @csrf
 
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:18px; margin-bottom:18px;">
-                {{-- Kode Buku (Barcode) --}}
+                {{-- Kode Buku --}}
                 <div class="form-group">
-                    <label for="input_kode_buku_pinjam" class="form-label">Kode Buku (Barcode)</label>
+                    <label for="input_kode_buku_pinjam" class="form-label">Kode Buku</label>
                     <input type="text"
                            id="input_kode_buku_pinjam"
                            class="form-control"
@@ -121,7 +120,7 @@
                                     data-stok="{{ $buku->stok_tersedia }}"
                                     {{ $isSelected ? 'selected' : '' }}
                                     {{ $habis && !$isSelected ? 'disabled' : '' }}>
-                                [{{ $kodeDisplay }}] {{ $buku->judul_buku }} — (Tersedia: {{ $buku->stok_tersedia }})
+                                [{{ $kodeDisplay }}] {{ $buku->judul_buku }} — Stok: {{ $buku->stok_tersedia }}
                             </option>
                         @endforeach
                     </select>
@@ -140,9 +139,9 @@
             </div>
 
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px; margin-bottom:18px;">
-                {{-- Nama Peminjam (Bisa Pilih Santri/Siswa atau Ketik Manual) --}}
+                {{-- Nama Peminjam --}}
                 <div class="form-group" style="position:relative;">
-                    <label for="input_nama_peminjam" class="form-label required">Nama Peminjam (Santri / Siswa)</label>
+                    <label for="input_nama_peminjam" class="form-label required">Nama Peminjam</label>
                     <div style="position:relative; display:flex; align-items:center;">
                         <input type="text"
                                name="nama_peminjam"
@@ -154,7 +153,7 @@
                                required
                                style="padding-right:34px;">
                         <input type="hidden" name="siswa_id" id="siswa_id" value="{{ old('siswa_id') }}">
-                        <div id="btn_toggle_santri" style="position:absolute; right:12px; cursor:pointer; color:var(--text-muted); display:flex; align-items:center; user-select:none;" title="Tampilkan daftar santri/siswa">
+                        <div id="btn_toggle_santri" style="position:absolute; right:12px; cursor:pointer; color:var(--text-muted); display:flex; align-items:center; user-select:none;" title="Tampilkan daftar peminjam">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
@@ -190,8 +189,8 @@
             </div>
 
             <div class="form-group" style="margin-bottom:24px;">
-                <label for="catatan" class="form-label">Catatan / Keterangan (Opsional)</label>
-                <textarea name="catatan" id="catatan" rows="2" class="form-control" placeholder="Catatan tambahan peminjaman buku...">{{ old('catatan') }}</textarea>
+                <label for="catatan" class="form-label">Catatan</label>
+                <textarea name="catatan" id="catatan" rows="2" class="form-control" placeholder="Catatan peminjaman buku...">{{ old('catatan') }}</textarea>
             </div>
 
             <div style="display:flex; align-items:center; justify-content:flex-end; gap:10px; padding-top:16px; border-top:1px solid var(--border-subtle);">
@@ -273,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (filtered.length === 0) {
                 const empty = document.createElement('div');
                 empty.className = 'autocomplete-empty';
-                empty.textContent = 'Nama santri tidak ditemukan di daftar (tetap bisa disimpan manual)';
+                empty.textContent = 'Nama santri tidak ditemukan di daftar';
                 listPrediksi.appendChild(empty);
             } else {
                 filtered.forEach((item) => {

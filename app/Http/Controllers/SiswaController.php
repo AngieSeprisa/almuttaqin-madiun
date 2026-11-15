@@ -15,7 +15,12 @@ class SiswaController extends Controller
     public function index(Request $request)
     {
         $activeRoom = session('active_lembaga');
-        $query = Siswa::query()->with('pendaftaran');
+        $query = Siswa::query()
+            ->with('pendaftaran')
+            ->where(function ($q) {
+                $q->whereNotIn('status', ['lulus', 'mutasi'])
+                  ->orWhereNull('status');
+            });
 
         // Filter berdasarkan ruang kerja/lembaga aktif
         $query->forLembaga($activeRoom);
