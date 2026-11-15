@@ -85,12 +85,12 @@
             <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-light);">
                 <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:13.5px; font-weight:500;">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', $pengguna->is_active ? '1' : '0') == '1' ? 'checked' : '' }} style="accent-color:var(--electric-blue); width:16px; height:16px;">
-                    Akun Aktif (Dapat masuk ke sistem)
+                    Akun Aktif
                 </label>
             </div>
         </div>
 
-        {{-- Seksi Unit Lembaga (Ruang Kerja) --}}
+        {{-- Seksi Unit Lembaga --}}
         <div class="form-section-card">
             <div class="form-section-header">
                 <div class="form-section-icon">
@@ -100,7 +100,7 @@
                     </svg>
                 </div>
                 <div class="form-section-title-wrap">
-                    <h2 class="form-section-title">Akses Ruang Kerja (Lembaga)</h2>
+                    <h2 class="form-section-title">Akses Ruang Kerja</h2>
                 </div>
             </div>
 
@@ -142,44 +142,72 @@
                 <table class="permission-table">
                     <thead>
                         <tr>
-                            <th style="width:36%;">Menu</th>
-                            <th>Lihat (View)</th>
-                            <th>Tambah (Create)</th>
-                            <th>Ubah (Edit)</th>
-                            <th>Hapus (Delete)</th>
+                            <th style="width:40%;">Menu</th>
+                            <th style="text-align:center;">Lihat</th>
+                            <th style="text-align:center;">Tambah</th>
+                            <th style="text-align:center;">Ubah</th>
+                            <th style="text-align:center;">Hapus</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($menus as $code => $label)
+                        @php
+                            $groupsToRender = $menuGroups ?? ['Menu' => $menus];
+                        @endphp
+                        @foreach($groupsToRender as $groupName => $groupItems)
+                        <tr style="background:var(--bg-page);">
+                            <td colspan="4" style="font-weight:700; font-size:12.5px; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em; padding:10px 14px;">
+                                {{ $groupName }}
+                            </td>
+                            <td style="text-align:center; padding:8px 14px;">
+                                <button type="button" class="btn btn-sm btn-secondary js-toggle-group" data-group="{{ \Illuminate\Support\Str::slug($groupName) }}" style="font-size:11px; padding:3px 10px;">
+                                    Pilih Grup
+                                </button>
+                            </td>
+                        </tr>
+                        @foreach($groupItems as $code => $label)
                         @php
                             $pView   = old("permissions.{$code}.view", $userPerms[$code]['view'] ?? false);
                             $pCreate = old("permissions.{$code}.create", $userPerms[$code]['create'] ?? false);
                             $pEdit   = old("permissions.{$code}.edit", $userPerms[$code]['edit'] ?? false);
                             $pDelete = old("permissions.{$code}.delete", $userPerms[$code]['delete'] ?? false);
+                            $groupSlug = \Illuminate\Support\Str::slug($groupName);
                         @endphp
                         <tr>
-                            <td>{{ $label }}</td>
-                            <td>
+                            <td style="padding-left:26px; font-weight:500;">{{ $label }}</td>
+                            <td style="text-align:center;">
                                 <input type="checkbox" name="permissions[{{ $code }}][view]" value="1" 
                                        {{ $pView ? 'checked' : '' }}
+                                       data-group="{{ $groupSlug }}"
+                                       data-code="{{ $code }}"
+                                       data-action="view"
                                        class="permission-checkbox js-perm-check">
                             </td>
-                            <td>
+                            <td style="text-align:center;">
                                 <input type="checkbox" name="permissions[{{ $code }}][create]" value="1"
                                        {{ $pCreate ? 'checked' : '' }}
+                                       data-group="{{ $groupSlug }}"
+                                       data-code="{{ $code }}"
+                                       data-action="create"
                                        class="permission-checkbox js-perm-check">
                             </td>
-                            <td>
+                            <td style="text-align:center;">
                                 <input type="checkbox" name="permissions[{{ $code }}][edit]" value="1"
                                        {{ $pEdit ? 'checked' : '' }}
+                                       data-group="{{ $groupSlug }}"
+                                       data-code="{{ $code }}"
+                                       data-action="edit"
                                        class="permission-checkbox js-perm-check">
                             </td>
-                            <td>
+                            <td style="text-align:center;">
                                 <input type="checkbox" name="permissions[{{ $code }}][delete]" value="1"
                                        {{ $pDelete ? 'checked' : '' }}
+                                       data-group="{{ $groupSlug }}"
+                                       data-code="{{ $code }}"
+                                       data-action="delete"
                                        class="permission-checkbox js-perm-check">
                             </td>
                         </tr>
+                        @endforeach
                         @endforeach
                     </tbody>
                 </table>
@@ -203,17 +231,50 @@
     document.addEventListener('DOMContentLoaded', function() {
         var btnToggle = document.getElementById('btnToggleAllPerms');
         var checkboxes = document.querySelectorAll('.js-perm-check');
-        var isAllChecked = false;
+
+        function syncToggleAllText() {
+            if (!btnToggle || checkboxes.length === 0) return;
+            var allChecked = Array.from(checkboxes).every(function(cb) { return cb.checked; });
+            btnToggle.textContent = allChecked ? 'Hapus Semua' : 'Centang Semua';
+        }
 
         if (btnToggle) {
+            syncToggleAllText();
             btnToggle.addEventListener('click', function() {
-                isAllChecked = !isAllChecked;
+                var allChecked = Array.from(checkboxes).every(function(cb) { return cb.checked; });
+                var nextState = !allChecked;
                 checkboxes.forEach(function(cb) {
-                    cb.checked = isAllChecked;
+                    cb.checked = nextState;
                 });
-                btnToggle.textContent = isAllChecked ? 'Hapus Semua' : 'Centang Semua';
+                syncToggleAllText();
             });
         }
+
+        document.querySelectorAll('.js-toggle-group').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var group = btn.getAttribute('data-group');
+                var groupCheckboxes = document.querySelectorAll('.js-perm-check[data-group="' + group + '"]');
+                var allGroupChecked = Array.from(groupCheckboxes).every(function(cb) { return cb.checked; });
+                var nextState = !allGroupChecked;
+                groupCheckboxes.forEach(function(cb) {
+                    cb.checked = nextState;
+                });
+                syncToggleAllText();
+            });
+        });
+
+        // Saat memilih Tambah/Ubah/Hapus pada suatu submenu, otomatis pastikan Lihat ikut tercentang
+        checkboxes.forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                var code = cb.getAttribute('data-code');
+                var action = cb.getAttribute('data-action');
+                if (cb.checked && action !== 'view' && code) {
+                    var viewCb = document.querySelector('.js-perm-check[data-code="' + code + '"][data-action="view"]');
+                    if (viewCb) viewCb.checked = true;
+                }
+                syncToggleAllText();
+            });
+        });
     });
 </script>
 @endsection

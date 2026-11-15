@@ -3,6 +3,7 @@
 @section('title', 'Daftar Buku')
 
 @section('header-actions')
+@if(!auth()->check() || auth()->user()->canDo('daftar_buku', 'create'))
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
     <a href="{{ route('perpustakaan.buku.create') }}" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
@@ -12,6 +13,7 @@
         <span>Tambah Buku</span>
     </a>
 </div>
+@endif
 @endsection
 
 @section('content')
@@ -169,7 +171,7 @@
                         </td>
                         <td style="text-align:center;">
                             <div class="action-btn-group">
-                                @if($item->stok_tersedia > 0)
+                                @if($item->stok_tersedia > 0 && (!auth()->check() || auth()->user()->canDo('pinjam_buku', 'create')))
                                 <a href="{{ route('perpustakaan.pinjam.create', ['buku_id' => $item->id]) }}"
                                    class="action-btn action-btn-success"
                                    title="Pinjam Buku Ini"
@@ -181,6 +183,7 @@
                                 </a>
                                 @endif
 
+                                @if(!auth()->check() || auth()->user()->canDo('daftar_buku', 'edit'))
                                 <button type="button"
                                         class="action-btn action-btn-edit"
                                         data-modal-target="modalEditBuku{{ $item->id }}"
@@ -191,7 +194,9 @@
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                     </svg>
                                 </button>
+                                @endif
 
+                                @if(!auth()->check() || auth()->user()->canDo('daftar_buku', 'delete'))
                                 <form action="{{ route('perpustakaan.buku.destroy', $item->id) }}" method="POST" style="display:inline;">
                                     @csrf
                                     @method('DELETE')
@@ -211,6 +216,7 @@
                                         </svg>
                                     </button>
                                 </form>
+                                @endif
                             </div>
 
                             {{-- Modal Edit Buku --}}

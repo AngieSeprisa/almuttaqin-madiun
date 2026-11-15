@@ -87,28 +87,47 @@ Route::middleware('auth')->group(function () {
         ->name('siswa.destroy');
 
     // Menu Data Warga (Siswa, Guru, Lulus, Mutasi)
-    Route::middleware('permission:data_warga|siswa|guru_warga|lulus_warga|mutasi_warga|guru_sekolah,view')
-        ->prefix('data-warga')
-        ->name('data-warga.')
-        ->group(function () {
-            Route::get('/guru', [DataWargaController::class, 'guru'])->name('guru');
-            Route::get('/lulus', [DataWargaController::class, 'lulus'])->name('lulus');
-            Route::post('/lulus', [DataWargaController::class, 'storeLulus'])->name('lulus.store');
-            Route::put('/lulus/{siswa}', [DataWargaController::class, 'updateLulus'])->name('lulus.update');
-            Route::get('/mutasi', [DataWargaController::class, 'mutasi'])->name('mutasi');
-            Route::post('/mutasi', [DataWargaController::class, 'storeMutasi'])->name('mutasi.store');
-            Route::put('/mutasi/{siswa}', [DataWargaController::class, 'updateMutasi'])->name('mutasi.update');
-            Route::patch('/{siswa}/kembalikan-aktif', [DataWargaController::class, 'kembalikanAktif'])->name('kembalikan-aktif');
-        });
+    Route::prefix('data-warga')->name('data-warga.')->group(function () {
+        Route::get('/guru', [DataWargaController::class, 'guru'])
+            ->middleware('permission:guru_warga,view')
+            ->name('guru');
+
+        Route::get('/lulus', [DataWargaController::class, 'lulus'])
+            ->middleware('permission:lulus_warga,view')
+            ->name('lulus');
+        Route::post('/lulus', [DataWargaController::class, 'storeLulus'])
+            ->middleware('permission:lulus_warga,create')
+            ->name('lulus.store');
+        Route::put('/lulus/{siswa}', [DataWargaController::class, 'updateLulus'])
+            ->middleware('permission:lulus_warga,edit')
+            ->name('lulus.update');
+
+        Route::get('/mutasi', [DataWargaController::class, 'mutasi'])
+            ->middleware('permission:mutasi_warga,view')
+            ->name('mutasi');
+        Route::post('/mutasi', [DataWargaController::class, 'storeMutasi'])
+            ->middleware('permission:mutasi_warga,create')
+            ->name('mutasi.store');
+        Route::put('/mutasi/{siswa}', [DataWargaController::class, 'updateMutasi'])
+            ->middleware('permission:mutasi_warga,edit')
+            ->name('mutasi.update');
+
+        Route::patch('/{siswa}/kembalikan-aktif', [DataWargaController::class, 'kembalikanAktif'])
+            ->middleware('permission:lulus_warga|mutasi_warga,edit')
+            ->name('kembalikan-aktif');
+    });
 
     // Menu Khusus Input Kartu NFC
-    Route::middleware('permission:siswa|nfc,view')->group(function () {
+    Route::middleware('permission:nfc,view')->group(function () {
         Route::get('/nfc-input', [NfcInputController::class, 'index'])->name('nfc.index');
         Route::get('/nfc-input/check-card', [NfcInputController::class, 'checkCard'])->name('nfc.check-card');
     });
 
-    Route::middleware('permission:siswa|nfc,edit')->group(function () {
+    Route::middleware('permission:nfc,create|edit')->group(function () {
         Route::post('/nfc-input/assign', [NfcInputController::class, 'assign'])->name('nfc.assign');
+    });
+
+    Route::middleware('permission:nfc,edit|delete')->group(function () {
         Route::post('/nfc-input/unpair', [NfcInputController::class, 'unpair'])->name('nfc.unpair');
     });
 
@@ -172,22 +191,22 @@ Route::middleware('auth')->group(function () {
         ->name('perizinan.sakit.destroy');
 
     // Menu Perizinan: Haid (Udzur Sholat Santriwati)
-    Route::middleware('permission:perizinan_haid|perizinan_sakit|rekap_pondok,view')->prefix('perizinan')->name('perizinan.')->group(function () {
+    Route::middleware('permission:perizinan_haid,view')->prefix('perizinan')->name('perizinan.')->group(function () {
         Route::get('/haid', [PerizinanHaidController::class, 'index'])->name('haid');
     });
 
-    Route::middleware('permission:perizinan_haid|perizinan_sakit|rekap_pondok,create')->prefix('perizinan')->name('perizinan.')->group(function () {
+    Route::middleware('permission:perizinan_haid,create')->prefix('perizinan')->name('perizinan.')->group(function () {
         Route::get('/haid/tambah', [PerizinanHaidController::class, 'create'])->name('haid.create');
         Route::post('/haid', [PerizinanHaidController::class, 'store'])->name('haid.store');
     });
 
-    Route::middleware('permission:perizinan_haid|perizinan_sakit|rekap_pondok,edit')->prefix('perizinan')->name('perizinan.')->group(function () {
+    Route::middleware('permission:perizinan_haid,edit')->prefix('perizinan')->name('perizinan.')->group(function () {
         Route::post('/haid/{id}/suci', [PerizinanHaidController::class, 'suci'])->name('haid.suci');
         Route::put('/haid/{id}', [PerizinanHaidController::class, 'update'])->name('haid.update');
     });
 
     Route::delete('/perizinan/haid/{id}', [PerizinanHaidController::class, 'destroy'])
-        ->middleware('permission:perizinan_haid|perizinan_sakit|rekap_pondok,delete')
+        ->middleware('permission:perizinan_haid,delete')
         ->name('perizinan.haid.destroy');
 
     // Menu Presensi Guru (Scan QR dari Perangkat Guru & Layar Kiosk)
@@ -200,150 +219,246 @@ Route::middleware('auth')->group(function () {
     });
 
     // Dashboard Monitoring Real-Time Multi-Lokasi (Proyektor / TV Asrama)
-    Route::get('/dashboard-presensi', [\App\Http\Controllers\PresensiDashboardController::class, 'index'])->name('dashboard-presensi');
-    Route::get('/dashboard-presensi/data', [\App\Http\Controllers\PresensiDashboardController::class, 'data'])->name('dashboard-presensi.data');
+    Route::middleware('permission:monitor_rfid,view')->group(function () {
+        Route::get('/dashboard-presensi', [\App\Http\Controllers\PresensiDashboardController::class, 'index'])->name('dashboard-presensi');
+        Route::get('/dashboard-presensi/data', [\App\Http\Controllers\PresensiDashboardController::class, 'data'])->name('dashboard-presensi.data');
+    });
 
     // Pengaturan Sesi & Perangkat Presensi RFID
-    Route::get('/pengaturan-sesi', [PengaturanSesiController::class, 'index'])->name('pengaturan.sesi');
-    Route::get('/pengaturan-sesi/create', [PengaturanSesiController::class, 'create'])->name('pengaturan.sesi.create');
-    Route::get('/pengaturan-sesi/{id}/edit', [PengaturanSesiController::class, 'edit'])->whereNumber('id')->name('pengaturan.sesi.edit');
-    Route::get('/pengaturan-sesi/last-device', [PengaturanSesiController::class, 'lastDetectedDevice'])->name('pengaturan.sesi.last-device');
-    Route::post('/pengaturan-sesi/store', [PengaturanSesiController::class, 'store'])->name('pengaturan.sesi.store');
-    Route::post('/pengaturan-sesi/bulk-delete', [PengaturanSesiController::class, 'destroyBulk'])->name('pengaturan.sesi.bulk-destroy');
-    Route::put('/pengaturan-sesi/{id}', [PengaturanSesiController::class, 'update'])->whereNumber('id')->name('pengaturan.sesi.update');
-    Route::delete('/pengaturan-sesi/{id}', [PengaturanSesiController::class, 'destroy'])->whereNumber('id')->name('pengaturan.sesi.destroy');
-    Route::post('/pengaturan-sesi/device', [PengaturanSesiController::class, 'storeDevice'])->name('pengaturan.sesi.device.store');
-    Route::put('/pengaturan-sesi/device/{id}', [PengaturanSesiController::class, 'updateDevice'])->whereNumber('id')->name('pengaturan.sesi.device.update');
-    Route::patch('/pengaturan-sesi/device/{id}/toggle', [PengaturanSesiController::class, 'toggleDevice'])->whereNumber('id')->name('pengaturan.sesi.device.toggle');
-    Route::delete('/pengaturan-sesi/device/{id}', [PengaturanSesiController::class, 'destroyDevice'])->whereNumber('id')->name('pengaturan.sesi.device.destroy');
+    Route::middleware('permission:pengaturan_sesi,view')->group(function () {
+        Route::get('/pengaturan-sesi', [PengaturanSesiController::class, 'index'])->name('pengaturan.sesi');
+        Route::get('/pengaturan-sesi/last-device', [PengaturanSesiController::class, 'lastDetectedDevice'])->name('pengaturan.sesi.last-device');
+    });
+    Route::middleware('permission:pengaturan_sesi,create')->group(function () {
+        Route::get('/pengaturan-sesi/create', [PengaturanSesiController::class, 'create'])->name('pengaturan.sesi.create');
+        Route::post('/pengaturan-sesi/store', [PengaturanSesiController::class, 'store'])->name('pengaturan.sesi.store');
+        Route::post('/pengaturan-sesi/device', [PengaturanSesiController::class, 'storeDevice'])->name('pengaturan.sesi.device.store');
+    });
+    Route::middleware('permission:pengaturan_sesi,edit')->group(function () {
+        Route::get('/pengaturan-sesi/{id}/edit', [PengaturanSesiController::class, 'edit'])->whereNumber('id')->name('pengaturan.sesi.edit');
+        Route::put('/pengaturan-sesi/{id}', [PengaturanSesiController::class, 'update'])->whereNumber('id')->name('pengaturan.sesi.update');
+        Route::put('/pengaturan-sesi/device/{id}', [PengaturanSesiController::class, 'updateDevice'])->whereNumber('id')->name('pengaturan.sesi.device.update');
+        Route::patch('/pengaturan-sesi/device/{id}/toggle', [PengaturanSesiController::class, 'toggleDevice'])->whereNumber('id')->name('pengaturan.sesi.device.toggle');
+    });
+    Route::middleware('permission:pengaturan_sesi,delete')->group(function () {
+        Route::post('/pengaturan-sesi/bulk-delete', [PengaturanSesiController::class, 'destroyBulk'])->name('pengaturan.sesi.bulk-destroy');
+        Route::delete('/pengaturan-sesi/{id}', [PengaturanSesiController::class, 'destroy'])->whereNumber('id')->name('pengaturan.sesi.destroy');
+        Route::delete('/pengaturan-sesi/device/{id}', [PengaturanSesiController::class, 'destroyDevice'])->whereNumber('id')->name('pengaturan.sesi.device.destroy');
+    });
 
     // Menu Rekap Pondok (Sholat & Pengajian)
     Route::get('/rekap-absensi/sholat', [RekapPondokController::class, 'sholat'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_sholat|pengaturan_pondok|siswa,view')
+        ->middleware('permission:rekap_sholat,view')
         ->name('rekap.sholat.index');
     Route::get('/rekap-absensi/sholat/export', [RekapPondokController::class, 'exportSholat'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_sholat|pengaturan_pondok|siswa,view')
+        ->middleware('permission:rekap_sholat,view')
         ->name('rekap.sholat.export');
 
     Route::get('/rekap-absensi/pengajian', [RekapPondokController::class, 'pengajian'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_pengajian|pengaturan_pondok|siswa,view')
+        ->middleware('permission:rekap_pengajian,view')
         ->name('rekap.pengajian.index');
     Route::get('/rekap-absensi/pengajian/export', [RekapPondokController::class, 'exportPengajian'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_pengajian|pengaturan_pondok|siswa,view')
+        ->middleware('permission:rekap_pengajian,view')
         ->name('rekap.pengajian.export');
 
     // Rute kompatibilitas rekap.pondok
     Route::get('/rekap-absensi/pondok', [RekapPondokController::class, 'index'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
+        ->middleware('permission:rekap_sholat|rekap_pengajian,view')
         ->name('rekap.pondok.index');
     Route::get('/rekap-absensi/pondok/export', [RekapPondokController::class, 'export'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|pengaturan_pondok|siswa,view')
+        ->middleware('permission:rekap_sholat|rekap_pengajian,view')
         ->name('rekap.pondok.export');
 
     // Ubah status kehadiran per sesi langsung dari modal rincian presensi
     Route::post('/rekap-absensi/update-status-sesi', [RekapPondokController::class, 'updateStatusSesi'])
-        ->middleware('permission:rekap_absensi|rekap_pondok|rekap_sholat|rekap_pengajian|pengaturan_pondok|siswa,edit')
+        ->middleware('permission:rekap_sholat|rekap_pengajian,edit')
         ->name('rekap.pondok.update-status');
 
     Route::prefix('rekap-absensi')->name('rekap-absensi.')->group(function () {
         Route::get('/sekolah', [SekolahController::class, 'rekapAbsensi'])
-            ->middleware('permission:sekolah,view')
+            ->middleware('permission:rekap_sekolah,view')
             ->name('sekolah');
         Route::get('/guru', [RekapAbsensiController::class, 'guru'])
-            ->middleware('permission:rekap_absensi,view')
+            ->middleware('permission:rekap_guru,view')
             ->name('guru');
         Route::get('/ekskul', [RekapEkskulController::class, 'index'])
-            ->middleware('permission:rekap_ekskul|rekap_absensi|sekolah,view')
+            ->middleware('permission:rekap_ekskul,view')
             ->name('ekskul');
         Route::put('/koreksi/{id}', [RekapAbsensiController::class, 'koreksi'])
-            ->middleware('permission:rekap_absensi,edit')
+            ->middleware('permission:rekap_guru,edit')
             ->name('koreksi');
         Route::get('/export', [RekapAbsensiController::class, 'export'])
-            ->middleware('permission:rekap_absensi,view')
+            ->middleware('permission:rekap_guru,view')
             ->name('export');
         Route::get('/cetak', [RekapAbsensiController::class, 'cetak'])
-            ->middleware('permission:rekap_absensi,view')
+            ->middleware('permission:rekap_guru,view')
             ->name('cetak');
     });
 
-    // Menu Sekolah (Jurnal, Rekap Jurnal, Rekap Absensi)
-    Route::middleware('permission:sekolah,view')->prefix('sekolah')->name('sekolah.')->group(function () {
-        Route::get('/jurnal', [SekolahController::class, 'jurnal'])->name('jurnal');
-        Route::post('/jurnal', [SekolahController::class, 'storeJurnal'])->name('jurnal.store');
-        Route::get('/rekap-jurnal', [SekolahController::class, 'rekapJurnal'])->name('rekap-jurnal');
-        Route::delete('/rekap-jurnal/{jurnal}', [SekolahController::class, 'destroyJurnal'])->name('jurnal.destroy');
-        Route::get('/rekap-absensi', [SekolahController::class, 'rekapAbsensi'])->name('rekap-absensi');
-        Route::get('/kelas-anggota/{kelas}', [SekolahController::class, 'getAnggotaKelas'])->name('kelas-anggota');
+    // Menu Sekolah (Jurnal, Rekap Jurnal, Rekap Absensi, Ekstrakurikuler)
+    Route::prefix('sekolah')->name('sekolah.')->group(function () {
+        Route::get('/jurnal', [SekolahController::class, 'jurnal'])
+            ->middleware('permission:sekolah_jurnal,view')
+            ->name('jurnal');
+        Route::post('/jurnal', [SekolahController::class, 'storeJurnal'])
+            ->middleware('permission:sekolah_jurnal,create|edit')
+            ->name('jurnal.store');
+        Route::get('/rekap-jurnal', [SekolahController::class, 'rekapJurnal'])
+            ->middleware('permission:sekolah_rekap_jurnal,view')
+            ->name('rekap-jurnal');
+        Route::delete('/rekap-jurnal/{jurnal}', [SekolahController::class, 'destroyJurnal'])
+            ->middleware('permission:sekolah_rekap_jurnal|sekolah_jurnal,delete')
+            ->name('jurnal.destroy');
+        Route::get('/rekap-absensi', [SekolahController::class, 'rekapAbsensi'])
+            ->middleware('permission:rekap_sekolah,view')
+            ->name('rekap-absensi');
+        Route::get('/kelas-anggota/{kelas}', [SekolahController::class, 'getAnggotaKelas'])
+            ->middleware('permission:sekolah_jurnal|sekolah_rekap_jurnal|rekap_sekolah,view')
+            ->name('kelas-anggota');
 
         // Submenu Ekstrakurikuler (Input Jurnal, Rekap Jurnal, Siswa Dynamic List)
         Route::prefix('ekskul')->name('ekskul.')->group(function () {
-            Route::get('/', [EkskulJurnalController::class, 'index'])->name('index');
-            Route::post('/', [EkskulJurnalController::class, 'store'])->name('store');
-            Route::get('/rekap-jurnal', [EkskulJurnalController::class, 'rekapJurnal'])->name('rekap-jurnal');
-            Route::get('/jurnal/{jurnalEkskul}', [EkskulJurnalController::class, 'show'])->name('jurnal.show');
-            Route::delete('/jurnal/{jurnalEkskul}', [EkskulJurnalController::class, 'destroy'])->name('jurnal.destroy');
-            Route::get('/siswa/{ekstrakurikuler}', [EkskulJurnalController::class, 'siswaByEkskul'])->name('siswa-by-ekskul');
+            Route::get('/', [EkskulJurnalController::class, 'index'])
+                ->middleware('permission:ekskul,view')
+                ->name('index');
+            Route::post('/', [EkskulJurnalController::class, 'store'])
+                ->middleware('permission:ekskul,create|edit')
+                ->name('store');
+            Route::get('/rekap-jurnal', [EkskulJurnalController::class, 'rekapJurnal'])
+                ->middleware('permission:ekskul,view')
+                ->name('rekap-jurnal');
+            Route::get('/jurnal/{jurnalEkskul}', [EkskulJurnalController::class, 'show'])
+                ->middleware('permission:ekskul,view')
+                ->name('jurnal.show');
+            Route::delete('/jurnal/{jurnalEkskul}', [EkskulJurnalController::class, 'destroy'])
+                ->middleware('permission:ekskul,delete')
+                ->name('jurnal.destroy');
+            Route::get('/siswa/{ekstrakurikuler}', [EkskulJurnalController::class, 'siswaByEkskul'])
+                ->middleware('permission:ekskul,view')
+                ->name('siswa-by-ekskul');
         });
     });
 
     // Menu Pondok (Daftar Materi, Target Pengajian, Jurnal Mengaji)
-    Route::middleware('permission:pondok|materi_pondok|target_pengajian|jurnal_mengaji|rekap_pondok|pengaturan_pondok,view')
-        ->prefix('pondok')
-        ->name('pondok.')
-        ->group(function () {
-            // 1. Daftar Materi Pondok (Al-Qur'an & Al-Hadist)
-            Route::get('/materi', [PondokPengajianController::class, 'materiIndex'])->name('materi.index');
-            Route::post('/materi', [PondokPengajianController::class, 'storeMateri'])->name('materi.store');
-            Route::post('/materi/muat-standar', [PondokPengajianController::class, 'muatStandarMateri'])->name('materi.muat-standar');
-            Route::put('/materi/{materi}', [PondokPengajianController::class, 'updateMateri'])->name('materi.update');
-            Route::delete('/materi/{materi}', [PondokPengajianController::class, 'destroyMateri'])->name('materi.destroy');
+    Route::prefix('pondok')->name('pondok.')->group(function () {
+        // 1. Daftar Materi Pondok (Al-Qur'an & Al-Hadist)
+        Route::get('/materi', [PondokPengajianController::class, 'materiIndex'])
+            ->middleware('permission:materi_pondok,view')
+            ->name('materi.index');
+        Route::post('/materi', [PondokPengajianController::class, 'storeMateri'])
+            ->middleware('permission:materi_pondok,create')
+            ->name('materi.store');
+        Route::post('/materi/muat-standar', [PondokPengajianController::class, 'muatStandarMateri'])
+            ->middleware('permission:materi_pondok,create')
+            ->name('materi.muat-standar');
+        Route::put('/materi/{materi}', [PondokPengajianController::class, 'updateMateri'])
+            ->middleware('permission:materi_pondok,edit')
+            ->name('materi.update');
+        Route::delete('/materi/{materi}', [PondokPengajianController::class, 'destroyMateri'])
+            ->middleware('permission:materi_pondok,delete')
+            ->name('materi.destroy');
 
-            // 2. Target Pengajian (Per Tanggal & Per Kelas Pengajian)
-            Route::get('/target-pengajian', [PondokPengajianController::class, 'targetIndex'])->name('target.index');
-            Route::post('/target-pengajian', [PondokPengajianController::class, 'storeTarget'])->name('target.store');
-            Route::put('/target-pengajian/{target}', [PondokPengajianController::class, 'updateTarget'])->name('target.update');
-            Route::delete('/target-pengajian/{target}', [PondokPengajianController::class, 'destroyTarget'])->name('target.destroy');
+        // 2. Target Pengajian (Per Tanggal & Per Kelas Pengajian)
+        Route::get('/target-pengajian', [PondokPengajianController::class, 'targetIndex'])
+            ->middleware('permission:target_pengajian,view')
+            ->name('target.index');
+        Route::post('/target-pengajian', [PondokPengajianController::class, 'storeTarget'])
+            ->middleware('permission:target_pengajian,create')
+            ->name('target.store');
+        Route::put('/target-pengajian/{target}', [PondokPengajianController::class, 'updateTarget'])
+            ->middleware('permission:target_pengajian,edit')
+            ->name('target.update');
+        Route::delete('/target-pengajian/{target}', [PondokPengajianController::class, 'destroyTarget'])
+            ->middleware('permission:target_pengajian,delete')
+            ->name('target.destroy');
 
-            // 3. Jurnal Mengaji & Absensi Pengajian + Rekap Jurnal
-            Route::get('/jurnal-mengaji', [PondokPengajianController::class, 'jurnalIndex'])->name('jurnal.index');
-            Route::post('/jurnal-mengaji', [PondokPengajianController::class, 'storeJurnal'])->name('jurnal.store');
-            Route::put('/jurnal-mengaji/{jurnal}', [PondokPengajianController::class, 'updateJurnal'])->name('jurnal.update');
-            Route::delete('/jurnal-mengaji/{jurnal}', [PondokPengajianController::class, 'destroyJurnal'])->name('jurnal.destroy');
-            Route::get('/rekap-jurnal', [PondokPengajianController::class, 'rekapJurnal'])->name('rekap-jurnal');
-            Route::get('/rekap-absensi', [RekapPondokController::class, 'pengajian'])->name('rekap-absensi');
-        });
+        // 3. Jurnal Mengaji & Absensi Pengajian + Rekap Jurnal
+        Route::get('/jurnal-mengaji', [PondokPengajianController::class, 'jurnalIndex'])
+            ->middleware('permission:jurnal_mengaji,view')
+            ->name('jurnal.index');
+        Route::post('/jurnal-mengaji', [PondokPengajianController::class, 'storeJurnal'])
+            ->middleware('permission:jurnal_mengaji,create')
+            ->name('jurnal.store');
+        Route::put('/jurnal-mengaji/{jurnal}', [PondokPengajianController::class, 'updateJurnal'])
+            ->middleware('permission:jurnal_mengaji,edit')
+            ->name('jurnal.update');
+        Route::delete('/jurnal-mengaji/{jurnal}', [PondokPengajianController::class, 'destroyJurnal'])
+            ->middleware('permission:jurnal_mengaji,delete')
+            ->name('jurnal.destroy');
+        Route::get('/rekap-jurnal', [PondokPengajianController::class, 'rekapJurnal'])
+            ->middleware('permission:jurnal_mengaji,view')
+            ->name('rekap-jurnal');
+        Route::get('/rekap-absensi', [RekapPondokController::class, 'pengajian'])
+            ->middleware('permission:rekap_pengajian,view')
+            ->name('rekap-absensi');
+    });
 
     // Menu Perpustakaan (Daftar Buku & Pinjam Buku)
-    Route::middleware('permission:perpustakaan|daftar_buku|pinjam_buku|pondok|sekolah,view')
-        ->prefix('perpustakaan')
-        ->name('perpustakaan.')
-        ->group(function () {
-            // 1. Daftar Buku
-            Route::get('/buku', [PerpustakaanController::class, 'bukuIndex'])->name('buku.index');
-            Route::get('/buku/create', [PerpustakaanController::class, 'createBuku'])->name('buku.create');
-            Route::get('/buku/generate-kode', [PerpustakaanController::class, 'generateKodeBuku'])->name('buku.generate-kode');
-            Route::post('/buku', [PerpustakaanController::class, 'storeBuku'])->name('buku.store');
-            Route::put('/buku/{buku}', [PerpustakaanController::class, 'updateBuku'])->name('buku.update');
-            Route::delete('/buku/{buku}', [PerpustakaanController::class, 'destroyBuku'])->name('buku.destroy');
+    Route::prefix('perpustakaan')->name('perpustakaan.')->group(function () {
+        // 1. Daftar Buku
+        Route::get('/buku', [PerpustakaanController::class, 'bukuIndex'])
+            ->middleware('permission:daftar_buku,view')
+            ->name('buku.index');
+        Route::get('/buku/create', [PerpustakaanController::class, 'createBuku'])
+            ->middleware('permission:daftar_buku,create')
+            ->name('buku.create');
+        Route::get('/buku/generate-kode', [PerpustakaanController::class, 'generateKodeBuku'])
+            ->middleware('permission:daftar_buku,create')
+            ->name('buku.generate-kode');
+        Route::post('/buku', [PerpustakaanController::class, 'storeBuku'])
+            ->middleware('permission:daftar_buku,create')
+            ->name('buku.store');
+        Route::put('/buku/{buku}', [PerpustakaanController::class, 'updateBuku'])
+            ->middleware('permission:daftar_buku,edit')
+            ->name('buku.update');
+        Route::delete('/buku/{buku}', [PerpustakaanController::class, 'destroyBuku'])
+            ->middleware('permission:daftar_buku,delete')
+            ->name('buku.destroy');
 
-            // 2. Pinjam Buku
-            Route::get('/pinjam', [PerpustakaanController::class, 'pinjamIndex'])->name('pinjam.index');
-            Route::get('/pinjam/create', [PerpustakaanController::class, 'createPinjam'])->name('pinjam.create');
-            Route::post('/pinjam', [PerpustakaanController::class, 'storePinjam'])->name('pinjam.store');
-            Route::patch('/pinjam/{pinjam}/kembali', [PerpustakaanController::class, 'kembalikanPinjam'])->name('pinjam.kembali');
-            Route::put('/pinjam/{pinjam}', [PerpustakaanController::class, 'updatePinjam'])->name('pinjam.update');
-            Route::delete('/pinjam/{pinjam}', [PerpustakaanController::class, 'destroyPinjam'])->name('pinjam.destroy');
-        });
+        // 2. Pinjam Buku
+        Route::get('/pinjam', [PerpustakaanController::class, 'pinjamIndex'])
+            ->middleware('permission:pinjam_buku,view')
+            ->name('pinjam.index');
+        Route::get('/pinjam/create', [PerpustakaanController::class, 'createPinjam'])
+            ->middleware('permission:pinjam_buku,create')
+            ->name('pinjam.create');
+        Route::post('/pinjam', [PerpustakaanController::class, 'storePinjam'])
+            ->middleware('permission:pinjam_buku,create')
+            ->name('pinjam.store');
+        Route::patch('/pinjam/{pinjam}/kembali', [PerpustakaanController::class, 'kembalikanPinjam'])
+            ->middleware('permission:pinjam_buku,edit')
+            ->name('pinjam.kembali');
+        Route::put('/pinjam/{pinjam}', [PerpustakaanController::class, 'updatePinjam'])
+            ->middleware('permission:pinjam_buku,edit')
+            ->name('pinjam.update');
+        Route::delete('/pinjam/{pinjam}', [PerpustakaanController::class, 'destroyPinjam'])
+            ->middleware('permission:pinjam_buku,delete')
+            ->name('pinjam.destroy');
+    });
 
     // Menu Jadwal Pelajaran Multi-Jenjang (SMP & SMA)
-    Route::middleware('permission:jadwal_pelajaran|sekolah,view')->prefix('jadwal-pelajaran')->name('jadwal-pelajaran.')->group(function () {
-        Route::get('/', [JadwalPelajaranController::class, 'index'])->name('index');
-        Route::get('/saya', [JadwalPelajaranController::class, 'saya'])->name('saya');
-        Route::post('/saya', [JadwalPelajaranController::class, 'storeSaya'])->name('saya.store');
-        Route::delete('/{id}', [JadwalPelajaranController::class, 'destroy'])->name('destroy');
-        Route::post('/toggle-lock', [JadwalPelajaranController::class, 'toggleLock'])->name('toggle-lock');
-        Route::get('/cetak', [JadwalPelajaranController::class, 'cetak'])->name('cetak');
-        Route::get('/ajax/classes-and-subjects', [JadwalPelajaranController::class, 'ajaxClassesAndSubjects'])->name('ajax-classes-subjects');
+    Route::prefix('jadwal-pelajaran')->name('jadwal-pelajaran.')->group(function () {
+        Route::get('/', [JadwalPelajaranController::class, 'index'])
+            ->middleware('permission:jadwal_pelajaran,view')
+            ->name('index');
+        Route::get('/saya', [JadwalPelajaranController::class, 'saya'])
+            ->middleware('permission:jadwal_saya,view')
+            ->name('saya');
+        Route::post('/saya', [JadwalPelajaranController::class, 'storeSaya'])
+            ->middleware('permission:jadwal_saya|jadwal_pelajaran,create|edit')
+            ->name('saya.store');
+        Route::delete('/{id}', [JadwalPelajaranController::class, 'destroy'])
+            ->middleware('permission:jadwal_saya|jadwal_pelajaran,delete')
+            ->name('destroy');
+        Route::post('/toggle-lock', [JadwalPelajaranController::class, 'toggleLock'])
+            ->middleware('permission:jadwal_pelajaran,edit')
+            ->name('toggle-lock');
+        Route::get('/cetak', [JadwalPelajaranController::class, 'cetak'])
+            ->middleware('permission:jadwal_pelajaran,view')
+            ->name('cetak');
+        Route::get('/ajax/classes-and-subjects', [JadwalPelajaranController::class, 'ajaxClassesAndSubjects'])
+            ->middleware('permission:jadwal_saya|jadwal_pelajaran,view')
+            ->name('ajax-classes-subjects');
     });
 
     // Menu Pengaturan Sekolah: Absensi Guru
@@ -440,35 +555,35 @@ Route::middleware('auth')->group(function () {
     // Menu Pengaturan Sekolah: Plotting Ekstrakurikuler & Kelola Ekstrakurikuler
     Route::prefix('plotting-ekskul')->name('plotting-ekskul.')->group(function () {
         Route::get('/', [PlottingEkskulController::class, 'index'])
-            ->middleware('permission:plotting_ekskul|sekolah,view')
+            ->middleware('permission:plotting_ekskul,view')
             ->name('index');
         Route::post('/ekskul', [PlottingEkskulController::class, 'storeEkskul'])
-            ->middleware('permission:plotting_ekskul|sekolah,create')
+            ->middleware('permission:plotting_ekskul,create')
             ->name('store-ekskul');
         Route::put('/ekskul/{ekstrakurikuler}', [PlottingEkskulController::class, 'updateEkskul'])
-            ->middleware('permission:plotting_ekskul|sekolah,edit')
+            ->middleware('permission:plotting_ekskul,edit')
             ->name('update-ekskul');
         Route::delete('/ekskul/{ekstrakurikuler}', [PlottingEkskulController::class, 'destroyEkskul'])
-            ->middleware('permission:plotting_ekskul|sekolah,delete')
+            ->middleware('permission:plotting_ekskul,delete')
             ->name('destroy-ekskul');
         Route::post('/ekskul-bulk-delete', [PlottingEkskulController::class, 'destroyBulkEkskul'])
-            ->middleware('permission:plotting_ekskul|sekolah,delete')
+            ->middleware('permission:plotting_ekskul,delete')
             ->name('destroy-bulk-ekskul');
         Route::get('/anggota/{ekstrakurikuler}', [PlottingEkskulController::class, 'anggota'])
-            ->middleware('permission:plotting_ekskul|sekolah,view')
+            ->middleware('permission:plotting_ekskul,view')
             ->name('anggota');
         Route::post('/tambah-anggota', [PlottingEkskulController::class, 'tambahAnggota'])
-            ->middleware('permission:plotting_ekskul|sekolah,edit')
+            ->middleware('permission:plotting_ekskul,edit')
             ->name('tambah-anggota');
         Route::post('/hapus-anggota', [PlottingEkskulController::class, 'hapusAnggota'])
-            ->middleware('permission:plotting_ekskul|sekolah,edit')
+            ->middleware('permission:plotting_ekskul,edit')
             ->name('hapus-anggota');
     });
 
     // Menu Pengaturan Pondok: Plotting Kamar & Kelola Kamar Asrama
     Route::prefix('plotting-kamar')->name('plotting-kamar.')->group(function () {
         Route::get('/', [PlottingKamarController::class, 'index'])
-            ->middleware('permission:plotting_kamar|pengaturan_pondok,view')
+            ->middleware('permission:plotting_kamar,view')
             ->name('index');
         Route::post('/kamar', [PlottingKamarController::class, 'storeKamar'])
             ->middleware('permission:plotting_kamar,create')
@@ -492,38 +607,38 @@ Route::middleware('auth')->group(function () {
             ->middleware('permission:plotting_kamar,edit')
             ->name('unassign');
         Route::get('/anggota/{kamar}', [PlottingKamarController::class, 'anggota'])
-            ->middleware('permission:plotting_kamar|pengaturan_pondok,view')
+            ->middleware('permission:plotting_kamar,view')
             ->name('anggota');
     });
 
     // Menu Pengaturan Pondok: Plotting Kelas Pengajian
     Route::prefix('plotting-pengajian')->name('plotting-pengajian.')->group(function () {
         Route::get('/', [PlottingKelasPengajianController::class, 'index'])
-            ->middleware('permission:plotting_pengajian|plotting_kamar|pengaturan_pondok,view')
+            ->middleware('permission:plotting_pengajian,view')
             ->name('index');
         Route::post('/kelas', [PlottingKelasPengajianController::class, 'storeKelas'])
-            ->middleware('permission:plotting_pengajian|plotting_kamar,create')
+            ->middleware('permission:plotting_pengajian,create')
             ->name('store-kelas');
         Route::put('/kelas/{kelas}', [PlottingKelasPengajianController::class, 'updateKelas'])
-            ->middleware('permission:plotting_pengajian|plotting_kamar,edit')
+            ->middleware('permission:plotting_pengajian,edit')
             ->name('update-kelas');
         Route::delete('/kelas/{kelas}', [PlottingKelasPengajianController::class, 'destroyKelas'])
-            ->middleware('permission:plotting_pengajian|plotting_kamar,delete')
+            ->middleware('permission:plotting_pengajian,delete')
             ->name('destroy-kelas');
         Route::post('/kelas-bulk-delete', [PlottingKelasPengajianController::class, 'destroyBulkKelas'])
-            ->middleware('permission:plotting_pengajian|plotting_kamar,delete')
+            ->middleware('permission:plotting_pengajian,delete')
             ->name('destroy-bulk-kelas');
         Route::post('/muat-standar', [PlottingKelasPengajianController::class, 'muatStandar'])
-            ->middleware('permission:plotting_pengajian|plotting_kamar,create')
+            ->middleware('permission:plotting_pengajian,create')
             ->name('muat-standar');
         Route::post('/mutasi', [PlottingKelasPengajianController::class, 'mutasi'])
-            ->middleware('permission:plotting_pengajian|plotting_kamar,edit')
+            ->middleware('permission:plotting_pengajian,edit')
             ->name('mutasi');
         Route::post('/unassign', [PlottingKelasPengajianController::class, 'unassign'])
-            ->middleware('permission:plotting_pengajian|plotting_kamar,edit')
+            ->middleware('permission:plotting_pengajian,edit')
             ->name('unassign');
         Route::get('/anggota/{kelas}', [PlottingKelasPengajianController::class, 'anggota'])
-            ->middleware('permission:plotting_pengajian|plotting_kamar|pengaturan_pondok,view')
+            ->middleware('permission:plotting_pengajian,view')
             ->name('anggota');
     });
 
@@ -565,65 +680,75 @@ Route::middleware('auth')->group(function () {
         Route::prefix('kelas')->name('kelas.')->group(function () {
             Route::get('/', function () {
                 return redirect()->route('plotting-kelas.index');
-            })->name('index');
-            Route::post('/', [PlottingKelasController::class, 'storeKelas'])->name('store');
-            Route::put('/{classroom}', [PlottingKelasController::class, 'updateKelas'])->name('update');
-            Route::patch('/{classroom}/toggle-status', [ClassroomController::class, 'toggleStatus'])->name('toggle-status');
-            Route::delete('/{classroom}', [PlottingKelasController::class, 'destroyKelas'])->name('destroy');
-            Route::post('/muat-standar', [PlottingKelasController::class, 'muatStandar'])->name('muat-standar');
+            })->middleware('permission:plotting_kelas,view')->name('index');
+            Route::post('/', [PlottingKelasController::class, 'storeKelas'])
+                ->middleware('permission:plotting_kelas,create')
+                ->name('store');
+            Route::put('/{classroom}', [PlottingKelasController::class, 'updateKelas'])
+                ->middleware('permission:plotting_kelas,edit')
+                ->name('update');
+            Route::patch('/{classroom}/toggle-status', [ClassroomController::class, 'toggleStatus'])
+                ->middleware('permission:plotting_kelas,edit')
+                ->name('toggle-status');
+            Route::delete('/{classroom}', [PlottingKelasController::class, 'destroyKelas'])
+                ->middleware('permission:plotting_kelas,delete')
+                ->name('destroy');
+            Route::post('/muat-standar', [PlottingKelasController::class, 'muatStandar'])
+                ->middleware('permission:plotting_kelas,create')
+                ->name('muat-standar');
         });
 
         // Master Jam Pelajaran / Time Slot
         Route::prefix('jam-pelajaran')->name('jam-pelajaran.')->group(function () {
             Route::get('/', [TimeSlotController::class, 'index'])
-                ->middleware('permission:master_jam|data_master,view')
+                ->middleware('permission:master_jam,view')
                 ->name('index');
             Route::post('/', [TimeSlotController::class, 'store'])
-                ->middleware('permission:master_jam|data_master,create')
+                ->middleware('permission:master_jam,create')
                 ->name('store');
             Route::put('/{jamPelajaran}', [TimeSlotController::class, 'update'])
-                ->middleware('permission:master_jam|data_master,edit')
+                ->middleware('permission:master_jam,edit')
                 ->name('update');
             Route::patch('/{jamPelajaran}/toggle-status', [TimeSlotController::class, 'toggleStatus'])
-                ->middleware('permission:master_jam|data_master,edit')
+                ->middleware('permission:master_jam,edit')
                 ->name('toggle-status');
             Route::delete('/{jamPelajaran}', [TimeSlotController::class, 'destroy'])
-                ->middleware('permission:master_jam|data_master,delete')
+                ->middleware('permission:master_jam,delete')
                 ->name('destroy');
             Route::post('/muat-standar', [TimeSlotController::class, 'muatStandar'])
-                ->middleware('permission:master_jam|data_master,create')
+                ->middleware('permission:master_jam,create')
                 ->name('muat-standar');
         });
 
         // Master Lembaga Pendidikan
         Route::prefix('lembaga')->name('lembaga.')->group(function () {
             Route::get('/', [LembagaController::class, 'index'])
-                ->middleware('permission:master_lembaga|data_master,view')
+                ->middleware('permission:master_lembaga,view')
                 ->name('index');
             Route::post('/', [LembagaController::class, 'store'])
-                ->middleware('permission:master_lembaga|data_master,create')
+                ->middleware('permission:master_lembaga,create')
                 ->name('store');
             Route::put('/{lembaga}', [LembagaController::class, 'update'])
-                ->middleware('permission:master_lembaga|data_master,edit')
+                ->middleware('permission:master_lembaga,edit')
                 ->name('update');
             Route::patch('/{lembaga}/toggle-status', [LembagaController::class, 'toggleStatus'])
-                ->middleware('permission:master_lembaga|data_master,edit')
+                ->middleware('permission:master_lembaga,edit')
                 ->name('toggle-status');
             Route::delete('/{lembaga}', [LembagaController::class, 'destroy'])
-                ->middleware('permission:master_lembaga|data_master,delete')
+                ->middleware('permission:master_lembaga,delete')
                 ->name('destroy');
         });
 
         // Master Import Data Siswa
         Route::prefix('import-siswa')->name('import-siswa.')->group(function () {
             Route::get('/', [ImportSiswaController::class, 'index'])
-                ->middleware('permission:master_import_siswa|data_master,view')
+                ->middleware('permission:master_import_siswa,view')
                 ->name('index');
             Route::get('/template', [ImportSiswaController::class, 'downloadTemplate'])
-                ->middleware('permission:master_import_siswa|data_master,view')
+                ->middleware('permission:master_import_siswa,view')
                 ->name('template');
             Route::post('/', [ImportSiswaController::class, 'import'])
-                ->middleware('permission:master_import_siswa|data_master,create')
+                ->middleware('permission:master_import_siswa,create')
                 ->name('store');
         });
     });

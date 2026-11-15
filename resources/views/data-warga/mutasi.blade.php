@@ -3,7 +3,7 @@
 @section('title', 'Mutasi')
 
 @section('header-actions')
-@if(!auth()->check() || auth()->user()->canDo('siswa', 'edit') || auth()->user()->canDo('data_warga', 'create'))
+@if(!auth()->check() || auth()->user()->canDo('mutasi_warga', 'create'))
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
     <button type="button" class="btn btn-primary" data-modal-target="modalTambahMutasi">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
@@ -158,6 +158,7 @@
                                     </svg>
                                 </a>
 
+                                @if(!auth()->check() || auth()->user()->canDo('mutasi_warga', 'edit'))
                                 <button type="button"
                                         class="action-btn action-btn-edit"
                                         data-modal-target="modalEditMutasi{{ $item->id }}"
@@ -186,6 +187,7 @@
                                         </svg>
                                     </button>
                                 </form>
+                                @endif
                             </div>
 
                             {{-- Modal Edit Mutasi --}}

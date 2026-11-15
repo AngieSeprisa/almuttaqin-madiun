@@ -24,11 +24,14 @@ class CheckPermission
         $user = Auth::user();
 
         $menus = preg_split('/[,|]/', $menuCode);
+        $actions = preg_split('/[,|]/', $action);
         $allowed = false;
         foreach ($menus as $m) {
-            if ($user->canDo(trim($m), $action)) {
-                $allowed = true;
-                break;
+            foreach ($actions as $act) {
+                if ($user->canDo(trim($m), trim($act))) {
+                    $allowed = true;
+                    break 2;
+                }
             }
         }
 

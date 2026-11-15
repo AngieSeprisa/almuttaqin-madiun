@@ -13,30 +13,86 @@ use Illuminate\Validation\Rule;
 class UserController extends Controller
 {
     /**
-     * Daftar menu sistem yang dapat diatur hak aksesnya
+     * Daftar grup menu dan submenu sistem yang dapat diatur hak aksesnya
+     */
+    public static function systemMenuGroups(): array
+    {
+        return [
+            'Data Warga' => [
+                'siswa'        => 'Siswa',
+                'guru_warga'   => 'Guru',
+                'lulus_warga'  => 'Lulus',
+                'mutasi_warga' => 'Mutasi',
+            ],
+            'Input NFC' => [
+                'nfc' => 'Input NFC',
+            ],
+            'Sekolah' => [
+                'sekolah_jurnal'       => 'Jurnal',
+                'sekolah_rekap_jurnal' => 'Rekap Jurnal',
+                'ekskul'               => 'Ekstrakurikuler',
+                'jadwal_pelajaran'     => 'Jadwal Pelajaran',
+                'jadwal_saya'          => 'Jadwal Mengajar Saya',
+            ],
+            'Pondok' => [
+                'materi_pondok'    => 'Daftar Materi',
+                'target_pengajian' => 'Target Pengajian',
+                'jurnal_mengaji'   => 'Jurnal Mengaji',
+            ],
+            'Perpustakaan' => [
+                'daftar_buku' => 'Daftar Buku',
+                'pinjam_buku' => 'Pinjam Buku',
+            ],
+            'Perizinan' => [
+                'perizinan_sambang' => 'Sambang',
+                'perizinan_sakit'   => 'Sakit',
+                'perizinan_haid'    => 'Haid',
+            ],
+            'Pendaftaran' => [
+                'pendaftaran' => 'Pendaftaran',
+            ],
+            'Rekap' => [
+                'rekap_sholat'    => 'Sholat',
+                'rekap_pengajian' => 'Pengajian',
+                'rekap_sekolah'   => 'Sekolah',
+                'rekap_guru'      => 'Guru',
+                'rekap_ekskul'    => 'Ekstrakurikuler',
+            ],
+            'Data Master' => [
+                'master_jam'          => 'Jam Pelajaran',
+                'master_lembaga'      => 'Lembaga',
+                'master_import_siswa' => 'Import Siswa',
+            ],
+            'Pengaturan Sekolah' => [
+                'pengaturan_sesi' => 'Sesi Presensi RFID',
+                'monitor_rfid'    => 'Monitor Live RFID',
+                'guru_sekolah'    => 'Guru Sekolah',
+                'plotting_mapel'  => 'Plotting Mata Pelajaran',
+                'plotting_kelas'  => 'Plotting Kelas',
+                'plotting_ekskul' => 'Ekstrakurikuler',
+            ],
+            'Pengaturan Pondok' => [
+                'plotting_kamar'     => 'Plotting Kamar',
+                'plotting_pengajian' => 'Plotting Pengajian',
+            ],
+            'Pengguna & Akses' => [
+                'pengguna' => 'Pengguna & Akses',
+            ],
+        ];
+    }
+
+    /**
+     * Daftar menu sistem (flat) yang dapat diatur hak aksesnya
      */
     public static function systemMenus(): array
     {
-        return [
-            'siswa'              => 'Data Warga: Siswa, Guru, Lulus & Mutasi',
-            'pendaftaran'        => 'Pendaftaran Baru',
-            'perizinan_sambang'  => 'Perizinan Sambang',
-            'perizinan_sakit'    => 'Perizinan Sakit',
-            'presensi'           => 'Presensi Guru (Scan QR)',
-            'rekap_absensi'      => 'Rekap Absensi',
-            'sekolah'            => 'Sekolah (Jurnal & Absensi)',
-            'pondok'             => 'Pondok (Daftar Materi, Target Pengajian & Jurnal Mengaji)',
-            'perpustakaan'       => 'Perpustakaan (Daftar Buku & Pinjam Buku)',
-            'pengaturan_absensi' => 'Pengaturan Absensi Guru',
-            'guru_sekolah'       => 'Guru Sekolah (Pengelolaan & Approval Mapel)',
-            'plotting_mapel'     => 'Plotting Mata Pelajaran',
-            'plotting_kelas'     => 'Plotting Kelas',
-            'plotting_kamar'     => 'Plotting Kamar Santri (Pondok)',
-            'master_kelas'       => 'Master Ruang Kelas',
-            'master_jam'         => 'Master Jam Pelajaran (Time Slot)',
-            'master_lembaga'     => 'Master Lembaga Pendidikan',
-            'pengguna'           => 'Pengguna & Hak Akses',
-        ];
+        $flat = [];
+        foreach (self::systemMenuGroups() as $groupName => $items) {
+            foreach ($items as $code => $label) {
+                $flat[$code] = $groupName === $label ? $label : $groupName . ' - ' . $label;
+            }
+        }
+        return $flat;
     }
 
 
@@ -79,8 +135,9 @@ class UserController extends Controller
     {
         $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
         $menus = self::systemMenus();
+        $menuGroups = self::systemMenuGroups();
 
-        return view('pengguna.create', compact('lembagas', 'menus'));
+        return view('pengguna.create', compact('lembagas', 'menus', 'menuGroups'));
     }
 
     /**
@@ -157,8 +214,9 @@ class UserController extends Controller
         $pengguna->load(['lembagas', 'permissions']);
         $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
         $menus = self::systemMenus();
+        $menuGroups = self::systemMenuGroups();
 
-        // Siapkan permission map
+        // Siapkan permission map untuk seluruh kode menu granular
         $userPerms = [];
         foreach ($pengguna->permissions as $perm) {
             $userPerms[$perm->menu_code] = [
@@ -169,7 +227,18 @@ class UserController extends Controller
             ];
         }
 
-        return view('pengguna.edit', compact('pengguna', 'lembagas', 'menus', 'userPerms'));
+        foreach ($menus as $code => $label) {
+            if (!array_key_exists($code, $userPerms)) {
+                $userPerms[$code] = [
+                    'view'   => $pengguna->canDo($code, 'view'),
+                    'create' => $pengguna->canDo($code, 'create'),
+                    'edit'   => $pengguna->canDo($code, 'edit'),
+                    'delete' => $pengguna->canDo($code, 'delete'),
+                ];
+            }
+        }
+
+        return view('pengguna.edit', compact('pengguna', 'lembagas', 'menus', 'menuGroups', 'userPerms'));
     }
 
     /**
@@ -276,22 +345,70 @@ class UserController extends Controller
     private function savePermissions(User $user, array $permissionsInput): void
     {
         $menus = self::systemMenus();
+        $legacyFallbackMap = User::legacyParentPermissionMap();
+
+        $savedStates = [];
 
         foreach ($menus as $menuCode => $label) {
-            $input = $permissionsInput[$menuCode] ?? [];
+            if (array_key_exists($menuCode, $permissionsInput)) {
+                $input = $permissionsInput[$menuCode] ?? [];
+            } elseif (isset($legacyFallbackMap[$menuCode]) && array_key_exists($legacyFallbackMap[$menuCode], $permissionsInput)) {
+                $input = $permissionsInput[$legacyFallbackMap[$menuCode]] ?? [];
+            } else {
+                $input = [];
+            }
+
+            $state = [
+                'can_view'   => !empty($input['view']),
+                'can_create' => !empty($input['create']),
+                'can_edit'   => !empty($input['edit']),
+                'can_delete' => !empty($input['delete']),
+            ];
+
+            $savedStates[$menuCode] = $state;
 
             UserPermission::updateOrCreate(
                 [
                     'user_id'   => $user->id,
                     'menu_code' => $menuCode,
                 ],
-                [
-                    'can_view'   => !empty($input['view']),
-                    'can_create' => !empty($input['create']),
-                    'can_edit'   => !empty($input['edit']),
-                    'can_delete' => !empty($input['delete']),
-                ]
+                $state
             );
         }
+
+        // Sinkronisasi kode grup / parent agar tetap selaras dengan pilihan submenu
+        foreach (User::groupPermissionChildrenMap() as $groupCode => $childCodes) {
+            $groupState = [
+                'can_view'   => false,
+                'can_create' => false,
+                'can_edit'   => false,
+                'can_delete' => false,
+            ];
+
+            foreach ($childCodes as $childCode) {
+                if (!empty($savedStates[$childCode]['can_view'])) {
+                    $groupState['can_view'] = true;
+                }
+                if (!empty($savedStates[$childCode]['can_create'])) {
+                    $groupState['can_create'] = true;
+                }
+                if (!empty($savedStates[$childCode]['can_edit'])) {
+                    $groupState['can_edit'] = true;
+                }
+                if (!empty($savedStates[$childCode]['can_delete'])) {
+                    $groupState['can_delete'] = true;
+                }
+            }
+
+            UserPermission::updateOrCreate(
+                [
+                    'user_id'   => $user->id,
+                    'menu_code' => $groupCode,
+                ],
+                $groupState
+            );
+        }
+
+        $user->unsetRelation('permissions');
     }
 }

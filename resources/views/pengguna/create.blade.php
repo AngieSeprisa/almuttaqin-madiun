@@ -98,12 +98,12 @@
             <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-light);">
                 <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:13.5px; font-weight:500;">
                     <input type="checkbox" name="is_active" value="1" {{ old('is_active', '1') == '1' ? 'checked' : '' }} style="accent-color:var(--electric-blue); width:16px; height:16px;">
-                    Akun Aktif (Dapat masuk ke sistem)
+                    Akun Aktif
                 </label>
             </div>
         </div>
 
-        {{-- Seksi Unit Lembaga (Ruang Kerja) --}}
+        {{-- Seksi Unit Lembaga --}}
         <div class="form-section-card">
             <div class="form-section-header">
                 <div class="form-section-icon">
@@ -113,7 +113,7 @@
                     </svg>
                 </div>
                 <div class="form-section-title-wrap">
-                    <h2 class="form-section-title">Akses Ruang Kerja (Lembaga)</h2>
+                    <h2 class="form-section-title">Akses Ruang Kerja</h2>
                 </div>
             </div>
 
@@ -160,38 +160,68 @@
                 <table class="permission-table">
                     <thead>
                         <tr>
-                            <th style="width:36%;">Menu</th>
-                            <th>Lihat (View)</th>
-                            <th>Tambah (Create)</th>
-                            <th>Ubah (Edit)</th>
-                            <th>Hapus (Delete)</th>
+                            <th style="width:40%;">Menu</th>
+                            <th style="text-align:center;">Lihat</th>
+                            <th style="text-align:center;">Tambah</th>
+                            <th style="text-align:center;">Ubah</th>
+                            <th style="text-align:center;">Hapus</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($menus as $code => $label)
+                        @php
+                            $groupsToRender = $menuGroups ?? ['Menu' => $menus];
+                        @endphp
+                        @foreach($groupsToRender as $groupName => $groupItems)
+                        <tr style="background:var(--bg-page);">
+                            <td colspan="4" style="font-weight:700; font-size:12.5px; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em; padding:10px 14px;">
+                                {{ $groupName }}
+                            </td>
+                            <td style="text-align:center; padding:8px 14px;">
+                                <button type="button" class="btn btn-sm btn-secondary js-toggle-group" data-group="{{ \Illuminate\Support\Str::slug($groupName) }}" style="font-size:11px; padding:3px 10px;">
+                                    Pilih Grup
+                                </button>
+                            </td>
+                        </tr>
+                        @foreach($groupItems as $code => $label)
+                        @php
+                            $groupSlug = \Illuminate\Support\Str::slug($groupName);
+                        @endphp
                         <tr>
-                            <td>{{ $label }}</td>
-                            <td>
+                            <td style="padding-left:26px; font-weight:500;">{{ $label }}</td>
+                            <td style="text-align:center;">
                                 <input type="checkbox" name="permissions[{{ $code }}][view]" value="1" 
                                        {{ old("permissions.{$code}.view") ? 'checked' : '' }}
+                                       data-group="{{ $groupSlug }}"
+                                       data-code="{{ $code }}"
+                                       data-action="view"
                                        class="permission-checkbox js-perm-check">
                             </td>
-                            <td>
+                            <td style="text-align:center;">
                                 <input type="checkbox" name="permissions[{{ $code }}][create]" value="1"
                                        {{ old("permissions.{$code}.create") ? 'checked' : '' }}
+                                       data-group="{{ $groupSlug }}"
+                                       data-code="{{ $code }}"
+                                       data-action="create"
                                        class="permission-checkbox js-perm-check">
                             </td>
-                            <td>
+                            <td style="text-align:center;">
                                 <input type="checkbox" name="permissions[{{ $code }}][edit]" value="1"
                                        {{ old("permissions.{$code}.edit") ? 'checked' : '' }}
+                                       data-group="{{ $groupSlug }}"
+                                       data-code="{{ $code }}"
+                                       data-action="edit"
                                        class="permission-checkbox js-perm-check">
                             </td>
-                            <td>
+                            <td style="text-align:center;">
                                 <input type="checkbox" name="permissions[{{ $code }}][delete]" value="1"
                                        {{ old("permissions.{$code}.delete") ? 'checked' : '' }}
+                                       data-group="{{ $groupSlug }}"
+                                       data-code="{{ $code }}"
+                                       data-action="delete"
                                        class="permission-checkbox js-perm-check">
                             </td>
                         </tr>
+                        @endforeach
                         @endforeach
                     </tbody>
                 </table>
@@ -230,17 +260,64 @@
         const perms = {
             guru: {
                 siswa: ['view'],
-                pendaftaran: [],
+                guru_warga: ['view'],
+                lulus_warga: ['view'],
+                mutasi_warga: ['view'],
+                sekolah_jurnal: ['view', 'create', 'edit'],
+                sekolah_rekap_jurnal: ['view'],
+                ekskul: ['view', 'create', 'edit'],
+                jadwal_pelajaran: ['view'],
+                jadwal_saya: ['view', 'create', 'edit', 'delete'],
+                materi_pondok: ['view'],
+                target_pengajian: ['view', 'create', 'edit'],
+                jurnal_mengaji: ['view', 'create', 'edit'],
+                daftar_buku: ['view'],
+                pinjam_buku: ['view', 'create', 'edit'],
                 perizinan_sambang: ['view', 'create', 'edit'],
                 perizinan_sakit: ['view', 'create', 'edit'],
-                pengguna: []
+                perizinan_haid: ['view', 'create', 'edit'],
+                rekap_sholat: ['view'],
+                rekap_pengajian: ['view'],
+                rekap_sekolah: ['view'],
+                rekap_guru: ['view'],
+                rekap_ekskul: ['view']
             },
             admin: {
-                siswa: ['view', 'create', 'edit'],
+                siswa: ['view', 'create', 'edit', 'delete'],
+                guru_warga: ['view'],
+                lulus_warga: ['view', 'create', 'edit'],
+                mutasi_warga: ['view', 'create', 'edit'],
+                nfc: ['view', 'create', 'edit'],
+                sekolah_jurnal: ['view', 'create', 'edit', 'delete'],
+                sekolah_rekap_jurnal: ['view', 'delete'],
+                ekskul: ['view', 'create', 'edit', 'delete'],
+                jadwal_pelajaran: ['view', 'create', 'edit', 'delete'],
+                jadwal_saya: ['view', 'create', 'edit', 'delete'],
+                materi_pondok: ['view', 'create', 'edit', 'delete'],
+                target_pengajian: ['view', 'create', 'edit', 'delete'],
+                jurnal_mengaji: ['view', 'create', 'edit', 'delete'],
+                daftar_buku: ['view', 'create', 'edit', 'delete'],
+                pinjam_buku: ['view', 'create', 'edit', 'delete'],
+                perizinan_sambang: ['view', 'create', 'edit', 'delete'],
+                perizinan_sakit: ['view', 'create', 'edit', 'delete'],
+                perizinan_haid: ['view', 'create', 'edit', 'delete'],
                 pendaftaran: ['view', 'create', 'edit'],
-                perizinan_sambang: ['view', 'create', 'edit'],
-                perizinan_sakit: ['view', 'create', 'edit'],
-                pengguna: ['view']
+                rekap_sholat: ['view', 'edit'],
+                rekap_pengajian: ['view', 'edit'],
+                rekap_sekolah: ['view'],
+                rekap_guru: ['view', 'edit'],
+                rekap_ekskul: ['view'],
+                master_jam: ['view', 'create', 'edit', 'delete'],
+                master_lembaga: ['view'],
+                master_import_siswa: ['view', 'create'],
+                pengaturan_sesi: ['view', 'create', 'edit', 'delete'],
+                monitor_rfid: ['view'],
+                guru_sekolah: ['view', 'create', 'edit', 'delete'],
+                plotting_mapel: ['view', 'create', 'edit', 'delete'],
+                plotting_kelas: ['view', 'create', 'edit', 'delete'],
+                plotting_ekskul: ['view', 'create', 'edit', 'delete'],
+                plotting_kamar: ['view', 'create', 'edit', 'delete'],
+                plotting_pengajian: ['view', 'create', 'edit', 'delete']
             }
         };
 
@@ -271,19 +348,50 @@
     document.addEventListener('DOMContentLoaded', function() {
         var btnToggle = document.getElementById('btnToggleAllPerms');
         var checkboxes = document.querySelectorAll('.js-perm-check');
-        var isAllChecked = false;
+
+        function syncToggleAllText() {
+            if (!btnToggle || checkboxes.length === 0) return;
+            var allChecked = Array.from(checkboxes).every(function(cb) { return cb.checked; });
+            btnToggle.textContent = allChecked ? 'Hapus Semua' : 'Centang Semua';
+        }
 
         if (btnToggle) {
+            syncToggleAllText();
             btnToggle.addEventListener('click', function() {
-                isAllChecked = !isAllChecked;
+                var allChecked = Array.from(checkboxes).every(function(cb) { return cb.checked; });
+                var nextState = !allChecked;
                 checkboxes.forEach(function(cb) {
-                    cb.checked = isAllChecked;
+                    cb.checked = nextState;
                 });
-                btnToggle.textContent = isAllChecked ? 'Hapus Semua' : 'Centang Semua';
+                syncToggleAllText();
             });
         }
 
-        // Auto apply guru preset on first load if creating new user
+        document.querySelectorAll('.js-toggle-group').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var group = btn.getAttribute('data-group');
+                var groupCheckboxes = document.querySelectorAll('.js-perm-check[data-group="' + group + '"]');
+                var allGroupChecked = Array.from(groupCheckboxes).every(function(cb) { return cb.checked; });
+                var nextState = !allGroupChecked;
+                groupCheckboxes.forEach(function(cb) {
+                    cb.checked = nextState;
+                });
+                syncToggleAllText();
+            });
+        });
+
+        checkboxes.forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                var code = cb.getAttribute('data-code');
+                var action = cb.getAttribute('data-action');
+                if (cb.checked && action !== 'view' && code) {
+                    var viewCb = document.querySelector('.js-perm-check[data-code="' + code + '"][data-action="view"]');
+                    if (viewCb) viewCb.checked = true;
+                }
+                syncToggleAllText();
+            });
+        });
+
         var roleSelect = document.getElementById('role');
         if (roleSelect && roleSelect.value === 'guru' && !document.querySelector('.js-perm-check:checked')) {
             applyPreset('guru');

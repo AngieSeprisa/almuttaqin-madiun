@@ -3,6 +3,7 @@
 @section('title', 'Daftar Materi Pondok')
 
 @section('header-actions')
+@if(!auth()->check() || auth()->user()->canDo('materi_pondok', 'create'))
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
     <form action="{{ route('pondok.materi.muat-standar') }}" method="POST" style="margin:0;">
         @csrf
@@ -23,6 +24,7 @@
         <span>Tambah Materi</span>
     </button>
 </div>
+@endif
 @endsection
 
 @push('styles')
@@ -255,18 +257,22 @@
                         </td>
                         <td style="text-align:center;">
                             <div class="action-btn-group" style="justify-content:center;">
+                                @if(!auth()->check() || auth()->user()->canDo('materi_pondok', 'edit'))
                                 <button type="button" class="action-btn action-btn-edit" data-modal-target="modalEditMateri{{ $item->id }}" title="Edit Materi">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                     </svg>
                                 </button>
+                                @endif
+                                @if(!auth()->check() || auth()->user()->canDo('materi_pondok', 'delete'))
                                 <button type="button" class="action-btn action-btn-delete" data-modal-target="modalHapusMateri{{ $item->id }}" title="Hapus Materi">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="3 6 5 6 21 6"></polyline>
                                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                     </svg>
                                 </button>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -276,11 +282,13 @@
                             <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
                                 <span style="font-size:14px; font-weight:600;">Belum ada daftar materi pondok</span>
                                 <span style="font-size:12.5px;">Tambahkan materi Al-Qur'an atau Al-Hadist, atau muat daftar kitab standar.</span>
+                                @if(!auth()->check() || auth()->user()->canDo('materi_pondok', 'create'))
                                 <div style="display:flex; gap:8px; margin-top:4px;">
                                     <button type="button" class="btn btn-sm btn-primary" data-modal-target="modalTambahMateri">
                                         + Tambah Materi
                                     </button>
                                 </div>
+                                @endif
                             </div>
                         </td>
                     </tr>

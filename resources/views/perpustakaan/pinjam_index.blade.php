@@ -3,6 +3,7 @@
 @section('title', 'Pinjam Buku')
 
 @section('header-actions')
+@if(!auth()->check() || auth()->user()->canDo('pinjam_buku', 'create'))
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
     <a href="{{ route('perpustakaan.pinjam.create') }}" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
@@ -12,6 +13,7 @@
         <span>Pinjam Buku</span>
     </a>
 </div>
+@endif
 @endsection
 
 @section('content')
@@ -199,7 +201,7 @@
                             <td style="text-align:center;">
                                 <div class="action-btn-group">
                                     {{-- Tandai Sudah Dikembalikan --}}
-                                    @if ($item->status !== 'dikembalikan')
+                                    @if ($item->status !== 'dikembalikan' && (!auth()->check() || auth()->user()->canDo('pinjam_buku', 'edit')))
                                         <form action="{{ route('perpustakaan.pinjam.kembali', $item->id) }}" method="POST" style="display:inline;">
                                             @csrf
                                             @method('PATCH')
@@ -221,6 +223,7 @@
                                     @endif
 
                                     {{-- Edit --}}
+                                    @if(!auth()->check() || auth()->user()->canDo('pinjam_buku', 'edit'))
                                     <button type="button"
                                             class="action-btn action-btn-edit"
                                             data-modal-target="modalEditPinjam{{ $item->id }}"
@@ -231,8 +234,10 @@
                                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                         </svg>
                                     </button>
+                                    @endif
 
                                     {{-- Hapus --}}
+                                    @if(!auth()->check() || auth()->user()->canDo('pinjam_buku', 'delete'))
                                     <form action="{{ route('perpustakaan.pinjam.destroy', $item->id) }}" method="POST" style="display:inline;">
                                         @csrf
                                         @method('DELETE')
@@ -252,6 +257,7 @@
                                             </svg>
                                         </button>
                                     </form>
+                                    @endif
                                 </div>
 
                                 {{-- Modal Edit Peminjaman --}}

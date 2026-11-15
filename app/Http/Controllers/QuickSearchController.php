@@ -56,7 +56,7 @@ class QuickSearchController extends Controller
                 'url' => route('data-warga.guru'),
                 'icon' => 'users',
                 'keywords' => 'data warga guru pengajar ustadz ustadzah lembaga',
-                'permission' => 'siswa',
+                'permission' => 'guru_warga',
             ],
             [
                 'title' => 'Data Warga: Lulus',
@@ -64,7 +64,7 @@ class QuickSearchController extends Controller
                 'url' => route('data-warga.lulus'),
                 'icon' => 'users',
                 'keywords' => 'data warga lulus alumni wisuda pondok sekolah',
-                'permission' => 'siswa',
+                'permission' => 'lulus_warga',
             ],
             [
                 'title' => 'Data Warga: Mutasi',
@@ -72,7 +72,7 @@ class QuickSearchController extends Controller
                 'url' => route('data-warga.mutasi'),
                 'icon' => 'users',
                 'keywords' => 'data warga mutasi pindah keluar siswa',
-                'permission' => 'siswa',
+                'permission' => 'mutasi_warga',
             ],
             [
                 'title' => 'Input Kartu NFC',
@@ -80,7 +80,7 @@ class QuickSearchController extends Controller
                 'url' => route('nfc.index'),
                 'icon' => 'credit-card',
                 'keywords' => 'nfc rfid kartu serial tap pairing input santri',
-                'permission' => 'siswa',
+                'permission' => 'nfc',
             ],
             [
                 'title' => 'Jurnal Pembelajaran',
@@ -88,7 +88,7 @@ class QuickSearchController extends Controller
                 'url' => route('sekolah.jurnal'),
                 'icon' => 'book',
                 'keywords' => 'jurnal sekolah pembelajaran materi guru kelas',
-                'permission' => 'sekolah',
+                'permission' => 'sekolah_jurnal',
             ],
             [
                 'title' => 'Rekap Jurnal',
@@ -96,7 +96,7 @@ class QuickSearchController extends Controller
                 'url' => route('sekolah.rekap-jurnal'),
                 'icon' => 'file-text',
                 'keywords' => 'rekap jurnal laporan mengajar',
-                'permission' => 'sekolah',
+                'permission' => 'sekolah_rekap_jurnal',
             ],
             [
                 'title' => 'Jurnal Ekstrakurikuler',
@@ -104,7 +104,7 @@ class QuickSearchController extends Controller
                 'url' => route('sekolah.ekskul.index'),
                 'icon' => 'activity',
                 'keywords' => 'ekskul ekstrakurikuler jurnal presensi latihan pembina kegiatan',
-                'permission' => 'sekolah',
+                'permission' => 'ekskul',
             ],
             [
                 'title' => 'Rekap Ekstrakurikuler',
@@ -112,7 +112,7 @@ class QuickSearchController extends Controller
                 'url' => route('rekap-absensi.ekskul'),
                 'icon' => 'calendar',
                 'keywords' => 'rekap ekskul ekstrakurikuler absensi laporan wa',
-                'permission' => 'rekap_absensi',
+                'permission' => 'rekap_ekskul',
             ],
             [
                 'title' => 'Rekap Absensi Sekolah',
@@ -120,7 +120,7 @@ class QuickSearchController extends Controller
                 'url' => route('rekap-absensi.sekolah'),
                 'icon' => 'calendar',
                 'keywords' => 'rekap absensi sekolah siswa absensi kehadiran',
-                'permission' => 'sekolah',
+                'permission' => 'rekap_sekolah',
             ],
             [
                 'title' => 'Rekap Absensi Guru',
@@ -128,7 +128,7 @@ class QuickSearchController extends Controller
                 'url' => route('rekap-absensi.guru'),
                 'icon' => 'calendar',
                 'keywords' => 'rekap guru absensi guru presensi pengajar',
-                'permission' => 'rekap_absensi',
+                'permission' => 'rekap_guru',
             ],
             [
                 'title' => 'Perizinan Sambang',
@@ -144,7 +144,7 @@ class QuickSearchController extends Controller
                 'url' => route('perpustakaan.buku.index'),
                 'icon' => 'book',
                 'keywords' => 'perpustakaan daftar buku tambah buku barcode kode buku koleksi',
-                'permission' => 'perpustakaan',
+                'permission' => 'daftar_buku',
             ],
             [
                 'title' => 'Pinjam Buku Perpustakaan',
@@ -152,7 +152,7 @@ class QuickSearchController extends Controller
                 'url' => route('perpustakaan.pinjam.index'),
                 'icon' => 'book',
                 'keywords' => 'perpustakaan pinjam buku peminjaman pengembalian santri siswa',
-                'permission' => 'perpustakaan',
+                'permission' => 'pinjam_buku',
             ],
             [
                 'title' => 'Perizinan Sakit',
@@ -176,7 +176,7 @@ class QuickSearchController extends Controller
                 'url' => route('rekap-absensi.guru'),
                 'icon' => 'check-square',
                 'keywords' => 'presensi guru rekap absensi tap rfid kehadiran',
-                'permission' => 'rekap_absensi',
+                'permission' => 'rekap_guru',
             ],
             [
                 'title' => 'Guru Sekolah',
@@ -224,7 +224,7 @@ class QuickSearchController extends Controller
                 'url' => route('pengaturan.sesi'),
                 'icon' => 'clock',
                 'keywords' => 'pengaturan sesi presensi rfid esp32 jadwal alat kamar',
-                'permission' => 'pengaturan_absensi',
+                'permission' => 'pengaturan_sesi',
             ],
             [
                 'title' => 'Dashboard Monitoring Presensi RFID',
@@ -232,7 +232,7 @@ class QuickSearchController extends Controller
                 'url' => route('dashboard-presensi'),
                 'icon' => 'activity',
                 'keywords' => 'dashboard presensi live rfid monitor kartu santri asrama',
-                'permission' => 'pengaturan_absensi',
+                'permission' => 'monitor_rfid',
             ],
             [
                 'title' => 'Master Ruang Kelas',

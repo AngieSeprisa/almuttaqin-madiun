@@ -187,9 +187,66 @@ class User extends Authenticatable
     }
 
     /**
+     * Peta grup menu ke daftar kode submenu granular di dalamnya
+     */
+    public static function groupPermissionChildrenMap(): array
+    {
+        return [
+            'data_warga'         => ['siswa', 'guru_warga', 'lulus_warga', 'mutasi_warga'],
+            'sekolah'            => ['sekolah_jurnal', 'sekolah_rekap_jurnal', 'ekskul', 'jadwal_pelajaran', 'jadwal_saya'],
+            'pondok'             => ['materi_pondok', 'target_pengajian', 'jurnal_mengaji'],
+            'perpustakaan'       => ['daftar_buku', 'pinjam_buku'],
+            'perizinan'          => ['perizinan_sambang', 'perizinan_sakit', 'perizinan_haid'],
+            'rekap_absensi'      => ['rekap_sholat', 'rekap_pengajian', 'rekap_sekolah', 'rekap_guru', 'rekap_ekskul'],
+            'rekap_pondok'       => ['rekap_sholat', 'rekap_pengajian'],
+            'data_master'        => ['master_jam', 'master_lembaga', 'master_import_siswa'],
+            'pengaturan_absensi' => ['pengaturan_sesi', 'monitor_rfid'],
+            'pengaturan_sekolah' => ['pengaturan_sesi', 'monitor_rfid', 'guru_sekolah', 'plotting_mapel', 'plotting_kelas', 'plotting_ekskul'],
+            'pengaturan_pondok'  => ['plotting_kamar', 'plotting_pengajian'],
+            'master_kelas'       => ['plotting_kelas'],
+        ];
+    }
+
+    /**
+     * Peta kode submenu granular ke kode menu induk (legacy fallback)
+     */
+    public static function legacyParentPermissionMap(): array
+    {
+        return [
+            'guru_warga'               => 'siswa',
+            'lulus_warga'              => 'siswa',
+            'mutasi_warga'             => 'siswa',
+            'nfc'                      => 'siswa',
+            'sekolah_jurnal'           => 'sekolah',
+            'sekolah_rekap_jurnal'     => 'sekolah',
+            'ekskul'                   => 'sekolah',
+            'jurnal_ekskul'            => 'ekskul',
+            'jadwal_pelajaran'         => 'sekolah',
+            'jadwal_saya'              => 'jadwal_pelajaran',
+            'materi_pondok'            => 'pondok',
+            'target_pengajian'         => 'pondok',
+            'jurnal_mengaji'           => 'pondok',
+            'daftar_buku'              => 'perpustakaan',
+            'pinjam_buku'              => 'perpustakaan',
+            'rekap_sholat'             => 'rekap_absensi',
+            'rekap_pengajian'          => 'rekap_absensi',
+            'rekap_sekolah'            => 'sekolah',
+            'rekap_guru'               => 'rekap_absensi',
+            'rekap_ekskul'             => 'rekap_absensi',
+            'master_jam'               => 'data_master',
+            'master_lembaga'           => 'data_master',
+            'master_import_siswa'      => 'data_master',
+            'master_kelas'             => 'plotting_kelas',
+            'pengaturan_sesi'          => 'pengaturan_absensi',
+            'monitor_rfid'             => 'pengaturan_absensi',
+            'plotting_kelas_pengajian' => 'plotting_pengajian',
+        ];
+    }
+
+    /**
      * Cek hak akses granular per menu dan tindakan
      *
-     * @param string $menuCode (siswa, pendaftaran, perizinan_sambang, perizinan_sakit, pengguna)
+     * @param string $menuCode
      * @param string $action (view, create, edit, delete)
      */
     public function canDo(string $menuCode, string $action = 'view'): bool
@@ -199,49 +256,101 @@ class User extends Authenticatable
             return true;
         }
 
-        // Menu NFC dan Data Warga mengikuti perizinan modul siswa
-        if (in_array($menuCode, ['nfc', 'data_warga', 'guru_warga', 'lulus_warga', 'mutasi_warga'], true)) {
-            $permSpecific = $this->permissions->firstWhere('menu_code', $menuCode);
-            if ($permSpecific) {
-                $field = 'can_' . $action;
-                return (bool) ($permSpecific->{$field} ?? false);
+        $field = 'can_' . $action;
+        $perms = $this->permissions;
+
+        // 1. Jika yang dicek adalah kode grup (misal: pondok, sekolah, perpustakaan, data_warga, rekap_absensi),
+        //    prioritaskan evaluasi dari submenu anak yang sudah tersimpan di database
+        $groupMap = self::groupPermissionChildrenMap();
+        if (isset($groupMap[$menuCode])) {
+            $childPerms = $perms->whereIn('menu_code', $groupMap[$menuCode]);
+            if ($childPerms->isNotEmpty()) {
+                return $childPerms->contains(fn ($p) => (bool) ($p->{$field} ?? false));
             }
-            return $this->canDo('siswa', $action);
+
+            $explicitGroupPerm = $perms->firstWhere('menu_code', $menuCode);
+            if ($explicitGroupPerm !== null) {
+                return (bool) ($explicitGroupPerm->{$field} ?? false);
+            }
         }
 
-        // Admin Lembaga & Guru memiliki akses default ke modul sekolah, jadwal pelajaran & ekstrakurikuler
-        if (in_array($this->role, ['admin_lembaga', 'guru']) && in_array($menuCode, ['sekolah', 'jadwal_pelajaran', 'ekskul', 'jurnal_ekskul', 'plotting_ekskul', 'rekap_ekskul'])) {
-            return true;
+        // 2. Cek izin eksplisit pada menu_code terkait di tabel user_permissions
+        $perm = $perms->firstWhere('menu_code', $menuCode);
+        if ($perm !== null) {
+            return (bool) ($perm->{$field} ?? false);
         }
 
-        // Admin Lembaga Pondok memiliki akses default ke modul Pondok, Pengaturan Pondok & Plotting Kamar / Pengajian & Rekap & Perizinan
-        if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, ['pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji', 'pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'])) {
-            return true;
+        // 3. Cek fallback ke menu induk (legacy parent) bila akun belum memiliki baris submenu spesifik
+        $parentMap = self::legacyParentPermissionMap();
+        $visited = [$menuCode];
+        $currentCode = $menuCode;
+        while (isset($parentMap[$currentCode])) {
+            $parentCode = $parentMap[$currentCode];
+            if (in_array($parentCode, $visited, true)) {
+                break;
+            }
+            $visited[] = $parentCode;
+
+            $parentPerm = $perms->firstWhere('menu_code', $parentCode);
+            if ($parentPerm !== null) {
+                return (bool) ($parentPerm->{$field} ?? false);
+            }
+            $currentCode = $parentCode;
         }
 
-        // Guru & Musyrif memiliki akses ke Menu Pondok (Daftar Materi, Target Pengajian, Jurnal Mengaji), Perpustakaan, Rekap Sholat, Pengajian, Pondok, Rekap Absensi, & Perizinan Pondok
-        if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, ['pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji', 'perpustakaan', 'daftar_buku', 'pinjam_buku', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'])) {
-            return true;
-        }
-
-        // Admin Lembaga memiliki akses default ke modul absensi, guru sekolah, pondok, perpustakaan, plotting & master data
-        if ($this->role === 'admin_lembaga' && in_array($menuCode, [
-            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
-            'perpustakaan', 'daftar_buku', 'pinjam_buku',
-            'presensi', 'rekap_absensi', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'pengaturan_absensi', 'guru_sekolah', 
-            'plotting_mapel', 'plotting_kelas', 'plotting_ekskul', 'ekskul', 'jurnal_ekskul', 'rekap_ekskul', 'jadwal_pelajaran',
-            'data_master', 'master_kelas', 'master_jam', 'master_lembaga', 'master_import_siswa', 'perizinan_haid'
-        ])) {
-            return true;
-        }
-
-        $perm = $this->permissions->firstWhere('menu_code', $menuCode);
-        if (!$perm) {
+        // 4. Jika akun sudah diatur menggunakan matriks hak akses granular, jangan gunakan default role
+        $granularCodes = [
+            'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_saya',
+            'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
+            'daftar_buku', 'pinjam_buku',
+            'guru_warga', 'lulus_warga', 'mutasi_warga', 'nfc',
+            'rekap_sholat', 'rekap_pengajian', 'rekap_sekolah', 'rekap_guru',
+            'pengaturan_sesi', 'monitor_rfid', 'plotting_pengajian',
+        ];
+        if ($perms->whereIn('menu_code', $granularCodes)->isNotEmpty()) {
             return false;
         }
 
-        $field = 'can_' . $action;
-        return (bool) ($perm->{$field} ?? false);
+        // 5. Fallback default berdasarkan role hanya untuk akun yang belum dikonfigurasi matriks granularnya
+        if (in_array($this->role, ['admin_lembaga', 'guru']) && in_array($menuCode, [
+            'sekolah', 'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_pelajaran', 'jadwal_saya',
+            'ekskul', 'jurnal_ekskul', 'plotting_ekskul', 'rekap_ekskul', 'rekap_sekolah'
+        ], true)) {
+            return true;
+        }
+
+        if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, [
+            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
+            'pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian',
+            'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'rekap_guru',
+            'perizinan', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'
+        ], true)) {
+            return true;
+        }
+
+        if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, [
+            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
+            'perpustakaan', 'daftar_buku', 'pinjam_buku',
+            'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'rekap_guru',
+            'perizinan', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'
+        ], true)) {
+            return true;
+        }
+
+        if ($this->role === 'admin_lembaga' && in_array($menuCode, [
+            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
+            'perpustakaan', 'daftar_buku', 'pinjam_buku',
+            'presensi', 'rekap_absensi', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_sekolah', 'rekap_guru',
+            'pengaturan_absensi', 'pengaturan_sekolah', 'pengaturan_sesi', 'monitor_rfid', 'guru_sekolah',
+            'plotting_mapel', 'plotting_kelas', 'plotting_ekskul', 'ekskul', 'jurnal_ekskul', 'rekap_ekskul',
+            'jadwal_pelajaran', 'jadwal_saya',
+            'data_master', 'master_kelas', 'master_jam', 'master_lembaga', 'master_import_siswa',
+            'perizinan', 'perizinan_haid'
+        ], true)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
