@@ -107,7 +107,7 @@ class PerpustakaanController extends Controller
         $validated = $request->validate([
             'barcode'    => ['nullable', 'string', 'max:100'],
             'judul_buku' => ['required', 'string', 'max:255'],
-            'kode_buku'  => ['nullable', 'string', 'max:50'],
+            'kode_buku'  => ['nullable', 'string', 'max:100'],
             'kategori'   => ['nullable', 'string', 'max:100'],
             'penulis'    => ['nullable', 'string', 'max:255'],
             'penerbit'   => ['nullable', 'string', 'max:255'],
@@ -118,7 +118,14 @@ class PerpustakaanController extends Controller
             'judul_buku.required' => 'Nama / judul buku wajib diisi.',
         ]);
 
+        $barcodeInput = trim((string) ($validated['barcode'] ?? ''));
         $kodeBuku = trim((string) ($validated['kode_buku'] ?? ''));
+
+        // Jika barcode di-scan atau diisi, barcode langsung menjadi kode_buku
+        if ($barcodeInput !== '') {
+            $kodeBuku = $barcodeInput;
+        }
+
         if ($kodeBuku === '' || PerpustakaanBuku::where('kode_buku', $kodeBuku)->exists()) {
             $kodeBuku = PerpustakaanBuku::generateKodeBuku();
         }
@@ -127,7 +134,7 @@ class PerpustakaanController extends Controller
 
         $buku = PerpustakaanBuku::create([
             'kode_buku'     => $kodeBuku,
-            'barcode'       => !empty($validated['barcode']) ? trim($validated['barcode']) : null,
+            'barcode'       => $barcodeInput !== '' ? $barcodeInput : $kodeBuku,
             'judul_buku'    => trim($validated['judul_buku']),
             'kategori'      => !empty($validated['kategori']) ? trim($validated['kategori']) : null,
             'penulis'       => !empty($validated['penulis']) ? trim($validated['penulis']) : null,
@@ -152,7 +159,7 @@ class PerpustakaanController extends Controller
         $validated = $request->validate([
             'barcode'    => ['nullable', 'string', 'max:100'],
             'judul_buku' => ['required', 'string', 'max:255'],
-            'kode_buku'  => ['required', 'string', 'max:50', 'unique:perpustakaan_bukus,kode_buku,' . $buku->id],
+            'kode_buku'  => ['required', 'string', 'max:100', 'unique:perpustakaan_bukus,kode_buku,' . $buku->id],
             'kategori'   => ['nullable', 'string', 'max:100'],
             'penulis'    => ['nullable', 'string', 'max:255'],
             'penerbit'   => ['nullable', 'string', 'max:255'],
@@ -165,9 +172,11 @@ class PerpustakaanController extends Controller
             'kode_buku.unique'    => 'Kode buku sudah digunakan oleh buku lain.',
         ]);
 
+        $kodeBuku = trim($validated['kode_buku']);
+
         $buku->update([
-            'kode_buku'  => trim($validated['kode_buku']),
-            'barcode'    => !empty($validated['barcode']) ? trim($validated['barcode']) : null,
+            'kode_buku'  => $kodeBuku,
+            'barcode'    => !empty($validated['barcode']) ? trim($validated['barcode']) : $kodeBuku,
             'judul_buku' => trim($validated['judul_buku']),
             'kategori'   => !empty($validated['kategori']) ? trim($validated['kategori']) : null,
             'penulis'    => !empty($validated['penulis']) ? trim($validated['penulis']) : null,

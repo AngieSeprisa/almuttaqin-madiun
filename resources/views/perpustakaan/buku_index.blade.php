@@ -133,7 +133,6 @@
                     <tr>
                         <th style="width:52px;">No</th>
                         <th>Kode Buku</th>
-                        <th>Barcode</th>
                         <th>Nama Buku</th>
                         <th>Kategori / Rak</th>
                         <th>Stok</th>
@@ -145,18 +144,9 @@
                     <tr>
                         <td>{{ $bukus->firstItem() + $idx }}</td>
                         <td>
-                            <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-family:monospace; font-size:12px; font-weight:700;">
-                                {{ $item->kode_buku }}
+                            <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-family:monospace; font-size:12.5px; font-weight:700;">
+                                {{ $item->kode_buku ?: $item->barcode }}
                             </span>
-                        </td>
-                        <td>
-                            @if($item->barcode)
-                                <span style="font-family:monospace; font-size:12.5px; font-weight:600; color:var(--text-secondary);">
-                                    {{ $item->barcode }}
-                                </span>
-                            @else
-                                <span style="color:var(--text-muted); font-size:12px;">-</span>
-                            @endif
                         </td>
                         <td>
                             <div style="font-weight:700; color:var(--text-primary); font-size:13.5px;">{{ $item->judul_buku }}</div>
@@ -244,15 +234,9 @@
                                             <button type="button" class="modal-close-btn" data-modal-close aria-label="Tutup">&times;</button>
                                         </div>
                                         <div class="modal-body" style="text-align:left; display:flex; flex-direction:column; gap:12px;">
-                                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                                                <div class="form-group" style="margin:0;">
-                                                    <label class="form-label">Kode Buku <span class="required-mark">*</span></label>
-                                                    <input type="text" name="kode_buku" value="{{ $item->kode_buku }}" class="form-control" required>
-                                                </div>
-                                                <div class="form-group" style="margin:0;">
-                                                    <label class="form-label">Barcode Buku</label>
-                                                    <input type="text" name="barcode" value="{{ $item->barcode }}" class="form-control" placeholder="Kode barcode...">
-                                                </div>
+                                            <div class="form-group" style="margin:0;">
+                                                <label class="form-label">Kode Buku (Barcode) <span class="required-mark">*</span></label>
+                                                <input type="text" name="kode_buku" value="{{ $item->kode_buku ?: $item->barcode }}" class="form-control" style="font-family:monospace; font-weight:700;" required>
                                             </div>
                                             <div class="form-group" style="margin:0;">
                                                 <label class="form-label">Nama Buku <span class="required-mark">*</span></label>
@@ -298,7 +282,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" style="padding:36px 16px; text-align:center;">
+                        <td colspan="6" style="padding:36px 16px; text-align:center;">
                             <div style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Belum ada data buku di perpustakaan</div>
                             <div style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">Tambahkan koleksi buku dengan scan barcode menggunakan kamera HP dan kode buku otomatis.</div>
                             <a href="{{ route('perpustakaan.buku.create') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">

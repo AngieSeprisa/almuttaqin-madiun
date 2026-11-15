@@ -33,7 +33,7 @@
     </div>
     @endif
 
-    {{-- LANGKAH 1: SCAN BARCODE BUKU DENGAN KAMERA HP --}}
+    {{-- LANGKAH 1: SCAN BARCODE BUKU DENGAN KAMERA HP (OTOMATIS TERTULIS KE KODE BUKU) --}}
     <div class="form-section-card" style="padding:22px 24px;">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
             <div style="display:flex; align-items:center; gap:10px;">
@@ -45,19 +45,16 @@
                 </div>
                 <div>
                     <h2 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">1. Scan Barcode Buku (Kamera HP)</h2>
-                    <span style="font-size:12px; color:var(--text-muted);">Arahkan kamera HP ke barcode pada sampul buku</span>
+                    <span style="font-size:12px; color:var(--text-muted);">Arahkan kamera ke barcode buku — begitu terbaca langsung otomatis tertulis ke Kode Buku</span>
                 </div>
             </div>
 
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <input type="file" id="barcodeFileInput" accept="image/*" capture="environment" style="display:none;">
-                <button type="button" id="btnUploadBarcode" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; font-size:13px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
+                <button type="button" id="btnSwitchCamera" class="btn btn-secondary" style="display:none; align-items:center; gap:6px; padding:8px 14px; font-size:13px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                     </svg>
-                    <span>Foto Barcode</span>
+                    <span>Ganti Kamera</span>
                 </button>
 
                 <button type="button" id="btnToggleCamera" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; font-size:13px; font-weight:600;">
@@ -71,7 +68,18 @@
         </div>
 
         <div id="scannerWrapper" style="position:relative; width:100%; max-width:460px; margin:0 auto; border-radius:14px; overflow:hidden; background:#0B0F17; min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; border:2px dashed var(--border-light);">
+            {{-- Native Live Video Stream (untuk BarcodeDetector cepat) --}}
+            <video id="nativeBarcodeVideo" playsinline muted autoplay style="display:none; width:100%; max-height:280px; object-fit:cover;"></video>
+
+            {{-- Fallback / Html5Qrcode Container --}}
             <div id="barcodeReader" style="width:100%;"></div>
+
+            {{-- Garis Panduan Fokus Barcode --}}
+            <div id="scanTargetOverlay" style="display:none; position:absolute; inset:0; pointer-events:none; align-items:center; justify-content:center;">
+                <div style="width:76%; max-width:300px; height:110px; border:2px solid #38bdf8; border-radius:12px; box-shadow:0 0 0 9999px rgba(15,23,42,0.38); position:relative;">
+                    <div style="position:absolute; left:8px; right:8px; top:50%; height:2px; background:#ef4444; box-shadow:0 0 8px #ef4444;"></div>
+                </div>
+            </div>
 
             <div id="scannerPlaceholder" style="padding:28px 20px; text-align:center; color:#94A3B8;">
                 <div style="width:52px; height:52px; border-radius:50%; background:rgba(255,255,255,0.06); margin:0 auto 10px auto; display:flex; align-items:center; justify-content:center; color:#E2E8F0;">
@@ -83,29 +91,20 @@
                         <path d="M21 5v14"></path>
                     </svg>
                 </div>
-                <div style="font-size:14px; font-weight:600; color:#F1F5F9; margin-bottom:4px;">Pemindai Barcode Buku Siap</div>
-                <div style="font-size:12px; color:#94A3B8; max-width:300px; margin:0 auto;">Tekan <strong>"Buka Kamera HP"</strong> untuk scan barcode buku secara langsung, atau ketik manual di bawah.</div>
+                <div id="scannerStatusTitle" style="font-size:14px; font-weight:600; color:#F1F5F9; margin-bottom:4px;">Menyiapkan Kamera Pemindai Barcode...</div>
+                <div id="scannerStatusDesc" style="font-size:12px; color:#94A3B8; max-width:320px; margin:0 auto;">Arahkan kamera HP ke barcode buku, angka barcode akan langsung tertulis otomatis pada kolom Kode Buku di bawah.</div>
             </div>
-        </div>
-
-        <div id="cameraControls" style="display:none; margin-top:12px; text-align:center;">
-            <button type="button" id="btnSwitchCamera" class="btn btn-secondary" style="font-size:12.5px; padding:6px 14px; display:inline-flex; align-items:center; gap:6px;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
-                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-                </svg>
-                <span>Ganti Kamera</span>
-            </button>
         </div>
 
         <div id="scanSuccessBanner" style="display:none; margin-top:14px; padding:10px 14px; border-radius:10px; background:#ecfdf5; border:1px solid #a7f3d0; color:#047857; font-size:13px; font-weight:600; align-items:center; gap:8px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:18px;height:18px;flex-shrink:0;">
                 <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
-            <span id="scanSuccessText">Barcode berhasil dipindai!</span>
+            <span id="scanSuccessText">Barcode berhasil terbaca dan otomatis ditulis ke Kode Buku!</span>
         </div>
     </div>
 
-    {{-- LANGKAH 2 & 3: DETAIL BUKU & KODE BUKU OTOMATIS --}}
+    {{-- LANGKAH 2: DETAIL BUKU & KODE BUKU --}}
     <div class="form-section-card" style="padding:24px 26px;">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border-subtle);">
             <div style="width:36px; height:36px; border-radius:10px; background:rgba(37,99,235,0.1); color:#2563eb; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
@@ -115,46 +114,34 @@
                 </svg>
             </div>
             <div>
-                <h2 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">2. Informasi Buku & Kode Otomatis</h2>
-                <span style="font-size:12px; color:var(--text-muted);">Masukkan nama buku dan simpan, kode buku dibuat secara otomatis</span>
+                <h2 style="font-size:16px; font-weight:700; color:var(--text-primary); margin:0;">2. Informasi Buku</h2>
+                <span style="font-size:12px; color:var(--text-muted);">Kode buku otomatis terisi dari hasil scan barcode (atau kode otomatis jika tanpa barcode)</span>
             </div>
         </div>
 
         <form action="{{ route('perpustakaan.buku.store') }}" method="POST" id="formTambahBuku" style="display:flex; flex-direction:column; gap:16px;">
             @csrf
+            <input type="hidden" name="barcode" id="input_barcode" value="{{ old('barcode') }}">
 
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
-                {{-- Barcode Buku (Hasil Scan / Ketik Manual) --}}
-                <div class="form-group" style="margin:0;">
-                    <label for="input_barcode" class="form-label">Barcode Buku</label>
+            {{-- Kode Buku (Hasil Scan Barcode / Otomatis) --}}
+            <div class="form-group" style="margin:0;">
+                <label for="kode_buku" class="form-label">Kode Buku (Barcode) <span class="required-mark">*</span></label>
+                <div style="display:flex; align-items:center; gap:8px;">
                     <input type="text"
-                           name="barcode"
-                           id="input_barcode"
-                           value="{{ old('barcode') }}"
+                           name="kode_buku"
+                           id="kode_buku"
+                           value="{{ old('kode_buku', $nextKodeBuku) }}"
                            class="form-control"
-                           placeholder="Otomatis terisi saat scan barcode..."
-                           style="font-family:monospace; font-weight:600;">
-                </div>
-
-                {{-- Kode Buku Otomatis --}}
-                <div class="form-group" style="margin:0;">
-                    <label for="kode_buku" class="form-label">Kode Buku (Otomatis)</label>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <input type="text"
-                               name="kode_buku"
-                               id="kode_buku"
-                               value="{{ old('kode_buku', $nextKodeBuku) }}"
-                               class="form-control"
-                               readonly
-                               style="font-family:monospace; font-weight:700; background:var(--nav-hover-bg); color:#1d4ed8;">
-                        <button type="button"
-                                id="btnGenerateKode"
-                                class="btn btn-secondary"
-                                style="white-space:nowrap; padding:9px 12px; font-size:12.5px;"
-                                title="Buat Ulang Kode Buku Otomatis">
-                            Buat Otomatis
-                        </button>
-                    </div>
+                           placeholder="Otomatis tertulis saat barcode buku terbaca kamera..."
+                           style="font-family:monospace; font-weight:700; font-size:14px; color:#1d4ed8; transition: box-shadow 0.25s ease, border-color 0.25s ease;"
+                           required>
+                    <button type="button"
+                            id="btnGenerateKode"
+                            class="btn btn-secondary"
+                            style="white-space:nowrap; padding:9px 12px; font-size:12.5px;"
+                            title="Buat Kode Buku Otomatis (Jika Buku Tidak Ada Barcode)">
+                        Kode Otomatis
+                    </button>
                 </div>
             </div>
 
@@ -167,8 +154,7 @@
                        value="{{ old('judul_buku') }}"
                        class="form-control"
                        placeholder="Masukkan nama atau judul buku..."
-                       required
-                       autofocus>
+                       required>
             </div>
 
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px;">
@@ -209,33 +195,35 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     var html5QrCode = null;
+    var nativeStream = null;
+    var nativeDetectorTimer = null;
     var isScanning = false;
-    var camerasList = [];
-    var currentCameraIndex = 0;
+    var currentFacingMode = 'environment';
 
     var btnToggleCamera = document.getElementById('btnToggleCamera');
     var camBtnText = document.getElementById('camBtnText');
-    var placeholder = document.getElementById('scannerPlaceholder');
-    var cameraControls = document.getElementById('cameraControls');
     var btnSwitchCamera = document.getElementById('btnSwitchCamera');
-    var btnUploadBarcode = document.getElementById('btnUploadBarcode');
-    var barcodeFileInput = document.getElementById('barcodeFileInput');
+    var placeholder = document.getElementById('scannerPlaceholder');
+    var scannerStatusTitle = document.getElementById('scannerStatusTitle');
+    var nativeVideo = document.getElementById('nativeBarcodeVideo');
+    var scanOverlay = document.getElementById('scanTargetOverlay');
 
     var inputBarcode = document.getElementById('input_barcode');
-    var inputJudul = document.getElementById('judul_buku');
     var inputKode = document.getElementById('kode_buku');
+    var inputJudul = document.getElementById('judul_buku');
     var btnGenerateKode = document.getElementById('btnGenerateKode');
     var scanBanner = document.getElementById('scanSuccessBanner');
     var scanText = document.getElementById('scanSuccessText');
 
     function fetchKodeBukuOtomatis() {
-        fetch('{{ route("perpustakaan.buku.generate-kode") }}', {
+        fetch('{{ route('perpustakaan.buku.generate-kode') }}', {
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(function (r) { return r.json(); })
         .then(function (data) {
             if (data && data.kode_buku && inputKode) {
                 inputKode.value = data.kode_buku;
+                if (inputBarcode) inputBarcode.value = '';
             }
         })
         .catch(function () {});
@@ -247,25 +235,191 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Ketika barcode terbaca oleh kamera: langsung otomatis ditulis ke Kode Buku tanpa klik apapun
     function applyScannedBarcode(code) {
         if (!code) return;
         var cleanCode = String(code).trim();
+        if (!cleanCode) return;
+
+        if (inputKode) {
+            inputKode.value = cleanCode;
+            inputKode.style.borderColor = '#10b981';
+            inputKode.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.25)';
+            setTimeout(function () {
+                inputKode.style.borderColor = '';
+                inputKode.style.boxShadow = '';
+            }, 1800);
+        }
+
         if (inputBarcode) {
             inputBarcode.value = cleanCode;
         }
-        if (inputKode && !inputKode.value.trim()) {
-            fetchKodeBukuOtomatis();
-        }
+
         if (scanBanner && scanText) {
-            scanText.textContent = 'Barcode berhasil dipindai: ' + cleanCode;
+            scanText.textContent = 'Barcode terbaca & otomatis ditulis ke Kode Buku: ' + cleanCode;
             scanBanner.style.display = 'flex';
         }
+
         if (navigator.vibrate) {
-            navigator.vibrate([80, 40, 80]);
+            try { navigator.vibrate(100); } catch (e) {}
         }
+
         stopScanner();
-        if (inputJudul) {
+
+        if (inputJudul && !inputJudul.value.trim()) {
             inputJudul.focus();
+        }
+    }
+
+    function setScanningUI(active) {
+        isScanning = active;
+        if (active) {
+            if (placeholder) placeholder.style.display = 'none';
+            if (scanOverlay) scanOverlay.style.display = 'flex';
+            if (camBtnText) camBtnText.textContent = 'Matikan Kamera';
+            if (btnToggleCamera) btnToggleCamera.className = 'btn btn-secondary';
+            if (btnSwitchCamera) btnSwitchCamera.style.display = 'inline-flex';
+        } else {
+            if (nativeVideo) nativeVideo.style.display = 'none';
+            if (scanOverlay) scanOverlay.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'block';
+            if (scannerStatusTitle) scannerStatusTitle.textContent = 'Pemindai Kamera Nonaktif';
+            if (camBtnText) camBtnText.textContent = 'Buka Kamera HP';
+            if (btnToggleCamera) btnToggleCamera.className = 'btn btn-primary';
+            if (btnSwitchCamera) btnSwitchCamera.style.display = 'none';
+        }
+    }
+
+    // Prioritas 1: Native BarcodeDetector API (sangat cepat & langsung membaca barcode buku 1D/2D di HP)
+    async function tryStartNativeBarcodeDetector() {
+        if (!('BarcodeDetector' in window) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            return false;
+        }
+
+        try {
+            var supported = await window.BarcodeDetector.getSupportedFormats();
+            var wanted = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'qr_code', 'codabar']
+                .filter(function (f) { return supported.indexOf(f) !== -1; });
+
+            if (wanted.length === 0) return false;
+
+            var detector = new window.BarcodeDetector({ formats: wanted });
+            nativeStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: currentFacingMode },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            });
+
+            nativeVideo.srcObject = nativeStream;
+            nativeVideo.style.display = 'block';
+            await nativeVideo.play();
+            setScanningUI(true);
+
+            nativeDetectorTimer = setInterval(async function () {
+                if (!isScanning || !nativeVideo || nativeVideo.readyState < 2) return;
+                try {
+                    var barcodes = await detector.detect(nativeVideo);
+                    if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                        applyScannedBarcode(barcodes[0].rawValue);
+                    }
+                } catch (e) {}
+            }, 120);
+
+            return true;
+        } catch (err) {
+            stopNativeStream();
+            return false;
+        }
+    }
+
+    function stopNativeStream() {
+        if (nativeDetectorTimer) {
+            clearInterval(nativeDetectorTimer);
+            nativeDetectorTimer = null;
+        }
+        if (nativeStream) {
+            nativeStream.getTracks().forEach(function (t) { t.stop(); });
+            nativeStream = null;
+        }
+        if (nativeVideo) {
+            nativeVideo.srcObject = null;
+            nativeVideo.style.display = 'none';
+        }
+    }
+
+    // Prioritas 2: Html5Qrcode Live Stream (untuk browser yang belum memiliki BarcodeDetector)
+    function startHtml5QrScanner() {
+        if (typeof Html5Qrcode === 'undefined') {
+            setScanningUI(false);
+            return;
+        }
+
+        try {
+            if (!html5QrCode) {
+                var formats = undefined;
+                if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+                    formats = [
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
+                        Html5QrcodeSupportedFormats.ITF,
+                        Html5QrcodeSupportedFormats.QR_CODE
+                    ];
+                }
+                html5QrCode = new Html5Qrcode('barcodeReader', {
+                    formatsToSupport: formats,
+                    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+                    verbose: false
+                });
+            }
+
+            if (placeholder) placeholder.style.display = 'none';
+
+            html5QrCode.start(
+                { facingMode: currentFacingMode },
+                {
+                    fps: 15,
+                    qrbox: { width: 260, height: 120 }
+                },
+                function (decodedText) {
+                    applyScannedBarcode(decodedText);
+                },
+                function () {}
+            ).then(function () {
+                setScanningUI(true);
+                if (scanOverlay) scanOverlay.style.display = 'none';
+            }).catch(function () {
+                setScanningUI(false);
+            });
+        } catch (e) {
+            setScanningUI(false);
+        }
+    }
+
+    async function startScanner() {
+        if (isScanning) return;
+        var okNative = await tryStartNativeBarcodeDetector();
+        if (!okNative) {
+            startHtml5QrScanner();
+        }
+    }
+
+    function stopScanner() {
+        stopNativeStream();
+        if (html5QrCode && isScanning) {
+            html5QrCode.stop().then(function () {
+                setScanningUI(false);
+            }).catch(function () {
+                setScanningUI(false);
+            });
+        } else {
+            setScanningUI(false);
         }
     }
 
@@ -279,109 +433,18 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (btnUploadBarcode && barcodeFileInput) {
-        btnUploadBarcode.addEventListener('click', function () {
-            barcodeFileInput.click();
-        });
-
-        barcodeFileInput.addEventListener('change', function (e) {
-            if (!e.target.files || e.target.files.length === 0) return;
-            var file = e.target.files[0];
-
-            if (!html5QrCode && typeof Html5Qrcode !== 'undefined') {
-                html5QrCode = new Html5Qrcode('barcodeReader');
-            }
-
-            if (html5QrCode) {
-                html5QrCode.scanFile(file, false)
-                    .then(function (decodedText) {
-                        applyScannedBarcode(decodedText);
-                    })
-                    .catch(function () {
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'Barcode Tidak Terbaca',
-                            text: 'Pastikan foto barcode buku terlihat jelas dan terang, atau ketik angka barcode secara manual.'
-                        });
-                    })
-                    .finally(function () {
-                        barcodeFileInput.value = '';
-                    });
-            }
-        });
-    }
-
-    function startScanner() {
-        if (typeof Html5Qrcode === 'undefined') {
-            if (barcodeFileInput) barcodeFileInput.click();
-            return;
-        }
-
-        if (!html5QrCode) {
-            html5QrCode = new Html5Qrcode('barcodeReader');
-        }
-
-        Html5Qrcode.getCameras().then(function (devices) {
-            if (!devices || !devices.length) {
-                if (barcodeFileInput) barcodeFileInput.click();
-                return;
-            }
-            camerasList = devices;
-            var backIdx = devices.findIndex(function (d) {
-                var lbl = (d.label || '').toLowerCase();
-                return lbl.includes('back') || lbl.includes('environment') || lbl.includes('belakang');
-            });
-            currentCameraIndex = backIdx !== -1 ? backIdx : 0;
-
-            if (placeholder) placeholder.style.display = 'none';
-            if (camerasList.length > 1 && cameraControls) cameraControls.style.display = 'block';
-
-            html5QrCode.start(
-                camerasList[currentCameraIndex].id,
-                {
-                    fps: 10,
-                    qrbox: { width: 260, height: 150 }
-                },
-                function (decodedText) {
-                    applyScannedBarcode(decodedText);
-                },
-                function () {}
-            ).then(function () {
-                isScanning = true;
-                if (camBtnText) camBtnText.textContent = 'Tutup Kamera';
-                if (btnToggleCamera) btnToggleCamera.className = 'btn btn-secondary';
-            }).catch(function () {
-                if (barcodeFileInput) barcodeFileInput.click();
-            });
-        }).catch(function () {
-            if (barcodeFileInput) barcodeFileInput.click();
-        });
-    }
-
-    function stopScanner() {
-        if (html5QrCode && isScanning) {
-            html5QrCode.stop().then(function () {
-                isScanning = false;
-                if (camBtnText) camBtnText.textContent = 'Buka Kamera HP';
-                if (btnToggleCamera) btnToggleCamera.className = 'btn btn-primary';
-                if (placeholder) placeholder.style.display = 'block';
-                if (cameraControls) cameraControls.style.display = 'none';
-            }).catch(function () {});
-        }
-    }
-
     if (btnSwitchCamera) {
         btnSwitchCamera.addEventListener('click', function () {
-            if (camerasList.length > 1 && isScanning) {
-                currentCameraIndex = (currentCameraIndex + 1) % camerasList.length;
-                html5QrCode.stop().then(function () {
-                    isScanning = false;
-                    startScanner();
-                });
-            }
+            currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+            stopScanner();
+            setTimeout(function () {
+                startScanner();
+            }, 250);
         });
     }
+
+    // Langsung aktifkan kamera otomatis saat halaman dibuka
+    startScanner();
 });
 </script>
 @endsection
-

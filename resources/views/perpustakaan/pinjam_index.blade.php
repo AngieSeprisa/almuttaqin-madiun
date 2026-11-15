@@ -109,7 +109,7 @@
 
             <div class="filter-search-wrap">
                 <input type="text" name="search" value="{{ request('search') }}"
-                       class="form-control filter-search-input" placeholder="Cari peminjam, buku, atau kode pinjam...">
+                       class="form-control filter-search-input" placeholder="Cari peminjam, buku, atau kode buku...">
                 <button type="submit" class="btn btn-secondary filter-search-btn" title="Cari">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
                         <circle cx="11" cy="11" r="8"></circle>
@@ -121,19 +121,19 @@
     </div>
 
     {{-- Tabel Data Peminjaman --}}
-    <div class="form-section-card" style="padding:0; overflow:hidden;">
-        <div class="table-responsive">
-            <table class="data-table">
+    <div class="table-card">
+        <div class="table-wrapper">
+            <table class="modern-table">
                 <thead>
                     <tr>
-                        <th style="width:52px; text-align:center;">No</th>
+                        <th style="width:52px;">No</th>
                         <th>Kode Pinjam</th>
                         <th>Nama Peminjam</th>
                         <th>Buku yang Dipinjam</th>
                         <th>Tanggal Pinjam</th>
                         <th>Batas / Tanggal Kembali</th>
-                        <th style="text-align:center;">Status</th>
-                        <th style="width:160px; text-align:right; padding-right:20px;">Aksi</th>
+                        <th>Status</th>
+                        <th style="text-align:center; width:160px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -142,16 +142,14 @@
                             $effStatus = $item->effective_status;
                         @endphp
                         <tr>
-                            <td style="text-align:center; color:var(--text-muted); font-size:12.5px;">
-                                {{ $peminjamans->firstItem() + $index }}
-                            </td>
+                            <td>{{ $peminjamans->firstItem() + $index }}</td>
                             <td>
-                                <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; background:#eff6ff; color:#1d4ed8; font-weight:700; font-size:12px; font-family:monospace;">
+                                <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700; font-size:12px; font-family:monospace;">
                                     {{ $item->kode_pinjam }}
                                 </span>
                             </td>
                             <td>
-                                <div class="font-medium text-primary" style="font-weight:700; font-size:14px;">{{ $item->nama_peminjam }}</div>
+                                <div style="font-weight:700; color:var(--text-primary); font-size:13.5px;">{{ $item->nama_peminjam }}</div>
                                 @if ($item->kelas_kamar)
                                     <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">{{ $item->kelas_kamar }}</div>
                                 @endif
@@ -166,7 +164,7 @@
                                     </div>
                                     <div style="display:flex; align-items:center; gap:6px; margin-top:3px; flex-wrap:wrap;">
                                         <span style="font-size:11.5px; font-family:monospace; color:#475569; background:#f1f5f9; padding:1px 6px; border-radius:4px;">
-                                            {{ $item->buku->kode_buku }}
+                                            {{ $item->buku->kode_buku ?: $item->buku->barcode }}
                                         </span>
                                         @if ($item->jumlah > 1)
                                             <span style="font-size:11.5px; font-weight:600; color:#1d4ed8;">
@@ -194,30 +192,39 @@
                                     <span style="color:var(--text-muted); font-size:12.5px;">-</span>
                                 @endif
                             </td>
-                            <td style="text-align:center;">
+                            <td>
                                 @if ($effStatus === 'dikembalikan')
-                                    <span style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; background:#ecfdf5; color:#047857; font-size:11.5px; font-weight:700;">
+                                    <span class="status-pill status-sudah_kembali" style="font-size:11.5px;">
                                         Sudah Dikembalikan
                                     </span>
                                 @elseif ($effStatus === 'terlambat')
-                                    <span style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; background:#fef2f2; color:#dc2626; font-size:11.5px; font-weight:700;">
+                                    <span class="status-pill status-melewati_batas" style="font-size:11.5px;">
                                         Terlambat
                                     </span>
                                 @else
-                                    <span style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; background:#eff6ff; color:#1d4ed8; font-size:11.5px; font-weight:700;">
+                                    <span class="status-pill status-sambang" style="font-size:11.5px;">
                                         Sedang Dipinjam
                                     </span>
                                 @endif
                             </td>
-                            <td style="text-align:right; padding-right:20px;">
-                                <div style="display:flex; align-items:center; justify-content:flex-end; gap:6px;">
+                            <td style="text-align:center;">
+                                <div class="action-btn-group">
                                     {{-- Tandai Sudah Dikembalikan --}}
                                     @if ($item->status !== 'dikembalikan')
-                                        <form action="{{ route('perpustakaan.pinjam.kembali', $item->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Tandai buku ini sudah dikembalikan oleh {{ addslashes($item->nama_peminjam) }}?')">
+                                        <form action="{{ route('perpustakaan.pinjam.kembali', $item->id) }}" method="POST" style="display:inline;">
                                             @csrf
                                             @method('PATCH')
-                                            <button type="submit" class="btn btn-sm btn-secondary" title="Tandai Sudah Dikembalikan" style="padding:5px 8px; color:#059669; border-color:#a7f3d0; background:#ecfdf5;">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                                            <button type="button"
+                                                    class="action-btn action-btn-success js-swal-confirm"
+                                                    data-title="Tandai Buku Sudah Dikembalikan?"
+                                                    data-html="Konfirmasi bahwa <strong>{{ $item->nama_peminjam }}</strong> telah mengembalikan buku <strong>{{ $item->buku?->judul_buku ?? '-' }}</strong>?"
+                                                    data-icon="question"
+                                                    data-confirm-text="Ya, Sudah Kembali"
+                                                    data-confirm-color="#10B981"
+                                                    data-cancel-text="Batal"
+                                                    title="Tandai Sudah Dikembalikan"
+                                                    aria-label="Tandai Sudah Dikembalikan">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                     <polyline points="20 6 9 17 4 12"></polyline>
                                                 </svg>
                                             </button>
@@ -226,44 +233,104 @@
 
                                     {{-- Edit --}}
                                     <button type="button"
-                                            class="btn btn-sm btn-secondary"
+                                            class="action-btn action-btn-edit"
+                                            data-modal-target="modalEditPinjam{{ $item->id }}"
                                             title="Edit Peminjaman"
-                                            style="padding:5px 8px; color:#d97706; border-color:#fde68a; background:#fffbeb;"
-                                            onclick='openEditPinjamModal(@json($item))'>
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                                            aria-label="Edit Peminjaman {{ $item->nama_peminjam }}">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                         </svg>
                                     </button>
 
                                     {{-- Hapus --}}
-                                    <form action="{{ route('perpustakaan.pinjam.destroy', $item->id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Yakin ingin menghapus data peminjaman {{ addslashes($item->kode_pinjam) }}?')">
+                                    <form action="{{ route('perpustakaan.pinjam.destroy', $item->id) }}" method="POST" style="display:inline;">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-secondary" title="Hapus Data" style="padding:5px 8px; color:#dc2626; border-color:#fecaca; background:#fef2f2;">
-                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+                                        <button type="button"
+                                                class="action-btn action-btn-delete js-swal-confirm"
+                                                data-title="Hapus Data Peminjaman?"
+                                                data-html="Apakah Anda yakin ingin menghapus data peminjaman <strong>{{ $item->kode_pinjam }}</strong> atas nama <strong>{{ $item->nama_peminjam }}</strong>?"
+                                                data-icon="warning"
+                                                data-confirm-text="Ya, Hapus"
+                                                data-confirm-color="#DC2626"
+                                                data-cancel-text="Batal"
+                                                title="Hapus Data"
+                                                aria-label="Hapus Data {{ $item->kode_pinjam }}">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                 <polyline points="3 6 5 6 21 6"></polyline>
                                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                             </svg>
                                         </button>
                                     </form>
                                 </div>
+
+                                {{-- Modal Edit Peminjaman --}}
+                                <div class="app-modal" id="modalEditPinjam{{ $item->id }}" role="dialog" aria-modal="true">
+                                    <div class="modal-dialog" style="max-width:520px;">
+                                        <form action="{{ route('perpustakaan.pinjam.update', $item->id) }}" method="POST">
+                                            @csrf
+                                            @method('PUT')
+                                            <div class="modal-header">
+                                                <h3 class="modal-title">Edit Data Peminjaman</h3>
+                                                <button type="button" class="modal-close-btn" data-modal-close aria-label="Tutup">&times;</button>
+                                            </div>
+                                            <div class="modal-body" style="text-align:left; display:flex; flex-direction:column; gap:12px;">
+                                                <div class="form-group" style="margin:0;">
+                                                    <label class="form-label">Nama Peminjam <span class="required-mark">*</span></label>
+                                                    <input type="text" name="nama_peminjam" value="{{ $item->nama_peminjam }}" class="form-control" required>
+                                                </div>
+
+                                                <div class="form-group" style="margin:0;">
+                                                    <label class="form-label">Kelas / Kamar</label>
+                                                    <input type="text" name="kelas_kamar" value="{{ $item->kelas_kamar }}" class="form-control" placeholder="Contoh: Kelas 8A • Kamar Al-Fatih">
+                                                </div>
+
+                                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                                                    <div class="form-group" style="margin:0;">
+                                                        <label class="form-label">Tanggal Pinjam <span class="required-mark">*</span></label>
+                                                        <input type="date" name="tanggal_pinjam" value="{{ $item->tanggal_pinjam ? $item->tanggal_pinjam->format('Y-m-d') : '' }}" class="form-control" required>
+                                                    </div>
+                                                    <div class="form-group" style="margin:0;">
+                                                        <label class="form-label">Estimasi / Batas Kembali</label>
+                                                        <input type="date" name="tanggal_jatuh_tempo" value="{{ $item->tanggal_jatuh_tempo ? $item->tanggal_jatuh_tempo->format('Y-m-d') : '' }}" class="form-control">
+                                                    </div>
+                                                </div>
+
+                                                <div class="form-group" style="margin:0;">
+                                                    <label class="form-label">Status Peminjaman <span class="required-mark">*</span></label>
+                                                    <select name="status" class="form-select" required>
+                                                        <option value="dipinjam" {{ $item->status === 'dipinjam' ? 'selected' : '' }}>Sedang Dipinjam</option>
+                                                        <option value="dikembalikan" {{ $item->status === 'dikembalikan' ? 'selected' : '' }}>Sudah Dikembalikan</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="form-group" style="margin:0;">
+                                                    <label class="form-label">Catatan</label>
+                                                    <textarea name="catatan" rows="2" class="form-control">{{ $item->catatan }}</textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-modal-close>Batal</button>
+                                                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" style="text-align:center; padding: 48px 20px;">
-                                <div style="color: var(--text-muted); display:flex; flex-direction:column; align-items:center; gap:10px;">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width:42px;height:42px; opacity:0.5;">
-                                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                            <td colspan="8" style="padding:36px 16px; text-align:center;">
+                                <div style="font-size:14px; font-weight:700; color:var(--text-primary); margin-bottom:4px;">Belum ada data peminjaman buku</div>
+                                <div style="font-size:12.5px; color:var(--text-muted); margin-bottom:14px;">Klik tombol <strong>Pinjam Buku</strong> untuk mencatat peminjaman buku baru.</div>
+                                <a href="{{ route('perpustakaan.pinjam.create') }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width:15px;height:15px;">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
                                     </svg>
-                                    <div style="font-weight:600; font-size:14.5px; color:var(--text-primary);">Belum ada data peminjaman buku</div>
-                                    <div style="font-size:13px;">Klik tombol <strong>Pinjam Buku</strong> untuk mencatat peminjaman baru.</div>
-                                    <a href="{{ route('perpustakaan.pinjam.create') }}" class="btn btn-primary" style="margin-top:6px;">
-                                        + Pinjam Buku
-                                    </a>
-                                </div>
+                                    <span>Pinjam Buku</span>
+                                </a>
                             </td>
                         </tr>
                     @endforelse
@@ -272,89 +339,10 @@
         </div>
 
         @if ($peminjamans->hasPages())
-        <div style="padding: 16px 20px; border-top: 1px solid var(--border-color);">
+        <div style="padding:12px 16px; border-top:1px solid var(--border-subtle);">
             {{ $peminjamans->links() }}
         </div>
         @endif
     </div>
 </div>
-
-{{-- Modal Edit Peminjaman --}}
-<div id="modalEditPinjam" class="modal-backdrop" style="display:none;">
-    <div class="modal-content" style="max-width: 520px;">
-        <div class="modal-header">
-            <h3 class="modal-title">Edit Data Peminjaman</h3>
-            <button type="button" class="btn-close" onclick="closeEditPinjamModal()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-        </div>
-        <form id="formEditPinjam" method="POST">
-            @csrf
-            @method('PUT')
-            <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
-                <div class="form-group">
-                    <label class="form-label required">Nama Peminjam</label>
-                    <input type="text" name="nama_peminjam" id="edit_nama_peminjam" class="form-control" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Kelas / Kamar</label>
-                    <input type="text" name="kelas_kamar" id="edit_kelas_kamar" class="form-control" placeholder="Contoh: Kelas 8A • Kamar Al-Fatih">
-                </div>
-
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group">
-                        <label class="form-label required">Tanggal Pinjam</label>
-                        <input type="date" name="tanggal_pinjam" id="edit_tanggal_pinjam" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Estimasi / Batas Kembali</label>
-                        <input type="date" name="tanggal_jatuh_tempo" id="edit_tanggal_jatuh_tempo" class="form-control">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label required">Status Peminjaman</label>
-                    <select name="status" id="edit_status" class="form-select" required>
-                        <option value="dipinjam">Sedang Dipinjam</option>
-                        <option value="dikembalikan">Sudah Dikembalikan</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Catatan</label>
-                    <textarea name="catatan" id="edit_catatan" rows="2" class="form-control"></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeEditPinjamModal()">Batal</button>
-                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-@push('scripts')
-<script>
-    function openEditPinjamModal(item) {
-        const modal = document.getElementById('modalEditPinjam');
-        const form = document.getElementById('formEditPinjam');
-
-        form.action = `{{ url('perpustakaan/pinjam') }}/${item.id}`;
-        document.getElementById('edit_nama_peminjam').value = item.nama_peminjam || '';
-        document.getElementById('edit_kelas_kamar').value = item.kelas_kamar || '';
-        document.getElementById('edit_tanggal_pinjam').value = item.tanggal_pinjam ? item.tanggal_pinjam.substring(0, 10) : '';
-        document.getElementById('edit_tanggal_jatuh_tempo').value = item.tanggal_jatuh_tempo ? item.tanggal_jatuh_tempo.substring(0, 10) : '';
-        document.getElementById('edit_status').value = item.status || 'dipinjam';
-        document.getElementById('edit_catatan').value = item.catatan || '';
-
-        modal.style.display = 'flex';
-    }
-
-    function closeEditPinjamModal() {
-        document.getElementById('modalEditPinjam').style.display = 'none';
-    }
-</script>
-@endpush
 @endsection
-

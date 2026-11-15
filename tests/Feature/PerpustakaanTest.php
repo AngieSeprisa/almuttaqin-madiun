@@ -39,21 +39,35 @@ class PerpustakaanTest extends TestCase
         $resKode = $this->actingAs($user)->getJson(route('perpustakaan.buku.generate-kode'));
         $resKode->assertStatus(200)->assertJson(['kode_buku' => 'BK-0001']);
 
-        // 4. Simpan buku baru (tanpa mengisi kode_buku akan otomatis dibuatkan BK-0001)
+        // 4. Simpan buku baru dari hasil scan barcode (barcode otomatis menjadi kode_buku)
         $resStore = $this->actingAs($user)->post(route('perpustakaan.buku.store'), [
             'barcode'    => '9786020332956',
             'judul_buku' => 'Riyadhus Shalihin Jilid 1',
-            'kode_buku'  => '',
+            'kode_buku'  => '9786020332956',
             'stok_total' => 3,
         ]);
 
         $resStore->assertRedirect(route('perpustakaan.buku.index'));
         $this->assertDatabaseHas('perpustakaan_bukus', [
-            'kode_buku'     => 'BK-0001',
+            'kode_buku'     => '9786020332956',
             'barcode'       => '9786020332956',
             'judul_buku'    => 'Riyadhus Shalihin Jilid 1',
             'stok_total'    => 3,
             'stok_tersedia' => 3,
+        ]);
+
+        // 5. Simpan buku kedua tanpa barcode akan otomatis dibuatkan kode BK-0002
+        $resStoreAuto = $this->actingAs($user)->post(route('perpustakaan.buku.store'), [
+            'barcode'    => '',
+            'judul_buku' => 'Bulughul Maram',
+            'kode_buku'  => '',
+            'stok_total' => 2,
+        ]);
+
+        $resStoreAuto->assertRedirect(route('perpustakaan.buku.index'));
+        $this->assertDatabaseHas('perpustakaan_bukus', [
+            'kode_buku'  => 'BK-0002',
+            'judul_buku' => 'Bulughul Maram',
         ]);
     }
 

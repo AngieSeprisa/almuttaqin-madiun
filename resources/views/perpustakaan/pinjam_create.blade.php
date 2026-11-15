@@ -72,10 +72,13 @@
         {{-- Area Scanner Barcode Opsional --}}
         <div id="pinjamScannerWrap" style="display:none; margin-bottom:20px; padding:16px; border-radius:12px; background:#f8fafc; border:1px dashed #cbd5e1;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                <span style="font-size:13px; font-weight:700; color:var(--text-primary);">Arahkan Kamera HP ke Barcode Buku</span>
+                <span style="font-size:13px; font-weight:700; color:var(--text-primary);">Arahkan Kamera HP ke Barcode Buku (Otomatis Terpilih Saat Terbaca)</span>
                 <button type="button" class="btn btn-sm btn-secondary" onclick="stopPinjamScanner()">Tutup Kamera</button>
             </div>
-            <div id="pinjamBarcodeReader" style="width:100%; max-width:420px; margin:0 auto; border-radius:10px; overflow:hidden; background:#0f172a;"></div>
+            <div style="width:100%; max-width:420px; margin:0 auto; border-radius:10px; overflow:hidden; background:#0f172a; position:relative;">
+                <video id="pinjamNativeVideo" playsinline muted autoplay style="display:none; width:100%; max-height:260px; object-fit:cover;"></video>
+                <div id="pinjamBarcodeReader" style="width:100%;"></div>
+            </div>
             <div id="pinjamScanFeedback" style="display:none; margin-top:10px; padding:9px 12px; border-radius:8px; font-size:12.5px; font-weight:600;"></div>
         </div>
 
@@ -327,8 +330,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// Scanner Barcode Buku pada Form Pinjam
+// Scanner Barcode Buku pada Form Pinjam (Langsung Otomatis Terpilih Saat Terbaca)
 let pinjamQrScanner = null;
+let pinjamNativeStream = null;
+let pinjamNativeTimer = null;
 let isPinjamScanning = false;
 
 async function togglePinjamScanner() {
@@ -339,6 +344,46 @@ async function togglePinjamScanner() {
     }
 
     wrap.style.display = 'block';
+
+    // Prioritas 1: Native BarcodeDetector
+    if ('BarcodeDetector' in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+            const supported = await window.BarcodeDetector.getSupportedFormats();
+            const wanted = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'qr_code', 'codabar']
+                .filter(f => supported.includes(f));
+            if (wanted.length > 0) {
+                const detector = new window.BarcodeDetector({ formats: wanted });
+                const video = document.getElementById('pinjamNativeVideo');
+                pinjamNativeStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+                video.srcObject = pinjamNativeStream;
+                video.style.display = 'block';
+                await video.play();
+                isPinjamScanning = true;
+
+                pinjamNativeTimer = setInterval(async () => {
+                    if (!isPinjamScanning || !video || video.readyState < 2) return;
+                    try {
+                        const codes = await detector.detect(video);
+                        if (codes && codes.length > 0 && codes[0].rawValue) {
+                            const code = codes[0].rawValue.trim();
+                            if (code) {
+                                await stopPinjamScanner();
+                                matchBookByScannedCode(code);
+                            }
+                        }
+                    } catch (e) {}
+                }, 120);
+                return;
+            }
+        } catch (e) {
+            stopPinjamNativeStream();
+        }
+    }
+
+    // Prioritas 2: Html5Qrcode
     if (typeof Html5Qrcode === 'undefined') {
         showPinjamScanFeedback('Library scanner belum siap, silakan pilih buku dari daftar.', true);
         return;
@@ -346,16 +391,33 @@ async function togglePinjamScanner() {
 
     try {
         if (!pinjamQrScanner) {
-            pinjamQrScanner = new Html5Qrcode('pinjamBarcodeReader');
+            let formats = undefined;
+            if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+                formats = [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.ITF,
+                    Html5QrcodeSupportedFormats.QR_CODE
+                ];
+            }
+            pinjamQrScanner = new Html5Qrcode('pinjamBarcodeReader', {
+                formatsToSupport: formats,
+                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+                verbose: false
+            });
         }
         await pinjamQrScanner.start(
             { facingMode: 'environment' },
-            { fps: 10, qrbox: { width: 250, height: 130 } },
+            { fps: 15, qrbox: { width: 250, height: 120 } },
             (decodedText) => {
                 const code = (decodedText || '').trim();
                 if (!code) return;
-                matchBookByScannedCode(code);
                 stopPinjamScanner();
+                matchBookByScannedCode(code);
             },
             () => {}
         );
@@ -365,14 +427,31 @@ async function togglePinjamScanner() {
     }
 }
 
+function stopPinjamNativeStream() {
+    if (pinjamNativeTimer) {
+        clearInterval(pinjamNativeTimer);
+        pinjamNativeTimer = null;
+    }
+    if (pinjamNativeStream) {
+        pinjamNativeStream.getTracks().forEach(t => t.stop());
+        pinjamNativeStream = null;
+    }
+    const video = document.getElementById('pinjamNativeVideo');
+    if (video) {
+        video.srcObject = null;
+        video.style.display = 'none';
+    }
+}
+
 async function stopPinjamScanner() {
-    const wrap = document.getElementById('pinjamScannerWrap');
+    stopPinjamNativeStream();
     if (pinjamQrScanner && isPinjamScanning) {
         try {
             await pinjamQrScanner.stop();
         } catch (e) {}
     }
     isPinjamScanning = false;
+    const wrap = document.getElementById('pinjamScannerWrap');
     if (wrap) wrap.style.display = 'none';
 }
 
