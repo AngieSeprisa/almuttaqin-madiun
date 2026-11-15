@@ -72,14 +72,17 @@
         {{-- Area Scanner Barcode Buku --}}
         <div id="pinjamScannerWrap" style="display:none; margin-bottom:20px; padding:16px; border-radius:12px; background:#f8fafc; border:1px dashed #cbd5e1;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                <span style="font-size:13px; font-weight:700; color:var(--text-primary);">Arahkan Kamera HP ke Barcode Buku (Langsung Otomatis Tertulis Saat Terbaca)</span>
+                <span style="font-size:13px; font-weight:700; color:var(--text-primary);">Arahkan & Tahan Kamera pada Barcode Buku Hingga Terverifikasi</span>
                 <button type="button" class="btn btn-sm btn-secondary" onclick="stopPinjamScanner()">Tutup Kamera</button>
             </div>
-            <div style="width:100%; max-width:420px; margin:0 auto; border-radius:10px; overflow:hidden; background:#0f172a; position:relative; min-height:210px; display:flex; align-items:center; justify-content:center;">
-                <video id="pinjamNativeVideo" playsinline muted autoplay style="display:none; width:100%; max-height:260px; object-fit:cover;"></video>
-                <div id="pinjamScanOverlay" style="display:none; position:absolute; inset:0; pointer-events:none; align-items:center; justify-content:center;">
-                    <div style="width:80%; max-width:300px; height:120px; border:2px solid #38bdf8; border-radius:12px; box-shadow:0 0 0 9999px rgba(15,23,42,0.38); position:relative;">
+            <div style="width:100%; max-width:420px; margin:0 auto; border-radius:10px; overflow:hidden; background:#0f172a; position:relative; min-height:220px; display:flex; align-items:center; justify-content:center;">
+                <video id="pinjamNativeVideo" playsinline muted autoplay style="display:none; width:100%; max-height:270px; object-fit:cover;"></video>
+                <div id="pinjamScanOverlay" style="display:none; position:absolute; inset:0; pointer-events:none; flex-direction:column; align-items:center; justify-content:center; gap:10px;">
+                    <div id="pinjamTargetBox" style="width:80%; max-width:300px; height:120px; border:2.5px solid #38bdf8; border-radius:12px; box-shadow:0 0 0 9999px rgba(15,23,42,0.42); position:relative; transition: border-color 0.2s ease;">
                         <div style="position:absolute; left:10px; right:10px; top:50%; height:2px; background:#ef4444; box-shadow:0 0 8px #ef4444;"></div>
+                    </div>
+                    <div id="pinjamHoldStatus" style="z-index:2; background:rgba(15,23,42,0.82); color:#f8fafc; font-size:12px; font-weight:600; padding:5px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.15);">
+                        Arahkan & tahan kamera pada barcode...
                     </div>
                 </div>
             </div>
@@ -376,45 +379,94 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// Scanner Barcode Buku pada Form Pinjam (ZBar WebAssembly + BarcodeDetector — Langsung Otomatis Tertulis Saat Terbaca)
+// Scanner Barcode Buku pada Form Pinjam (ZBar WebAssembly + Verifikasi Stabil Multi-Frame)
 let pinjamNativeStream = null;
 let pinjamNativeTimer = null;
 let isPinjamScanning = false;
 let isPinjamDecoding = false;
+let pinjamCameraOpenedAt = 0;
+let pinjamConfiguredScanner = null;
 let pinjamScanCanvas = document.createElement('canvas');
 let pinjamScanCtx = pinjamScanCanvas.getContext('2d', { willReadFrequently: true });
-let pinjamDetector = null;
 
-function normalizePinjamBarcode(raw) {
-    const s = String(raw || '').trim();
-    if (/^00\d{11}$/.test(s)) {
-        return s.substring(1);
+const PINJAM_REQUIRED_CONSENSUS = 4;
+let pinjamLastCandidate = '';
+let pinjamCandidateStreak = 0;
+
+function isValidCompletePinjamBarcode(raw) {
+    const code = String(raw || '').trim();
+    if (!code || code.length < 6) return false;
+
+    if (/^\d+$/.test(code)) {
+        if (code.length !== 8 && code.length !== 12 && code.length !== 13) {
+            return false;
+        }
+        let sum = 0;
+        const len = code.length;
+        for (let i = 0; i < len - 1; i++) {
+            const digit = parseInt(code.charAt(i), 10);
+            const posFromRight = (len - 1) - i;
+            const weight = (posFromRight % 2 === 1) ? 3 : 1;
+            sum += digit * weight;
+        }
+        const checkDigit = (10 - (sum % 10)) % 10;
+        return checkDigit === parseInt(code.charAt(len - 1), 10);
     }
-    return s;
+
+    return code.length >= 6;
 }
 
-async function decodePinjamRegion(video, sx, sy, sw, sh, targetW, targetH) {
-    if (sw <= 0 || sh <= 0) return null;
+async function getPinjamConfiguredScanner() {
+    if (pinjamConfiguredScanner) return pinjamConfiguredScanner;
+    if (typeof zbarWasm === 'undefined' || typeof zbarWasm.ZBarScanner === 'undefined') return null;
+
+    try {
+        const scanner = await zbarWasm.ZBarScanner.create();
+        const T = zbarWasm.ZBarSymbolType;
+        const C = zbarWasm.ZBarConfigType;
+
+        scanner.setConfig(T.ZBAR_NONE, C.ZBAR_CFG_ENABLE, 0);
+        scanner.setConfig(T.ZBAR_EAN13, C.ZBAR_CFG_ENABLE, 1);
+        scanner.setConfig(T.ZBAR_EAN8, C.ZBAR_CFG_ENABLE, 1);
+        scanner.setConfig(T.ZBAR_CODE128, C.ZBAR_CFG_ENABLE, 1);
+        scanner.setConfig(T.ZBAR_CODE39, C.ZBAR_CFG_ENABLE, 1);
+        scanner.setConfig(T.ZBAR_QRCODE, C.ZBAR_CFG_ENABLE, 1);
+
+        pinjamConfiguredScanner = scanner;
+        return scanner;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function decodePinjamCenter(video) {
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return null;
+
+    const cropW = Math.round(vw * 0.8);
+    const cropH = Math.round(vh * 0.48);
+    const cropX = Math.round((vw - cropW) / 2);
+    const cropY = Math.round((vh - cropH) / 2);
+    const targetW = Math.min(840, cropW);
+    const targetH = Math.min(500, cropH);
+
     pinjamScanCanvas.width = targetW;
     pinjamScanCanvas.height = targetH;
-    pinjamScanCtx.drawImage(video, sx, sy, sw, sh, 0, 0, targetW, targetH);
+    pinjamScanCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, targetW, targetH);
     const imgData = pinjamScanCtx.getImageData(0, 0, targetW, targetH);
 
     if (typeof zbarWasm !== 'undefined' && typeof zbarWasm.scanImageData === 'function') {
         try {
-            const symbols = await zbarWasm.scanImageData(imgData);
+            const scanner = await getPinjamConfiguredScanner();
+            const symbols = scanner
+                ? await zbarWasm.scanImageData(imgData, scanner)
+                : await zbarWasm.scanImageData(imgData);
             if (symbols && symbols.length > 0) {
                 const val = symbols[0].decode();
-                if (val && val.trim()) return val.trim();
-            }
-        } catch (e) {}
-    }
-
-    if (pinjamDetector) {
-        try {
-            const codes = await pinjamDetector.detect(imgData);
-            if (codes && codes.length > 0 && codes[0].rawValue) {
-                return codes[0].rawValue.trim();
+                if (val && isValidCompletePinjamBarcode(val)) {
+                    return val.trim();
+                }
             }
         } catch (e) {}
     }
@@ -422,10 +474,21 @@ async function decodePinjamRegion(video, sx, sy, sw, sh, targetW, targetH) {
     return null;
 }
 
+function resetPinjamConsensusUI() {
+    pinjamLastCandidate = '';
+    pinjamCandidateStreak = 0;
+    const box = document.getElementById('pinjamTargetBox');
+    const hold = document.getElementById('pinjamHoldStatus');
+    if (box) box.style.borderColor = '#38bdf8';
+    if (hold) hold.textContent = 'Arahkan & tahan kamera pada barcode...';
+}
+
 async function togglePinjamScanner() {
     const wrap = document.getElementById('pinjamScannerWrap');
     const video = document.getElementById('pinjamNativeVideo');
     const overlay = document.getElementById('pinjamScanOverlay');
+    const box = document.getElementById('pinjamTargetBox');
+    const hold = document.getElementById('pinjamHoldStatus');
 
     if (isPinjamScanning) {
         await stopPinjamScanner();
@@ -433,6 +496,7 @@ async function togglePinjamScanner() {
     }
 
     wrap.style.display = 'block';
+    resetPinjamConsensusUI();
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         showPinjamScanFeedback('Browser tidak mendukung akses kamera.', true);
@@ -440,10 +504,6 @@ async function togglePinjamScanner() {
     }
 
     try {
-        if (!pinjamDetector && typeof window.BarcodeDetector !== 'undefined') {
-            try { pinjamDetector = new window.BarcodeDetector(); } catch (e) {}
-        }
-
         pinjamNativeStream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: false
@@ -453,36 +513,43 @@ async function togglePinjamScanner() {
         video.style.display = 'block';
         if (overlay) overlay.style.display = 'flex';
         await video.play();
+        pinjamCameraOpenedAt = Date.now();
         isPinjamScanning = true;
 
         pinjamNativeTimer = setInterval(async () => {
             if (!isPinjamScanning || isPinjamDecoding || !video || video.readyState < 2) return;
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-            if (!vw || !vh) return;
+            if (Date.now() - pinjamCameraOpenedAt < 800) return;
 
             isPinjamDecoding = true;
             try {
-                const cropW = Math.round(vw * 0.8);
-                const cropH = Math.round(vh * 0.5);
-                const cropX = Math.round((vw - cropW) / 2);
-                const cropY = Math.round((vh - cropH) / 2);
-
-                let found = await decodePinjamRegion(video, cropX, cropY, cropW, cropH, Math.min(800, cropW), Math.min(500, cropH));
-                if (!found) {
-                    found = await decodePinjamRegion(video, 0, 0, vw, vh, 640, Math.round(640 * (vh / vw)));
-                }
-
+                const found = await decodePinjamCenter(video);
                 if (found) {
-                    const clean = normalizePinjamBarcode(found);
-                    await stopPinjamScanner();
-                    matchBookByScannedCode(clean, false);
+                    if (found === pinjamLastCandidate) {
+                        pinjamCandidateStreak++;
+                    } else {
+                        pinjamLastCandidate = found;
+                        pinjamCandidateStreak = 1;
+                    }
+
+                    if (box) box.style.borderColor = '#10b981';
+                    if (hold) {
+                        hold.textContent = 'Memverifikasi angka barcode: ' + found + ' (' + pinjamCandidateStreak + '/' + PINJAM_REQUIRED_CONSENSUS + ')';
+                    }
+
+                    if (pinjamCandidateStreak >= PINJAM_REQUIRED_CONSENSUS) {
+                        await stopPinjamScanner();
+                        matchBookByScannedCode(found, false);
+                    }
+                } else {
+                    if (pinjamCandidateStreak > 0) {
+                        resetPinjamConsensusUI();
+                    }
                 }
             } catch (e) {
             } finally {
                 isPinjamDecoding = false;
             }
-        }, 110);
+        }, 220);
     } catch (e) {
         showPinjamScanFeedback('Tidak dapat membuka kamera. Pastikan izin kamera diizinkan pada browser.', true);
     }
@@ -507,6 +574,7 @@ async function stopPinjamScanner() {
 
     isPinjamScanning = false;
     isPinjamDecoding = false;
+    resetPinjamConsensusUI();
     const wrap = document.getElementById('pinjamScannerWrap');
     if (wrap) wrap.style.display = 'none';
 }
@@ -514,7 +582,7 @@ async function stopPinjamScanner() {
 function matchBookByScannedCode(code, silentIfNotFound) {
     const select = document.getElementById('perpustakaan_buku_id');
     const inputKode = document.getElementById('input_kode_buku_pinjam');
-    const clean = normalizePinjamBarcode(code);
+    const clean = String(code || '').trim();
 
     // Langsung otomatis tulis ke kolom Kode Buku (Barcode)
     if (inputKode && !silentIfNotFound) {
