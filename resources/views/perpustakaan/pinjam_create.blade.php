@@ -56,7 +56,7 @@
                 </div>
                 <div>
                     <h2 style="font-size:17px; font-weight:700; color:var(--text-primary); margin:0;">Formulir Peminjaman Buku</h2>
-                    <p style="font-size:12.5px; color:var(--text-secondary); margin:2px 0 0;">Pilih buku yang dipinjam, lengkapi data peminjam, lalu klik Simpan</p>
+                    <p style="font-size:12.5px; color:var(--text-secondary); margin:2px 0 0;">Scan barcode buku atau pilih buku dari daftar, lengkapi data peminjam, lalu klik Simpan</p>
                 </div>
             </div>
 
@@ -69,23 +69,38 @@
             </button>
         </div>
 
-        {{-- Area Scanner Barcode Opsional --}}
+        {{-- Area Scanner Barcode Buku --}}
         <div id="pinjamScannerWrap" style="display:none; margin-bottom:20px; padding:16px; border-radius:12px; background:#f8fafc; border:1px dashed #cbd5e1;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-                <span style="font-size:13px; font-weight:700; color:var(--text-primary);">Arahkan Kamera HP ke Barcode Buku (Otomatis Terpilih Saat Terbaca)</span>
+                <span style="font-size:13px; font-weight:700; color:var(--text-primary);">Arahkan Kamera HP ke Barcode Buku (Langsung Otomatis Tertulis Saat Terbaca)</span>
                 <button type="button" class="btn btn-sm btn-secondary" onclick="stopPinjamScanner()">Tutup Kamera</button>
             </div>
-            <div style="width:100%; max-width:420px; margin:0 auto; border-radius:10px; overflow:hidden; background:#0f172a; position:relative;">
+            <div style="width:100%; max-width:420px; margin:0 auto; border-radius:10px; overflow:hidden; background:#0f172a; position:relative; min-height:210px; display:flex; align-items:center; justify-content:center;">
                 <video id="pinjamNativeVideo" playsinline muted autoplay style="display:none; width:100%; max-height:260px; object-fit:cover;"></video>
-                <div id="pinjamBarcodeReader" style="width:100%;"></div>
+                <div id="pinjamScanOverlay" style="display:none; position:absolute; inset:0; pointer-events:none; align-items:center; justify-content:center;">
+                    <div style="width:80%; max-width:300px; height:120px; border:2px solid #38bdf8; border-radius:12px; box-shadow:0 0 0 9999px rgba(15,23,42,0.38); position:relative;">
+                        <div style="position:absolute; left:10px; right:10px; top:50%; height:2px; background:#ef4444; box-shadow:0 0 8px #ef4444;"></div>
+                    </div>
+                </div>
             </div>
-            <div id="pinjamScanFeedback" style="display:none; margin-top:10px; padding:9px 12px; border-radius:8px; font-size:12.5px; font-weight:600;"></div>
         </div>
+
+        <div id="pinjamScanFeedback" style="display:none; margin-bottom:16px; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:600;"></div>
 
         <form action="{{ route('perpustakaan.pinjam.store') }}" method="POST" id="formPinjamBuku">
             @csrf
 
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px; margin-bottom:18px;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:18px; margin-bottom:18px;">
+                {{-- Kode Buku (Barcode) --}}
+                <div class="form-group">
+                    <label for="input_kode_buku_pinjam" class="form-label">Kode Buku (Barcode)</label>
+                    <input type="text"
+                           id="input_kode_buku_pinjam"
+                           class="form-control"
+                           placeholder="Otomatis tertulis saat scan barcode..."
+                           style="font-family:monospace; font-weight:700; color:#1d4ed8; transition: box-shadow 0.25s ease, border-color 0.25s ease;">
+                </div>
+
                 {{-- Pilih Buku --}}
                 <div class="form-group">
                     <label for="perpustakaan_buku_id" class="form-label required">Pilih Buku yang Dipinjam</label>
@@ -95,14 +110,15 @@
                             @php
                                 $isSelected = (string) old('perpustakaan_buku_id', $selectedBukuId) === (string) $buku->id;
                                 $habis = $buku->stok_tersedia <= 0;
+                                $kodeDisplay = $buku->kode_buku ?: $buku->barcode;
                             @endphp
                             <option value="{{ $buku->id }}"
-                                    data-kode="{{ $buku->kode_buku }}"
+                                    data-kode="{{ $kodeDisplay }}"
                                     data-barcode="{{ $buku->barcode }}"
                                     data-stok="{{ $buku->stok_tersedia }}"
                                     {{ $isSelected ? 'selected' : '' }}
                                     {{ $habis && !$isSelected ? 'disabled' : '' }}>
-                                [{{ $buku->kode_buku }}] {{ $buku->judul_buku }} — (Tersedia: {{ $buku->stok_tersedia }})
+                                [{{ $kodeDisplay }}] {{ $buku->judul_buku }} — (Tersedia: {{ $buku->stok_tersedia }})
                             </option>
                         @endforeach
                     </select>
@@ -200,9 +216,15 @@
     })->values();
 @endphp
 @push('scripts')
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+{{-- ZBar WebAssembly + BarcodeDetector Polyfill (Mendukung iOS Safari, Android Chrome, & Desktop) --}}
+<script src="{{ asset('js/vendor/zbar/zbar-wasm.js') }}" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js'"></script>
+<script src="{{ asset('js/vendor/zbar/barcode-detector-polyfill.js') }}" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js'"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.BarcodeDetector === 'undefined' && typeof barcodeDetectorPolyfill !== 'undefined') {
+        window.BarcodeDetector = barcodeDetectorPolyfill.BarcodeDetectorPolyfill;
+    }
+
     const dataSantri = @json($santriJsonData);
 
     const inputNama = document.getElementById('input_nama_peminjam');
@@ -210,6 +232,30 @@ document.addEventListener('DOMContentLoaded', function () {
     const inputKelasKamar = document.getElementById('kelas_kamar');
     const listPrediksi = document.getElementById('list_prediksi_santri');
     const btnToggle = document.getElementById('btn_toggle_santri');
+    const selectBuku = document.getElementById('perpustakaan_buku_id');
+    const inputKodePinjam = document.getElementById('input_kode_buku_pinjam');
+
+    // Sinkronisasi Kode Buku <-> Pilih Buku
+    if (selectBuku && inputKodePinjam) {
+        function syncKodeFromSelectedOption() {
+            const opt = selectBuku.options[selectBuku.selectedIndex];
+            if (opt && opt.value) {
+                inputKodePinjam.value = opt.getAttribute('data-kode') || opt.getAttribute('data-barcode') || '';
+            }
+        }
+        syncKodeFromSelectedOption();
+
+        selectBuku.addEventListener('change', function () {
+            syncKodeFromSelectedOption();
+        });
+
+        inputKodePinjam.addEventListener('input', function () {
+            const val = this.value.trim();
+            if (val.length >= 3) {
+                matchBookByScannedCode(val, true);
+            }
+        });
+    }
 
     if (inputNama && listPrediksi) {
         let selectedIndex = -1;
@@ -330,14 +376,57 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
-// Scanner Barcode Buku pada Form Pinjam (Langsung Otomatis Terpilih Saat Terbaca)
-let pinjamQrScanner = null;
+// Scanner Barcode Buku pada Form Pinjam (ZBar WebAssembly + BarcodeDetector — Langsung Otomatis Tertulis Saat Terbaca)
 let pinjamNativeStream = null;
 let pinjamNativeTimer = null;
 let isPinjamScanning = false;
+let isPinjamDecoding = false;
+let pinjamScanCanvas = document.createElement('canvas');
+let pinjamScanCtx = pinjamScanCanvas.getContext('2d', { willReadFrequently: true });
+let pinjamDetector = null;
+
+function normalizePinjamBarcode(raw) {
+    const s = String(raw || '').trim();
+    if (/^00\d{11}$/.test(s)) {
+        return s.substring(1);
+    }
+    return s;
+}
+
+async function decodePinjamRegion(video, sx, sy, sw, sh, targetW, targetH) {
+    if (sw <= 0 || sh <= 0) return null;
+    pinjamScanCanvas.width = targetW;
+    pinjamScanCanvas.height = targetH;
+    pinjamScanCtx.drawImage(video, sx, sy, sw, sh, 0, 0, targetW, targetH);
+    const imgData = pinjamScanCtx.getImageData(0, 0, targetW, targetH);
+
+    if (typeof zbarWasm !== 'undefined' && typeof zbarWasm.scanImageData === 'function') {
+        try {
+            const symbols = await zbarWasm.scanImageData(imgData);
+            if (symbols && symbols.length > 0) {
+                const val = symbols[0].decode();
+                if (val && val.trim()) return val.trim();
+            }
+        } catch (e) {}
+    }
+
+    if (pinjamDetector) {
+        try {
+            const codes = await pinjamDetector.detect(imgData);
+            if (codes && codes.length > 0 && codes[0].rawValue) {
+                return codes[0].rawValue.trim();
+            }
+        } catch (e) {}
+    }
+
+    return null;
+}
 
 async function togglePinjamScanner() {
     const wrap = document.getElementById('pinjamScannerWrap');
+    const video = document.getElementById('pinjamNativeVideo');
+    const overlay = document.getElementById('pinjamScanOverlay');
+
     if (isPinjamScanning) {
         await stopPinjamScanner();
         return;
@@ -345,89 +434,61 @@ async function togglePinjamScanner() {
 
     wrap.style.display = 'block';
 
-    // Prioritas 1: Native BarcodeDetector
-    if ('BarcodeDetector' in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-            const supported = await window.BarcodeDetector.getSupportedFormats();
-            const wanted = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'qr_code', 'codabar']
-                .filter(f => supported.includes(f));
-            if (wanted.length > 0) {
-                const detector = new window.BarcodeDetector({ formats: wanted });
-                const video = document.getElementById('pinjamNativeVideo');
-                pinjamNativeStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-                    audio: false
-                });
-                video.srcObject = pinjamNativeStream;
-                video.style.display = 'block';
-                await video.play();
-                isPinjamScanning = true;
-
-                pinjamNativeTimer = setInterval(async () => {
-                    if (!isPinjamScanning || !video || video.readyState < 2) return;
-                    try {
-                        const codes = await detector.detect(video);
-                        if (codes && codes.length > 0 && codes[0].rawValue) {
-                            const code = codes[0].rawValue.trim();
-                            if (code) {
-                                await stopPinjamScanner();
-                                matchBookByScannedCode(code);
-                            }
-                        }
-                    } catch (e) {}
-                }, 120);
-                return;
-            }
-        } catch (e) {
-            stopPinjamNativeStream();
-        }
-    }
-
-    // Prioritas 2: Html5Qrcode
-    if (typeof Html5Qrcode === 'undefined') {
-        showPinjamScanFeedback('Library scanner belum siap, silakan pilih buku dari daftar.', true);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showPinjamScanFeedback('Browser tidak mendukung akses kamera.', true);
         return;
     }
 
     try {
-        if (!pinjamQrScanner) {
-            let formats = undefined;
-            if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
-                formats = [
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.UPC_A,
-                    Html5QrcodeSupportedFormats.UPC_E,
-                    Html5QrcodeSupportedFormats.ITF,
-                    Html5QrcodeSupportedFormats.QR_CODE
-                ];
-            }
-            pinjamQrScanner = new Html5Qrcode('pinjamBarcodeReader', {
-                formatsToSupport: formats,
-                experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-                verbose: false
-            });
+        if (!pinjamDetector && typeof window.BarcodeDetector !== 'undefined') {
+            try { pinjamDetector = new window.BarcodeDetector(); } catch (e) {}
         }
-        await pinjamQrScanner.start(
-            { facingMode: 'environment' },
-            { fps: 15, qrbox: { width: 250, height: 120 } },
-            (decodedText) => {
-                const code = (decodedText || '').trim();
-                if (!code) return;
-                stopPinjamScanner();
-                matchBookByScannedCode(code);
-            },
-            () => {}
-        );
+
+        pinjamNativeStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false
+        });
+        video.srcObject = pinjamNativeStream;
+        video.setAttribute('playsinline', 'true');
+        video.style.display = 'block';
+        if (overlay) overlay.style.display = 'flex';
+        await video.play();
         isPinjamScanning = true;
+
+        pinjamNativeTimer = setInterval(async () => {
+            if (!isPinjamScanning || isPinjamDecoding || !video || video.readyState < 2) return;
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+            if (!vw || !vh) return;
+
+            isPinjamDecoding = true;
+            try {
+                const cropW = Math.round(vw * 0.8);
+                const cropH = Math.round(vh * 0.5);
+                const cropX = Math.round((vw - cropW) / 2);
+                const cropY = Math.round((vh - cropH) / 2);
+
+                let found = await decodePinjamRegion(video, cropX, cropY, cropW, cropH, Math.min(800, cropW), Math.min(500, cropH));
+                if (!found) {
+                    found = await decodePinjamRegion(video, 0, 0, vw, vh, 640, Math.round(640 * (vh / vw)));
+                }
+
+                if (found) {
+                    const clean = normalizePinjamBarcode(found);
+                    await stopPinjamScanner();
+                    matchBookByScannedCode(clean, false);
+                }
+            } catch (e) {
+            } finally {
+                isPinjamDecoding = false;
+            }
+        }, 110);
     } catch (e) {
-        showPinjamScanFeedback('Tidak dapat membuka kamera. Pastikan izin kamera aktif.', true);
+        showPinjamScanFeedback('Tidak dapat membuka kamera. Pastikan izin kamera diizinkan pada browser.', true);
     }
 }
 
-function stopPinjamNativeStream() {
+async function stopPinjamScanner() {
     if (pinjamNativeTimer) {
         clearInterval(pinjamNativeTimer);
         pinjamNativeTimer = null;
@@ -441,31 +502,52 @@ function stopPinjamNativeStream() {
         video.srcObject = null;
         video.style.display = 'none';
     }
-}
+    const overlay = document.getElementById('pinjamScanOverlay');
+    if (overlay) overlay.style.display = 'none';
 
-async function stopPinjamScanner() {
-    stopPinjamNativeStream();
-    if (pinjamQrScanner && isPinjamScanning) {
-        try {
-            await pinjamQrScanner.stop();
-        } catch (e) {}
-    }
     isPinjamScanning = false;
+    isPinjamDecoding = false;
     const wrap = document.getElementById('pinjamScannerWrap');
     if (wrap) wrap.style.display = 'none';
 }
 
-function matchBookByScannedCode(code) {
+function matchBookByScannedCode(code, silentIfNotFound) {
     const select = document.getElementById('perpustakaan_buku_id');
+    const inputKode = document.getElementById('input_kode_buku_pinjam');
+    const clean = normalizePinjamBarcode(code);
+
+    // Langsung otomatis tulis ke kolom Kode Buku (Barcode)
+    if (inputKode && !silentIfNotFound) {
+        inputKode.value = clean;
+        inputKode.style.borderColor = '#10b981';
+        inputKode.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.25)';
+        setTimeout(() => {
+            inputKode.style.borderColor = '';
+            inputKode.style.boxShadow = '';
+        }, 2000);
+    }
+
+    if (navigator.vibrate && !silentIfNotFound) {
+        try { navigator.vibrate(100); } catch (e) {}
+    }
+
     if (!select) return;
 
-    const clean = code.toLowerCase();
+    const cleanLower = clean.toLowerCase();
+    const cleanNoZero = cleanLower.replace(/^0+/, '');
     let matchedOption = null;
 
     Array.from(select.options).forEach(opt => {
-        const barcode = (opt.getAttribute('data-barcode') || '').toLowerCase();
-        const kode = (opt.getAttribute('data-kode') || '').toLowerCase();
-        if ((barcode && barcode === clean) || (kode && kode === clean)) {
+        if (!opt.value) return;
+        const barcode = (opt.getAttribute('data-barcode') || '').toLowerCase().trim();
+        const kode = (opt.getAttribute('data-kode') || '').toLowerCase().trim();
+        const barcodeNoZero = barcode.replace(/^0+/, '');
+        const kodeNoZero = kode.replace(/^0+/, '');
+
+        if (
+            (barcode && (barcode === cleanLower || (cleanNoZero && barcodeNoZero === cleanNoZero))) ||
+            (kode && (kode === cleanLower || (cleanNoZero && kodeNoZero === cleanNoZero)))
+        ) {
             matchedOption = opt;
         }
     });
@@ -473,17 +555,18 @@ function matchBookByScannedCode(code) {
     if (matchedOption) {
         select.value = matchedOption.value;
         select.dispatchEvent(new Event('change', { bubbles: true }));
-        showPinjamScanFeedback('Buku ditemukan: ' + matchedOption.textContent.trim(), false);
-    } else {
-        showPinjamScanFeedback('Buku dengan barcode "' + code + '" belum terdaftar di Daftar Buku.', true);
+        select.dispatchEvent(new Event('fi-select:sync'));
+        if (!silentIfNotFound) {
+            showPinjamScanFeedback('Barcode "' + clean + '" terbaca — Buku terpilih: ' + matchedOption.textContent.trim(), false);
+        }
+    } else if (!silentIfNotFound) {
+        showPinjamScanFeedback('Barcode "' + clean + '" berhasil terbaca, namun buku dengan kode tersebut belum terdaftar di Daftar Buku.', true);
     }
 }
 
 function showPinjamScanFeedback(msg, isError) {
     const el = document.getElementById('pinjamScanFeedback');
-    const wrap = document.getElementById('pinjamScannerWrap');
     if (!el) return;
-    if (wrap) wrap.style.display = 'block';
     el.style.display = 'block';
     el.style.background = isError ? '#fef2f2' : '#ecfdf5';
     el.style.color = isError ? '#b91c1c' : '#047857';
@@ -493,4 +576,3 @@ function showPinjamScanFeedback(msg, isError) {
 </script>
 @endpush
 @endsection
-

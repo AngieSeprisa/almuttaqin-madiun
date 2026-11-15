@@ -67,17 +67,14 @@
             </div>
         </div>
 
-        <div id="scannerWrapper" style="position:relative; width:100%; max-width:460px; margin:0 auto; border-radius:14px; overflow:hidden; background:#0B0F17; min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; border:2px dashed var(--border-light);">
-            {{-- Native Live Video Stream (untuk BarcodeDetector cepat) --}}
-            <video id="nativeBarcodeVideo" playsinline muted autoplay style="display:none; width:100%; max-height:280px; object-fit:cover;"></video>
-
-            {{-- Fallback / Html5Qrcode Container --}}
-            <div id="barcodeReader" style="width:100%;"></div>
+        <div id="scannerWrapper" style="position:relative; width:100%; max-width:460px; margin:0 auto; border-radius:14px; overflow:hidden; background:#0B0F17; min-height:230px; display:flex; flex-direction:column; align-items:center; justify-content:center; border:2px dashed var(--border-light);">
+            {{-- Live Video Stream dengan ZBar WebAssembly + Native BarcodeDetector --}}
+            <video id="nativeBarcodeVideo" playsinline muted autoplay style="display:none; width:100%; max-height:290px; object-fit:cover;"></video>
 
             {{-- Garis Panduan Fokus Barcode --}}
             <div id="scanTargetOverlay" style="display:none; position:absolute; inset:0; pointer-events:none; align-items:center; justify-content:center;">
-                <div style="width:76%; max-width:300px; height:110px; border:2px solid #38bdf8; border-radius:12px; box-shadow:0 0 0 9999px rgba(15,23,42,0.38); position:relative;">
-                    <div style="position:absolute; left:8px; right:8px; top:50%; height:2px; background:#ef4444; box-shadow:0 0 8px #ef4444;"></div>
+                <div style="width:80%; max-width:320px; height:125px; border:2px solid #38bdf8; border-radius:12px; box-shadow:0 0 0 9999px rgba(15,23,42,0.38); position:relative;">
+                    <div style="position:absolute; left:10px; right:10px; top:50%; height:2px; background:#ef4444; box-shadow:0 0 8px #ef4444;"></div>
                 </div>
             </div>
 
@@ -191,14 +188,24 @@
     </div>
 </div>
 
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+{{-- ZBar WebAssembly + BarcodeDetector Polyfill (Mendukung iOS Safari, Android Chrome, & Desktop) --}}
+<script src="{{ asset('js/vendor/zbar/zbar-wasm.js') }}" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js'"></script>
+<script src="{{ asset('js/vendor/zbar/barcode-detector-polyfill.js') }}" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js'"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var html5QrCode = null;
+    if (typeof window.BarcodeDetector === 'undefined' && typeof barcodeDetectorPolyfill !== 'undefined') {
+        window.BarcodeDetector = barcodeDetectorPolyfill.BarcodeDetectorPolyfill;
+    }
+
     var nativeStream = null;
-    var nativeDetectorTimer = null;
+    var scanTimer = null;
     var isScanning = false;
+    var isDecodingFrame = false;
     var currentFacingMode = 'environment';
+
+    var scanCanvas = document.createElement('canvas');
+    var scanCtx = scanCanvas.getContext('2d', { willReadFrequently: true });
+    var nativeDetector = null;
 
     var btnToggleCamera = document.getElementById('btnToggleCamera');
     var camBtnText = document.getElementById('camBtnText');
@@ -235,10 +242,19 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Normalisasi UPC-A 12 digit yang diawali 0 pada hasil EAN-13
+    function normalizeBarcode(raw) {
+        var s = String(raw || '').trim();
+        if (/^00\d{11}$/.test(s)) {
+            return s.substring(1);
+        }
+        return s;
+    }
+
     // Ketika barcode terbaca oleh kamera: langsung otomatis ditulis ke Kode Buku tanpa klik apapun
     function applyScannedBarcode(code) {
         if (!code) return;
-        var cleanCode = String(code).trim();
+        var cleanCode = normalizeBarcode(code);
         if (!cleanCode) return;
 
         if (inputKode) {
@@ -248,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(function () {
                 inputKode.style.borderColor = '';
                 inputKode.style.boxShadow = '';
-            }, 1800);
+            }, 2000);
         }
 
         if (inputBarcode) {
@@ -290,20 +306,51 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    // Prioritas 1: Native BarcodeDetector API (sangat cepat & langsung membaca barcode buku 1D/2D di HP)
-    async function tryStartNativeBarcodeDetector() {
-        if (!('BarcodeDetector' in window) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            return false;
+    async function decodeRegion(sx, sy, sw, sh, targetW, targetH) {
+        if (sw <= 0 || sh <= 0) return null;
+        scanCanvas.width = targetW;
+        scanCanvas.height = targetH;
+        scanCtx.drawImage(nativeVideo, sx, sy, sw, sh, 0, 0, targetW, targetH);
+        var imgData = scanCtx.getImageData(0, 0, targetW, targetH);
+
+        // 1. ZBar WebAssembly (C++ WASM — sangat akurat untuk 1D barcode di iOS & Android)
+        if (typeof zbarWasm !== 'undefined' && typeof zbarWasm.scanImageData === 'function') {
+            try {
+                var symbols = await zbarWasm.scanImageData(imgData);
+                if (symbols && symbols.length > 0) {
+                    var val = symbols[0].decode();
+                    if (val && val.trim()) return val.trim();
+                }
+            } catch (e) {}
+        }
+
+        // 2. BarcodeDetector (Native / Polyfill)
+        if (nativeDetector) {
+            try {
+                var codes = await nativeDetector.detect(imgData);
+                if (codes && codes.length > 0 && codes[0].rawValue) {
+                    return codes[0].rawValue.trim();
+                }
+            } catch (e) {}
+        }
+
+        return null;
+    }
+
+    async function startScanner() {
+        if (isScanning) return;
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setScanningUI(false);
+            return;
         }
 
         try {
-            var supported = await window.BarcodeDetector.getSupportedFormats();
-            var wanted = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'qr_code', 'codabar']
-                .filter(function (f) { return supported.indexOf(f) !== -1; });
+            if (!nativeDetector && typeof window.BarcodeDetector !== 'undefined') {
+                try {
+                    nativeDetector = new window.BarcodeDetector();
+                } catch (e) {}
+            }
 
-            if (wanted.length === 0) return false;
-
-            var detector = new window.BarcodeDetector({ formats: wanted });
             nativeStream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: { ideal: currentFacingMode },
@@ -314,31 +361,48 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             nativeVideo.srcObject = nativeStream;
+            nativeVideo.setAttribute('playsinline', 'true');
             nativeVideo.style.display = 'block';
             await nativeVideo.play();
             setScanningUI(true);
 
-            nativeDetectorTimer = setInterval(async function () {
-                if (!isScanning || !nativeVideo || nativeVideo.readyState < 2) return;
-                try {
-                    var barcodes = await detector.detect(nativeVideo);
-                    if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-                        applyScannedBarcode(barcodes[0].rawValue);
-                    }
-                } catch (e) {}
-            }, 120);
+            scanTimer = setInterval(async function () {
+                if (!isScanning || isDecodingFrame || !nativeVideo || nativeVideo.readyState < 2) return;
+                var vw = nativeVideo.videoWidth;
+                var vh = nativeVideo.videoHeight;
+                if (!vw || !vh) return;
 
-            return true;
+                isDecodingFrame = true;
+                try {
+                    // Pass 1: Area Tengah (Kotak Target Barcode) dengan resolusi tajam
+                    var cropW = Math.round(vw * 0.8);
+                    var cropH = Math.round(vh * 0.5);
+                    var cropX = Math.round((vw - cropW) / 2);
+                    var cropY = Math.round((vh - cropH) / 2);
+                    var found = await decodeRegion(cropX, cropY, cropW, cropH, Math.min(800, cropW), Math.min(500, cropH));
+
+                    // Pass 2: Full Frame jika barcode berada sedikit di luar kotak tengah
+                    if (!found) {
+                        found = await decodeRegion(0, 0, vw, vh, 640, Math.round(640 * (vh / vw)));
+                    }
+
+                    if (found) {
+                        applyScannedBarcode(found);
+                    }
+                } catch (e) {
+                } finally {
+                    isDecodingFrame = false;
+                }
+            }, 110);
         } catch (err) {
-            stopNativeStream();
-            return false;
+            stopScanner();
         }
     }
 
-    function stopNativeStream() {
-        if (nativeDetectorTimer) {
-            clearInterval(nativeDetectorTimer);
-            nativeDetectorTimer = null;
+    function stopScanner() {
+        if (scanTimer) {
+            clearInterval(scanTimer);
+            scanTimer = null;
         }
         if (nativeStream) {
             nativeStream.getTracks().forEach(function (t) { t.stop(); });
@@ -348,79 +412,8 @@ document.addEventListener('DOMContentLoaded', function () {
             nativeVideo.srcObject = null;
             nativeVideo.style.display = 'none';
         }
-    }
-
-    // Prioritas 2: Html5Qrcode Live Stream (untuk browser yang belum memiliki BarcodeDetector)
-    function startHtml5QrScanner() {
-        if (typeof Html5Qrcode === 'undefined') {
-            setScanningUI(false);
-            return;
-        }
-
-        try {
-            if (!html5QrCode) {
-                var formats = undefined;
-                if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
-                    formats = [
-                        Html5QrcodeSupportedFormats.EAN_13,
-                        Html5QrcodeSupportedFormats.EAN_8,
-                        Html5QrcodeSupportedFormats.CODE_128,
-                        Html5QrcodeSupportedFormats.CODE_39,
-                        Html5QrcodeSupportedFormats.UPC_A,
-                        Html5QrcodeSupportedFormats.UPC_E,
-                        Html5QrcodeSupportedFormats.ITF,
-                        Html5QrcodeSupportedFormats.QR_CODE
-                    ];
-                }
-                html5QrCode = new Html5Qrcode('barcodeReader', {
-                    formatsToSupport: formats,
-                    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-                    verbose: false
-                });
-            }
-
-            if (placeholder) placeholder.style.display = 'none';
-
-            html5QrCode.start(
-                { facingMode: currentFacingMode },
-                {
-                    fps: 15,
-                    qrbox: { width: 260, height: 120 }
-                },
-                function (decodedText) {
-                    applyScannedBarcode(decodedText);
-                },
-                function () {}
-            ).then(function () {
-                setScanningUI(true);
-                if (scanOverlay) scanOverlay.style.display = 'none';
-            }).catch(function () {
-                setScanningUI(false);
-            });
-        } catch (e) {
-            setScanningUI(false);
-        }
-    }
-
-    async function startScanner() {
-        if (isScanning) return;
-        var okNative = await tryStartNativeBarcodeDetector();
-        if (!okNative) {
-            startHtml5QrScanner();
-        }
-    }
-
-    function stopScanner() {
-        stopNativeStream();
-        if (html5QrCode && isScanning) {
-            html5QrCode.stop().then(function () {
-                setScanningUI(false);
-            }).catch(function () {
-                setScanningUI(false);
-            });
-        } else {
-            setScanningUI(false);
-        }
+        isDecodingFrame = false;
+        setScanningUI(false);
     }
 
     if (btnToggleCamera) {
