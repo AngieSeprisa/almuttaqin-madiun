@@ -20,6 +20,7 @@ use App\Http\Controllers\PlottingKelasPengajianController;
 use App\Http\Controllers\PlottingMapelController;
 use App\Http\Controllers\PerizinanController;
 use App\Http\Controllers\PerizinanHaidController;
+use App\Http\Controllers\PerpustakaanController;
 use App\Http\Controllers\PlottingEkskulController;
 use App\Http\Controllers\PondokPengajianController;
 use App\Http\Controllers\PresensiController;
@@ -294,6 +295,28 @@ Route::middleware('auth')->group(function () {
             Route::delete('/jurnal-mengaji/{jurnal}', [PondokPengajianController::class, 'destroyJurnal'])->name('jurnal.destroy');
             Route::get('/rekap-jurnal', [PondokPengajianController::class, 'rekapJurnal'])->name('rekap-jurnal');
             Route::get('/rekap-absensi', [RekapPondokController::class, 'pengajian'])->name('rekap-absensi');
+        });
+
+    // Menu Perpustakaan (Daftar Buku & Pinjam Buku)
+    Route::middleware('permission:perpustakaan|daftar_buku|pinjam_buku|pondok|sekolah,view')
+        ->prefix('perpustakaan')
+        ->name('perpustakaan.')
+        ->group(function () {
+            // 1. Daftar Buku
+            Route::get('/buku', [PerpustakaanController::class, 'bukuIndex'])->name('buku.index');
+            Route::get('/buku/create', [PerpustakaanController::class, 'createBuku'])->name('buku.create');
+            Route::get('/buku/generate-kode', [PerpustakaanController::class, 'generateKodeBuku'])->name('buku.generate-kode');
+            Route::post('/buku', [PerpustakaanController::class, 'storeBuku'])->name('buku.store');
+            Route::put('/buku/{buku}', [PerpustakaanController::class, 'updateBuku'])->name('buku.update');
+            Route::delete('/buku/{buku}', [PerpustakaanController::class, 'destroyBuku'])->name('buku.destroy');
+
+            // 2. Pinjam Buku
+            Route::get('/pinjam', [PerpustakaanController::class, 'pinjamIndex'])->name('pinjam.index');
+            Route::get('/pinjam/create', [PerpustakaanController::class, 'createPinjam'])->name('pinjam.create');
+            Route::post('/pinjam', [PerpustakaanController::class, 'storePinjam'])->name('pinjam.store');
+            Route::patch('/pinjam/{pinjam}/kembali', [PerpustakaanController::class, 'kembalikanPinjam'])->name('pinjam.kembali');
+            Route::put('/pinjam/{pinjam}', [PerpustakaanController::class, 'updatePinjam'])->name('pinjam.update');
+            Route::delete('/pinjam/{pinjam}', [PerpustakaanController::class, 'destroyPinjam'])->name('pinjam.destroy');
         });
 
     // Menu Jadwal Pelajaran Multi-Jenjang (SMP & SMA)

@@ -115,6 +115,22 @@ class QuickSearchController extends Controller
                 'permission' => 'perizinan_sambang',
             ],
             [
+                'title' => 'Daftar Buku Perpustakaan',
+                'description' => 'Kelola koleksi buku, scan barcode & kode buku otomatis',
+                'url' => route('perpustakaan.buku.index'),
+                'icon' => 'book',
+                'keywords' => 'perpustakaan daftar buku tambah buku barcode kode buku koleksi',
+                'permission' => 'perpustakaan',
+            ],
+            [
+                'title' => 'Pinjam Buku Perpustakaan',
+                'description' => 'Peminjaman & pengembalian buku perpustakaan',
+                'url' => route('perpustakaan.pinjam.index'),
+                'icon' => 'book',
+                'keywords' => 'perpustakaan pinjam buku peminjaman pengembalian santri siswa',
+                'permission' => 'perpustakaan',
+            ],
+            [
                 'title' => 'Perizinan Sakit',
                 'description' => 'Data izin santri sakit & istirahat',
                 'url' => route('perizinan.sakit'),

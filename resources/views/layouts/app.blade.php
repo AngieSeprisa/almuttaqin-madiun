@@ -223,6 +223,39 @@
                 </div>
                 @endif
 
+                {{-- Menu Perpustakaan dengan Submenu Daftar Buku & Pinjam Buku --}}
+                @if(!$authUser || $authUser->canDo('perpustakaan', 'view') || $authUser->canDo('daftar_buku', 'view') || $authUser->canDo('pinjam_buku', 'view') || $authUser->canDo('pondok', 'view') || $authUser->canDo('sekolah', 'view'))
+                @php
+                    $isPerpustakaanActive = request()->routeIs('perpustakaan.*');
+                @endphp
+                <div class="nav-group {{ $isPerpustakaanActive ? 'open' : '' }}" id="navGroupPerpustakaan">
+                    <button type="button" class="nav-item nav-item-has-sub {{ $isPerpustakaanActive ? 'active' : '' }}" id="togglePerpustakaan" title="Perpustakaan">
+                        <span class="nav-item-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-item-text">Perpustakaan</span>
+                        <span class="nav-item-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="sidebar-subnav">
+                        <a href="{{ route('perpustakaan.buku.index') }}" class="subnav-item {{ request()->routeIs('perpustakaan.buku.*') ? 'active' : '' }}" title="Daftar Buku">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Daftar Buku</span>
+                        </a>
+                        <a href="{{ route('perpustakaan.pinjam.index') }}" class="subnav-item {{ request()->routeIs('perpustakaan.pinjam.*') ? 'active' : '' }}" title="Pinjam Buku">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Pinjam Buku</span>
+                        </a>
+                    </div>
+                </div>
+                @endif
+
                 {{-- Menu Perizinan dengan Submenu Sambang & Sakit --}}
                 @if(!$authUser || $authUser->canDo('perizinan_sambang', 'view') || $authUser->canDo('perizinan_sakit', 'view'))
                 <div class="nav-group {{ request()->routeIs('perizinan.*') ? 'open' : '' }}" id="navGroupPerizinan">

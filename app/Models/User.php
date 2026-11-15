@@ -214,14 +214,15 @@ class User extends Authenticatable
             return true;
         }
 
-        // Guru & Musyrif memiliki akses ke Menu Pondok (Daftar Materi, Target Pengajian, Jurnal Mengaji), Rekap Sholat, Pengajian, Pondok, Rekap Absensi, & Perizinan Pondok
-        if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, ['pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'])) {
+        // Guru & Musyrif memiliki akses ke Menu Pondok (Daftar Materi, Target Pengajian, Jurnal Mengaji), Perpustakaan, Rekap Sholat, Pengajian, Pondok, Rekap Absensi, & Perizinan Pondok
+        if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, ['pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji', 'perpustakaan', 'daftar_buku', 'pinjam_buku', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'])) {
             return true;
         }
 
-        // Admin Lembaga memiliki akses default ke modul absensi, guru sekolah, pondok, plotting & master data
+        // Admin Lembaga memiliki akses default ke modul absensi, guru sekolah, pondok, perpustakaan, plotting & master data
         if ($this->role === 'admin_lembaga' && in_array($menuCode, [
             'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
+            'perpustakaan', 'daftar_buku', 'pinjam_buku',
             'presensi', 'rekap_absensi', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'pengaturan_absensi', 'guru_sekolah', 
             'plotting_mapel', 'plotting_kelas', 'plotting_ekskul', 'ekskul', 'jurnal_ekskul', 'rekap_ekskul', 'jadwal_pelajaran',
             'data_master', 'master_kelas', 'master_jam', 'master_lembaga', 'master_import_siswa', 'perizinan_haid'

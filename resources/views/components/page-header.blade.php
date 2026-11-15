@@ -45,6 +45,14 @@
                 $bcParent = 'Pondok';
                 $bcParentRoute = route('pondok.jurnal.index');
                 $bcChild = 'Jurnal Mengaji';
+            } elseif (request()->routeIs('perpustakaan.buku.*')) {
+                $bcParent = 'Perpustakaan';
+                $bcParentRoute = route('perpustakaan.buku.index');
+                $bcChild = request()->routeIs('*.create') ? 'Tambah Buku' : 'Daftar Buku';
+            } elseif (request()->routeIs('perpustakaan.pinjam.*')) {
+                $bcParent = 'Perpustakaan';
+                $bcParentRoute = route('perpustakaan.pinjam.index');
+                $bcChild = request()->routeIs('*.create') ? 'Form Pinjam Buku' : 'Pinjam Buku';
             } elseif (request()->routeIs('rekap.sholat.*')) {
                 $customBreadcrumbHtml = null;
                 $breadcrumbsList = [

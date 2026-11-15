@@ -26,6 +26,7 @@ class UserController extends Controller
             'rekap_absensi'      => 'Rekap Absensi',
             'sekolah'            => 'Sekolah (Jurnal & Absensi)',
             'pondok'             => 'Pondok (Daftar Materi, Target Pengajian & Jurnal Mengaji)',
+            'perpustakaan'       => 'Perpustakaan (Daftar Buku & Pinjam Buku)',
             'pengaturan_absensi' => 'Pengaturan Absensi Guru',
             'guru_sekolah'       => 'Guru Sekolah (Pengelolaan & Approval Mapel)',
             'plotting_mapel'     => 'Plotting Mata Pelajaran',
