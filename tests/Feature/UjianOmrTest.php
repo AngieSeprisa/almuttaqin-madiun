@@ -168,6 +168,18 @@ class UjianOmrTest extends TestCase
             'nomor_soal'    => 5,
             'kunci_jawaban' => 'E',
         ]);
+
+        // Verifikasi form submit dengan method PUT (seperti pada form HTML blade) tidak menyebabkan error 405
+        $resPut = $this->actingAs($this->admin)->put(route('ujian.update-kunci', $ujian->id), [
+            'kunci' => [1 => 'C', 2 => 'D'],
+            'bobot' => [1 => 2.0, 2 => 2.0],
+        ]);
+        $resPut->assertRedirect();
+        $this->assertDatabaseHas('ujian_kunci', [
+            'ujian_id'      => $ujian->id,
+            'nomor_soal'    => 1,
+            'kunci_jawaban' => 'C',
+        ]);
     }
 
     public function test_cetak_ljk_a4_memiliki_4_fiducial_markers_dan_qr_code(): void

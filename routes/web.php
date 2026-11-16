@@ -487,7 +487,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{ujian}/kunci', [UjianController::class, 'kunci'])
             ->middleware('permission:ujian,edit')
             ->name('kunci');
-        Route::post('/{ujian}/kunci', [UjianController::class, 'updateKunci'])
+        Route::match(['post', 'put'], '/{ujian}/kunci', [UjianController::class, 'updateKunci'])
             ->middleware('permission:ujian,edit')
             ->name('update-kunci');
 
@@ -508,7 +508,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{ujian}/hasil', [UjianController::class, 'hasil'])
             ->middleware('permission:ujian,view')
             ->name('hasil');
-        Route::post('/{ujian}/hasil/{hasil}/manual', [UjianController::class, 'updateHasilManual'])
+        Route::match(['post', 'put'], '/{ujian}/hasil/{hasil}/manual', [UjianController::class, 'updateHasilManual'])
             ->middleware('permission:ujian,edit')
             ->name('update-hasil-manual');
         Route::get('/{ujian}/export-excel', [UjianController::class, 'exportExcel'])
