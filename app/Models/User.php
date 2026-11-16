@@ -193,7 +193,7 @@ class User extends Authenticatable
     {
         return [
             'data_warga'         => ['siswa', 'guru_warga', 'lulus_warga', 'mutasi_warga'],
-            'sekolah'            => ['sekolah_jurnal', 'sekolah_rekap_jurnal', 'ekskul', 'jadwal_pelajaran', 'jadwal_saya'],
+            'sekolah'            => ['sekolah_jurnal', 'sekolah_rekap_jurnal', 'ekskul', 'jadwal_pelajaran', 'jadwal_saya', 'ujian'],
             'pondok'             => ['materi_pondok', 'target_pengajian', 'jurnal_mengaji'],
             'perpustakaan'       => ['daftar_buku', 'pinjam_buku'],
             'perizinan'          => ['perizinan_sambang', 'perizinan_sakit', 'perizinan_haid'],
@@ -219,6 +219,7 @@ class User extends Authenticatable
             'nfc'                      => 'siswa',
             'sekolah_jurnal'           => 'sekolah',
             'sekolah_rekap_jurnal'     => 'sekolah',
+            'ujian'                    => 'sekolah',
             'ekskul'                   => 'sekolah',
             'jurnal_ekskul'            => 'ekskul',
             'jadwal_pelajaran'         => 'sekolah',
@@ -300,7 +301,7 @@ class User extends Authenticatable
 
         // 4. Jika akun sudah diatur menggunakan matriks hak akses granular, jangan gunakan default role
         $granularCodes = [
-            'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_saya',
+            'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_saya', 'ujian',
             'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
             'daftar_buku', 'pinjam_buku',
             'guru_warga', 'lulus_warga', 'mutasi_warga', 'nfc',
@@ -315,7 +316,7 @@ class User extends Authenticatable
 
         // 5. Fallback default berdasarkan role hanya untuk akun yang belum dikonfigurasi matriks granularnya
         if (in_array($this->role, ['admin_lembaga', 'guru']) && in_array($menuCode, [
-            'sekolah', 'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_pelajaran', 'jadwal_saya',
+            'sekolah', 'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_pelajaran', 'jadwal_saya', 'ujian',
             'ekskul', 'jurnal_ekskul', 'plotting_ekskul', 'rekap_ekskul', 'rekap_sekolah'
         ], true)) {
             return true;

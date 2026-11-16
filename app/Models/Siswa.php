@@ -61,6 +61,14 @@ class Siswa extends Model
     }
 
     /**
+     * Accessor NISN dengan fallback ke data formulir pendaftaran
+     */
+    public function getNisnAttribute(): ?string
+    {
+        return $this->attributes['nisn'] ?? $this->pendaftaran?->nisn ?? null;
+    }
+
+    /**
      * Relasi ke data Master Kelas Pengajian
      */
     public function kelasPengajian()

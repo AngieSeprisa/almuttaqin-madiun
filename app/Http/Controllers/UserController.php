@@ -33,6 +33,7 @@ class UserController extends Controller
                 'ekskul'               => 'Ekstrakurikuler',
                 'jadwal_pelajaran'     => 'Jadwal Pelajaran',
                 'jadwal_saya'          => 'Jadwal Mengajar Saya',
+                'ujian'                => 'Ujian & LJK',
             ],
             'Pondok' => [
                 'materi_pondok'    => 'Daftar Materi',

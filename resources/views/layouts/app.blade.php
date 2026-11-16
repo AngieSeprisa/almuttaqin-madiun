@@ -197,11 +197,13 @@
                     $canEkskul             = !$authUser || $authUser->canDo('ekskul', 'view');
                     $canJadwalPelajaran    = !$authUser || $authUser->canDo('jadwal_pelajaran', 'view');
                     $canJadwalSaya         = !$authUser || $authUser->canDo('jadwal_saya', 'view');
-                    $showSekolahGroup      = $canSekolahJurnal || $canSekolahRekapJurnal || $canEkskul || $canJadwalPelajaran || $canJadwalSaya;
+                    $canUjian              = !$authUser || $authUser->canDo('ujian', 'view');
+                    $showSekolahGroup      = $canSekolahJurnal || $canSekolahRekapJurnal || $canEkskul || $canJadwalPelajaran || $canJadwalSaya || $canUjian;
+                    $isSekolahActive       = request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') || request()->routeIs('sekolah.ekskul.*') || request()->routeIs('ujian.*');
                 @endphp
                 @if($showSekolahGroup)
-                <div class="nav-group {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') || request()->routeIs('sekolah.ekskul.*') ? 'open' : '' }}" id="navGroupSekolah">
-                    <button type="button" class="nav-item nav-item-has-sub {{ request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') || request()->routeIs('sekolah.ekskul.*') ? 'active' : '' }}" id="toggleSekolah" title="Sekolah">
+                <div class="nav-group {{ $isSekolahActive ? 'open' : '' }}" id="navGroupSekolah">
+                    <button type="button" class="nav-item nav-item-has-sub {{ $isSekolahActive ? 'active' : '' }}" id="toggleSekolah" title="Sekolah">
                         <span class="nav-item-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
@@ -244,6 +246,12 @@
                         <a href="{{ route('jadwal-pelajaran.saya') }}" class="subnav-item {{ request()->routeIs('jadwal-pelajaran.saya*') ? 'active' : '' }}" title="Jadwal Mengajar Saya">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Jadwal Mengajar Saya</span>
+                        </a>
+                        @endif
+                        @if($canUjian)
+                        <a href="{{ route('ujian.index') }}" class="subnav-item {{ request()->routeIs('ujian.*') ? 'active' : '' }}" title="Ujian & LJK">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Ujian & LJK</span>
                         </a>
                         @endif
                     </div>

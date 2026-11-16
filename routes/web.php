@@ -33,6 +33,7 @@ use App\Http\Controllers\RekapPondokController;
 use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\SiswaController;
 use App\Http\Controllers\TimeSlotController;
+use App\Http\Controllers\UjianController;
 use App\Http\Controllers\UserController;
 
 
@@ -459,6 +460,60 @@ Route::middleware('auth')->group(function () {
         Route::get('/ajax/classes-and-subjects', [JadwalPelajaranController::class, 'ajaxClassesAndSubjects'])
             ->middleware('permission:jadwal_saya|jadwal_pelajaran,view')
             ->name('ajax-classes-subjects');
+    });
+
+    // Menu Ujian & Koreksi LJK Otomatis (OMR + QR Code)
+    Route::prefix('ujian')->name('ujian.')->group(function () {
+        Route::get('/', [UjianController::class, 'index'])
+            ->middleware('permission:ujian,view')
+            ->name('index');
+        Route::get('/create', [UjianController::class, 'create'])
+            ->middleware('permission:ujian,create')
+            ->name('create');
+        Route::post('/', [UjianController::class, 'store'])
+            ->middleware('permission:ujian,create')
+            ->name('store');
+        Route::get('/{ujian}/edit', [UjianController::class, 'edit'])
+            ->middleware('permission:ujian,edit')
+            ->name('edit');
+        Route::put('/{ujian}', [UjianController::class, 'update'])
+            ->middleware('permission:ujian,edit')
+            ->name('update');
+        Route::delete('/{ujian}', [UjianController::class, 'destroy'])
+            ->middleware('permission:ujian,delete')
+            ->name('destroy');
+
+        // Kunci Jawaban
+        Route::get('/{ujian}/kunci', [UjianController::class, 'kunci'])
+            ->middleware('permission:ujian,edit')
+            ->name('kunci');
+        Route::post('/{ujian}/kunci', [UjianController::class, 'updateKunci'])
+            ->middleware('permission:ujian,edit')
+            ->name('update-kunci');
+
+        // Cetak LJK (View & Print)
+        Route::get('/{ujian}/cetak-ljk', [UjianController::class, 'cetakLjk'])
+            ->middleware('permission:ujian,view')
+            ->name('cetak-ljk');
+
+        // Upload & Proses Scan LJK
+        Route::get('/{ujian}/upload-scan', [UjianController::class, 'uploadScan'])
+            ->middleware('permission:ujian,create|edit')
+            ->name('upload-scan');
+        Route::post('/{ujian}/process-scan', [UjianController::class, 'processScan'])
+            ->middleware('permission:ujian,create|edit')
+            ->name('process-scan');
+
+        // Dashboard Rekap Hasil & Koreksi Manual & Export
+        Route::get('/{ujian}/hasil', [UjianController::class, 'hasil'])
+            ->middleware('permission:ujian,view')
+            ->name('hasil');
+        Route::post('/{ujian}/hasil/{hasil}/manual', [UjianController::class, 'updateHasilManual'])
+            ->middleware('permission:ujian,edit')
+            ->name('update-hasil-manual');
+        Route::get('/{ujian}/export-excel', [UjianController::class, 'exportExcel'])
+            ->middleware('permission:ujian,view')
+            ->name('export-excel');
     });
 
     // Menu Pengaturan Sekolah: Absensi Guru
