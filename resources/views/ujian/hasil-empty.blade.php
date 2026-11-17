@@ -15,7 +15,7 @@
 @endsection
 
 @section('content')
-<div style="max-width:800px; margin:40px auto; text-align:center; background:#ffffff; border:1px solid #e2e8f0; border-radius:16px; padding:50px 24px;">
+<div style="width:100%; margin-bottom:40px; text-align:center; background:#ffffff; border:1px solid #e2e8f0; border-radius:16px; padding:50px 24px;">
     <div style="width:64px; height:64px; border-radius:50%; background:#eff6ff; color:#0284c7; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
         <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>

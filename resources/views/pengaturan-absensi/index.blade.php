@@ -29,7 +29,7 @@
 @endsection
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:20px; max-width:1100px;">
+<div style="display:flex; flex-direction:column; gap:20px; width:100%;">
 
     {{-- Alert Notifikasi --}}
     @if(session('success'))

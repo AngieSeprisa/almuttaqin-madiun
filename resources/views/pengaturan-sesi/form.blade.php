@@ -721,8 +721,6 @@ a.btn.btn-secondary:hover {
 
 .sesi-form-page-container {
     width: 100%;
-    max-width: 1080px;
-    margin: 0 auto;
     padding-bottom: 40px;
 }
 

@@ -27,7 +27,7 @@
 @endsection
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:20px; max-width:960px; margin:0 auto;">
+<div style="display:flex; flex-direction:column; gap:20px; width:100%;">
 
     {{-- Status Kartu Hari Ini & Live Clock --}}
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">

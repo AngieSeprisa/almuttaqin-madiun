@@ -21,8 +21,7 @@
 @section('content')
 <style>
     .kunci-container {
-        max-width: 1040px;
-        margin: 0 auto;
+        width: 100%;
     }
     .kunci-header-card {
         background: var(--bg-surface, #ffffff);

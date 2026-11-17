@@ -29,8 +29,7 @@
 @section('content')
 <style>
     .upload-container {
-        max-width: 960px;
-        margin: 0 auto;
+        width: 100%;
     }
     .info-summary-card {
         background: var(--bg-surface, #ffffff);

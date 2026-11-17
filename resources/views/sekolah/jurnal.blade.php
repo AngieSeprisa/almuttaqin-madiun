@@ -21,7 +21,7 @@
 @endpush
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:20px; width:100%; max-width:1200px;">
+<div style="display:flex; flex-direction:column; gap:20px; width:100%;">
 
     {{-- Feedback Alerts --}}
     @if(session('success'))

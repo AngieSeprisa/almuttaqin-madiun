@@ -9,12 +9,17 @@
         border: 1px solid var(--border-light, #e2e8f0);
         border-radius: 16px;
         padding: 26px 30px;
-        max-width: 820px;
-        margin: 0 auto 30px auto;
+        width: 100%;
+        margin-bottom: 30px;
         box-shadow: 0 4px 14px rgba(0,0,0,0.04);
     }
+    .sesi-form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+    }
     .form-group-sesi {
-        margin-bottom: 18px;
+        margin-bottom: 6px;
     }
     .form-group-sesi label {
         display: block;
@@ -69,56 +74,58 @@
         </div>
 
         <form id="formSesiUjian" onsubmit="handleStartSession(event)">
-            <!-- 1. Pilih Kelas -->
-            <div class="form-group-sesi">
-                <label>1. Pilih Kelas</label>
-                <select id="selectKelas" class="input-sesi" onchange="filterAvailableExams()" required>
-                    <option value="">-- Pilih Kelas Ujian --</option>
-                    @foreach($kelases as $k)
-                        <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- 2. Pilih Mata Pelajaran -->
-            <div class="form-group-sesi">
-                <label>2. Pilih Mata Pelajaran</label>
-                <select id="selectMapel" class="input-sesi" onchange="onMapelChanged()" required>
-                    <option value="">-- Pilih Mata Pelajaran --</option>
-                    @foreach($mapels as $m)
-                        <option value="{{ $m->id }}" data-guru-id="{{ $m->guru_id }}" data-guru-name="{{ $m->guru?->name ?? '' }}">
-                            {{ $m->mata_pelajaran }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- 3. Guru Pengampu (Otomatis Terisi) -->
-            <div class="form-group-sesi">
-                <label>3. Guru Pengampu (Terisi Otomatis)</label>
-                <div style="position:relative;">
-                    <input type="text" id="inputGuruName" class="input-sesi" placeholder="Guru otomatis terdeteksi dari mata pelajaran" readonly style="background:#f8fafc; font-weight:600; color:#1e293b;">
-                    <input type="hidden" id="inputGuruId">
+            <div class="sesi-form-grid">
+                <!-- 1. Pilih Kelas -->
+                <div class="form-group-sesi">
+                    <label>1. Pilih Kelas</label>
+                    <select id="selectKelas" class="input-sesi" onchange="filterAvailableExams()" required>
+                        <option value="">-- Pilih Kelas Ujian --</option>
+                        @foreach($kelases as $k)
+                            <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
+                        @endforeach
+                    </select>
                 </div>
-            </div>
 
-            <!-- 4. Pilih Jam Ujian -->
-            <div class="form-group-sesi">
-                <label>4. Pilih Jam Ujian</label>
-                <select id="selectJam" class="input-sesi" required>
-                    <option value="">-- Pilih Jam Sesi Ujian --</option>
-                    @if($timeSlots->isNotEmpty())
-                        @foreach($timeSlots as $ts)
-                            <option value="Jam Ke-{{ $ts->jam_ke }} ({{ $ts->mulai }} - {{ $ts->selesai }})">
-                                Jam Ke-{{ $ts->jam_ke }} ({{ $ts->mulai }} - {{ $ts->selesai }})
+                <!-- 2. Pilih Mata Pelajaran -->
+                <div class="form-group-sesi">
+                    <label>2. Pilih Mata Pelajaran</label>
+                    <select id="selectMapel" class="input-sesi" onchange="onMapelChanged()" required>
+                        <option value="">-- Pilih Mata Pelajaran --</option>
+                        @foreach($mapels as $m)
+                            <option value="{{ $m->id }}" data-guru-id="{{ $m->guru_id }}" data-guru-name="{{ $m->guru?->name ?? '' }}">
+                                {{ $m->mata_pelajaran }}
                             </option>
                         @endforeach
-                    @else
-                        <option value="Sesi Pagi 1 (07:30 - 09:00)">Sesi Pagi 1 (07:30 - 09:00)</option>
-                        <option value="Sesi Pagi 2 (09:30 - 11:00)">Sesi Pagi 2 (09:30 - 11:00)</option>
-                        <option value="Sesi Siang (12:30 - 14:00)">Sesi Siang (12:30 - 14:00)</option>
-                    @endif
-                </select>
+                    </select>
+                </div>
+
+                <!-- 3. Guru Pengampu (Otomatis Terisi) -->
+                <div class="form-group-sesi">
+                    <label>3. Guru Pengampu (Terisi Otomatis)</label>
+                    <div style="position:relative;">
+                        <input type="text" id="inputGuruName" class="input-sesi" placeholder="Guru otomatis terdeteksi dari mata pelajaran" readonly style="background:#f8fafc; font-weight:600; color:#1e293b;">
+                        <input type="hidden" id="inputGuruId">
+                    </div>
+                </div>
+
+                <!-- 4. Pilih Jam Ujian -->
+                <div class="form-group-sesi">
+                    <label>4. Pilih Jam Ujian</label>
+                    <select id="selectJam" class="input-sesi" required>
+                        <option value="">-- Pilih Jam Sesi Ujian --</option>
+                        @if($timeSlots->isNotEmpty())
+                            @foreach($timeSlots as $ts)
+                                <option value="Jam Ke-{{ $ts->jam_ke }} ({{ $ts->mulai }} - {{ $ts->selesai }})">
+                                    Jam Ke-{{ $ts->jam_ke }} ({{ $ts->mulai }} - {{ $ts->selesai }})
+                                </option>
+                            @endforeach
+                        @else
+                            <option value="Sesi Pagi 1 (07:30 - 09:00)">Sesi Pagi 1 (07:30 - 09:00)</option>
+                            <option value="Sesi Pagi 2 (09:30 - 11:00)">Sesi Pagi 2 (09:30 - 11:00)</option>
+                            <option value="Sesi Siang (12:30 - 14:00)">Sesi Siang (12:30 - 14:00)</option>
+                        @endif
+                    </select>
+                </div>
             </div>
 
             <!-- Info Ujian Yang Cocok -->

@@ -15,7 +15,7 @@
 @endsection
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:18px; max-width:1300px; margin:0 auto;">
+<div style="display:flex; flex-direction:column; gap:18px; width:100%;">
 
     {{-- Alert Banner --}}
     @if (session('success'))

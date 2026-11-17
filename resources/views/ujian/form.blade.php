@@ -15,8 +15,7 @@
         border: 1px solid var(--border-light, #e2e8f0);
         border-radius: 14px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-        max-width: 820px;
-        margin: 0 auto;
+        width: 100%;
         overflow: hidden;
     }
     .ujian-form-header {
