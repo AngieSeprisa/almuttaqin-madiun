@@ -13,7 +13,7 @@
 @endsection
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:20px; max-width:860px; margin:0 auto; width:100%;">
+<div style="display:flex; flex-direction:column; gap:20px; width:100%;">
 
     @if ($errors->any())
     <div class="alert-banner alert-error">

@@ -13,7 +13,7 @@
 @endsection
 
 @section('content')
-<div style="display:flex; flex-direction:column; gap:20px; width:100%; max-width:860px; margin:0 auto;">
+<div style="display:flex; flex-direction:column; gap:20px; width:100%;">
 
     {{-- Alert Notifikasi --}}
     @if (session('success'))
