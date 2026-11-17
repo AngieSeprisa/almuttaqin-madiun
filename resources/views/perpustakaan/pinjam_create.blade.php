@@ -113,14 +113,16 @@
                                 $isSelected = (string) old('perpustakaan_buku_id', $selectedBukuId) === (string) $buku->id;
                                 $habis = $buku->stok_tersedia <= 0;
                                 $kodeDisplay = $buku->kode_buku ?: $buku->barcode;
+                                $pengarang = trim($buku->penulis ?? '');
                             @endphp
                             <option value="{{ $buku->id }}"
                                     data-kode="{{ $kodeDisplay }}"
                                     data-barcode="{{ $buku->barcode }}"
+                                    data-penulis="{{ $pengarang }}"
                                     data-stok="{{ $buku->stok_tersedia }}"
                                     {{ $isSelected ? 'selected' : '' }}
                                     {{ $habis && !$isSelected ? 'disabled' : '' }}>
-                                [{{ $kodeDisplay }}] {{ $buku->judul_buku }} — Stok: {{ $buku->stok_tersedia }}
+                                {{ $buku->judul_buku }}{{ $pengarang !== '' ? ' — ' . $pengarang : '' }} — Stok: {{ $buku->stok_tersedia }}
                             </option>
                         @endforeach
                     </select>

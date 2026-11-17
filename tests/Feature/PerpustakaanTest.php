@@ -79,6 +79,7 @@ class PerpustakaanTest extends TestCase
             'kode_buku'     => 'BK-0001',
             'barcode'       => '9781234567890',
             'judul_buku'    => 'Tafsir Jalalain',
+            'penulis'       => 'Imam As-Suyuthi',
             'stok_total'    => 2,
             'stok_tersedia' => 2,
         ]);
@@ -89,11 +90,12 @@ class PerpustakaanTest extends TestCase
         $resPinjamIndex->assertSee('Pinjam Buku');
         $resPinjamIndex->assertSee(route('perpustakaan.pinjam.create'));
 
-        // 2. Halaman baru form Pinjam Buku
+        // 2. Halaman baru form Pinjam Buku: Menampilkan nama buku, nama pengarang, dan stok (tanpa kode buku)
         $resPinjamCreate = $this->actingAs($user)->get(route('perpustakaan.pinjam.create'));
         $resPinjamCreate->assertStatus(200);
         $resPinjamCreate->assertSee('Formulir Peminjaman Buku');
-        $resPinjamCreate->assertSee('Tafsir Jalalain');
+        $resPinjamCreate->assertSee('Tafsir Jalalain — Imam As-Suyuthi — Stok: 2');
+        $resPinjamCreate->assertDontSee('[BK-0001]');
 
         // 3. Simpan peminjaman buku
         $resStorePinjam = $this->actingAs($user)->post(route('perpustakaan.pinjam.store'), [
