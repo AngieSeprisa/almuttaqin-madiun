@@ -193,7 +193,8 @@ class User extends Authenticatable
     {
         return [
             'data_warga'         => ['siswa', 'guru_warga', 'lulus_warga', 'mutasi_warga'],
-            'sekolah'            => ['sekolah_jurnal', 'sekolah_rekap_jurnal', 'ekskul', 'jadwal_pelajaran', 'jadwal_saya', 'ujian'],
+            'sekolah'            => ['sekolah_jurnal', 'sekolah_rekap_jurnal', 'ekskul', 'jadwal_pelajaran', 'jadwal_saya'],
+            'ujian'              => ['ujian_soal', 'ujian_ljk', 'ujian_sesi', 'ujian_koreksi', 'ujian_nilai'],
             'pondok'             => ['materi_pondok', 'target_pengajian', 'jurnal_mengaji'],
             'perpustakaan'       => ['daftar_buku', 'pinjam_buku'],
             'perizinan'          => ['perizinan_sambang', 'perizinan_sakit', 'perizinan_haid'],
@@ -220,6 +221,11 @@ class User extends Authenticatable
             'sekolah_jurnal'           => 'sekolah',
             'sekolah_rekap_jurnal'     => 'sekolah',
             'ujian'                    => 'sekolah',
+            'ujian_soal'               => 'ujian',
+            'ujian_ljk'                => 'ujian',
+            'ujian_sesi'               => 'ujian',
+            'ujian_koreksi'            => 'ujian',
+            'ujian_nilai'              => 'ujian',
             'ekskul'                   => 'sekolah',
             'jurnal_ekskul'            => 'ekskul',
             'jadwal_pelajaran'         => 'sekolah',
@@ -302,6 +308,7 @@ class User extends Authenticatable
         // 4. Jika akun sudah diatur menggunakan matriks hak akses granular, jangan gunakan default role
         $granularCodes = [
             'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_saya', 'ujian',
+            'ujian_soal', 'ujian_ljk', 'ujian_sesi', 'ujian_koreksi', 'ujian_nilai',
             'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
             'daftar_buku', 'pinjam_buku',
             'guru_warga', 'lulus_warga', 'mutasi_warga', 'nfc',
@@ -317,6 +324,7 @@ class User extends Authenticatable
         // 5. Fallback default berdasarkan role hanya untuk akun yang belum dikonfigurasi matriks granularnya
         if (in_array($this->role, ['admin_lembaga', 'guru']) && in_array($menuCode, [
             'sekolah', 'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_pelajaran', 'jadwal_saya', 'ujian',
+            'ujian_soal', 'ujian_ljk', 'ujian_sesi', 'ujian_koreksi', 'ujian_nilai',
             'ekskul', 'jurnal_ekskul', 'plotting_ekskul', 'rekap_ekskul', 'rekap_sekolah'
         ], true)) {
             return true;

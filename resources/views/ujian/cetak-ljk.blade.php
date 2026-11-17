@@ -335,12 +335,13 @@
                 </div>
             </div>
 
-            {{-- KOTAK PETUNJUK --}}
+            {{-- KOTAK PETUNJUK & TATA TERTIB UJIAN --}}
             <div class="instruction-box">
-                <div>
-                    <strong>PETUNJUK:</strong> Hitamkan bulatan secara penuh dengan pensil 2B atau pulpen hitam. Jangan melipat atau merobek lembar jawaban ini.
+                <div style="flex:1;">
+                    <strong style="color:#0f172a;">PETUNJUK & TATA TERTIB:</strong>
+                    <div style="font-size:6.8pt; color:#334155; line-height:1.35; margin-top:2px; white-space:pre-line;">{{ $ujian->peraturan_efektif }}</div>
                 </div>
-                <div class="instruction-samples">
+                <div class="instruction-samples" style="flex-shrink:0;">
                     <span>Benar: <span class="sample-bubble filled">A</span></span>
                     <span>Salah: <span class="sample-bubble">✓</span> <span class="sample-bubble">✗</span> <span class="sample-bubble">●</span></span>
                 </div>

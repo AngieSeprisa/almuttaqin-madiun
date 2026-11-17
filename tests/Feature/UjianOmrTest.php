@@ -70,16 +70,23 @@ class UjianOmrTest extends TestCase
 
     public function test_menu_ujian_terdaftar_di_sidebar_dan_matriks_hak_akses(): void
     {
-        // 1. Menu Ujian terdaftar di matriks hak akses
+        // 1. Menu Ujian terdaftar di matriks hak akses dengan 5 sub menunya
         $menuGroups = UserController::systemMenuGroups();
-        $this->assertArrayHasKey('Sekolah', $menuGroups);
-        $this->assertArrayHasKey('ujian', $menuGroups['Sekolah']);
+        $this->assertArrayHasKey('Ujian', $menuGroups);
+        $this->assertArrayHasKey('ujian_soal', $menuGroups['Ujian']);
+        $this->assertArrayHasKey('ujian_ljk', $menuGroups['Ujian']);
+        $this->assertArrayHasKey('ujian_sesi', $menuGroups['Ujian']);
+        $this->assertArrayHasKey('ujian_koreksi', $menuGroups['Ujian']);
+        $this->assertArrayHasKey('ujian_nilai', $menuGroups['Ujian']);
 
-        // 2. Tampil di sidebar
+        // 2. Tampil di sidebar sebagai menu utama tersendiri dengan 5 sub menu
         $res = $this->actingAs($this->admin)->get(route('beranda'));
         $res->assertStatus(200);
-        $res->assertSee('Ujian & LJK', false);
-        $res->assertSee(route('ujian.index'));
+        $res->assertSee('Soal Ujian');
+        $res->assertSee('Sesi Ujian');
+        $res->assertSee('Koreksi Ujian');
+        $res->assertSee('Nilai Ujian');
+        $res->assertSee(route('ujian.soal'));
     }
 
     public function test_crud_ujian_dan_inisialisasi_kunci_jawaban_otomatis(): void
@@ -406,5 +413,126 @@ class UjianOmrTest extends TestCase
         $res = $this->actingAs($this->admin)->get(route('ujian.export-excel', $ujian->id));
         $res->assertStatus(200);
         $this->assertStringContainsString('spreadsheetml.sheet', $res->headers->get('content-type'));
+    }
+
+    public function test_submenu_soal_ujian_dan_template_download(): void
+    {
+        // 1. Halaman Soal Ujian
+        $res = $this->actingAs($this->admin)->get(route('ujian.soal'));
+        $res->assertStatus(200);
+        $res->assertSee('Soal Ujian');
+        $res->assertSee('Unduh Template Word (.docx)');
+
+        // 2. Unduh template Word (.docx)
+        $resTemplate = $this->actingAs($this->admin)->get(route('ujian.download-template'));
+        $resTemplate->assertStatus(200);
+        $this->assertStringContainsString('wordprocessingml.document', $resTemplate->headers->get('content-type'));
+    }
+
+    public function test_submenu_ljk_dan_peraturan(): void
+    {
+        $ujian = Ujian::create([
+            'kode_ujian'    => 'LJK-SUB-01',
+            'nama_ujian'    => 'Uji Submenu LJK',
+            'mapel_id'      => $this->mapel->id,
+            'kelas_id'      => $this->kelas->id,
+            'guru_id'       => $this->admin->id,
+            'jumlah_soal'   => 25,
+            'jumlah_opsi'   => 4,
+            'bobot_benar'   => 1.0,
+            'tanggal_ujian' => now()->format('Y-m-d'),
+            'status'        => 'aktif',
+        ]);
+
+        // 1. Halaman LJK
+        $res = $this->actingAs($this->admin)->get(route('ujian.ljk'));
+        $res->assertStatus(200);
+        $res->assertSee('Cetak Lembar Jawab Komputer (LJK)');
+
+        // 2. Update Peraturan Ujian
+        $resPeraturan = $this->actingAs($this->admin)->post(route('ujian.update-peraturan', $ujian->id), [
+            'peraturan_ujian' => "1. Berdoalah sebelum mengerjakan.\n2. Dilarang berbuat curang.",
+        ]);
+        $resPeraturan->assertRedirect();
+        $this->assertDatabaseHas('ujian', [
+            'id'              => $ujian->id,
+            'peraturan_ujian' => "1. Berdoalah sebelum mengerjakan.\n2. Dilarang berbuat curang.",
+        ]);
+    }
+
+    public function test_submenu_sesi_ujian_dan_proyektor_fullscreen(): void
+    {
+        $ujian = Ujian::create([
+            'kode_ujian'    => 'SESI-SUB-01',
+            'nama_ujian'    => 'Uji Sesi Proyektor',
+            'mapel_id'      => $this->mapel->id,
+            'kelas_id'      => $this->kelas->id,
+            'guru_id'       => $this->admin->id,
+            'jumlah_soal'   => 5,
+            'jumlah_opsi'   => 4,
+            'bobot_benar'   => 1.0,
+            'tanggal_ujian' => now()->format('Y-m-d'),
+            'status'        => 'aktif',
+        ]);
+
+        // 1. Halaman pemilihan sesi ujian
+        $res = $this->actingAs($this->admin)->get(route('ujian.sesi'));
+        $res->assertStatus(200);
+        $res->assertSee('Persiapan Sesi Ujian di Kelas');
+        $res->assertSee('Mulai Sesi Ujian');
+
+        // 2. Mode Proyektor Full Screen
+        $resProyektor = $this->actingAs($this->admin)->get(route('ujian.proyektor', $ujian->id));
+        $resProyektor->assertStatus(200);
+        $resProyektor->assertSee('Uji Sesi Proyektor');
+    }
+
+    public function test_submenu_nilai_dan_analisis_butir_soal(): void
+    {
+        $ujian = Ujian::create([
+            'kode_ujian'    => 'NILAI-SUB-01',
+            'nama_ujian'    => 'Uji Analisis Soal',
+            'mapel_id'      => $this->mapel->id,
+            'kelas_id'      => $this->kelas->id,
+            'guru_id'       => $this->admin->id,
+            'jumlah_soal'   => 2,
+            'jumlah_opsi'   => 4,
+            'bobot_benar'   => 50.0,
+            'tanggal_ujian' => now()->format('Y-m-d'),
+            'status'        => 'aktif',
+        ]);
+
+        UjianKunci::create(['ujian_id' => $ujian->id, 'nomor_soal' => 1, 'kunci_jawaban' => 'A', 'bobot' => 50.0]);
+        UjianKunci::create(['ujian_id' => $ujian->id, 'nomor_soal' => 2, 'kunci_jawaban' => 'B', 'bobot' => 50.0]);
+
+        UjianHasil::create([
+            'ujian_id'      => $ujian->id,
+            'siswa_id'      => $this->siswa->id,
+            'jawaban_siswa' => [1 => 'A', 2 => 'C'],
+            'jumlah_benar'  => 1,
+            'jumlah_salah'  => 1,
+            'jumlah_kosong' => 0,
+            'nilai_akhir'   => 50.00,
+            'status_scan'   => 'valid',
+            'waktu_scan'    => now(),
+        ]);
+
+        // Akses menu nilai
+        $resNilai = $this->actingAs($this->admin)->get(route('ujian.nilai', ['ujian_id' => $ujian->id]));
+        $resNilai->assertStatus(200);
+        $resNilai->assertSee('Daftar Nilai Siswa');
+        $resNilai->assertSee('Analisis Butir Soal');
+
+        // Analisis butir soal accessor
+        $analisis = $ujian->analisis_soal;
+        $this->assertEquals(1, $analisis[1]['jumlah_benar']);
+        $this->assertEquals(0, $analisis[1]['jumlah_salah']);
+        $this->assertEquals(100.0, $analisis[1]['persen_benar']);
+        $this->assertEquals('Mudah', $analisis[1]['tingkat_kesukaran']);
+
+        $this->assertEquals(0, $analisis[2]['jumlah_benar']);
+        $this->assertEquals(1, $analisis[2]['jumlah_salah']);
+        $this->assertEquals(0.0, $analisis[2]['persen_benar']);
+        $this->assertEquals('Sukar', $analisis[2]['tingkat_kesukaran']);
     }
 }

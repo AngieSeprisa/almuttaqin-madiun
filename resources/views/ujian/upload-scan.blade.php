@@ -1,8 +1,9 @@
 @extends('layouts.app')
 
-@section('title', 'Unggah & Koreksi LJK: ' . $ujian->nama_ujian)
+@section('title', 'Koreksi LJK Otomatis' . ($ujian ? ': ' . $ujian->nama_ujian : ''))
 
 @section('header-actions')
+@if($ujian)
 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
     <a href="{{ route('ujian.hasil', $ujian->id) }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px; border-radius:8px;">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
@@ -18,10 +19,11 @@
         </svg>
         <span>Cetak LJK</span>
     </a>
-    <a href="{{ route('ujian.index') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px; border-radius:8px;">
-        &larr; Kembali
+    <a href="{{ route('ujian.soal') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px; border-radius:8px;">
+        &larr; Soal Ujian
     </a>
 </div>
+@endif
 @endsection
 
 @section('content')
@@ -145,6 +147,37 @@
         </div>
     @endif
 
+    @if(isset($ujians) && $ujians->count() > 0)
+    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <label for="selectUjian" style="font-size:13px; font-weight:700; color:#334155; margin:0;">Pilih Ujian:</label>
+            <select id="selectUjian" class="form-control" style="font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid #cbd5e1; min-width:280px;" onchange="window.location.href='{{ route('ujian.koreksi') }}?ujian_id=' + this.value">
+                @foreach($ujians as $u)
+                    <option value="{{ $u->id }}" {{ ($ujian && $ujian->id == $u->id) ? 'selected' : '' }}>
+                        {{ $u->nama_ujian }} ({{ $u->kelas->nama_kelas ?? '-' }} - {{ $u->mapel->nama_mapel ?? '-' }})
+                    </option>
+                @endforeach
+            </select>
+        </div>
+        <div style="font-size:12px; color:#64748b;">
+            Total Ujian: <strong>{{ $ujians->count() }}</strong>
+        </div>
+    </div>
+    @endif
+
+    @if(!$ujian)
+    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; padding:48px 24px; text-align:center; color:#64748b;">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#94a3b8" stroke-width="1.5" style="margin-bottom:16px;">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <h3 style="font-size:16px; font-weight:700; color:#1e293b; margin:0 0 8px;">Belum Ada Ujian</h3>
+        <p style="font-size:13px; margin:0 auto 16px; max-width:400px;">Silakan buat ujian baru atau unggah soal terlebih dahulu sebelum melakukan koreksi scan LJK.</p>
+        <a href="{{ route('ujian.soal') }}" class="btn btn-primary" style="font-size:13px; padding:8px 18px; border-radius:8px;">
+            Ke Menu Soal Ujian
+        </a>
+    </div>
+    @else
     <!-- Kartu Informasi Ujian -->
     <div class="info-summary-card">
         <div>
@@ -447,5 +480,6 @@
         fileInput.value = '';
     }
 </script>
+@endif
 @endsection
 

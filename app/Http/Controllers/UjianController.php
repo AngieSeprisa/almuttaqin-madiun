@@ -5,16 +5,20 @@ namespace App\Http\Controllers;
 use App\Models\Ujian;
 use App\Models\UjianKunci;
 use App\Models\UjianHasil;
+use App\Models\UjianSoal;
 use App\Models\Classroom;
 use App\Models\MataPelajaran;
 use App\Models\Siswa;
+use App\Models\TimeSlot;
 use App\Models\User;
 use App\Services\Omr\LjkTemplateService;
 use App\Services\Omr\OmrScannerService;
 use App\Services\Omr\QrCodeGenerator;
+use App\Services\Omr\WordQuestionParserService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -24,11 +28,24 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 class UjianController extends Controller
 {
     /**
-     * Tampilkan daftar ujian
+     * Redirect default /ujian ke sub menu Soal Ujian
      */
     public function index(Request $request)
     {
-        $query = Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils');
+        return $this->soalIndex($request);
+    }
+
+    // =========================================================================
+    // 1. SUB MENU: SOAL UJIAN
+    // =========================================================================
+
+    /**
+     * Sub menu 1: Daftar Soal Ujian
+     */
+    public function soalIndex(Request $request)
+    {
+        $query = Ujian::with(['mapel', 'kelas', 'guru'])
+            ->withCount(['soals', 'kuncis']);
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -46,30 +63,11 @@ class UjianController extends Controller
             $query->where('mapel_id', $request->mapel_id);
         }
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
         $ujians = $query->latest('tanggal_ujian')->paginate(12)->withQueryString();
-
         $kelases = Classroom::active()->orderBy('tingkat')->orderBy('nama_kelas')->get();
         $mapels = MataPelajaran::orderBy('mata_pelajaran')->get();
 
-        // Statistik Ringkas
-        $totalUjian = Ujian::count();
-        $ujianAktif = Ujian::where('status', 'aktif')->count();
-        $ujianSelesai = Ujian::where('status', 'selesai')->count();
-        $totalKoreksi = UjianHasil::count();
-
-        return view('ujian.index', compact(
-            'ujians',
-            'kelases',
-            'mapels',
-            'totalUjian',
-            'ujianAktif',
-            'ujianSelesai',
-            'totalKoreksi'
-        ));
+        return view('ujian.soal-index', compact('ujians', 'kelases', 'mapels'));
     }
 
     /**
@@ -83,7 +81,6 @@ class UjianController extends Controller
             $q->where('role', 'guru')->orWhere('is_guru_sekolah', true);
         })->where('is_active', true)->orderBy('name')->get();
 
-        // Generate saran kode ujian otomatis (contoh: UJN-202611-001)
         $prefix = 'UJN-' . date('Ym') . '-';
         $last = Ujian::where('kode_ujian', 'like', "$prefix%")->orderBy('id', 'desc')->first();
         $nextNum = $last ? (((int) substr($last->kode_ujian, -3)) + 1) : 1;
@@ -95,6 +92,7 @@ class UjianController extends Controller
                 'jumlah_soal'   => 40,
                 'jumlah_opsi'   => 4,
                 'bobot_benar'   => 1.00,
+                'timer_default' => 90,
                 'tanggal_ujian' => now()->toDateString(),
                 'status'        => 'draft',
             ]),
@@ -106,7 +104,7 @@ class UjianController extends Controller
     }
 
     /**
-     * Simpan ujian baru ke database
+     * Simpan ujian baru
      */
     public function store(Request $request)
     {
@@ -116,20 +114,36 @@ class UjianController extends Controller
             'mapel_id'      => 'nullable|exists:mata_pelajarans,id',
             'kelas_id'      => 'nullable|exists:classrooms,id',
             'guru_id'       => 'nullable|exists:users,id',
-            'jumlah_soal'   => 'required|integer|min:5|max:100',
+            'jumlah_soal'   => 'required|integer|min:1|max:100',
             'jumlah_opsi'   => 'required|integer|in:4,5',
             'bobot_benar'   => 'required|numeric|min:0.1|max:100',
+            'timer_default' => 'nullable|integer|min:10|max:1800',
             'tanggal_ujian' => 'required|date',
             'status'        => 'required|in:draft,aktif,selesai',
+            'file_word'     => 'nullable|file|mimes:docx|max:10240',
         ]);
 
-        $ujian = DB::transaction(function () use ($validated) {
-            $ujian = Ujian::create($validated);
+        $timerDefault = $validated['timer_default'] ?? 90;
 
-            // Inisialisasi Kunci Jawaban Default (A untuk setiap nomor)
-            $kuncis = [];
+        $ujian = DB::transaction(function () use ($validated, $timerDefault, $request) {
+            $ujian = Ujian::create([
+                'kode_ujian'    => $validated['kode_ujian'],
+                'nama_ujian'    => $validated['nama_ujian'],
+                'mapel_id'      => $validated['mapel_id'] ?? null,
+                'kelas_id'      => $validated['kelas_id'] ?? null,
+                'guru_id'       => $validated['guru_id'] ?? null,
+                'jumlah_soal'   => $validated['jumlah_soal'],
+                'jumlah_opsi'   => $validated['jumlah_opsi'],
+                'bobot_benar'   => $validated['bobot_benar'],
+                'timer_default' => $timerDefault,
+                'tanggal_ujian' => $validated['tanggal_ujian'],
+                'status'        => $validated['status'],
+            ]);
+
+            // Inisialisasi kunci jawaban default jika belum ada naskah Word
+            $kunciData = [];
             for ($no = 1; $no <= $ujian->jumlah_soal; $no++) {
-                $kuncis[] = [
+                $kunciData[] = [
                     'ujian_id'      => $ujian->id,
                     'nomor_soal'    => $no,
                     'kunci_jawaban' => 'A',
@@ -138,13 +152,18 @@ class UjianController extends Controller
                     'updated_at'    => now(),
                 ];
             }
-            UjianKunci::insert($kuncis);
+            UjianKunci::insert($kunciData);
+
+            // Jika ada file Word (.docx) diunggah langsung saat pembuatan
+            if ($request->hasFile('file_word')) {
+                $this->processUploadedWordFile($request->file('file_word'), $ujian);
+            }
 
             return $ujian;
         });
 
         return redirect()->route('ujian.kunci', $ujian->id)
-            ->with('success', "Ujian {$ujian->nama_ujian} berhasil dibuat. Silakan lengkapi kunci jawaban di bawah.");
+            ->with('success', "Ujian {$ujian->nama_ujian} berhasil dibuat. Silakan atur kunci jawaban atau unggah naskah soal.");
     }
 
     /**
@@ -178,9 +197,10 @@ class UjianController extends Controller
             'mapel_id'      => 'nullable|exists:mata_pelajarans,id',
             'kelas_id'      => 'nullable|exists:classrooms,id',
             'guru_id'       => 'nullable|exists:users,id',
-            'jumlah_soal'   => 'required|integer|min:5|max:100',
+            'jumlah_soal'   => 'required|integer|min:1|max:100',
             'jumlah_opsi'   => 'required|integer|in:4,5',
             'bobot_benar'   => 'required|numeric|min:0.1|max:100',
+            'timer_default' => 'nullable|integer|min:10|max:1800',
             'tanggal_ujian' => 'required|date',
             'status'        => 'required|in:draft,aktif,selesai',
         ]);
@@ -190,7 +210,6 @@ class UjianController extends Controller
         DB::transaction(function () use ($ujian, $validated, $prevJumlahSoal) {
             $ujian->update($validated);
 
-            // Jika jumlah soal bertambah, tambahkan kunci default
             if ($ujian->jumlah_soal > $prevJumlahSoal) {
                 $newKunci = [];
                 for ($no = $prevJumlahSoal + 1; $no <= $ujian->jumlah_soal; $no++) {
@@ -205,31 +224,132 @@ class UjianController extends Controller
                 }
                 UjianKunci::insert($newKunci);
             } elseif ($ujian->jumlah_soal < $prevJumlahSoal) {
-                // Hapus kunci yang melebihi jumlah soal baru
                 UjianKunci::where('ujian_id', $ujian->id)
                     ->where('nomor_soal', '>', $ujian->jumlah_soal)
                     ->delete();
             }
         });
 
-        return redirect()->route('ujian.index')
+        return redirect()->route('ujian.soal')
             ->with('success', "Data ujian {$ujian->nama_ujian} berhasil diperbarui.");
     }
 
     /**
-     * Hapus ujian dan seluruh hasil terkait
+     * Hapus ujian
      */
     public function destroy(Ujian $ujian)
     {
         $nama = $ujian->nama_ujian;
         $ujian->delete();
 
-        return redirect()->route('ujian.index')
+        return redirect()->route('ujian.soal')
             ->with('success', "Ujian {$nama} berhasil dihapus.");
     }
 
     /**
-     * Halaman manajemen Kunci Jawaban interaktif
+     * Unggah naskah soal Word (.docx) dan ekstrak butir soal otomatis
+     */
+    public function uploadWordSoal(Request $request, Ujian $ujian)
+    {
+        $request->validate([
+            'file_word'     => 'required|file|mimes:docx|max:15360', // max 15MB
+            'timer_per_soal'=> 'nullable|integer|min:10|max:1800',
+        ]);
+
+        $file = $request->file('file_word');
+        $timer = (int) ($request->input('timer_per_soal') ?: ($ujian->timer_default ?: 90));
+
+        try {
+            $parsed = $this->processUploadedWordFile($file, $ujian, $timer);
+
+            return redirect()->back()->with('success', "Naskah soal Word berhasil diproses! {$parsed['total_soal']} butir soal terbaca dan kunci jawaban telah disinkronkan.");
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', 'Gagal memproses file Word: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Helper pemrosesan file Word (.docx)
+     */
+    private function processUploadedWordFile($uploadedFile, Ujian $ujian, int $timer = 90): array
+    {
+        $parser = new WordQuestionParserService();
+        $parsed = $parser->parse($uploadedFile->getRealPath());
+
+        if (empty($parsed['soals'])) {
+            throw new \Exception("Tidak ada butir soal yang berhasil terdeteksi dalam file Word. Pastikan format penomoran sesuai template (misal: 1. Pertanyaan, A. Pilihan, B. Pilihan...).");
+        }
+
+        // Simpan file asli ke storage
+        $storedPath = $uploadedFile->store('naskah_ujian', 'public');
+
+        DB::transaction(function () use ($ujian, $parsed, $storedPath, $timer) {
+            // Hapus soal lama
+            UjianSoal::where('ujian_id', $ujian->id)->delete();
+
+            $soalInserts = [];
+            $kunciMap = [];
+
+            foreach ($parsed['soals'] as $item) {
+                $no = (int) $item['nomor'];
+                $soalInserts[] = [
+                    'ujian_id'      => $ujian->id,
+                    'nomor_soal'    => $no,
+                    'pertanyaan'    => $item['pertanyaan'],
+                    'opsi_a'        => $item['opsi_a'],
+                    'opsi_b'        => $item['opsi_b'],
+                    'opsi_c'        => $item['opsi_c'],
+                    'opsi_d'        => $item['opsi_d'],
+                    'opsi_e'        => $item['opsi_e'],
+                    'kunci_jawaban' => $item['kunci'] ?? 'A',
+                    'timer_detik'   => $timer,
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
+                ];
+
+                $kunciMap[$no] = strtoupper($item['kunci'] ?? 'A');
+            }
+
+            UjianSoal::insert($soalInserts);
+
+            // Update informasi ujian
+            $ujian->update([
+                'file_soal'     => $storedPath,
+                'jumlah_soal'   => count($parsed['soals']),
+                'jumlah_opsi'   => $parsed['jumlah_opsi'] ?? $ujian->jumlah_opsi,
+                'timer_default' => $timer,
+            ]);
+
+            // Sinkronkan ke tabel ujian_kunci
+            foreach ($kunciMap as $no => $kunciLetter) {
+                UjianKunci::updateOrCreate(
+                    ['ujian_id' => $ujian->id, 'nomor_soal' => $no],
+                    ['kunci_jawaban' => $kunciLetter, 'bobot' => $ujian->bobot_benar]
+                );
+            }
+
+            // Hapus kunci yang melebihi jumlah soal baru
+            UjianKunci::where('ujian_id', $ujian->id)
+                ->where('nomor_soal', '>', count($parsed['soals']))
+                ->delete();
+        });
+
+        return $parsed;
+    }
+
+    /**
+     * Unduh Template Naskah Soal Word (.docx)
+     */
+    public function downloadTemplate()
+    {
+        $parser = new WordQuestionParserService();
+        $tempFile = $parser->generateTemplateDocx();
+
+        return response()->download($tempFile, 'Template_Naskah_Soal_Ujian.docx')->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Halaman Kunci Jawaban
      */
     public function kunci(Ujian $ujian)
     {
@@ -268,7 +388,6 @@ class UjianController extends Controller
                 );
             }
 
-            // Hitung ulang nilai seluruh siswa yang sudah pernah dikoreksi
             $this->recalculateAllScores($ujian);
         });
 
@@ -276,45 +395,76 @@ class UjianController extends Controller
     }
 
     /**
-     * Hitung ulang skor semua siswa pada ujian ini
+     * Update timer per soal
      */
-    private function recalculateAllScores(Ujian $ujian): void
+    public function updateTimer(Request $request, Ujian $ujian)
     {
-        $kunciMap = $ujian->kuncis->pluck('kunci_jawaban', 'nomor_soal')->all();
-        $bobotMap = $ujian->kuncis->pluck('bobot', 'nomor_soal')->all();
-        $totalSkorMaks = array_sum($bobotMap) ?: (count($kunciMap) * ($ujian->bobot_benar ?: 1.0));
+        $validated = $request->validate([
+            'timer_default'  => 'required|integer|min:10|max:1800',
+            'soal_timer'     => 'nullable|array',
+            'soal_timer.*'   => 'integer|min:10|max:1800',
+        ]);
 
-        foreach ($ujian->hasils as $hasil) {
-            $jawaban = $hasil->jawaban_siswa ?: [];
-            $benar = 0;
-            $salah = 0;
-            $kosong = 0;
-            $totalDidapat = 0.0;
+        DB::transaction(function () use ($ujian, $validated) {
+            $ujian->update(['timer_default' => $validated['timer_default']]);
 
-            for ($no = 1; $no <= $ujian->jumlah_soal; $no++) {
-                $jawab = $jawaban[$no] ?? null;
-                $kunci = $kunciMap[$no] ?? null;
-                $b = (float)($bobotMap[$no] ?? $ujian->bobot_benar ?? 1.0);
-
-                if ($jawab === null) {
-                    $kosong++;
-                } elseif ($kunci && strtoupper($jawab) === strtoupper($kunci)) {
-                    $benar++;
-                    $totalDidapat += $b;
-                } else {
-                    $salah++;
+            if (!empty($validated['soal_timer'])) {
+                foreach ($validated['soal_timer'] as $soalId => $detik) {
+                    UjianSoal::where('id', $soalId)
+                        ->where('ujian_id', $ujian->id)
+                        ->update(['timer_detik' => $detik]);
                 }
+            } else {
+                UjianSoal::where('ujian_id', $ujian->id)
+                    ->update(['timer_detik' => $validated['timer_default']]);
             }
+        });
 
-            $nilai = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
+        return redirect()->back()->with('success', 'Waktu hitung mundur soal berhasil diperbarui.');
+    }
 
-            $hasil->update([
-                'jumlah_benar'  => $benar,
-                'jumlah_salah'  => $salah,
-                'jumlah_kosong' => $kosong,
-                'nilai_akhir'   => $nilai,
-            ]);
+    // =========================================================================
+    // 2. SUB MENU: LJK (LEMBAR JAWAB KOMPUTER)
+    // =========================================================================
+
+    /**
+     * Sub menu 2: Halaman Manajemen & Cetak LJK
+     */
+    public function ljkIndex(Request $request)
+    {
+        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])
+            ->latest('tanggal_ujian')
+            ->get();
+
+        $selectedUjianId = $request->input('ujian_id') ?: ($ujians->first()?->id ?? null);
+        $ujian = $selectedUjianId ? Ujian::with(['mapel', 'kelas', 'guru'])->find($selectedUjianId) : null;
+
+        $siswas = collect();
+        if ($ujian && $ujian->kelas) {
+            $namaKelas = $ujian->kelas->nama_kelas;
+            $siswas = Siswa::where(function ($q) use ($namaKelas) {
+                $q->where('kelas', $namaKelas)
+                  ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
+            })->where('status', 'aktif')->orderBy('nama_lengkap')->get();
         }
+
+        return view('ujian.ljk-index', compact('ujians', 'ujian', 'siswas'));
+    }
+
+    /**
+     * Simpan teks peraturan ujian
+     */
+    public function updatePeraturan(Request $request, Ujian $ujian)
+    {
+        $validated = $request->validate([
+            'peraturan_ujian' => 'nullable|string|max:2000',
+        ]);
+
+        $ujian->update([
+            'peraturan_ujian' => $validated['peraturan_ujian'],
+        ]);
+
+        return redirect()->back()->with('success', 'Peraturan dan tata tertib LJK berhasil diperbarui.');
     }
 
     /**
@@ -324,7 +474,6 @@ class UjianController extends Controller
     {
         $ujian->load(['mapel', 'kelas', 'guru']);
 
-        // Ambil daftar siswa kelas terkait
         $query = Siswa::query();
         if ($ujian->kelas_id && $ujian->kelas) {
             $namaKelas = $ujian->kelas->nama_kelas;
@@ -340,7 +489,6 @@ class UjianController extends Controller
 
         $siswas = $query->where('status', 'aktif')->orderBy('nama_lengkap')->get();
 
-        // Jika kelas kosong / belum ada siswa, buat dummy 1 lembar blank untuk contoh cetak
         if ($siswas->isEmpty()) {
             $siswas = collect([
                 new Siswa([
@@ -351,7 +499,6 @@ class UjianController extends Controller
             ]);
         }
 
-        // Siapkan QR Code SVG per siswa
         $qrCodes = [];
         foreach ($siswas as $s) {
             $payload = LjkTemplateService::makeQrPayload($ujian, $s);
@@ -363,22 +510,100 @@ class UjianController extends Controller
         return view('ujian.cetak-ljk', compact('ujian', 'siswas', 'qrCodes', 'bubbleCoords'));
     }
 
+    // =========================================================================
+    // 3. SUB MENU: SESI UJIAN (MODE FULL SCREEN PROYEKTOR)
+    // =========================================================================
+
     /**
-     * Halaman Upload & Koreksi LJK Scan
+     * Sub menu 3: Form Pengaturan Sesi Ujian (Pilih Kelas, Mapel, Guru Auto, Jam)
      */
-    public function uploadScan(Ujian $ujian)
+    public function sesiIndex(Request $request)
     {
-        $ujian->load(['mapel', 'kelas', 'guru'])->loadCount('hasils');
-        return view('ujian.upload-scan', compact('ujian'));
+        $kelases = Classroom::active()->orderBy('tingkat')->orderBy('nama_kelas')->get();
+        $mapels = MataPelajaran::with('lembaga')->orderBy('mata_pelajaran')->get();
+        $gurus = User::where(function ($q) {
+            $q->where('role', 'guru')->orWhere('is_guru_sekolah', true);
+        })->where('is_active', true)->orderBy('name')->get();
+
+        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])
+            ->withCount('soals')
+            ->latest('tanggal_ujian')
+            ->get();
+
+        $timeSlots = TimeSlot::active()->orderBy('jam_ke')->get();
+
+        return view('ujian.sesi-index', compact('kelases', 'mapels', 'gurus', 'ujians', 'timeSlots'));
     }
 
     /**
-     * Proses Pemindaian File PDF / Gambar yang Diunggah (Sequential Batch Processing)
+     * Tampilan Mode Layar Penuh (Proyektor Kelas) dengan Timer per Nomor Soal
+     */
+    public function proyektor(Request $request, Ujian $ujian)
+    {
+        $ujian->load(['mapel', 'kelas', 'guru', 'soals']);
+
+        $soals = $ujian->soals;
+
+        // Jika belum ada butir soal di tabel ujian_soal, buat representasi fallback
+        if ($soals->isEmpty()) {
+            $dummy = [];
+            for ($no = 1; $no <= $ujian->jumlah_soal; $no++) {
+                $dummy[] = new UjianSoal([
+                    'id'          => $no,
+                    'nomor_soal'  => $no,
+                    'pertanyaan'  => "Soal nomor {$no}. Silakan kerjakan dan hitamkan bulatan jawaban pada lembar jawab LJK Anda.",
+                    'opsi_a'      => 'Pilihan A',
+                    'opsi_b'      => 'Pilihan B',
+                    'opsi_c'      => 'Pilihan C',
+                    'opsi_d'      => 'Pilihan D',
+                    'opsi_e'      => $ujian->jumlah_opsi == 5 ? 'Pilihan E' : null,
+                    'timer_detik' => $ujian->timer_default ?: 90,
+                ]);
+            }
+            $soals = collect($dummy);
+        }
+
+        $activeSlot = $request->input('jam_ujian', 'Jam Sesi Ujian');
+
+        return view('ujian.proyektor', compact('ujian', 'soals', 'activeSlot'));
+    }
+
+    // =========================================================================
+    // 4. SUB MENU: KOREKSI UJIAN (OMR + QR CODE BATCH SCAN)
+    // =========================================================================
+
+    /**
+     * Sub menu 4: Halaman Koreksi LJK
+     */
+    public function koreksiIndex(Request $request)
+    {
+        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])
+            ->withCount('hasils')
+            ->latest('tanggal_ujian')
+            ->get();
+
+        $selectedUjianId = $request->input('ujian_id') ?: ($ujians->first()?->id ?? null);
+        $ujian = $selectedUjianId ? Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->find($selectedUjianId) : null;
+
+        return view('ujian.upload-scan', compact('ujians', 'ujian'));
+    }
+
+    /**
+     * Upload scan LJK untuk satu ujian
+     */
+    public function uploadScan(Ujian $ujian)
+    {
+        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->latest('tanggal_ujian')->get();
+        return view('ujian.upload-scan', compact('ujians', 'ujian'));
+    }
+
+    /**
+     * Proses Pemindaian File PDF / Gambar (Sequential Batch Processing)
      */
     public function processScan(Request $request, Ujian $ujian)
     {
         $request->validate([
-            'file_scan' => 'required|file|mimes:pdf,jpg,jpeg,png|max:51200', // maks 50MB
+            'file_scan' => 'required|file|mimes:pdf,jpg,jpeg,png|max:51200',
         ]);
 
         $file = $request->file('file_scan');
@@ -402,12 +627,42 @@ class UjianController extends Controller
         }
     }
 
+    // =========================================================================
+    // 5. SUB MENU: NILAI UJIAN & ANALISIS BUTIR SOAL
+    // =========================================================================
+
     /**
-     * Dashboard Rekap Nilai Ujian
+     * Sub menu 5: Rekapitulasi Nilai & Analisis Butir Soal
+     */
+    public function nilaiIndex(Request $request)
+    {
+        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])
+            ->withCount('hasils')
+            ->latest('tanggal_ujian')
+            ->get();
+
+        $selectedUjianId = $request->input('ujian_id') ?: ($ujians->first()?->id ?? null);
+        $ujian = $selectedUjianId ? Ujian::with(['mapel', 'kelas', 'guru', 'kuncis', 'hasils'])->find($selectedUjianId) : null;
+
+        if (!$ujian && $ujians->isNotEmpty()) {
+            $ujian = $ujians->first();
+        }
+
+        if (!$ujian) {
+            return view('ujian.hasil-empty', compact('ujians'));
+        }
+
+        return $this->hasil($ujian);
+    }
+
+    /**
+     * Dashboard Rekap Nilai Ujian Tertentu
      */
     public function hasil(Ujian $ujian)
     {
+        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->latest('tanggal_ujian')->get();
         $ujian->load(['mapel', 'kelas', 'guru']);
+
         $hasils = UjianHasil::with('siswa')
             ->where('ujian_id', $ujian->id)
             ->join('siswas', 'siswas.id', '=', 'ujian_hasil.siswa_id')
@@ -417,27 +672,38 @@ class UjianController extends Controller
 
         $kuncis = $ujian->kuncis->pluck('kunci_jawaban', 'nomor_soal')->all();
         $statistik = $ujian->statistik;
+        $analisis = $ujian->analisis_soal;
 
-        return view('ujian.hasil', compact('ujian', 'hasils', 'kuncis', 'statistik'));
+        return view('ujian.hasil', compact('ujians', 'ujian', 'hasils', 'kuncis', 'statistik', 'analisis'));
     }
 
     /**
-     * Update Koreksi Manual oleh Guru jika ada jawaban ganda / samar
+     * Update Koreksi Manual oleh Guru
      */
     public function updateHasilManual(Request $request, Ujian $ujian, UjianHasil $hasil)
     {
-        $validated = $request->validate([
-            'nomor_soal' => 'required|integer|min:1|max:' . $ujian->jumlah_soal,
-            'jawaban'    => 'nullable|string|in:A,B,C,D,E,GANDA,null',
-        ]);
-
-        $nomor = $validated['nomor_soal'];
-        $jawabanBaru = $validated['jawaban'] === 'null' ? null : $validated['jawaban'];
-
         $currentAnswers = $hasil->jawaban_siswa ?? [];
-        $currentAnswers[$nomor] = $jawabanBaru;
 
-        // Hitung ulang nilai siswa ini
+        if ($request->has('jawaban') && is_array($request->input('jawaban'))) {
+            $inputAnswers = $request->input('jawaban');
+            foreach ($inputAnswers as $no => $ans) {
+                $noInt = (int)$no;
+                if ($noInt >= 1 && $noInt <= $ujian->jumlah_soal) {
+                    $ansClean = trim((string)$ans);
+                    $currentAnswers[$noInt] = $ansClean !== '' ? strtoupper($ansClean) : null;
+                }
+            }
+        } else {
+            $validated = $request->validate([
+                'nomor_soal' => 'required|integer|min:1|max:' . $ujian->jumlah_soal,
+                'jawaban'    => 'nullable|string|in:A,B,C,D,E,GANDA,null',
+            ]);
+
+            $nomor = $validated['nomor_soal'];
+            $jawabanBaru = $validated['jawaban'] === 'null' ? null : $validated['jawaban'];
+            $currentAnswers[$nomor] = $jawabanBaru;
+        }
+
         $kunciMap = $ujian->kuncis->pluck('kunci_jawaban', 'nomor_soal')->all();
         $bobotMap = $ujian->kuncis->pluck('bobot', 'nomor_soal')->all();
         $totalSkorMaks = array_sum($bobotMap) ?: ($ujian->jumlah_soal * ($ujian->bobot_benar ?: 1.0));
@@ -478,15 +744,19 @@ class UjianController extends Controller
             'catatan_scan'  => $hasGanda ? 'Masih terdapat jawaban ganda.' : 'Telah diverifikasi manual oleh Guru.',
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => "Jawaban nomor $nomor berhasil diperbarui. Nilai akhir: $nilai",
-            'data'    => $hasil->fresh(),
-        ]);
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Jawaban berhasil diperbarui. Nilai akhir: $nilai",
+                'data'    => $hasil->fresh(),
+            ]);
+        }
+
+        return redirect()->route('ujian.hasil', $ujian->id)->with('success', 'Hasil koreksi siswa berhasil diperbarui.');
     }
 
     /**
-     * Export Hasil Nilai ke Excel (.xlsx / .csv)
+     * Export Hasil Nilai ke Excel (.xlsx)
      */
     public function exportExcel(Request $request, Ujian $ujian)
     {
@@ -502,7 +772,6 @@ class UjianController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Hasil Ujian');
 
-        // Header Dokumen
         $sheet->setCellValue('A1', 'YAYASAN PONDOK PESANTREN AL-MUTTAQIN');
         $sheet->setCellValue('A2', 'REKAPITULASI HASIL UJIAN & KOREKSI LJK');
         $sheet->setCellValue('A4', 'Nama Ujian: ' . $ujian->nama_ujian);
@@ -513,7 +782,6 @@ class UjianController extends Controller
         $sheet->getStyle('A1:A2')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A4:D5')->getFont()->setBold(true);
 
-        // Header Kolom Tabel
         $headers = [
             'No',
             'NISN',
@@ -536,7 +804,6 @@ class UjianController extends Controller
             $col++;
         }
 
-        // Isi Data Siswa
         $no = 1;
         $row = 8;
         foreach ($hasils as $h) {
@@ -555,7 +822,6 @@ class UjianController extends Controller
             $sheet->getStyle('D' . $row . ':G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle('H' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            // Warna status
             if ($h->status_scan !== 'valid') {
                 $sheet->getStyle('H' . $row)->getFont()->getColor()->setRGB('D97706');
             }
@@ -564,7 +830,6 @@ class UjianController extends Controller
             $row++;
         }
 
-        // Auto width
         foreach (range('A', 'I') as $c) {
             $sheet->getColumnDimension($c)->setAutoSize(true);
         }
@@ -579,5 +844,46 @@ class UjianController extends Controller
             'Cache-Control' => 'max-age=0',
         ]);
     }
-}
 
+    /**
+     * Hitung ulang skor seluruh siswa
+     */
+    private function recalculateAllScores(Ujian $ujian): void
+    {
+        $kunciMap = $ujian->kuncis->pluck('kunci_jawaban', 'nomor_soal')->all();
+        $bobotMap = $ujian->kuncis->pluck('bobot', 'nomor_soal')->all();
+        $totalSkorMaks = array_sum($bobotMap) ?: (count($kunciMap) * ($ujian->bobot_benar ?: 1.0));
+
+        foreach ($ujian->hasils as $hasil) {
+            $jawaban = $hasil->jawaban_siswa ?: [];
+            $benar = 0;
+            $salah = 0;
+            $kosong = 0;
+            $totalDidapat = 0.0;
+
+            for ($no = 1; $no <= $ujian->jumlah_soal; $no++) {
+                $jawab = $jawaban[$no] ?? null;
+                $kunci = $kunciMap[$no] ?? null;
+                $b = (float)($bobotMap[$no] ?? $ujian->bobot_benar ?? 1.0);
+
+                if ($jawab === null) {
+                    $kosong++;
+                } elseif ($kunci && strtoupper($jawab) === strtoupper($kunci)) {
+                    $benar++;
+                    $totalDidapat += $b;
+                } else {
+                    $salah++;
+                }
+            }
+
+            $nilai = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
+
+            $hasil->update([
+                'jumlah_benar'  => $benar,
+                'jumlah_salah'  => $salah,
+                'jumlah_kosong' => $kosong,
+                'nilai_akhir'   => $nilai,
+            ]);
+        }
+    }
+}

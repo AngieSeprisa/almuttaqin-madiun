@@ -464,55 +464,88 @@ Route::middleware('auth')->group(function () {
 
     // Menu Ujian & Koreksi LJK Otomatis (OMR + QR Code)
     Route::prefix('ujian')->name('ujian.')->group(function () {
+        // Submenu 1: Soal Ujian & Manajemen Soal Word
+        Route::get('/soal', [UjianController::class, 'soalIndex'])
+            ->middleware('permission:ujian_soal|ujian,view')
+            ->name('soal');
+        Route::get('/download-template', [UjianController::class, 'downloadTemplate'])
+            ->middleware('permission:ujian_soal|ujian,view')
+            ->name('download-template');
+        Route::post('/{ujian}/upload-word', [UjianController::class, 'uploadWordSoal'])
+            ->middleware('permission:ujian_soal|ujian,edit')
+            ->name('upload-word');
+        Route::post('/{ujian}/timer', [UjianController::class, 'updateTimer'])
+            ->middleware('permission:ujian_soal|ujian,edit')
+            ->name('update-timer');
+
+        // CRUD Ujian & Input Kunci
         Route::get('/', [UjianController::class, 'index'])
-            ->middleware('permission:ujian,view')
+            ->middleware('permission:ujian_soal|ujian,view')
             ->name('index');
         Route::get('/create', [UjianController::class, 'create'])
-            ->middleware('permission:ujian,create')
+            ->middleware('permission:ujian_soal|ujian,create')
             ->name('create');
         Route::post('/', [UjianController::class, 'store'])
-            ->middleware('permission:ujian,create')
+            ->middleware('permission:ujian_soal|ujian,create')
             ->name('store');
         Route::get('/{ujian}/edit', [UjianController::class, 'edit'])
-            ->middleware('permission:ujian,edit')
+            ->middleware('permission:ujian_soal|ujian,edit')
             ->name('edit');
         Route::put('/{ujian}', [UjianController::class, 'update'])
-            ->middleware('permission:ujian,edit')
+            ->middleware('permission:ujian_soal|ujian,edit')
             ->name('update');
         Route::delete('/{ujian}', [UjianController::class, 'destroy'])
-            ->middleware('permission:ujian,delete')
+            ->middleware('permission:ujian_soal|ujian,delete')
             ->name('destroy');
-
-        // Kunci Jawaban
         Route::get('/{ujian}/kunci', [UjianController::class, 'kunci'])
-            ->middleware('permission:ujian,edit')
+            ->middleware('permission:ujian_soal|ujian,edit')
             ->name('kunci');
         Route::match(['post', 'put'], '/{ujian}/kunci', [UjianController::class, 'updateKunci'])
-            ->middleware('permission:ujian,edit')
+            ->middleware('permission:ujian_soal|ujian,edit')
             ->name('update-kunci');
 
-        // Cetak LJK (View & Print)
+        // Submenu 2: LJK
+        Route::get('/ljk', [UjianController::class, 'ljkIndex'])
+            ->middleware('permission:ujian_ljk|ujian,view')
+            ->name('ljk');
+        Route::post('/{ujian}/peraturan', [UjianController::class, 'updatePeraturan'])
+            ->middleware('permission:ujian_ljk|ujian,edit')
+            ->name('update-peraturan');
         Route::get('/{ujian}/cetak-ljk', [UjianController::class, 'cetakLjk'])
-            ->middleware('permission:ujian,view')
+            ->middleware('permission:ujian_ljk|ujian,view')
             ->name('cetak-ljk');
 
-        // Upload & Proses Scan LJK
-        Route::get('/{ujian}/upload-scan', [UjianController::class, 'uploadScan'])
-            ->middleware('permission:ujian,create|edit')
+        // Submenu 3: Sesi Ujian (Mode Full Screen Proyektor)
+        Route::get('/sesi', [UjianController::class, 'sesiIndex'])
+            ->middleware('permission:ujian_sesi|ujian,view')
+            ->name('sesi');
+        Route::get('/{ujian}/proyektor', [UjianController::class, 'proyektor'])
+            ->middleware('permission:ujian_sesi|ujian,view')
+            ->name('proyektor');
+
+        // Submenu 4: Koreksi Ujian (OMR + QR)
+        Route::get('/koreksi', [UjianController::class, 'koreksiIndex'])
+            ->middleware('permission:ujian_koreksi|ujian,view')
+            ->name('koreksi');
+        Route::match(['get', 'post'], '/{ujian}/upload-scan', [UjianController::class, 'uploadScan'])
+            ->middleware('permission:ujian_koreksi|ujian,create|edit')
             ->name('upload-scan');
         Route::post('/{ujian}/process-scan', [UjianController::class, 'processScan'])
-            ->middleware('permission:ujian,create|edit')
+            ->middleware('permission:ujian_koreksi|ujian,create|edit')
             ->name('process-scan');
 
-        // Dashboard Rekap Hasil & Koreksi Manual & Export
+        // Submenu 5: Nilai Ujian & Analisis Soal
+        Route::get('/nilai', [UjianController::class, 'nilaiIndex'])
+            ->middleware('permission:ujian_nilai|ujian,view')
+            ->name('nilai');
         Route::get('/{ujian}/hasil', [UjianController::class, 'hasil'])
-            ->middleware('permission:ujian,view')
+            ->middleware('permission:ujian_nilai|ujian,view')
             ->name('hasil');
         Route::match(['post', 'put'], '/{ujian}/hasil/{hasil}/manual', [UjianController::class, 'updateHasilManual'])
-            ->middleware('permission:ujian,edit')
+            ->middleware('permission:ujian_nilai|ujian,edit')
             ->name('update-hasil-manual');
         Route::get('/{ujian}/export-excel', [UjianController::class, 'exportExcel'])
-            ->middleware('permission:ujian,view')
+            ->middleware('permission:ujian_nilai|ujian,view')
             ->name('export-excel');
     });
 

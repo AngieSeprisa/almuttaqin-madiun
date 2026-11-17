@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Rekap Hasil Ujian: ' . $ujian->nama_ujian)
+@section('title', 'Hasil & Analisis Ujian: ' . $ujian->nama_ujian)
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -19,27 +19,11 @@
             <polyline points="17 8 12 3 7 8"></polyline>
             <line x1="12" y1="3" x2="12" y2="15"></line>
         </svg>
-        <span>Unggah Hasil Scan</span>
+        <span>Koreksi LJK (Scan)</span>
     </a>
 
-    <a href="{{ route('ujian.cetak-ljk', $ujian->id) }}" target="_blank" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px; border-radius:8px;">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-            <rect x="6" y="14" width="12" height="8"></rect>
-        </svg>
-        <span>Cetak LJK</span>
-    </a>
-
-    <a href="{{ route('ujian.kunci', $ujian->id) }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px; border-radius:8px;">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
-        </svg>
-        <span>Kunci Jawaban</span>
-    </a>
-
-    <a href="{{ route('ujian.index') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px; border-radius:8px;">
-        &larr; Kembali
+    <a href="{{ route('ujian.nilai') }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px; border-radius:8px;">
+        &larr; Rekap Nilai
     </a>
 </div>
 @endsection
@@ -52,7 +36,7 @@
     }
     .stats-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 16px;
         margin-bottom: 24px;
     }
@@ -64,6 +48,7 @@
         display: flex;
         align-items: center;
         gap: 14px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
     }
     .stat-icon {
         width: 44px;
@@ -85,6 +70,46 @@
         color: #64748b;
         margin-top: 3px;
     }
+
+    /* Tabs Navigation */
+    .tabs-nav {
+        display: flex;
+        gap: 8px;
+        border-bottom: 2px solid #e2e8f0;
+        margin-bottom: 20px;
+    }
+    .tab-btn {
+        padding: 10px 18px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #64748b;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: -2px;
+        transition: all 0.15s ease;
+    }
+    .tab-btn:hover {
+        color: #0284c7;
+    }
+    .tab-btn.active {
+        color: #0284c7;
+        border-bottom-color: #0284c7;
+        background: #f0f9ff;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+    }
+    .tab-pane {
+        display: none;
+    }
+    .tab-pane.active {
+        display: block;
+    }
+
     .table-container {
         background: var(--bg-surface, #ffffff);
         border: 1px solid var(--border-light, #e2e8f0);
@@ -114,7 +139,26 @@
         background: #fafafa;
     }
 
-    /* Modal Koreksi */
+    /* Distribution badge */
+    .dist-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #f1f5f9;
+        color: #475569;
+    }
+    .dist-badge.correct {
+        background: #dcfce7;
+        color: #166534;
+        font-weight: 700;
+    }
+
+    /* Modal Koreksi Manual */
     .modal-overlay {
         position: fixed;
         top: 0;
@@ -150,48 +194,90 @@
         overflow-y: auto;
     }
     .modal-foot {
-        padding: 14px 24px;
+        padding: 16px 24px;
         border-top: 1px solid #e2e8f0;
         display: flex;
         justify-content: flex-end;
         gap: 10px;
         background: #f8fafc;
-        border-bottom-left-radius: 14px;
-        border-bottom-right-radius: 14px;
+        border-radius: 0 0 14px 14px;
     }
-    .modal-answers-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-        gap: 10px;
-    }
-    .answer-edit-box {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 8px 10px;
+
+    .opt-circle-btn {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
         font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
     }
-    .answer-edit-box.is-wrong {
-        border-color: #fecaca;
-        background: #fff5f5;
-    }
-    .answer-edit-box.is-ganda {
-        border-color: #fde68a;
-        background: #fffbeb;
+    .opt-circle-btn.selected {
+        background: #0284c7;
+        color: #ffffff;
+        border-color: #0284c7;
     }
 </style>
 
 <div class="hasil-container">
     @if(session('success'))
-        <div style="background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46; padding:12px 16px; border-radius:10px; margin-bottom:16px; font-size:14px;">
+        <div style="background:#ecfdf5; border-left:4px solid #10b981; color:#065f46; padding:12px 16px; border-radius:8px; margin-bottom:20px; font-size:13px;">
             {{ session('success') }}
         </div>
     @endif
 
-    <!-- Kartu Statistik -->
+    @if(isset($ujians) && $ujians->count() > 1)
+    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 18px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <label for="selectUjianHasil" style="font-size:13px; font-weight:700; color:#334155; margin:0;">Pilih Ujian:</label>
+            <select id="selectUjianHasil" class="form-control" style="font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid #cbd5e1; min-width:280px;" onchange="window.location.href='{{ route('ujian.nilai') }}?ujian_id=' + this.value">
+                @foreach($ujians as $u)
+                    <option value="{{ $u->id }}" {{ $ujian->id == $u->id ? 'selected' : '' }}>
+                        {{ $u->nama_ujian }} ({{ $u->kelas->nama_kelas ?? '-' }} - {{ $u->mapel->nama_mapel ?? '-' }})
+                    </option>
+                @endforeach
+            </select>
+        </div>
+        <div style="font-size:12px; color:#64748b;">
+            Menampilkan data untuk ujian <strong>{{ $ujian->nama_ujian }}</strong>
+        </div>
+    </div>
+    @endif
+
+    {{-- Info Card Ujian --}}
+    <div style="background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color:#ffffff; border-radius:14px; padding:20px 24px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <div>
+            <div style="font-size:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Rekapitulasi Nilai & Analisis Soal</div>
+            <h2 style="font-size:20px; font-weight:800; margin:4px 0 6px 0; color:#f8fafc;">{{ $ujian->nama_ujian }}</h2>
+            <div style="font-size:13px; color:#cbd5e1; display:flex; gap:16px; flex-wrap:wrap;">
+                <span><strong>Kelas:</strong> {{ $ujian->kelas->nama_kelas ?? '-' }}</span>
+                <span><strong>Mata Pelajaran:</strong> {{ $ujian->mapel->nama_mapel ?? '-' }}</span>
+                <span><strong>Guru:</strong> {{ $ujian->guru->nama_guru ?? '-' }}</span>
+                <span><strong>Jumlah Soal:</strong> {{ $ujian->jumlah_soal }} Butir</span>
+            </div>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <a href="{{ route('ujian.kunci', $ujian->id) }}" class="btn btn-secondary" style="background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.2); color:#ffffff; font-size:12px;">
+                Lihat Kunci ({{ $ujian->kuncis->count() }})
+            </a>
+            <a href="{{ route('ujian.cetak-ljk', $ujian->id) }}" target="_blank" class="btn btn-secondary" style="background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.2); color:#ffffff; font-size:12px;">
+                Cetak LJK PDF
+            </a>
+        </div>
+    </div>
+
+    {{-- Ringkasan Statistik --}}
+    @php
+        $stat = $ujian->statistik;
+    @endphp
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-icon" style="background:#eff6ff; color:#0052FF;">
+            <div class="stat-icon" style="background:#eff6ff; color:#2563eb;">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
@@ -200,40 +286,53 @@
                 </svg>
             </div>
             <div>
-                <div class="stat-val">{{ $statistik['total_peserta'] }}</div>
+                <div class="stat-val">{{ $stat['total_peserta'] }}</div>
                 <div class="stat-lbl">Total Siswa Terkoreksi</div>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon" style="background:#ecfdf5; color:#059669;">
+            <div class="stat-icon" style="background:#f0fdf4; color:#16a34a;">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
-                    <polyline points="16 7 22 7 22 13"></polyline>
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
                 </svg>
             </div>
             <div>
-                <div class="stat-val">{{ $statistik['nilai_tertinggi'] }}</div>
+                <div class="stat-val">{{ number_format($stat['rata_rata'], 1) }}</div>
+                <div class="stat-lbl">Rata-Rata Nilai</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#fefce8; color:#ca8a04;">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="8" r="7"></circle>
+                    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
+                </svg>
+            </div>
+            <div>
+                <div class="stat-val" style="color:#16a34a;">{{ number_format($stat['nilai_tertinggi'], 1) }}</div>
                 <div class="stat-lbl">Nilai Tertinggi</div>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon" style="background:#eff6ff; color:#2563eb;">
+            <div class="stat-icon" style="background:#fff1f2; color:#e11d48;">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                    <polyline points="17 18 23 18 23 12"></polyline>
                 </svg>
             </div>
             <div>
-                <div class="stat-val">{{ $statistik['nilai_rata_rata'] }}</div>
-                <div class="stat-lbl">Rata-rata Nilai</div>
+                <div class="stat-val" style="color:#e11d48;">{{ number_format($stat['nilai_terendah'], 1) }}</div>
+                <div class="stat-lbl">Nilai Terendah</div>
             </div>
         </div>
 
         <div class="stat-card">
-            <div class="stat-icon" style="background:#fffbeb; color:#d97706;">
+            <div class="stat-icon" style="background:{{ $stat['perlu_cek'] > 0 ? '#fff7ed' : '#f8fafc' }}; color:{{ $stat['perlu_cek'] > 0 ? '#ea580c' : '#94a3b8' }};">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                     <line x1="12" y1="9" x2="12" y2="13"></line>
@@ -241,270 +340,315 @@
                 </svg>
             </div>
             <div>
-                <div class="stat-val" style="color: {{ $statistik['perlu_cek'] > 0 ? '#d97706' : '#1e293b' }};">
-                    {{ $statistik['perlu_cek'] }}
-                </div>
+                <div class="stat-val" style="color:{{ $stat['perlu_cek'] > 0 ? '#ea580c' : '#64748b' }};">{{ $stat['perlu_cek'] }}</div>
                 <div class="stat-lbl">Perlu Cek Manual</div>
             </div>
         </div>
     </div>
 
-    <!-- Tabel Rekap Nilai -->
-    <div class="table-container">
-        <div style="padding:16px 20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-            <div>
-                <h3 style="font-size:16px; font-weight:700; margin:0; color:#1e293b;">Daftar Nilai Siswa</h3>
-                <div style="font-size:12px; color:#64748b; margin-top:2px;">
-                    Kelas {{ $ujian->kelas?->nama_kelas ?? 'Semua Kelas' }} &bull; {{ $ujian->mapel?->mata_pelajaran ?? '-' }} &bull; Total Soal: {{ $ujian->jumlah_soal }}
+    {{-- Tabs Navigation --}}
+    <div class="tabs-nav">
+        <button type="button" class="tab-btn active" onclick="switchTab('tab-nilai', this)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+            </svg>
+            <span>Daftar Nilai Siswa ({{ $ujian->hasils->count() }})</span>
+        </button>
+
+        <button type="button" class="tab-btn" onclick="switchTab('tab-analisis', this)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+            <span>Analisis Butir Soal & Daya Pembeda</span>
+        </button>
+    </div>
+
+    {{-- Tab 1: Nilai Siswa --}}
+    <div id="tab-nilai" class="tab-pane active">
+        <div class="table-container">
+            <div style="padding:16px 20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-weight:700; color:#1e293b; font-size:15px;">Daftar Hasil Pengerjaan Siswa</div>
+                <div style="font-size:12px; color:#64748b;">
+                    Klik tombol <strong>Koreksi Manual</strong> untuk memeriksa atau mengubah jawaban siswa.
                 </div>
             </div>
-            <div style="font-size:13px; color:#64748b;">
-                Menampilkan {{ $hasils->count() }} dari {{ $hasils->total() }} hasil
+
+            <div style="overflow-x:auto;">
+                <table class="hasil-table">
+                    <thead>
+                        <tr>
+                            <th style="width:45px; text-align:center;">No</th>
+                            <th>NIS / NISN</th>
+                            <th>Nama Siswa</th>
+                            <th style="text-align:center;">Benar</th>
+                            <th style="text-align:center;">Salah</th>
+                            <th style="text-align:center;">Kosong</th>
+                            <th style="text-align:center;">Nilai Akhir</th>
+                            <th style="text-align:center;">Status</th>
+                            <th>Waktu Scan</th>
+                            <th style="text-align:center;">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($ujian->hasils as $idx => $h)
+                            <tr>
+                                <td style="text-align:center; color:#64748b;">{{ $idx + 1 }}</td>
+                                <td style="font-weight:600; font-family:monospace;">{{ $h->siswa->nisn ?? $h->siswa->nis ?? '-' }}</td>
+                                <td style="font-weight:600; color:#1e293b;">{{ $h->siswa->nama_lengkap ?? 'Siswa ID ' . $h->siswa_id }}</td>
+                                <td style="text-align:center; font-weight:700; color:#16a34a;">{{ $h->jumlah_benar }}</td>
+                                <td style="text-align:center; font-weight:700; color:#dc2626;">{{ $h->jumlah_salah }}</td>
+                                <td style="text-align:center; color:#64748b;">{{ $h->jumlah_kosong }}</td>
+                                <td style="text-align:center;">
+                                    <span style="font-size:16px; font-weight:800; color:{{ $h->nilai_akhir >= 75 ? '#16a34a' : ($h->nilai_akhir >= 60 ? '#ca8a04' : '#dc2626') }};">
+                                        {{ number_format($h->nilai_akhir, 1) }}
+                                    </span>
+                                </td>
+                                <td style="text-align:center;">
+                                    @if($h->status_scan == 'perlu_cek_manual')
+                                        <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#fff7ed; color:#ea580c; border:1px solid #fed7aa;" title="{{ $h->catatan_scan }}">
+                                            Perlu Cek
+                                        </span>
+                                    @else
+                                        <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0;">
+                                            Valid
+                                        </span>
+                                    @endif
+                                </td>
+                                <td style="font-size:12px; color:#64748b;">{{ $h->waktu_scan ? $h->waktu_scan->format('d/m/Y H:i') : '-' }}</td>
+                                <td style="text-align:center;">
+                                    <button type="button" class="btn btn-secondary" style="padding:4px 10px; font-size:11px; border-radius:6px;" onclick="openEditModal({{ $h->id }}, '{{ addslashes($h->siswa->nama_lengkap ?? 'Siswa') }}', {{ json_encode($h->jawaban_siswa) }}, '{{ $h->catatan_scan }}')">
+                                        Koreksi Manual
+                                    </button>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="10" style="text-align:center; padding:40px 20px; color:#94a3b8;">
+                                    Belum ada lembar LJK yang dikoreksi untuk ujian ini.<br>
+                                    <a href="{{ route('ujian.upload-scan', $ujian->id) }}" class="btn btn-primary" style="margin-top:10px; display:inline-inline-flex; font-size:12px;">
+                                        Unggah PDF Scan LJK
+                                    </a>
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {{-- Tab 2: Analisis Butir Soal --}}
+    <div id="tab-analisis" class="tab-pane">
+        @php
+            $analisis = $ujian->analisis_soal;
+            $soalSukar = collect($analisis)->where('tingkat_kesukaran', 'Sukar')->pluck('nomor_soal')->implode(', ');
+            $soalMudah = collect($analisis)->where('tingkat_kesukaran', 'Mudah')->pluck('nomor_soal')->implode(', ');
+        @endphp
+
+        {{-- Highlight Card Soal Sukar & Mudah --}}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:12px; padding:16px 20px;">
+                <div style="font-size:12px; font-weight:700; color:#991b1b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">
+                    Soal Paling Sukar (&lt; 35% Benar)
+                </div>
+                <div style="font-size:14px; color:#7f1d1d; font-weight:600;">
+                    {{ $soalSukar ?: 'Tidak ada soal berkategori sukar.' }}
+                </div>
+                <div style="font-size:12px; color:#b91c1c; margin-top:4px;">
+                    Nomor-nomor ini memerlukan review dan pembahasan lebih mendalam di kelas.
+                </div>
+            </div>
+
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:16px 20px;">
+                <div style="font-size:12px; font-weight:700; color:#166534; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">
+                    Soal Paling Mudah (&gt; 75% Benar)
+                </div>
+                <div style="font-size:14px; color:#14532d; font-weight:600;">
+                    {{ $soalMudah ?: 'Tidak ada soal berkategori sangat mudah.' }}
+                </div>
+                <div style="font-size:12px; color:#15803d; margin-top:4px;">
+                    Mayoritas siswa berhasil menjawab butir soal ini dengan benar.
+                </div>
             </div>
         </div>
 
-        <table class="hasil-table">
-            <thead>
-                <tr>
-                    <th style="width:50px; text-align:center;">No</th>
-                    <th>Nama Siswa</th>
-                    <th style="width:110px; text-align:center;">NISN</th>
-                    <th style="width:80px; text-align:center;">Benar</th>
-                    <th style="width:80px; text-align:center;">Salah</th>
-                    <th style="width:80px; text-align:center;">Kosong</th>
-                    <th style="width:90px; text-align:center;">Nilai</th>
-                    <th style="width:130px;">Status Scan</th>
-                    <th>Catatan</th>
-                    <th style="width:110px; text-align:center;">Aksi</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($hasils as $idx => $h)
-                    <tr id="row-hasil-{{ $h->id }}">
-                        <td style="text-align:center; color:#64748b; font-weight:600;">
-                            {{ $hasils->firstItem() + $idx }}
-                        </td>
-                        <td>
-                            <div style="font-weight:600; color:#1e293b;">{{ $h->siswa?->nama_lengkap ?? 'Siswa #' . $h->siswa_id }}</div>
-                            <div style="font-size:11px; color:#94a3b8;">Kamar: {{ $h->siswa?->kamar ?? '-' }}</div>
-                        </td>
-                        <td style="text-align:center; font-family:monospace; color:#475569;">
-                            {{ $h->siswa?->nisn ?? '-' }}
-                        </td>
-                        <td style="text-align:center; font-weight:700; color:#059669;" id="cell-benar-{{ $h->id }}">
-                            {{ $h->jumlah_benar }}
-                        </td>
-                        <td style="text-align:center; font-weight:700; color:#dc2626;" id="cell-salah-{{ $h->id }}">
-                            {{ $h->jumlah_salah }}
-                        </td>
-                        <td style="text-align:center; font-weight:600; color:#64748b;" id="cell-kosong-{{ $h->id }}">
-                            {{ $h->jumlah_kosong }}
-                        </td>
-                        <td style="text-align:center; font-weight:800; font-size:15px; color:#0052FF;" id="cell-nilai-{{ $h->id }}">
-                            {{ number_format($h->nilai_akhir, 2) }}
-                        </td>
-                        <td id="cell-status-{{ $h->id }}">
-                            @if($h->status_scan === 'valid')
-                                <span class="badge" style="background:#ecfdf5; color:#059669; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Valid</span>
-                            @else
-                                <span class="badge" style="background:#fffbeb; color:#d97706; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Perlu Cek</span>
-                            @endif
-                        </td>
-                        <td style="font-size:12px; color:#64748b;" id="cell-catatan-{{ $h->id }}">
-                            {{ $h->catatan_scan ?? '-' }}
-                        </td>
-                        <td style="text-align:center;">
-                            <button type="button" class="btn btn-secondary" onclick="openReviewModal({{ $h->id }}, '{{ addslashes($h->siswa?->nama_lengkap ?? 'Siswa') }}', {{ json_encode($h->jawaban_siswa ?? []) }})" style="padding:5px 10px; font-size:12px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
-                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                </svg>
-                                <span>Koreksi</span>
-                            </button>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="10" style="text-align:center; padding:36px; color:#94a3b8;">
-                            Belum ada lembar jawab yang dikoreksi untuk ujian ini. Silakan klik tombol <strong>Unggah Hasil Scan</strong> di atas.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-
-        @if($hasils->hasPages())
-            <div style="padding:14px 20px; border-top:1px solid #e2e8f0;">
-                {{ $hasils->links() }}
+        <div class="table-container">
+            <div style="padding:16px 20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                <div style="font-weight:700; color:#1e293b; font-size:15px;">Tabel Sebaran Pilihan Jawaban & Tingkat Kesukaran</div>
+                <div style="font-size:12px; color:#64748b;">
+                    Badge hijau pada kolom A-E menunjukkan kunci jawaban yang benar.
+                </div>
             </div>
-        @endif
+
+            <div style="overflow-x:auto;">
+                <table class="hasil-table">
+                    <thead>
+                        <tr>
+                            <th style="width:50px; text-align:center;">No</th>
+                            <th style="text-align:center; width:60px;">Kunci</th>
+                            <th style="text-align:center; width:120px;">% Benar</th>
+                            <th style="text-align:center; width:100px;">Kategori</th>
+                            <th style="text-align:center; width:70px;">Benar</th>
+                            <th style="text-align:center; width:70px;">Salah</th>
+                            <th style="text-align:center;">Pilihan Siswa: A</th>
+                            <th style="text-align:center;">B</th>
+                            <th style="text-align:center;">C</th>
+                            <th style="text-align:center;">D</th>
+                            @if($ujian->jumlah_opsi == 5)
+                                <th style="text-align:center;">E</th>
+                            @endif
+                            <th style="text-align:center; width:70px;">Kosong</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($analisis as $no => $item)
+                            <tr>
+                                <td style="text-align:center; font-weight:700; color:#334155;">{{ $no }}</td>
+                                <td style="text-align:center;">
+                                    <span style="display:inline-block; width:26px; height:26px; line-height:26px; border-radius:50%; background:#0284c7; color:#ffffff; font-weight:800; font-size:12px;">
+                                        {{ $item['kunci'] }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <div style="flex:1; background:#e2e8f0; height:8px; border-radius:4px; overflow:hidden;">
+                                            <div style="background:{{ $item['persen_benar'] >= 75 ? '#16a34a' : ($item['persen_benar'] >= 35 ? '#0284c7' : '#dc2626') }}; height:100%; width:{{ $item['persen_benar'] }}%;"></div>
+                                        </div>
+                                        <span style="font-size:12px; font-weight:700; min-width:38px; text-align:right;">{{ $item['persen_benar'] }}%</span>
+                                    </div>
+                                </td>
+                                <td style="text-align:center;">
+                                    @if($item['tingkat_kesukaran'] == 'Mudah')
+                                        <span style="padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#dcfce7; color:#166534;">Mudah</span>
+                                    @elseif($item['tingkat_kesukaran'] == 'Sedang')
+                                        <span style="padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#e0f2fe; color:#0369a1;">Sedang</span>
+                                    @else
+                                        <span style="padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#fee2e2; color:#991b1b;">Sukar</span>
+                                    @endif
+                                </td>
+                                <td style="text-align:center; font-weight:700; color:#16a34a;">{{ $item['jumlah_benar'] }}</td>
+                                <td style="text-align:center; font-weight:700; color:#dc2626;">{{ $item['jumlah_salah'] }}</td>
+                                
+                                @foreach(['A', 'B', 'C', 'D'] as $opt)
+                                    <td style="text-align:center;">
+                                        <span class="dist-badge {{ $item['kunci'] == $opt ? 'correct' : '' }}">
+                                            {{ $item['distribusi'][$opt] ?? 0 }}
+                                        </span>
+                                    </td>
+                                @endforeach
+
+                                @if($ujian->jumlah_opsi == 5)
+                                    <td style="text-align:center;">
+                                        <span class="dist-badge {{ $item['kunci'] == 'E' ? 'correct' : '' }}">
+                                            {{ $item['distribusi']['E'] ?? 0 }}
+                                        </span>
+                                    </td>
+                                @endif
+
+                                <td style="text-align:center; color:#94a3b8; font-size:12px;">{{ $item['jumlah_kosong'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Modal Koreksi Manual -->
-<div class="modal-overlay" id="reviewModal">
+{{-- Modal Koreksi Manual --}}
+<div id="modalEdit" class="modal-overlay">
     <div class="modal-card">
-        <div class="modal-head">
-            <div>
-                <h3 style="font-size:16px; font-weight:700; margin:0; color:#1e293b;" id="modalSiswaNama">Koreksi Lembar Siswa</h3>
-                <div style="font-size:12px; color:#64748b; margin-top:2px;">
-                    Ubah jawaban nomor tertentu jika terjadi arsiran ganda atau goresan samar pada LJK.
+        <form id="formManual" method="POST" action="">
+            @csrf
+            <div class="modal-head">
+                <div>
+                    <h3 style="font-size:16px; font-weight:700; margin:0;" id="modalSiswaName">Koreksi Manual Siswa</h3>
+                    <div style="font-size:12px; color:#64748b; margin-top:2px;" id="modalCatatan">Catatan scan</div>
+                </div>
+                <button type="button" onclick="closeEditModal()" style="border:none; background:none; font-size:22px; cursor:pointer; color:#94a3b8;">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px;" id="modalJawabanGrid">
+                    {{-- Dinamis diisi JavaScript --}}
                 </div>
             </div>
-            <button type="button" onclick="closeReviewModal()" style="border:none; background:transparent; cursor:pointer; color:#94a3b8; font-size:20px; line-height:1;">
-                &times;
-            </button>
-        </div>
 
-        <div class="modal-body">
-            <div id="modalAlertMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px;"></div>
-            
-            <div class="modal-answers-grid" id="modalAnswersGrid">
-                <!-- Dinamis per nomor soal -->
+            <div class="modal-foot">
+                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Batal</button>
+                <button type="submit" class="btn btn-primary">Simpan & Hitung Ulang Nilai</button>
             </div>
-        </div>
-
-        <div class="modal-foot">
-            <button type="button" class="btn btn-secondary" onclick="closeReviewModal()" style="padding:7px 16px; font-size:13px; border-radius:8px;">
-                Tutup
-            </button>
-        </div>
+        </form>
     </div>
 </div>
 
 <script>
-    const kuncis = @json($kuncis);
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        el.classList.add('active');
+    }
+
     const jumlahSoal = {{ $ujian->jumlah_soal }};
     const jumlahOpsi = {{ $ujian->jumlah_opsi }};
-    const opsiLetters = ['A', 'B', 'C', 'D', 'E'].slice(0, jumlahOpsi);
-    let activeHasilId = null;
+    const opsiLetters = jumlahOpsi == 5 ? ['A','B','C','D','E'] : ['A','B','C','D'];
+    const updateUrlPattern = "{{ route('ujian.update-hasil-manual', [$ujian->id, ':hasil_id']) }}";
 
-    function openReviewModal(hasilId, namaSiswa, jawabanMap) {
-        activeHasilId = hasilId;
-        document.getElementById('modalSiswaNama').textContent = 'Koreksi Lembar: ' + namaSiswa;
-        document.getElementById('modalAlertMsg').style.display = 'none';
+    function openEditModal(hasilId, siswaName, jawabanMap, catatanScan) {
+        document.getElementById('modalSiswaName').innerText = 'Koreksi Manual: ' + siswaName;
+        document.getElementById('modalCatatan').innerText = catatanScan ? 'Catatan OMR: ' + catatanScan : 'Semua nomor terdeteksi normal.';
+        document.getElementById('formManual').action = updateUrlPattern.replace(':hasil_id', hasilId);
 
-        const grid = document.getElementById('modalAnswersGrid');
-        grid.innerHTML = '';
+        const container = document.getElementById('modalJawabanGrid');
+        container.innerHTML = '';
 
-        for (let no = 1; no <= jumlahSoal; no++) {
-            const jawab = jawabanMap ? (jawabanMap[no] || null) : null;
-            const kunci = kuncis[no] || '-';
-            const isCorrect = jawab && kunci && jawab.toUpperCase() === kunci.toUpperCase();
-            const isGanda = jawab === 'GANDA';
-            const isWrong = !isCorrect && jawab !== null;
-
-            let cardClass = 'answer-edit-box';
-            if (isGanda) cardClass += ' is-ganda';
-            else if (isWrong) cardClass += ' is-wrong';
-
+        for (let i = 1; i <= jumlahSoal; i++) {
+            const currentAns = (jawabanMap && (jawabanMap[i] || jawabanMap[i.toString()])) || '';
             const box = document.createElement('div');
-            box.className = cardClass;
-            box.id = `box-soal-${no}`;
+            box.style.border = '1px solid #e2e8f0';
+            box.style.borderRadius = '8px';
+            box.style.padding = '8px 10px';
+            box.style.background = '#f8fafc';
 
-            let selectOptions = `<option value="null" ${jawab === null ? 'selected' : ''}>[Kosong]</option>`;
+            let labelHtml = `<div style="font-weight:700; font-size:12px; margin-bottom:4px; display:flex; justify-content:space-between;">
+                <span>No. ${i}</span>
+                <span style="font-size:11px; color:#dc2626;">${currentAns === 'GANDA' ? 'GANDA' : ''}</span>
+            </div>`;
+
+            let optHtml = `<div style="display:flex; gap:4px; justify-content:center;">`;
             opsiLetters.forEach(opt => {
-                selectOptions += `<option value="${opt}" ${jawab === opt ? 'selected' : ''}>${opt}</option>`;
+                const isChecked = currentAns === opt ? 'selected' : '';
+                optHtml += `<button type="button" class="opt-circle-btn ${isChecked}" onclick="selectAnswer(${i}, '${opt}', this)">${opt}</button>`;
             });
-            selectOptions += `<option value="GANDA" ${jawab === 'GANDA' ? 'selected' : ''}>[GANDA]</option>`;
+            optHtml += `</div>`;
+            optHtml += `<input type="hidden" name="jawaban[${i}]" id="ans_input_${i}" value="${currentAns}">`;
 
-            box.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                    <strong style="color:#1e293b;">#${no}</strong>
-                    <span style="font-size:11px; color:#64748b;">Kunci: <strong style="color:#0052FF;">${kunci}</strong></span>
-                </div>
-                <div style="display:flex; align-items:center; gap:6px;">
-                    <select onchange="saveAnswerChange(${no}, this.value)" style="width:100%; padding:4px 6px; font-size:12px; border-radius:6px; border:1px solid #cbd5e1; background:#fff; font-weight:600; color:#1e293b;">
-                        ${selectOptions}
-                    </select>
-                </div>
-            `;
-            grid.appendChild(box);
+            box.innerHTML = labelHtml + optHtml;
+            container.appendChild(box);
         }
 
-        document.getElementById('reviewModal').style.display = 'flex';
+        document.getElementById('modalEdit').style.display = 'flex';
     }
 
-    function closeReviewModal() {
-        document.getElementById('reviewModal').style.display = 'none';
-        activeHasilId = null;
-    }
-
-    function saveAnswerChange(nomorSoal, nilaiJawaban) {
-        if (!activeHasilId) return;
-
-        const alertBox = document.getElementById('modalAlertMsg');
-        alertBox.style.display = 'block';
-        alertBox.style.background = '#eff6ff';
-        alertBox.style.color = '#1d4ed8';
-        alertBox.style.border = '1px solid #bfdbfe';
-        alertBox.textContent = `Menyimpan perubahan nomor ${nomorSoal}...`;
-
-        const url = `/ujian/{{ $ujian->id }}/hasil/${activeHasilId}/manual`;
-
-        fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                nomor_soal: nomorSoal,
-                jawaban: nilaiJawaban
-            })
-        })
-        .then(res => res.json())
-        .then(res => {
-            if (res.success) {
-                alertBox.style.background = '#ecfdf5';
-                alertBox.style.color = '#065f46';
-                alertBox.style.border = '1px solid #a7f3d0';
-                alertBox.textContent = res.message;
-
-                // Update baris tabel siswa
-                const d = res.data;
-                const cellBenar = document.getElementById(`cell-benar-${activeHasilId}`);
-                const cellSalah = document.getElementById(`cell-salah-${activeHasilId}`);
-                const cellKosong = document.getElementById(`cell-kosong-${activeHasilId}`);
-                const cellNilai = document.getElementById(`cell-nilai-${activeHasilId}`);
-                const cellStatus = document.getElementById(`cell-status-${activeHasilId}`);
-                const cellCatatan = document.getElementById(`cell-catatan-${activeHasilId}`);
-
-                if (cellBenar) cellBenar.textContent = d.jumlah_benar;
-                if (cellSalah) cellSalah.textContent = d.jumlah_salah;
-                if (cellKosong) cellKosong.textContent = d.jumlah_kosong;
-                if (cellNilai) cellNilai.textContent = parseFloat(d.nilai_akhir).toFixed(2);
-                if (cellCatatan) cellCatatan.textContent = d.catatan_scan || '-';
-
-                if (cellStatus) {
-                    if (d.status_scan === 'valid') {
-                        cellStatus.innerHTML = '<span class="badge" style="background:#ecfdf5; color:#059669; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Valid</span>';
-                    } else {
-                        cellStatus.innerHTML = '<span class="badge" style="background:#fffbeb; color:#d97706; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Perlu Cek</span>';
-                    }
-                }
-            } else {
-                alertBox.style.background = '#fef2f2';
-                alertBox.style.color = '#991b1b';
-                alertBox.style.border = '1px solid #fecaca';
-                alertBox.textContent = res.message || 'Gagal menyimpan jawaban.';
-            }
-        })
-        .catch(err => {
-            alertBox.style.background = '#fef2f2';
-            alertBox.style.color = '#991b1b';
-            alertBox.style.border = '1px solid #fecaca';
-            alertBox.textContent = 'Terjadi kesalahan jaringan.';
-        });
-    }
-
-    // Tutup jika klik overlay luar
-    document.getElementById('reviewModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            closeReviewModal();
+    function selectAnswer(no, opt, btn) {
+        const parent = btn.parentElement;
+        const currentInput = document.getElementById('ans_input_' + no);
+        if (currentInput.value === opt) {
+            currentInput.value = '';
+            btn.classList.remove('selected');
+        } else {
+            parent.querySelectorAll('.opt-circle-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            currentInput.value = opt;
         }
-    });
+    }
+
+    function closeEditModal() {
+        document.getElementById('modalEdit').style.display = 'none';
+    }
 </script>
 @endsection
-

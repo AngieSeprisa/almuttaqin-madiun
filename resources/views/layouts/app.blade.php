@@ -197,9 +197,8 @@
                     $canEkskul             = !$authUser || $authUser->canDo('ekskul', 'view');
                     $canJadwalPelajaran    = !$authUser || $authUser->canDo('jadwal_pelajaran', 'view');
                     $canJadwalSaya         = !$authUser || $authUser->canDo('jadwal_saya', 'view');
-                    $canUjian              = !$authUser || $authUser->canDo('ujian', 'view');
-                    $showSekolahGroup      = $canSekolahJurnal || $canSekolahRekapJurnal || $canEkskul || $canJadwalPelajaran || $canJadwalSaya || $canUjian;
-                    $isSekolahActive       = request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') || request()->routeIs('sekolah.ekskul.*') || request()->routeIs('ujian.*');
+                    $showSekolahGroup      = $canSekolahJurnal || $canSekolahRekapJurnal || $canEkskul || $canJadwalPelajaran || $canJadwalSaya;
+                    $isSekolahActive       = request()->routeIs('sekolah.jurnal*') || request()->routeIs('sekolah.rekap-jurnal*') || request()->routeIs('jadwal-pelajaran.*') || request()->routeIs('sekolah.ekskul.*');
                 @endphp
                 @if($showSekolahGroup)
                 <div class="nav-group {{ $isSekolahActive ? 'open' : '' }}" id="navGroupSekolah">
@@ -248,10 +247,68 @@
                             <span class="subnav-text">Jadwal Mengajar Saya</span>
                         </a>
                         @endif
-                        @if($canUjian)
-                        <a href="{{ route('ujian.index') }}" class="subnav-item {{ request()->routeIs('ujian.*') ? 'active' : '' }}" title="Ujian & LJK">
+                    </div>
+                </div>
+                @endif
+
+                {{-- Menu Ujian --}}
+                @php
+                    $canUjianSoal    = !$authUser || $authUser->canDo('ujian_soal', 'view');
+                    $canUjianLjk     = !$authUser || $authUser->canDo('ujian_ljk', 'view');
+                    $canUjianSesi    = !$authUser || $authUser->canDo('ujian_sesi', 'view');
+                    $canUjianKoreksi = !$authUser || $authUser->canDo('ujian_koreksi', 'view');
+                    $canUjianNilai   = !$authUser || $authUser->canDo('ujian_nilai', 'view');
+                    $showUjianGroup  = $canUjianSoal || $canUjianLjk || $canUjianSesi || $canUjianKoreksi || $canUjianNilai || (!$authUser || $authUser->canDo('ujian', 'view'));
+                    $isUjianActive   = request()->routeIs('ujian.*');
+                @endphp
+                @if($showUjianGroup)
+                <div class="nav-group {{ $isUjianActive ? 'open' : '' }}" id="navGroupUjian">
+                    <button type="button" class="nav-item nav-item-has-sub {{ $isUjianActive ? 'active' : '' }}" id="toggleUjian" title="Ujian">
+                        <span class="nav-item-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </span>
+                        <span class="nav-item-text">Ujian</span>
+                        <span class="nav-item-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="sidebar-subnav">
+                        @if($canUjianSoal)
+                        <a href="{{ route('ujian.soal') }}" class="subnav-item {{ request()->routeIs('ujian.soal*') || request()->routeIs('ujian.index*') || request()->routeIs('ujian.create*') || request()->routeIs('ujian.edit*') || request()->routeIs('ujian.kunci*') ? 'active' : '' }}" title="Soal Ujian">
                             <span class="subnav-dot"></span>
-                            <span class="subnav-text">Ujian & LJK</span>
+                            <span class="subnav-text">Soal Ujian</span>
+                        </a>
+                        @endif
+                        @if($canUjianLjk)
+                        <a href="{{ route('ujian.ljk') }}" class="subnav-item {{ request()->routeIs('ujian.ljk*') ? 'active' : '' }}" title="LJK">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">LJK</span>
+                        </a>
+                        @endif
+                        @if($canUjianSesi)
+                        <a href="{{ route('ujian.sesi') }}" class="subnav-item {{ request()->routeIs('ujian.sesi*') || request()->routeIs('ujian.proyektor*') ? 'active' : '' }}" title="Sesi Ujian">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Sesi Ujian</span>
+                        </a>
+                        @endif
+                        @if($canUjianKoreksi)
+                        <a href="{{ route('ujian.koreksi') }}" class="subnav-item {{ request()->routeIs('ujian.koreksi*') || request()->routeIs('ujian.upload-scan*') ? 'active' : '' }}" title="Koreksi Ujian">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Koreksi Ujian</span>
+                        </a>
+                        @endif
+                        @if($canUjianNilai)
+                        <a href="{{ route('ujian.nilai') }}" class="subnav-item {{ request()->routeIs('ujian.nilai*') || request()->routeIs('ujian.hasil*') ? 'active' : '' }}" title="Nilai Ujian">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Nilai Ujian</span>
                         </a>
                         @endif
                     </div>

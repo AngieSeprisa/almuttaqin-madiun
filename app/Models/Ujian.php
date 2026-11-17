@@ -22,14 +22,28 @@ class Ujian extends Model
         'bobot_benar',
         'tanggal_ujian',
         'status',
+        'file_soal',
+        'timer_default',
+        'peraturan_ujian',
+        'jam_mulai',
+        'jam_selesai',
     ];
 
     protected $casts = [
         'jumlah_soal'   => 'integer',
         'jumlah_opsi'   => 'integer',
+        'timer_default' => 'integer',
         'bobot_benar'   => 'decimal:2',
         'tanggal_ujian' => 'date',
     ];
+
+    /**
+     * Relasi ke Butir Soal Ujian
+     */
+    public function soals()
+    {
+        return $this->hasMany(UjianSoal::class, 'ujian_id')->orderBy('nomor_soal');
+    }
 
     /**
      * Relasi ke Mata Pelajaran
@@ -115,6 +129,87 @@ class Ujian extends Model
             'perlu_cek'     => $perluCek,
             'valid'         => $valid,
         ];
+    }
+
+    /**
+     * Teks peraturan ujian efektif (default jika belum diatur)
+     */
+    public function getPeraturanEfektifAttribute(): string
+    {
+        if (!empty(trim($this->peraturan_ujian ?? ''))) {
+            return $this->peraturan_ujian;
+        }
+
+        return "1. Periksa identitas yang tercetak pada lembar jawab sebelum mulai mengerjakan.\n" .
+               "2. Hitamkan bulatan pilihan jawaban secara penuh menggunakan pensil 2B atau pulpen bertinta hitam pekat.\n" .
+               "3. Dilarang melipat, meremas, atau mengotori 4 kotak hitam pekat di setiap sudut lembar kertas.\n" .
+               "4. Soal ujian ditampilkan berurutan di layar proyektor kelas dengan batas waktu otomatis per nomor.\n" .
+               "5. Dilarang berbicara, berbuat curang, atau bekerja sama selama sesi ujian berlangsung.";
+    }
+
+    /**
+     * Hitung analisis butir soal (tingkat kesukaran, benar, salah, dan distribusi pengecoh/distraktor)
+     */
+    public function getAnalisisSoalAttribute(): array
+    {
+        $hasils = $this->hasils;
+        $totalSiswa = $hasils->count();
+        $kunciMap = $this->kuncis->pluck('kunci_jawaban', 'nomor_soal')->all();
+        $opsiLetters = $this->jumlah_opsi == 5 ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
+
+        $analisis = [];
+
+        for ($no = 1; $no <= $this->jumlah_soal; $no++) {
+            $kunci = strtoupper($kunciMap[$no] ?? 'A');
+            $benar = 0;
+            $salah = 0;
+            $kosong = 0;
+            $ganda = 0;
+            $distribusi = array_fill_keys($opsiLetters, 0);
+
+            foreach ($hasils as $h) {
+                $jawab = $h->jawaban_siswa[$no] ?? null;
+
+                if ($jawab === null) {
+                    $kosong++;
+                } elseif ($jawab === 'GANDA') {
+                    $ganda++;
+                    $salah++;
+                } else {
+                    $letter = strtoupper($jawab);
+                    if (isset($distribusi[$letter])) {
+                        $distribusi[$letter]++;
+                    }
+                    if ($letter === $kunci) {
+                        $benar++;
+                    } else {
+                        $salah++;
+                    }
+                }
+            }
+
+            $persenBenar = $totalSiswa > 0 ? round(($benar / $totalSiswa) * 100, 1) : 0;
+
+            $tingkatKesukaran = match (true) {
+                $persenBenar >= 75 => 'Mudah',
+                $persenBenar >= 35 => 'Sedang',
+                default            => 'Sukar',
+            };
+
+            $analisis[$no] = [
+                'nomor_soal'        => $no,
+                'kunci'             => $kunci,
+                'jumlah_benar'      => $benar,
+                'jumlah_salah'      => $salah,
+                'jumlah_kosong'     => $kosong,
+                'jumlah_ganda'      => $ganda,
+                'persen_benar'      => $persenBenar,
+                'tingkat_kesukaran' => $tingkatKesukaran,
+                'distribusi'        => $distribusi,
+            ];
+        }
+
+        return $analisis;
     }
 }
 
