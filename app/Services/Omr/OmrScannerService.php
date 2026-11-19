@@ -110,16 +110,6 @@ class OmrScannerService
             $siswa = Siswa::find($siswaData['siswa_id']);
         }
 
-        // Fallback jika QR tidak terbaca: cocokkan dengan siswa kelas berdasarkan urutan halaman
-        if (!$siswa && $ujian->kelas_id) {
-            $siswaList = Siswa::where('kelas', $ujian->kelas?->nama_kelas)
-                ->orWhereHas('pendaftaran', fn($q) => $q->where('kelas', $ujian->kelas?->nama_kelas))
-                ->orderBy('nama_lengkap')
-                ->get();
-
-            $siswa = $siswaList->get($pageNumber - 1) ?? null;
-        }
-
         // 3. Kalibrasi vertikal dinamis berdasarkan bar header hitam (.omr-col-header)
         $deltaV = 0.0;
         $detectedHeaderBottomV = $this->detectHeaderBarBottomV($im, $markers, $ujian->jumlah_soal, $imgWidth, $imgHeight, $paperWhite);
@@ -131,7 +121,11 @@ class OmrScannerService
         $bubbleCoords = LjkTemplateService::getBubbleCoordinates($ujian->jumlah_soal, $ujian->jumlah_opsi);
         $jawabanSiswa = [];
         $catatanScan = [];
-        $statusScan = 'valid';
+        $statusScan = $siswa ? 'valid' : 'perlu_cek_manual';
+
+        if (!$siswa) {
+            $catatanScan[] = 'QR Code identitas siswa tidak terbaca. Harap pilih nama siswa secara manual.';
+        }
 
         // Hitung radius bulatan berdasarkan resolusi gambar (jarak marker TL ke TR = 176mm, radius bulatan ~2.25mm => 0.0128)
         $markerDistX = sqrt(pow($markers['TR']['x'] - $markers['TL']['x'], 2) + pow($markers['TR']['y'] - $markers['TL']['y'], 2));
@@ -230,8 +224,8 @@ class OmrScannerService
             'halaman'       => $pageNumber,
             'hasil_id'      => $hasilModel?->id,
             'siswa_id'      => $siswa?->id,
-            'nama_siswa'    => $siswa?->nama_lengkap ?? "Siswa Tidak Dikenal (Hal. $pageNumber)",
-            'nisn'          => $siswa?->nisn ?? '-',
+            'nama_siswa'    => $siswa?->nama_lengkap ?? "Siswa Belum Teridentifikasi (Hal. $pageNumber)",
+            'nisn'          => $siswa?->pendaftaran?->nisn ?? $siswa?->nisn ?? '-',
             'jumlah_benar'  => $jumlahBenar,
             'jumlah_salah'  => $jumlahSalah,
             'jumlah_kosong' => $jumlahKosong,

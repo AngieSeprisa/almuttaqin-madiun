@@ -136,17 +136,19 @@
         /* QR CODE BOX (POJOK KANAN ATAS) */
         .qr-box-wrap {
             text-align: center;
-            border: 1px solid #000000;
-            padding: 4px;
+            border: 1px solid #cbd5e1;
+            padding: 5px 6px;
             background: #ffffff;
             margin-right: 6mm;
+            border-radius: 4px;
         }
         .qr-box-wrap .qr-caption {
-            font-size: 6.5pt;
+            font-size: 6.8pt;
             font-weight: bold;
             font-family: monospace;
-            margin-top: 2px;
+            margin-top: 3px;
             letter-spacing: 0.05em;
+            color: #0f172a;
         }
 
         /* PETUNJUK PENGISIAN */

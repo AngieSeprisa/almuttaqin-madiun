@@ -417,10 +417,19 @@
                                     @endif
                                 </td>
                                 <td style="font-size:12px; color:#64748b;">{{ $h->waktu_scan ? $h->waktu_scan->format('d/m/Y H:i') : '-' }}</td>
-                                <td style="text-align:center;">
-                                    <button type="button" class="btn btn-secondary" style="padding:4px 10px; font-size:11px; border-radius:6px;" onclick="openEditModal({{ $h->id }}, '{{ addslashes($h->siswa->nama_lengkap ?? 'Siswa') }}', {{ json_encode($h->jawaban_siswa) }}, '{{ $h->catatan_scan }}')">
-                                        Koreksi Manual
-                                    </button>
+                                <td style="text-align:center; white-space:nowrap;">
+                                    <div style="display:inline-flex; gap:6px; align-items:center;">
+                                        <button type="button" class="btn btn-secondary" style="padding:4px 10px; font-size:11px; border-radius:6px;" onclick="openEditModal({{ $h->id }}, {{ $h->siswa_id }}, '{{ addslashes($h->siswa->nama_lengkap ?? 'Siswa') }}', {{ json_encode($h->jawaban_siswa) }}, '{{ addslashes($h->catatan_scan ?? '') }}')">
+                                            Koreksi Manual
+                                        </button>
+                                        <form method="POST" action="{{ route('ujian.destroy-hasil', [$ujian->id, $h->id]) }}" onsubmit="return confirm('Yakin ingin menghapus hasil scan {{ addslashes($h->siswa->nama_lengkap ?? 'siswa ini') }}?')" style="margin:0; display:inline;">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-danger" style="padding:4px 8px; font-size:11px; border-radius:6px; background:#fef2f2; border:1px solid #fecaca; color:#dc2626;" title="Hapus Hasil Scan">
+                                                Hapus
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -571,6 +580,16 @@
             </div>
 
             <div class="modal-body">
+                <div style="margin-bottom:14px; background:#f0f6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 14px;">
+                    <label for="modalSelectSiswa" style="font-size:12px; font-weight:700; color:#1e40af; display:block; margin-bottom:4px;">Nama Siswa Pemilik Lembar Ini:</label>
+                    <select name="siswa_id" id="modalSelectSiswa" class="form-control" style="font-size:13px; font-weight:600; padding:6px 10px; border-radius:6px; border:1px solid #93c5fd; width:100%;">
+                        @foreach($siswaList as $sw)
+                            <option value="{{ $sw->id }}">{{ $sw->nama_lengkap }} (ID: {{ $sw->id }})</option>
+                        @endforeach
+                    </select>
+                    <div style="font-size:11px; color:#3b82f6; margin-top:3px;">Jika scanner keliru mencocokkan identitas siswa (misal QR tertutup atau out-of-order), Anda dapat memindahkan lembar ini ke nama siswa yang benar di sini.</div>
+                </div>
+
                 <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px;" id="modalJawabanGrid">
                     {{-- Dinamis diisi JavaScript --}}
                 </div>
@@ -597,10 +616,15 @@
     const opsiLetters = jumlahOpsi == 5 ? ['A','B','C','D','E'] : ['A','B','C','D'];
     const updateUrlPattern = "{{ route('ujian.update-hasil-manual', [$ujian->id, ':hasil_id']) }}";
 
-    function openEditModal(hasilId, siswaName, jawabanMap, catatanScan) {
+    function openEditModal(hasilId, siswaId, siswaName, jawabanMap, catatanScan) {
         document.getElementById('modalSiswaName').innerText = 'Koreksi Manual: ' + siswaName;
         document.getElementById('modalCatatan').innerText = catatanScan ? 'Catatan OMR: ' + catatanScan : 'Semua nomor terdeteksi normal.';
         document.getElementById('formManual').action = updateUrlPattern.replace(':hasil_id', hasilId);
+
+        const sel = document.getElementById('modalSelectSiswa');
+        if (sel && siswaId) {
+            sel.value = siswaId;
+        }
 
         const container = document.getElementById('modalJawabanGrid');
         container.innerHTML = '';

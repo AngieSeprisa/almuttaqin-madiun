@@ -653,4 +653,92 @@ class UjianOmrTest extends TestCase
             ->assertJsonPath('data.rincian.0.jumlah_benar', 10)
             ->assertJsonPath('data.rincian.0.nilai_akhir', 100);
     }
+
+    public function test_process_scan_tanpa_qr_tidak_keliru_menetapkan_siswa_pertama_abjad_dan_bisa_diassign_manual(): void
+    {
+        $siswaPertama = Siswa::create([
+            'nama_lengkap' => 'Abdillah Wakhidul Akhir',
+            'kelas'        => $this->kelas->nama_kelas,
+        ]);
+        $siswaNova = Siswa::create([
+            'nama_lengkap' => 'Nova Abdul Mutthalib',
+            'kelas'        => $this->kelas->nama_kelas,
+        ]);
+
+        $ujian = Ujian::create([
+            'kode_ujian'    => 'UJN-TEST-NOVA',
+            'nama_ujian'    => 'Ujian Tanpa Fallback Abjad',
+            'mapel_id'      => $this->mapel->id,
+            'kelas_id'      => $this->kelas->id,
+            'guru_id'       => $this->admin->id,
+            'jumlah_soal'   => 5,
+            'jumlah_opsi'   => 4,
+            'bobot_benar'   => 20.0,
+            'tanggal_ujian' => now()->format('Y-m-d'),
+            'status'        => 'aktif',
+        ]);
+
+        for ($no = 1; $no <= 5; $no++) {
+            UjianKunci::create([
+                'ujian_id'      => $ujian->id,
+                'nomor_soal'    => $no,
+                'kunci_jawaban' => 'A',
+                'bobot'         => 20.0,
+            ]);
+        }
+
+        $w = 1200; $h = 1700;
+        $img = imagecreatetruecolor($w, $h);
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $black = imagecolorallocate($img, 0, 0, 0);
+        imagefill($img, 0, 0, $white);
+
+        // 4 Fiducial markers
+        imagefilledrectangle($img, 65, 65, 125, 125, $black);
+        imagefilledrectangle($img, $w - 125, 65, $w - 65, 125, $black);
+        imagefilledrectangle($img, 65, $h - 125, 125, $h - 65, $black);
+        imagefilledrectangle($img, $w - 125, $h - 125, $w - 65, $h - 65, $black);
+
+        $tmpJpg = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test_nova_ljk_' . uniqid() . '.jpg';
+        imagejpeg($img, $tmpJpg, 85);
+        imagedestroy($img);
+
+        $uploadedFile = new \Illuminate\Http\UploadedFile($tmpJpg, 'ljk_nova.jpg', 'image/jpeg', null, true);
+
+        // Scan tanpa QR payload (misal QR tidak terbaca)
+        $response = $this->actingAs($this->admin)->postJson(route('ujian.process-scan', $ujian->id), [
+            'file_scan'   => $uploadedFile,
+            'page_number' => 1,
+            'qr_payload'  => null,
+        ]);
+
+        @unlink($tmpJpg);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.rincian.0.siswa_id', null) // Tidak boleh otomatis mengambil Abdillah Wakhidul Akhir
+            ->assertJsonPath('data.rincian.0.status_scan', 'perlu_cek_manual');
+
+        // Pastikan Abdillah TIDAK mendapat record hasil ujian palsu
+        $this->assertDatabaseMissing('ujian_hasil', [
+            'ujian_id' => $ujian->id,
+            'siswa_id' => $siswaPertama->id,
+        ]);
+
+        // Guru melakukan penetapan nama siswa manual ke Nova Abdul Mutthalib
+        $assignRes = $this->actingAs($this->admin)->postJson(route('ujian.assign-hasil-siswa', $ujian->id), [
+            'siswa_id' => $siswaNova->id,
+            'jawaban'  => [1 => 'A', 2 => 'A', 3 => 'A', 4 => 'A', 5 => 'A'],
+        ]);
+
+        $assignRes->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.siswa_id', $siswaNova->id)
+            ->assertJsonPath('data.nama_siswa', 'Nova Abdul Mutthalib');
+
+        $this->assertDatabaseHas('ujian_hasil', [
+            'ujian_id' => $ujian->id,
+            'siswa_id' => $siswaNova->id,
+        ]);
+    }
 }

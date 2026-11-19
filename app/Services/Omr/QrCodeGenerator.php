@@ -10,10 +10,32 @@ class QrCodeGenerator
 {
     /**
      * Generate SVG string dari text payload.
-     * Menggunakan QR Code Matrix standar dengan Reed-Solomon ECC.
+     * Menggunakan QR Code standar ISO dengan Reed-Solomon ECC.
      */
     public static function svg(string $data, int $size = 120, string $fgColor = '#000000', string $bgColor = '#FFFFFF'): string
     {
+        if (class_exists(\chillerlan\QRCode\QRCode::class)) {
+            try {
+                $options = new \chillerlan\QRCode\QROptions([
+                    'outputInterface' => \chillerlan\QRCode\Output\QRMarkupSVG::class,
+                    'outputBase64'    => false,
+                    'addQuietzone'    => true,
+                    'quietzoneSize'   => 2,
+                    'eccLevel'        => \chillerlan\QRCode\Common\EccLevel::M,
+                ]);
+                $svg = (new \chillerlan\QRCode\QRCode($options))->render($data);
+                if (str_contains($svg, '<svg')) {
+                    $svg = preg_replace('/<svg([^>]*)width="[^"]*"/i', '<svg$1', $svg);
+                    $svg = preg_replace('/<svg([^>]*)height="[^"]*"/i', '<svg$1', $svg);
+                    $svg = preg_replace('/<svg([^>]*)class="[^"]*"/i', '<svg$1', $svg);
+                    $svg = preg_replace('/<svg([^>]*)>/i', '<svg class="qr-svg"$1 width="' . $size . '" height="' . $size . '" style="max-width:100%; height:auto;">', $svg, 1);
+                }
+                return $svg;
+            } catch (\Throwable $e) {
+                // Fallback ke manual rendering jika pustaka gagal
+            }
+        }
+
         $matrix = self::encode($data);
         $count = count($matrix);
         $cellSize = $size / $count;
@@ -41,6 +63,23 @@ class QrCodeGenerator
      */
     public static function pngDataUri(string $data, int $size = 120): string
     {
+        if (class_exists(\chillerlan\QRCode\QRCode::class)) {
+            try {
+                $scale = max(2, (int) round($size / 33));
+                $options = new \chillerlan\QRCode\QROptions([
+                    'outputInterface' => \chillerlan\QRCode\Output\QRGdImagePNG::class,
+                    'outputBase64'    => true,
+                    'scale'           => $scale,
+                    'addQuietzone'    => true,
+                    'quietzoneSize'   => 3,
+                    'eccLevel'        => \chillerlan\QRCode\Common\EccLevel::M,
+                ]);
+                return (new \chillerlan\QRCode\QRCode($options))->render($data);
+            } catch (\Throwable $e) {
+                // Fallback ke manual GD
+            }
+        }
+
         $matrix = self::encode($data);
         $count = count($matrix);
         $scale = max(2, (int) round($size / $count));

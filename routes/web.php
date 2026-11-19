@@ -533,6 +533,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/{ujian}/process-scan', [UjianController::class, 'processScan'])
             ->middleware('permission:ujian_koreksi|ujian,create|edit')
             ->name('process-scan');
+        Route::post('/{ujian}/assign-hasil-siswa', [UjianController::class, 'assignHasilSiswa'])
+            ->middleware('permission:ujian_koreksi|ujian,create|edit')
+            ->name('assign-hasil-siswa');
 
         // Submenu 5: Nilai Ujian & Analisis Soal
         Route::get('/nilai', [UjianController::class, 'nilaiIndex'])
@@ -544,6 +547,9 @@ Route::middleware('auth')->group(function () {
         Route::match(['post', 'put'], '/{ujian}/hasil/{hasil}/manual', [UjianController::class, 'updateHasilManual'])
             ->middleware('permission:ujian_nilai|ujian,edit')
             ->name('update-hasil-manual');
+        Route::delete('/{ujian}/hasil/{hasil}', [UjianController::class, 'destroyHasil'])
+            ->middleware('permission:ujian_nilai|ujian,delete')
+            ->name('destroy-hasil');
         Route::get('/{ujian}/export-excel', [UjianController::class, 'exportExcel'])
             ->middleware('permission:ujian_nilai|ujian,view')
             ->name('export-excel');

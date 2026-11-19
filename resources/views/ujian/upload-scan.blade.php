@@ -323,9 +323,11 @@
 }
 </style>
 
-<!-- PDF.js & ZBar WebAssembly (Self-hosted dengan fallback CDN) -->
+<!-- PDF.js, jsQR & ZBar WebAssembly (Self-hosted dengan fallback CDN) -->
 <script src="{{ asset('js/vendor/pdfjs/pdf.min.js') }}"
         onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'"></script>
+<script src="{{ asset('js/vendor/jsqr/jsqr.js') }}"
+        onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js'"></script>
 <script src="{{ asset('js/vendor/zbar/zbar-wasm.js') }}"
         onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js'"></script>
 <script src="{{ asset('js/vendor/zbar/barcode-detector-polyfill.js') }}"
@@ -345,6 +347,8 @@
     const resultSummaryText = document.getElementById('resultSummaryText');
 
     const PROCESS_SCAN_URL = '{{ route('ujian.process-scan', $ujian->id) }}';
+    const ASSIGN_SISWA_URL = '{{ route('ujian.assign-hasil-siswa', $ujian->id) }}';
+    const SISWAS_KELAS = @json($siswasKelas ?? []);
     const CSRF_TOKEN = '{{ csrf_token() }}';
     const PDF_WORKER_URL = '{{ asset('js/vendor/pdfjs/pdf.worker.min.js') }}';
 
@@ -421,7 +425,7 @@
     }
 
     /**
-     * Dekode QR Code identitas siswa langsung di browser menggunakan ZBar WASM / BarcodeDetector
+     * Dekode QR Code identitas siswa langsung di browser menggunakan jsQR / ZBar / BarcodeDetector
      */
     async function decodeQrFromCanvas(sourceCanvas) {
         const w = sourceCanvas.width;
@@ -436,9 +440,10 @@
             }
         }
 
-        // Daftar area pencarian QR Code (prioritas pojok kanan atas LJK, lalu setengah atas, lalu penuh)
+        // Daftar area pencarian QR Code (prioritas pojok kanan atas LJK: x: 55%-95%, y: 2%-30%)
         const regions = [
-            { x: Math.floor(w * 0.50), y: 0, w: Math.ceil(w * 0.50), h: Math.ceil(h * 0.30) },
+            { x: Math.floor(w * 0.55), y: Math.floor(h * 0.02), w: Math.ceil(w * 0.40), h: Math.ceil(h * 0.28) },
+            { x: Math.floor(w * 0.50), y: 0, w: Math.ceil(w * 0.50), h: Math.ceil(h * 0.35) },
             { x: 0, y: 0, w: w, h: Math.ceil(h * 0.45) },
             { x: 0, y: 0, w: w, h: h },
         ];
@@ -458,11 +463,21 @@
             cropCanvas.width = tw;
             cropCanvas.height = th;
             cropCtx.drawImage(sourceCanvas, reg.x, reg.y, reg.w, reg.h, 0, 0, tw, th);
+            const imgData = cropCtx.getImageData(0, 0, tw, th);
 
-            // 1. Coba ZBar WebAssembly
+            // 1. Coba jsQR (Pure JS, paling andal dan sinkron)
+            if (typeof window.jsQR === 'function') {
+                try {
+                    const qrResult = window.jsQR(imgData.data, tw, th, { inversionAttempts: 'attemptBoth' });
+                    if (qrResult && qrResult.data && qrResult.data.trim().length > 0) {
+                        return qrResult.data.trim();
+                    }
+                } catch (e) {}
+            }
+
+            // 2. Coba ZBar WebAssembly
             if (typeof zbarWasm !== 'undefined' && typeof zbarWasm.scanImageData === 'function') {
                 try {
-                    const imgData = cropCtx.getImageData(0, 0, tw, th);
                     const symbols = await zbarWasm.scanImageData(imgData);
                     if (symbols && symbols.length > 0) {
                         for (const sym of symbols) {
@@ -475,7 +490,7 @@
                 } catch (e) {}
             }
 
-            // 2. Coba Native / Polyfill BarcodeDetector
+            // 3. Coba Native / Polyfill BarcodeDetector
             if (qrDetectorInstance) {
                 try {
                     const codes = await qrDetectorInstance.detect(cropCanvas);
@@ -717,6 +732,73 @@
         }
     }
 
+    function buildSiswaOptionsHtml(selectedId) {
+        let opts = '';
+        if (Array.isArray(SISWAS_KELAS)) {
+            SISWAS_KELAS.forEach(s => {
+                const isSel = (selectedId && Number(selectedId) === Number(s.id)) ? 'selected' : '';
+                opts += `<option value="${s.id}" ${isSel}>${s.nama_lengkap} (ID: ${s.id})</option>`;
+            });
+        }
+        return opts;
+    }
+
+    function toggleSiswaSelect(halaman) {
+        const wrap = document.getElementById(`siswa_select_wrap_${halaman}`);
+        if (wrap) {
+            wrap.style.display = (wrap.style.display === 'none' || wrap.style.display === '') ? 'block' : 'none';
+        }
+    }
+
+    async function assignSiswaFromSelect(halaman, hasilId, siswaId, jawabanObj) {
+        if (!siswaId) return;
+
+        try {
+            const res = await fetch(ASSIGN_SISWA_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': CSRF_TOKEN,
+                },
+                body: JSON.stringify({
+                    hasil_id: hasilId || null,
+                    siswa_id: Number(siswaId),
+                    jawaban: jawabanObj || {},
+                }),
+            });
+
+            const payload = await res.json();
+            if (!res.ok || !payload.success) {
+                alert(payload.message || 'Gagal menghubungkan siswa.');
+                return;
+            }
+
+            const nameEl = document.getElementById(`siswa_nama_${halaman}`);
+            if (nameEl) nameEl.textContent = payload.data.nama_siswa;
+
+            const badgeEl = document.getElementById(`status_badge_${halaman}`);
+            if (badgeEl) {
+                badgeEl.innerHTML = '<span style="background:#ecfdf5; color:#059669; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Valid (Tersimpan)</span>';
+            }
+
+            const noticeEl = document.getElementById(`unassigned_notice_${halaman}`);
+            if (noticeEl) noticeEl.style.display = 'none';
+
+            const dispEl = document.getElementById(`siswa_display_${halaman}`);
+            if (dispEl) dispEl.style.display = 'flex';
+
+            const wrapEl = document.getElementById(`siswa_select_wrap_${halaman}`);
+            if (wrapEl) wrapEl.style.display = 'none';
+
+            const noteEl = document.getElementById(`catatan_scan_${halaman}`);
+            if (noteEl) noteEl.textContent = 'Diverifikasi manual oleh Guru (' + payload.data.nama_siswa + ')';
+
+        } catch (e) {
+            alert('Terjadi kesalahan: ' + e.message);
+        }
+    }
+
     function showScanResults(data) {
         resultCard.style.display = 'block';
         resultSummaryText.textContent = `Total ${data.total_halaman} halaman diproses. Berhasil: ${data.berhasil} lembar, Perlu Cek Manual: ${data.perlu_cek} lembar.`;
@@ -724,22 +806,37 @@
         let rowsHtml = '';
         if (data.rincian && data.rincian.length > 0) {
             data.rincian.forEach(r => {
-                const statusBadge = r.status_scan === 'valid'
+                const isIdentified = !!r.siswa_id;
+                const statusBadge = (r.status_scan === 'valid' && isIdentified)
                     ? '<span style="background:#ecfdf5; color:#059669; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Valid</span>'
                     : '<span style="background:#fffbeb; color:#d97706; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Perlu Cek Manual</span>';
+
+                const jawabanEscaped = JSON.stringify(r.jawaban || {}).replace(/"/g, '&quot;');
 
                 rowsHtml += `
                     <tr style="border-bottom:1px solid #f1f5f9;">
                         <td style="padding:10px 14px; font-weight:600; color:#64748b;">#${r.halaman}</td>
                         <td style="padding:10px 14px;">
-                            <div style="font-weight:600; color:#1e293b;">${r.nama_siswa || 'Tidak Dikenali'}</div>
-                            <div style="font-size:11px; color:#94a3b8;">${r.catatan_scan || '-'}</div>
+                            <div id="unassigned_notice_${r.halaman}" style="${isIdentified ? 'display:none;' : 'display:block; margin-bottom:4px; color:#d97706; font-weight:700;'}">
+                                ⚠️ ${r.nama_siswa || 'Siswa Belum Dipilih'}
+                            </div>
+                            <div id="siswa_display_${r.halaman}" style="${isIdentified ? 'display:flex;' : 'display:none;'} align-items:center; gap:8px;">
+                                <div style="font-weight:600; color:#1e293b;" id="siswa_nama_${r.halaman}">${r.nama_siswa || 'Tidak Dikenali'}</div>
+                                <button type="button" onclick="toggleSiswaSelect(${r.halaman})" style="border:none; background:#eff6ff; color:#0052FF; font-size:11px; padding:2px 8px; border-radius:4px; cursor:pointer;" title="Ubah Siswa">Ubah</button>
+                            </div>
+                            <div id="siswa_select_wrap_${r.halaman}" style="${isIdentified ? 'display:none;' : 'display:block;'} margin-top:4px;">
+                                <select class="form-control" style="font-size:12px; padding:4px 8px; border-radius:6px; border:1px solid #3b82f6; max-width:280px; background:#f0f6ff;" onchange="assignSiswaFromSelect(${r.halaman}, ${r.hasil_id || 0}, this.value, ${jawabanEscaped})">
+                                    <option value="">-- Pilih Nama Siswa Manual --</option>
+                                    ${buildSiswaOptionsHtml(r.siswa_id)}
+                                </select>
+                            </div>
+                            <div style="font-size:11px; color:#94a3b8; margin-top:2px;" id="catatan_scan_${r.halaman}">${r.catatan_scan || '-'}</div>
                         </td>
                         <td style="padding:10px 14px; text-align:center; color:#059669; font-weight:600;">${r.jumlah_benar ?? 0}</td>
                         <td style="padding:10px 14px; text-align:center; color:#dc2626; font-weight:600;">${r.jumlah_salah ?? 0}</td>
                         <td style="padding:10px 14px; text-align:center; color:#64748b;">${r.jumlah_kosong ?? 0}</td>
                         <td style="padding:10px 14px; text-align:center; font-weight:800; color:#0052FF; font-size:14px;">${r.nilai_akhir ?? 0}</td>
-                        <td style="padding:10px 14px;">${statusBadge}</td>
+                        <td style="padding:10px 14px;" id="status_badge_${r.halaman}">${statusBadge}</td>
                     </tr>
                 `;
             });

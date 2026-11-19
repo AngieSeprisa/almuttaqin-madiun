@@ -585,7 +585,19 @@ class UjianController extends Controller
         $selectedUjianId = $request->input('ujian_id') ?: ($ujians->first()?->id ?? null);
         $ujian = $selectedUjianId ? Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->find($selectedUjianId) : null;
 
-        return view('ujian.upload-scan', compact('ujians', 'ujian'));
+        $siswasKelas = collect();
+        if ($ujian && $ujian->kelas_id && $ujian->kelas) {
+            $namaKelas = $ujian->kelas->nama_kelas;
+            $siswasKelas = Siswa::where(function ($q) use ($namaKelas) {
+                $q->where('kelas', $namaKelas)
+                  ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
+            })->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
+        }
+        if ($siswasKelas->isEmpty()) {
+            $siswasKelas = Siswa::orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
+        }
+
+        return view('ujian.upload-scan', compact('ujians', 'ujian', 'siswasKelas'));
     }
 
     /**
@@ -594,7 +606,20 @@ class UjianController extends Controller
     public function uploadScan(Ujian $ujian)
     {
         $ujians = Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->latest('tanggal_ujian')->get();
-        return view('ujian.upload-scan', compact('ujians', 'ujian'));
+
+        $siswasKelas = collect();
+        if ($ujian && $ujian->kelas_id && $ujian->kelas) {
+            $namaKelas = $ujian->kelas->nama_kelas;
+            $siswasKelas = Siswa::where(function ($q) use ($namaKelas) {
+                $q->where('kelas', $namaKelas)
+                  ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
+            })->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
+        }
+        if ($siswasKelas->isEmpty()) {
+            $siswasKelas = Siswa::orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
+        }
+
+        return view('ujian.upload-scan', compact('ujians', 'ujian', 'siswasKelas'));
     }
 
     /**
@@ -697,7 +722,19 @@ class UjianController extends Controller
         $statistik = $ujian->statistik;
         $analisis = $ujian->analisis_soal;
 
-        return view('ujian.hasil', compact('ujians', 'ujian', 'hasils', 'kuncis', 'statistik', 'analisis'));
+        $siswaList = collect();
+        if ($ujian->kelas_id && $ujian->kelas) {
+            $namaKelas = $ujian->kelas->nama_kelas;
+            $siswaList = Siswa::where(function ($q) use ($namaKelas) {
+                $q->where('kelas', $namaKelas)
+                  ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
+            })->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
+        }
+        if ($siswaList->isEmpty()) {
+            $siswaList = Siswa::orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
+        }
+
+        return view('ujian.hasil', compact('ujians', 'ujian', 'hasils', 'kuncis', 'statistik', 'analisis', 'siswaList'));
     }
 
     /**
@@ -705,6 +742,17 @@ class UjianController extends Controller
      */
     public function updateHasilManual(Request $request, Ujian $ujian, UjianHasil $hasil)
     {
+        if ($request->filled('siswa_id')) {
+            $newSiswaId = (int) $request->input('siswa_id');
+            if ($newSiswaId > 0 && $newSiswaId !== (int) $hasil->siswa_id) {
+                UjianHasil::where('ujian_id', $ujian->id)
+                    ->where('siswa_id', $newSiswaId)
+                    ->where('id', '!=', $hasil->id)
+                    ->delete();
+                $hasil->siswa_id = $newSiswaId;
+            }
+        }
+
         $currentAnswers = $hasil->jawaban_siswa ?? [];
 
         if ($request->has('jawaban') && is_array($request->input('jawaban'))) {
@@ -758,6 +806,7 @@ class UjianController extends Controller
         $nilai = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
 
         $hasil->update([
+            'siswa_id'      => $hasil->siswa_id,
             'jawaban_siswa' => $currentAnswers,
             'jumlah_benar'  => $benar,
             'jumlah_salah'  => $salah,
@@ -776,6 +825,101 @@ class UjianController extends Controller
         }
 
         return redirect()->route('ujian.hasil', $ujian->id)->with('success', 'Hasil koreksi siswa berhasil diperbarui.');
+    }
+
+    /**
+     * Hubungkan atau ubah siswa hasil scan secara manual
+     */
+    public function assignHasilSiswa(Request $request, Ujian $ujian)
+    {
+        $validated = $request->validate([
+            'hasil_id'      => 'nullable|integer',
+            'siswa_id'      => 'required|exists:siswas,id',
+            'jawaban'       => 'nullable|array',
+        ]);
+
+        $siswa = Siswa::findOrFail($validated['siswa_id']);
+        $hasil = null;
+
+        if (!empty($validated['hasil_id'])) {
+            $hasil = UjianHasil::where('ujian_id', $ujian->id)->find($validated['hasil_id']);
+        }
+
+        if ($hasil) {
+            UjianHasil::where('ujian_id', $ujian->id)
+                ->where('siswa_id', $siswa->id)
+                ->where('id', '!=', $hasil->id)
+                ->delete();
+
+            $hasil->siswa_id = $siswa->id;
+            $hasil->status_scan = 'valid';
+            $hasil->catatan_scan = 'Telah diverifikasi manual oleh Guru (' . $siswa->nama_lengkap . ')';
+            $hasil->save();
+        } else {
+            $currentAnswers = $validated['jawaban'] ?? [];
+            $kunciMap = $ujian->kuncis->pluck('kunci_jawaban', 'nomor_soal')->all();
+            $bobotMap = $ujian->kuncis->pluck('bobot', 'nomor_soal')->all();
+            $totalSkorMaks = array_sum($bobotMap) ?: ($ujian->jumlah_soal * ($ujian->bobot_benar ?: 1.0));
+
+            $benar = 0; $salah = 0; $kosong = 0; $totalDidapat = 0.0;
+            for ($no = 1; $no <= $ujian->jumlah_soal; $no++) {
+                $ans = $currentAnswers[$no] ?? null;
+                $k = $kunciMap[$no] ?? null;
+                $w = (float)($bobotMap[$no] ?? $ujian->bobot_benar ?? 1.0);
+                if ($ans === null) {
+                    $kosong++;
+                } elseif ($k && strtoupper($ans) === strtoupper($k)) {
+                    $benar++;
+                    $totalDidapat += $w;
+                } else {
+                    $salah++;
+                }
+            }
+            $nilai = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
+
+            $hasil = UjianHasil::updateOrCreate(
+                [
+                    'ujian_id' => $ujian->id,
+                    'siswa_id' => $siswa->id,
+                ],
+                [
+                    'jawaban_siswa' => $currentAnswers,
+                    'jumlah_benar'  => $benar,
+                    'jumlah_salah'  => $salah,
+                    'jumlah_kosong' => $kosong,
+                    'nilai_akhir'   => $nilai,
+                    'status_scan'   => 'valid',
+                    'catatan_scan'  => 'Telah diverifikasi manual oleh Guru (' . $siswa->nama_lengkap . ')',
+                    'waktu_scan'    => now(),
+                ]
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Siswa berhasil dihubungkan: ' . $siswa->nama_lengkap,
+            'data'    => [
+                'hasil_id'    => $hasil->id,
+                'siswa_id'    => $siswa->id,
+                'nama_siswa'  => $siswa->nama_lengkap,
+                'status_scan' => 'valid',
+                'nilai_akhir' => $hasil->nilai_akhir,
+            ],
+        ]);
+    }
+
+    /**
+     * Hapus data hasil ujian seorang siswa
+     */
+    public function destroyHasil(Ujian $ujian, UjianHasil $hasil)
+    {
+        if ($hasil->ujian_id !== $ujian->id) {
+            abort(404);
+        }
+        $hasil->delete();
+
+        return redirect()->route('ujian.hasil', $ujian->id)
+            ->with('success', 'Data hasil scan siswa berhasil dihapus.');
     }
 
     /**
