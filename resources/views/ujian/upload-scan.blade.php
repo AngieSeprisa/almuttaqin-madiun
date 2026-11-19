@@ -153,7 +153,7 @@
             <select id="selectUjian" class="form-control" style="font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid #cbd5e1; min-width:280px;" onchange="window.location.href='{{ route('ujian.koreksi') }}?ujian_id=' + this.value">
                 @foreach($ujians as $u)
                     <option value="{{ $u->id }}" {{ ($ujian && $ujian->id == $u->id) ? 'selected' : '' }}>
-                        {{ $u->nama_ujian }} ({{ $u->kelas->nama_kelas ?? '-' }} - {{ $u->mapel->nama_mapel ?? '-' }})
+                        {{ $u->nama_ujian }} ({{ $u->kelas?->nama_kelas ?? '-' }} - {{ $u->mapel?->mata_pelajaran ?? '-' }})
                     </option>
                 @endforeach
             </select>
@@ -201,7 +201,7 @@
 
     <!-- Dropzone Area -->
     <div class="dropzone-box" id="dropzoneBox" onclick="document.getElementById('fileInput').click()">
-        <input type="file" id="fileInput" name="file_scan" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="handleFileSelected(this.files)">
+        <input type="file" id="fileInput" name="file_scan" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="display:none;" onchange="handleFileSelected(this.files)">
         
         <div class="dropzone-icon-circle">
             <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2">
@@ -214,8 +214,8 @@
         <h3 style="font-size:16px; font-weight:700; color:#1e293b; margin:0 0 6px;">
             Pilih atau Tarik File Hasil Scan ke Sini
         </h3>
-        <p style="font-size:13px; color:#64748b; margin:0 auto 16px; max-width:480px;">
-            Dukung 1 file <strong>PDF multi-halaman</strong> (satu tumpuk lembar jawab satu kelas) atau gambar <strong>JPG/PNG</strong>. Maksimal ukuran file 50 MB.
+        <p style="font-size:13px; color:#64748b; margin:0 auto 16px; max-width:520px;">
+            Dukung 1 file <strong>PDF multi-halaman</strong> (satu tumpuk lembar jawab satu kelas) atau beberapa gambar <strong>JPG/PNG</strong> sekaligus. Halaman akan dikonversi &amp; dikompresi otomatis per lembar sebelum dikirim.
         </p>
 
         <button type="button" class="btn btn-primary" style="padding:9px 22px; font-size:13px; border-radius:8px; pointer-events:none;">
@@ -323,6 +323,14 @@
 }
 </style>
 
+<!-- PDF.js & ZBar WebAssembly (Self-hosted dengan fallback CDN) -->
+<script src="{{ asset('js/vendor/pdfjs/pdf.min.js') }}"
+        onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'"></script>
+<script src="{{ asset('js/vendor/zbar/zbar-wasm.js') }}"
+        onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.9.15/dist/index.js'"></script>
+<script src="{{ asset('js/vendor/zbar/barcode-detector-polyfill.js') }}"
+        onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@undecaf/barcode-detector-polyfill@0.9.21/dist/index.js'"></script>
+
 <script>
     const dropzone = document.getElementById('dropzoneBox');
     const fileInput = document.getElementById('fileInput');
@@ -335,6 +343,22 @@
     const resultCard = document.getElementById('resultCard');
     const resultTableBody = document.getElementById('resultTableBody');
     const resultSummaryText = document.getElementById('resultSummaryText');
+
+    const PROCESS_SCAN_URL = '{{ route('ujian.process-scan', $ujian->id) }}';
+    const CSRF_TOKEN = '{{ csrf_token() }}';
+    const PDF_WORKER_URL = '{{ asset('js/vendor/pdfjs/pdf.worker.min.js') }}';
+
+    if (typeof window.BarcodeDetector === 'undefined' && typeof barcodeDetectorPolyfill !== 'undefined') {
+        window.BarcodeDetector = barcodeDetectorPolyfill.BarcodeDetectorPolyfill;
+    }
+
+    let qrDetectorInstance = null;
+
+    function configurePdfJsWorker() {
+        if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL;
+        }
+    }
 
     ['dragenter', 'dragover'].forEach(eventName => {
         dropzone.addEventListener(eventName, (e) => {
@@ -355,83 +379,342 @@
     dropzone.addEventListener('drop', (e) => {
         const dt = e.dataTransfer;
         const files = dt.files;
-        if (files.length > 0) {
+        if (files && files.length > 0) {
             handleFileSelected(files);
         }
     });
 
-    function handleFileSelected(files) {
-        if (!files || files.length === 0) return;
-        const file = files[0];
+    function updateProgress(pct, title, subtitle, step) {
+        const safePct = Math.max(0, Math.min(100, Math.round(pct)));
+        progressBarFill.style.width = safePct + '%';
+        progressPercent.textContent = safePct + '%';
+        if (title !== undefined) progressTitle.textContent = title;
+        if (subtitle !== undefined) progressSubtitle.textContent = subtitle;
+        if (step !== undefined) progressStep.textContent = step;
+    }
 
-        // Validasi tipe file
-        const validExts = ['pdf', 'jpg', 'jpeg', 'png'];
-        const ext = file.name.split('.').pop().toLowerCase();
-        if (!validExts.includes(ext)) {
-            alert('Format berkas tidak didukung. Harap pilih berkas PDF, JPG, atau PNG.');
-            return;
+    /**
+     * Ekspor canvas menjadi JPEG Blob dengan batas aman < 1.4 MB agar tidak pernah ditolak batas upload PHP server
+     */
+    function canvasToSafeJpegBlob(canvas) {
+        return new Promise((resolve, reject) => {
+            const qualities = [0.85, 0.72, 0.58];
+            let idx = 0;
+
+            function tryNext() {
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error('Gagal mengonversi halaman ke gambar JPEG.'));
+                        return;
+                    }
+                    if (blob.size <= 1400 * 1024 || idx >= qualities.length - 1) {
+                        resolve(blob);
+                    } else {
+                        idx++;
+                        tryNext();
+                    }
+                }, 'image/jpeg', qualities[idx]);
+            }
+
+            tryNext();
+        });
+    }
+
+    /**
+     * Dekode QR Code identitas siswa langsung di browser menggunakan ZBar WASM / BarcodeDetector
+     */
+    async function decodeQrFromCanvas(sourceCanvas) {
+        const w = sourceCanvas.width;
+        const h = sourceCanvas.height;
+        if (!w || !h) return null;
+
+        if (!qrDetectorInstance && typeof window.BarcodeDetector !== 'undefined') {
+            try {
+                qrDetectorInstance = new window.BarcodeDetector({ formats: ['qr_code'] });
+            } catch (e) {
+                try { qrDetectorInstance = new window.BarcodeDetector(); } catch (e2) {}
+            }
+        }
+
+        // Daftar area pencarian QR Code (prioritas pojok kanan atas LJK, lalu setengah atas, lalu penuh)
+        const regions = [
+            { x: Math.floor(w * 0.50), y: 0, w: Math.ceil(w * 0.50), h: Math.ceil(h * 0.30) },
+            { x: 0, y: 0, w: w, h: Math.ceil(h * 0.45) },
+            { x: 0, y: 0, w: w, h: h },
+        ];
+
+        const cropCanvas = document.createElement('canvas');
+        const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
+
+        for (const reg of regions) {
+            if (reg.w < 40 || reg.h < 40) continue;
+
+            // Skala area crop agar optimal untuk pembacaan QR
+            const maxDim = 900;
+            const scale = Math.min(1, maxDim / Math.max(reg.w, reg.h));
+            const tw = Math.max(40, Math.round(reg.w * scale));
+            const th = Math.max(40, Math.round(reg.h * scale));
+
+            cropCanvas.width = tw;
+            cropCanvas.height = th;
+            cropCtx.drawImage(sourceCanvas, reg.x, reg.y, reg.w, reg.h, 0, 0, tw, th);
+
+            // 1. Coba ZBar WebAssembly
+            if (typeof zbarWasm !== 'undefined' && typeof zbarWasm.scanImageData === 'function') {
+                try {
+                    const imgData = cropCtx.getImageData(0, 0, tw, th);
+                    const symbols = await zbarWasm.scanImageData(imgData);
+                    if (symbols && symbols.length > 0) {
+                        for (const sym of symbols) {
+                            const val = sym.decode ? sym.decode() : '';
+                            if (val && val.trim().length > 0) {
+                                return val.trim();
+                            }
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            // 2. Coba Native / Polyfill BarcodeDetector
+            if (qrDetectorInstance) {
+                try {
+                    const codes = await qrDetectorInstance.detect(cropCanvas);
+                    if (codes && codes.length > 0 && codes[0].rawValue) {
+                        return String(codes[0].rawValue).trim();
+                    }
+                } catch (e) {}
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Render file gambar (JPG/PNG/WebP) ke canvas dengan ukuran optimal (~1450px max lebar)
+     */
+    function loadImageFileToCanvas(file) {
+        return new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                const maxW = 1450;
+                const scale = img.naturalWidth > maxW ? (maxW / img.naturalWidth) : 1;
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(img.naturalWidth * scale);
+                canvas.height = Math.round(img.naturalHeight * scale);
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas);
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Gagal membaca berkas gambar ' + file.name));
+            };
+            img.src = url;
+        });
+    }
+
+    /**
+     * Kirim satu halaman JPEG terkompresi (+ QR payload jika terbaca) ke server untuk dikoreksi OMR
+     */
+    async function uploadSinglePageToServer(blob, filename, pageNumber, qrPayload) {
+        const formData = new FormData();
+        formData.append('file_scan', blob, filename);
+        formData.append('page_number', String(pageNumber));
+        if (qrPayload) {
+            formData.append('qr_payload', qrPayload);
+        }
+        formData.append('_token', CSRF_TOKEN);
+
+        const response = await fetch(PROCESS_SCAN_URL, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: formData,
+        });
+
+        let payload = null;
+        try {
+            payload = await response.json();
+        } catch (e) {
+            throw new Error(`Respons server tidak valid (HTTP ${response.status}).`);
+        }
+
+        if (!response.ok || !payload || !payload.success) {
+            let msg = (payload && payload.message) ? payload.message : `Gagal memproses halaman #${pageNumber} (HTTP ${response.status}).`;
+            if (payload && payload.errors) {
+                const firstErr = Object.values(payload.errors).flat()[0];
+                if (firstErr) msg = firstErr;
+            }
+            throw new Error(msg);
+        }
+
+        return payload.data;
+    }
+
+    /**
+     * Render dan proses seluruh halaman berkas PDF di browser lalu kirim satu per satu ke server
+     */
+    async function processPdfClientSide(file, pageOffset, aggregated) {
+        configurePdfJsWorker();
+        if (!window.pdfjsLib) {
+            throw new Error('Pustaka pembaca PDF di browser belum termuat. Silakan periksa koneksi internet lalu muat ulang halaman.');
+        }
+
+        updateProgress(5, 'Membuka dokumen PDF ' + file.name + '...', 'Menghitung jumlah halaman lembar jawab...', 'Memuat PDF secara lokal di browser...');
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const numPages = pdfDoc.numPages;
+
+        const renderCanvas = document.createElement('canvas');
+        const renderCtx = renderCanvas.getContext('2d', { willReadFrequently: true });
+
+        for (let p = 1; p <= numPages; p++) {
+            const globalPage = pageOffset + p;
+            const basePct = ((p - 1) / numPages) * 100;
+
+            updateProgress(
+                Math.max(5, basePct + (25 / numPages)),
+                `Memproses Halaman ${p} dari ${numPages}...`,
+                `Berkas: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`,
+                `Merender gambar LJK & membaca QR Code siswa halaman #${p}...`
+            );
+
+            const page = await pdfDoc.getPage(p);
+            const unscaledViewport = page.getViewport({ scale: 1.0 });
+            // Target lebar ~1400px (setara ~170 DPI A4) — sangat tajam untuk OMR & QR, ukuran file ringan
+            const targetWidth = 1400;
+            const scale = Math.min(2.5, Math.max(1.2, targetWidth / unscaledViewport.width));
+            const viewport = page.getViewport({ scale });
+
+            renderCanvas.width = Math.round(viewport.width);
+            renderCanvas.height = Math.round(viewport.height);
+            renderCtx.fillStyle = '#ffffff';
+            renderCtx.fillRect(0, 0, renderCanvas.width, renderCanvas.height);
+
+            await page.render({ canvasContext: renderCtx, viewport }).promise;
+
+            // Baca QR Code langsung di browser
+            const qrPayload = await decodeQrFromCanvas(renderCanvas);
+
+            // Kompres ke JPEG ringan (< 1.4 MB)
+            const jpegBlob = await canvasToSafeJpegBlob(renderCanvas);
+
+            updateProgress(
+                basePct + (65 / numPages),
+                `Mengoreksi OMR Halaman ${p} dari ${numPages}...`,
+                `Ukuran terkompresi: ${(jpegBlob.size / 1024).toFixed(0)} KB` + (qrPayload ? ' • QR Siswa Terbaca' : ''),
+                `Memeriksa fiducial marker & menilai bulatan jawaban halaman #${p}...`
+            );
+
+            const serverData = await uploadSinglePageToServer(
+                jpegBlob,
+                `ljk_page_${globalPage}.jpg`,
+                globalPage,
+                qrPayload
+            );
+
+            mergePageResult(aggregated, serverData);
+            updateProgress((p / numPages) * 100, `Halaman ${p} dari ${numPages} selesai`, undefined, `Selesai memproses halaman #${p}.`);
+
+            page.cleanup();
+        }
+
+        await pdfDoc.destroy();
+        return numPages;
+    }
+
+    function mergePageResult(aggregated, serverData) {
+        if (!serverData) return;
+        aggregated.total_halaman += (serverData.total_halaman || 0);
+        aggregated.berhasil += (serverData.berhasil || 0);
+        aggregated.perlu_cek += (serverData.perlu_cek || 0);
+        if (Array.isArray(serverData.rincian)) {
+            aggregated.rincian.push(...serverData.rincian);
+        }
+    }
+
+    async function handleFileSelected(fileList) {
+        if (!fileList || fileList.length === 0) return;
+
+        const files = Array.from(fileList);
+        const validExts = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+
+        for (const f of files) {
+            const ext = (f.name.split('.').pop() || '').toLowerCase();
+            if (!validExts.includes(ext)) {
+                alert('Format berkas "' + f.name + '" tidak didukung. Harap pilih berkas PDF, JPG, atau PNG.');
+                return;
+            }
         }
 
         // Tampilkan progress UI
         dropzone.style.display = 'none';
         progressCard.style.display = 'block';
         resultCard.style.display = 'none';
+        updateProgress(5, 'Menyiapkan berkas scan...', `${files.length} berkas dipilih`, 'Memulai ekstraksi halaman...');
 
-        progressTitle.textContent = 'Mengunggah ' + file.name + '...';
-        progressSubtitle.textContent = 'Ukuran: ' + (file.size / (1024 * 1024)).toFixed(2) + ' MB';
-        progressBarFill.style.width = '10%';
-        progressPercent.textContent = '10%';
-        progressStep.textContent = 'Mengirim berkas ke server...';
+        const aggregated = {
+            total_halaman: 0,
+            berhasil: 0,
+            perlu_cek: 0,
+            rincian: [],
+        };
 
-        const formData = new FormData();
-        formData.append('file_scan', file);
-        formData.append('_token', '{{ csrf_token() }}');
+        try {
+            let pageCounter = 0;
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '{{ route('ujian.process-scan', $ujian->id) }}', true);
-        xhr.setRequestHeader('Accept', 'application/json');
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const ext = (file.name.split('.').pop() || '').toLowerCase();
 
-        xhr.upload.onprogress = function (e) {
-            if (e.lengthComputable) {
-                const percentComplete = Math.round((e.loaded / e.total) * 60);
-                progressBarFill.style.width = percentComplete + '%';
-                progressPercent.textContent = percentComplete + '%';
-                if (percentComplete >= 60) {
-                    progressTitle.textContent = 'Memproses Koreksi OMR & QR Code...';
-                    progressSubtitle.textContent = 'Sistem sedang mengekstrak halaman dan membaca bulatan jawaban secara berurutan.';
-                    progressStep.textContent = 'Memeriksa sudut fiducial marker & grading jawaban...';
+                if (ext === 'pdf') {
+                    const count = await processPdfClientSide(file, pageCounter, aggregated);
+                    pageCounter += count;
+                } else {
+                    pageCounter++;
+                    const basePct = (i / files.length) * 100;
+                    updateProgress(
+                        Math.max(10, basePct + (25 / files.length)),
+                        `Memproses gambar ${i + 1} dari ${files.length}...`,
+                        `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`,
+                        'Mengoptimalkan resolusi gambar & membaca QR Code siswa...'
+                    );
+
+                    const canvas = await loadImageFileToCanvas(file);
+                    const qrPayload = await decodeQrFromCanvas(canvas);
+                    const jpegBlob = await canvasToSafeJpegBlob(canvas);
+
+                    updateProgress(
+                        basePct + (65 / files.length),
+                        `Mengoreksi OMR gambar ${i + 1} dari ${files.length}...`,
+                        `Ukuran terkompresi: ${(jpegBlob.size / 1024).toFixed(0)} KB` + (qrPayload ? ' • QR Siswa Terbaca' : ''),
+                        'Memeriksa fiducial marker & menilai bulatan jawaban...'
+                    );
+
+                    const serverData = await uploadSinglePageToServer(
+                        jpegBlob,
+                        `ljk_img_${pageCounter}.jpg`,
+                        pageCounter,
+                        qrPayload
+                    );
+                    mergePageResult(aggregated, serverData);
                 }
             }
-        };
 
-        xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    const res = JSON.parse(xhr.responseText);
-                    progressBarFill.style.width = '100%';
-                    progressPercent.textContent = '100%';
-                    setTimeout(() => {
-                        progressCard.style.display = 'none';
-                        showScanResults(res.data);
-                    }, 400);
-                } catch (err) {
-                    showError('Gagal memproses respons server.');
-                }
-            } else {
-                let errMsg = 'Gagal memproses berkas.';
-                try {
-                    const errRes = JSON.parse(xhr.responseText);
-                    if (errRes.message) errMsg = errRes.message;
-                } catch(e) {}
-                showError(errMsg);
-            }
-        };
-
-        xhr.onerror = function () {
-            showError('Koneksi jaringan terputus atau server tidak merespons.');
-        };
-
-        xhr.send(formData);
+            updateProgress(100, 'Koreksi LJK Selesai!', `Total ${aggregated.total_halaman} halaman berhasil diproses.`, 'Menampilkan rekap hasil...');
+            setTimeout(() => {
+                progressCard.style.display = 'none';
+                showScanResults(aggregated);
+            }, 350);
+        } catch (err) {
+            showError(err && err.message ? err.message : 'Terjadi kesalahan saat memproses berkas LJK.');
+        }
     }
 
     function showScanResults(data) {
@@ -470,7 +753,17 @@
     function showError(message) {
         progressCard.style.display = 'none';
         dropzone.style.display = 'block';
-        alert('Kesalahan Scan LJK:\n' + message);
+        fileInput.value = '';
+        if (window.Swal) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Kesalahan Scan LJK',
+                text: message,
+                confirmButtonColor: '#0052FF',
+            });
+        } else {
+            alert('Kesalahan Scan LJK:\n' + message);
+        }
     }
 
     function resetUploadForm() {

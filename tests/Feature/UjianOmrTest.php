@@ -535,4 +535,122 @@ class UjianOmrTest extends TestCase
         $this->assertEquals(0.0, $analisis[2]['persen_benar']);
         $this->assertEquals('Sukar', $analisis[2]['tingkat_kesukaran']);
     }
+
+    public function test_process_scan_per_halaman_dengan_qr_payload_dan_kalibrasi_header_dinamis(): void
+    {
+        // Buat siswa kedua yang secara alfabetis berada di urutan belakang (memastikan QR payload diprioritaskan)
+        $siswaKedua = Siswa::create([
+            'nama_lengkap'  => 'Zaki Nova Mutthalib',
+            'nisn'          => '9998887776',
+            'jenis_kelamin' => 'L',
+            'kelas'         => $this->kelas->nama_kelas,
+            'lembaga'       => 'SMP',
+        ]);
+
+        $ujian = Ujian::create([
+            'kode_ujian'    => 'UJN-202611-099',
+            'nama_ujian'    => 'SAS Informatika Kalibrasi',
+            'mapel_id'      => $this->mapel->id,
+            'kelas_id'      => $this->kelas->id,
+            'guru_id'       => $this->admin->id,
+            'jumlah_soal'   => 10,
+            'jumlah_opsi'   => 4,
+            'bobot_benar'   => 10.0,
+            'tanggal_ujian' => now()->format('Y-m-d'),
+            'status'        => 'aktif',
+        ]);
+
+        for ($no = 1; $no <= 10; $no++) {
+            UjianKunci::create([
+                'ujian_id'      => $ujian->id,
+                'nomor_soal'    => $no,
+                'kunci_jawaban' => 'C',
+                'bobot'         => 10.0,
+            ]);
+        }
+
+        // Render LJK simulasi A4 (1240 x 1754 px) dengan marker abu-abu gelap & bar header hitam bergeser +8mm ke bawah
+        $w = 1240;
+        $h = 1754;
+        $img = imagecreatetruecolor($w, $h);
+        $paper = imagecolorallocate($img, 245, 245, 245);
+        $markerColor = imagecolorallocate($img, 65, 65, 65); // Abu-abu gelap seperti hasil scan printer laser
+        $headerBlack = imagecolorallocate($img, 30, 30, 30);
+        $pencilFill = imagecolorallocate($img, 55, 55, 55);
+        $bubbleRing = imagecolorallocate($img, 140, 140, 140);
+        imagefilledrectangle($img, 0, 0, $w, $h, $paper);
+
+        // 4 Fiducial Markers (10x10mm pada margin 12mm)
+        $mmToPxX = $w / 210.0;
+        $mmToPxY = $h / 297.0;
+        $mSizeW = (int) round(10.0 * $mmToPxX);
+        $mSizeH = (int) round(10.0 * $mmToPxY);
+        $tlLeft = (int) round(12.0 * $mmToPxX);
+        $tlTop  = (int) round(12.0 * $mmToPxY);
+        $trLeft = (int) round(188.0 * $mmToPxX);
+        $blTop  = (int) round(275.0 * $mmToPxY);
+
+        imagefilledrectangle($img, $tlLeft, $tlTop, $tlLeft + $mSizeW, $tlTop + $mSizeH, $markerColor);
+        imagefilledrectangle($img, $trLeft, $tlTop, $trLeft + $mSizeW, $tlTop + $mSizeH, $markerColor);
+        imagefilledrectangle($img, $tlLeft, $blTop, $tlLeft + $mSizeW, $blTop + $mSizeH, $markerColor);
+        imagefilledrectangle($img, $trLeft, $blTop, $trLeft + $mSizeW, $blTop + $mSizeH, $markerColor);
+
+        $tlCx = $tlLeft + ($mSizeW / 2.0);
+        $tlCy = $tlTop + ($mSizeH / 2.0);
+        $refW = ($trLeft + ($mSizeW / 2.0)) - $tlCx;
+        $refH = ($blTop + ($mSizeH / 2.0)) - $tlCy;
+
+        // Pergeseran vertikal +8mm (simulasi kotak peraturan ujian yang lebih panjang)
+        $shiftMm = 8.0;
+        $deltaV = $shiftMm / LjkTemplateService::REF_HEIGHT_MM;
+
+        // Gambar bar hitam header kolom (.omr-col-header tinggi 5mm) di atas grid yang bergeser +8mm
+        $headerBottomV = LjkTemplateService::getNominalHeaderBottomV() + $deltaV;
+        $headerTopV = $headerBottomV - (5.0 / LjkTemplateService::REF_HEIGHT_MM);
+        foreach (LjkTemplateService::getColumnHeaderBands(10) as $band) {
+            $hx1 = (int) round($tlCx + $band['u1'] * $refW);
+            $hx2 = (int) round($tlCx + $band['u2'] * $refW);
+            $hy1 = (int) round($tlCy + $headerTopV * $refH);
+            $hy2 = (int) round($tlCy + $headerBottomV * $refH);
+            imagefilledrectangle($img, $hx1, $hy1, $hx2, $hy2, $headerBlack);
+        }
+
+        // Gambar bulatan kosong untuk semua opsi dan hitamkan opsi C untuk seluruh 10 soal
+        $bubbleCoords = LjkTemplateService::getBubbleCoordinates(10, 4);
+        $diam = (int) round(4.5 * $mmToPxX);
+        foreach ($bubbleCoords as $no => $opsiList) {
+            foreach ($opsiList as $opsi => $coord) {
+                $px = (int) round($tlCx + ($coord['u'] * $refW));
+                $py = (int) round($tlCy + (($coord['v'] + $deltaV) * $refH));
+                imageellipse($img, $px, $py, $diam, $diam, $bubbleRing);
+                if ($opsi === 'C') {
+                    imagefilledellipse($img, $px, $py, $diam - 4, $diam - 4, $pencilFill);
+                }
+            }
+        }
+
+        $tmpJpg = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test_scan_ljk_' . uniqid() . '.jpg';
+        imagejpeg($img, $tmpJpg, 85);
+        imagedestroy($img);
+
+        $uploadedFile = new \Illuminate\Http\UploadedFile($tmpJpg, 'ljk_page_1.jpg', 'image/jpeg', null, true);
+        $qrPayload = LjkTemplateService::makeQrPayload($ujian, $siswaKedua);
+
+        $response = $this->actingAs($this->admin)->postJson(route('ujian.process-scan', $ujian->id), [
+            'file_scan'   => $uploadedFile,
+            'page_number' => 1,
+            'qr_payload'  => $qrPayload,
+        ]);
+
+        @unlink($tmpJpg);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.total_halaman', 1)
+            ->assertJsonPath('data.berhasil', 1)
+            ->assertJsonPath('data.rincian.0.siswa_id', $siswaKedua->id)
+            ->assertJsonPath('data.rincian.0.nama_siswa', 'Zaki Nova Mutthalib')
+            ->assertJsonPath('data.rincian.0.jumlah_benar', 10)
+            ->assertJsonPath('data.rincian.0.nilai_akhir', 100);
+    }
 }

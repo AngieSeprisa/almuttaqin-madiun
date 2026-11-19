@@ -14,58 +14,75 @@ class LjkTemplateService
     public const PAGE_WIDTH_MM = 210.0;
     public const PAGE_HEIGHT_MM = 297.0;
 
-    // Posisi 4 Fiducial Markers (Kotak Hitam Sudut 10x10 mm)
+    // Posisi 4 Fiducial Markers (Kotak Hitam Sudut 10x10 mm pada margin 12mm)
+    // Pusat kotak marker berada pada 12mm + 5mm = 17mm dari tepi kertas
     public const MARKER_SIZE_MM = 10.0;
-    public const TL_X_MM = 12.0;
-    public const TL_Y_MM = 12.0;
-    public const TR_X_MM = 188.0;
-    public const TR_Y_MM = 12.0;
-    public const BL_X_MM = 12.0;
-    public const BL_Y_MM = 275.0;
-    public const BR_X_MM = 188.0;
-    public const BR_Y_MM = 275.0;
+    public const TL_X_MM = 17.0;
+    public const TL_Y_MM = 17.0;
+    public const TR_X_MM = 193.0;
+    public const TR_Y_MM = 17.0;
+    public const BL_X_MM = 17.0;
+    public const BL_Y_MM = 280.0;
+    public const BR_X_MM = 193.0;
+    public const BR_Y_MM = 280.0;
 
-    // Jarak aktif antara marker TL dan BR sebagai bidang referensi OMR (0.0 s.d. 1.0)
+    // Jarak aktif antara pusat marker TL dan BR sebagai bidang referensi OMR (0.0 s.d. 1.0)
     public const REF_WIDTH_MM = self::TR_X_MM - self::TL_X_MM;   // 176 mm
     public const REF_HEIGHT_MM = self::BL_Y_MM - self::TL_Y_MM; // 263 mm
 
+    // Posisi nominal tepi bawah header hitam kolom (.omr-col-header) pada cetak-ljk.blade.php
+    public const NOMINAL_GRID_START_Y_MM = 86.2;
+
+    // Tinggi tiap baris soal (.omr-row = 3.5px + 17px + 3.5px + 1px = 25px @ 96dpi)
+    public const ROW_HEIGHT_MM = 6.6146;
+
     /**
      * Hitung peta koordinat relatif normalisasi (u, v) untuk setiap bulatan nomor soal
-     * u = (x_pos - TL_X) / REF_WIDTH
-     * v = (y_pos - TL_Y) / REF_HEIGHT
-     * Rentang u dan v adalah 0.0 s.d 1.0 terhadap kotak acuan 4 marker.
+     * Mengikuti tata letak presisi CSS cetak-ljk.blade.php (A4 210x297mm, .ljk-content margin 24mm).
+     * u = (x_pos - TL_X_MM) / REF_WIDTH_MM
+     * v = (y_pos - TL_Y_MM) / REF_HEIGHT_MM
      */
     public static function getBubbleCoordinates(int $jumlahSoal = 40, int $jumlahOpsi = 4): array
     {
         $coords = [];
         $opsiList = $jumlahOpsi >= 5 ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
+        $opsiCount = count($opsiList);
 
-        // Tentukan jumlah kolom grid (4 kolom untuk <= 40 soal, 5 kolom untuk 50, dst)
+        // Tentukan jumlah kolom grid (4 kolom untuk <= 40 soal, 5 kolom untuk > 40 soal)
         $numCols = $jumlahSoal <= 40 ? 4 : 5;
         $soalPerCol = (int) ceil($jumlahSoal / $numCols);
 
-        // Area OMR Grid di dalam kertas (dalam mm)
-        $gridStartY_mm = 88.0; // Setelah header identitas dan petunjuk
-        $gridEndY_mm   = 265.0;
-        $colWidth_mm   = self::REF_WIDTH_MM / $numCols;
-        $rowHeight_mm  = min(8.0, ($gridEndY_mm - $gridStartY_mm) / $soalPerCol);
+        // Lebar area konten: 210mm - 24mm (kiri) - 24mm (kanan) = 162mm
+        $contentLeft_mm = 24.0;
+        $contentWidth_mm = 162.0;
+        $colGap_mm = 12.0 / 3.77952756; // 12px = 3.175 mm
+        $colWidth_mm = ($contentWidth_mm - (($numCols - 1) * $colGap_mm)) / $numCols;
 
-        $bubbleSpacing_mm = $jumlahOpsi >= 5 ? 5.5 : 6.5;
-        $bubbleStartOffset_mm = 11.0; // Jarak dari label nomor soal
+        // Geometri bulatan pada .omr-row (rata kanan via justify-content: space-between)
+        $bubbleDiam_mm = 17.0 / 3.77952756;  // 17px = 4.4979 mm
+        $bubbleGap_mm  = 5.0 / 3.77952756;   // 5px  = 1.3229 mm
+        $bubbleStep_mm = $bubbleDiam_mm + $bubbleGap_mm; // 5.8208 mm
+        $rightPad_mm   = 7.0 / 3.77952756;   // 1px border + 6px padding-right = 1.8521 mm
+
+        $gridStartY_mm = self::NOMINAL_GRID_START_Y_MM;
+        $rowHeight_mm  = self::ROW_HEIGHT_MM;
 
         for ($soal = 1; $soal <= $jumlahSoal; $soal++) {
             $colIdx = (int) floor(($soal - 1) / $soalPerCol);
             $rowIdx = ($soal - 1) % $soalPerCol;
 
-            $colOriginX_mm = self::TL_X_MM + ($colIdx * $colWidth_mm) + 2.0;
-            $rowOriginY_mm = $gridStartY_mm + ($rowIdx * $rowHeight_mm) + ($rowHeight_mm / 2);
+            $colLeftX_mm  = $contentLeft_mm + ($colIdx * ($colWidth_mm + $colGap_mm));
+            $colRightX_mm = $colLeftX_mm + $colWidth_mm;
+            $lastBubbleX_mm = $colRightX_mm - $rightPad_mm - ($bubbleDiam_mm / 2.0);
+
+            $rowCenterY_mm = $gridStartY_mm + ($rowIdx * $rowHeight_mm) + ($rowHeight_mm / 2.0);
 
             $coords[$soal] = [];
             foreach ($opsiList as $optIdx => $opsi) {
-                $bubbleX_mm = $colOriginX_mm + $bubbleStartOffset_mm + ($optIdx * $bubbleSpacing_mm);
-                $bubbleY_mm = $rowOriginY_mm;
+                $bubbleX_mm = $lastBubbleX_mm - (($opsiCount - 1 - $optIdx) * $bubbleStep_mm);
+                $bubbleY_mm = $rowCenterY_mm;
 
-                // Normalisasi terhadap marker TL dan BR
+                // Normalisasi terhadap pusat marker TL (17, 17) dan BR (193, 280)
                 $u = ($bubbleX_mm - self::TL_X_MM) / self::REF_WIDTH_MM;
                 $v = ($bubbleY_mm - self::TL_Y_MM) / self::REF_HEIGHT_MM;
 
@@ -79,6 +96,38 @@ class LjkTemplateService
         }
 
         return $coords;
+    }
+
+    /**
+     * Pita horizontal normalisasi (u1, u2) untuk tiap kolom OMR (digunakan untuk mendeteksi bar header hitam .omr-col-header)
+     */
+    public static function getColumnHeaderBands(int $jumlahSoal = 40): array
+    {
+        $numCols = $jumlahSoal <= 40 ? 4 : 5;
+        $contentLeft_mm = 24.0;
+        $contentWidth_mm = 162.0;
+        $colGap_mm = 12.0 / 3.77952756;
+        $colWidth_mm = ($contentWidth_mm - (($numCols - 1) * $colGap_mm)) / $numCols;
+
+        $bands = [];
+        for ($c = 0; $c < $numCols; $c++) {
+            $x1 = $contentLeft_mm + ($c * ($colWidth_mm + $colGap_mm)) + 2.0;
+            $x2 = $contentLeft_mm + ($c * ($colWidth_mm + $colGap_mm)) + $colWidth_mm - 2.0;
+            $bands[] = [
+                'u1' => round(($x1 - self::TL_X_MM) / self::REF_WIDTH_MM, 5),
+                'u2' => round(($x2 - self::TL_X_MM) / self::REF_WIDTH_MM, 5),
+            ];
+        }
+
+        return $bands;
+    }
+
+    /**
+     * Nilai v normalisasi untuk tepi bawah nominal bar header kolom hitam
+     */
+    public static function getNominalHeaderBottomV(): float
+    {
+        return round((self::NOMINAL_GRID_START_Y_MM - self::TL_Y_MM) / self::REF_HEIGHT_MM, 5);
     }
 
     /**

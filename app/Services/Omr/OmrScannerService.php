@@ -24,10 +24,17 @@ class OmrScannerService
      * @param Ujian $ujian Ujian terkait
      * @param string $filePath Path file fisik di server
      * @param callable|null $progressCallback Callback setiap selesai 1 halaman: fn(int $page, array $result)
+     * @param int $startPage Nomor halaman awal (berguna saat browser mengirim 1 halaman per request)
+     * @param string|null $clientQrPayload Hasil decode QR Code dari browser (jika tersedia)
      * @return array Rekapitulasi hasil koreksi semua halaman
      */
-    public function processFile(Ujian $ujian, string $filePath, ?callable $progressCallback = null): array
-    {
+    public function processFile(
+        Ujian $ujian,
+        string $filePath,
+        ?callable $progressCallback = null,
+        int $startPage = 1,
+        ?string $clientQrPayload = null
+    ): array {
         $kunciMap = $ujian->kuncis->pluck('kunci_jawaban', 'nomor_soal')->all();
         $bobotMap = $ujian->kuncis->pluck('bobot', 'nomor_soal')->all();
 
@@ -35,13 +42,16 @@ class OmrScannerService
         $processedResults = [];
 
         // Ekstraksi sequential: 1 halaman per iterasi generator
-        foreach (PdfImageExtractorService::extractPages($filePath) as $pageNumber => $imagePath) {
+        foreach (PdfImageExtractorService::extractPages($filePath) as $index => $imagePath) {
             $totalPages++;
-            $pageResult = $this->processSinglePageImage($ujian, $imagePath, $pageNumber, $kunciMap, $bobotMap);
+            $actualPageNumber = ($startPage - 1) + $index;
+            $qrForThisPage = ($index === 1) ? $clientQrPayload : null;
+
+            $pageResult = $this->processSinglePageImage($ujian, $imagePath, $actualPageNumber, $kunciMap, $bobotMap, $qrForThisPage);
             $processedResults[] = $pageResult;
 
             if ($progressCallback) {
-                $progressCallback($pageNumber, $pageResult);
+                $progressCallback($actualPageNumber, $pageResult);
             }
 
             // Bersihkan memori PHP setelah setiap halaman
@@ -62,8 +72,14 @@ class OmrScannerService
     /**
      * Proses analisis OMR untuk satu halaman gambar LJK
      */
-    public function processSinglePageImage(Ujian $ujian, string $imagePath, int $pageNumber, array $kunciMap, array $bobotMap): array
-    {
+    public function processSinglePageImage(
+        Ujian $ujian,
+        string $imagePath,
+        int $pageNumber,
+        array $kunciMap,
+        array $bobotMap,
+        ?string $clientQrPayload = null
+    ): array {
         $im = $this->loadImage($imagePath);
         if (!$im) {
             return [
@@ -72,19 +88,24 @@ class OmrScannerService
                 'nama_siswa'  => 'Halaman ' . $pageNumber,
                 'status_scan' => 'perlu_cek_manual',
                 'catatan'     => 'Gagal membaca format gambar halaman.',
+                'catatan_scan'=> 'Gagal membaca format gambar halaman.',
             ];
         }
 
         $imgWidth = imagesx($im);
         $imgHeight = imagesy($im);
+        $paperWhite = $this->estimatePaperLuminance($im, $imgWidth, $imgHeight);
 
         // 1. Deteksi 4 Titik Sudut Fiducial Marker
-        $markers = $this->detectFiducialMarkers($im, $imgWidth, $imgHeight);
+        $markers = $this->detectFiducialMarkers($im, $imgWidth, $imgHeight, $paperWhite);
 
-        // 2. Baca Identitas Siswa dari QR Code
-        $siswaData = $this->decodeQrCodeOrIdentity($im, $markers, $ujian, $imgWidth, $imgHeight);
+        // 2. Baca Identitas Siswa dari QR Code (prioritas hasil decode browser, lalu Zxing server)
+        $siswaData = $this->parseQrPayload($clientQrPayload, $ujian);
+        if (empty($siswaData['siswa_id'])) {
+            $siswaData = $this->decodeQrCodeOrIdentity($im, $markers, $ujian, $imgWidth, $imgHeight);
+        }
+
         $siswa = null;
-
         if (!empty($siswaData['siswa_id'])) {
             $siswa = Siswa::find($siswaData['siswa_id']);
         }
@@ -99,28 +120,39 @@ class OmrScannerService
             $siswa = $siswaList->get($pageNumber - 1) ?? null;
         }
 
-        // 3. Evaluasi Bulatan Jawaban (OMR Sampling)
+        // 3. Kalibrasi vertikal dinamis berdasarkan bar header hitam (.omr-col-header)
+        $deltaV = 0.0;
+        $detectedHeaderBottomV = $this->detectHeaderBarBottomV($im, $markers, $ujian->jumlah_soal, $imgWidth, $imgHeight, $paperWhite);
+        if ($detectedHeaderBottomV !== null) {
+            $deltaV = $detectedHeaderBottomV - LjkTemplateService::getNominalHeaderBottomV();
+        }
+
+        // 4. Evaluasi Bulatan Jawaban (OMR Sampling)
         $bubbleCoords = LjkTemplateService::getBubbleCoordinates($ujian->jumlah_soal, $ujian->jumlah_opsi);
         $jawabanSiswa = [];
         $catatanScan = [];
         $statusScan = 'valid';
 
-        // Hitung radius bulatan berdasarkan resolusi gambar (jarak marker TL ke TR)
+        // Hitung radius bulatan berdasarkan resolusi gambar (jarak marker TL ke TR = 176mm, radius bulatan ~2.25mm => 0.0128)
         $markerDistX = sqrt(pow($markers['TR']['x'] - $markers['TL']['x'], 2) + pow($markers['TR']['y'] - $markers['TL']['y'], 2));
-        $sampleRadius = max(3, (int) round($markerDistX * 0.0075)); // radius ~1.5mm
+        $sampleRadius = max(4, (int) round($markerDistX * 0.0115)); // ~2.0mm radius bulatan
 
         foreach ($bubbleCoords as $nomor => $opsiList) {
             $optionDarkness = [];
 
             foreach ($opsiList as $opsi => $coord) {
-                // Transformasi koordinat relatif (u, v) ke piksel nyata (Bilinear Mapping)
-                $pt = $this->mapPoint($coord['u'], $coord['v'], $markers);
-                $darkness = $this->measureBubbleDarkness($im, $pt['x'], $pt['y'], $sampleRadius, $imgWidth, $imgHeight);
+                // Transformasi koordinat relatif (u, v + deltaV) ke piksel nyata (Bilinear Mapping)
+                $pt = $this->mapPoint($coord['u'], $coord['v'] + $deltaV, $markers);
+                $darkness = $this->measureBubbleDarkness($im, $pt['x'], $pt['y'], $sampleRadius, $imgWidth, $imgHeight, $paperWhite);
                 $optionDarkness[$opsi] = $darkness;
             }
 
-            // Tentukan pilihan berdasarkan tingkat kehitaman
-            $markedOptions = array_keys(array_filter($optionDarkness, fn($d) => $d >= self::DARKNESS_THRESHOLD));
+            // Tentukan pilihan berdasarkan tingkat kehitaman (adaptif terhadap cetakan huruf A/B/C/D di dalam bulatan kosong)
+            $minDarkness = !empty($optionDarkness) ? min($optionDarkness) : 0.0;
+            $markedOptions = array_keys(array_filter(
+                $optionDarkness,
+                fn($d) => $d >= self::DARKNESS_THRESHOLD && (($d - $minDarkness) >= 0.14 || $d >= 0.48)
+            ));
 
             if (count($markedOptions) === 1) {
                 $jawabanSiswa[$nomor] = $markedOptions[0];
@@ -131,7 +163,7 @@ class OmrScannerService
                 $top1 = $optionDarkness[$keys[0]];
                 $top2 = $optionDarkness[$keys[1]];
 
-                if ($top1 >= 0.50 && $top2 < 0.35) {
+                if ($top1 >= 0.50 && ($top1 - $top2) >= 0.18 && $top2 < 0.38) {
                     $jawabanSiswa[$nomor] = $keys[0];
                 } else {
                     $jawabanSiswa[$nomor] = 'GANDA';
@@ -212,31 +244,88 @@ class OmrScannerService
     }
 
     /**
+     * Estimasi kecerahan putih kertas (persentil ke-90 di area tengah kertas)
+     */
+    private function estimatePaperLuminance($im, int $w, int $h): float
+    {
+        $samples = [];
+        $stepX = max(10, (int) ($w / 18));
+        $stepY = max(10, (int) ($h / 24));
+
+        for ($y = (int)($h * 0.12); $y < (int)($h * 0.88); $y += $stepY) {
+            for ($x = (int)($w * 0.12); $x < (int)($w * 0.88); $x += $stepX) {
+                $rgb = imagecolorat($im, $x, $y);
+                $samples[] = 0.299 * (($rgb >> 16) & 0xFF)
+                           + 0.587 * (($rgb >> 8) & 0xFF)
+                           + 0.114 * ($rgb & 0xFF);
+            }
+        }
+
+        if (empty($samples)) {
+            return 250.0;
+        }
+
+        sort($samples, SORT_NUMERIC);
+        $p90Idx = (int) floor(count($samples) * 0.90);
+        return max(150.0, (float) ($samples[$p90Idx] ?? 250.0));
+    }
+
+    /**
+     * Parse teks QR Code (JSON LjkTemplateService::makeQrPayload atau ID teks)
+     */
+    private function parseQrPayload(?string $raw, Ujian $ujian): array
+    {
+        if (empty($raw)) {
+            return [];
+        }
+
+        $trimmed = trim($raw);
+        $json = @json_decode($trimmed, true);
+        if (is_array($json) && !empty($json['s'])) {
+            return [
+                'siswa_id' => (int) $json['s'],
+                'ujian_id' => (int) ($json['u'] ?? $ujian->id),
+            ];
+        }
+
+        // Fallback pola teks ID: UJN-202611-001-0192
+        if (preg_match('/-(\d{1,6})$/', $trimmed, $m)) {
+            return [
+                'siswa_id' => (int) $m[1],
+                'ujian_id' => $ujian->id,
+            ];
+        }
+
+        return [];
+    }
+
+    /**
      * Deteksi 4 Titik Sudut Fiducial Markers pada LJK
      */
-    private function detectFiducialMarkers($im, int $w, int $h): array
+    private function detectFiducialMarkers($im, int $w, int $h, float $paperWhite = 250.0): array
     {
-        // 4 Zona Pencarian Sudut
+        // 4 Zona Pencarian Sudut (lebar sedikit longgar agar toleran terhadap margin scanner)
         $zones = [
-            'TL' => ['min_x' => 0,               'max_x' => (int)($w * 0.22), 'min_y' => 0,               'max_y' => (int)($h * 0.18)],
-            'TR' => ['min_x' => (int)($w * 0.78), 'max_x' => $w - 1,          'min_y' => 0,               'max_y' => (int)($h * 0.18)],
-            'BL' => ['min_x' => 0,               'max_x' => (int)($w * 0.22), 'min_y' => (int)($h * 0.82), 'max_y' => $h - 1],
-            'BR' => ['min_x' => (int)($w * 0.78), 'max_x' => $w - 1,          'min_y' => (int)($h * 0.82), 'max_y' => $h - 1],
+            'TL' => ['min_x' => 0,               'max_x' => (int)($w * 0.24), 'min_y' => 0,               'max_y' => (int)($h * 0.20)],
+            'TR' => ['min_x' => (int)($w * 0.76), 'max_x' => $w - 1,          'min_y' => 0,               'max_y' => (int)($h * 0.20)],
+            'BL' => ['min_x' => 0,               'max_x' => (int)($w * 0.24), 'min_y' => (int)($h * 0.80), 'max_y' => $h - 1],
+            'BR' => ['min_x' => (int)($w * 0.76), 'max_x' => $w - 1,          'min_y' => (int)($h * 0.80), 'max_y' => $h - 1],
         ];
 
+        $darkCutoff = min(145.0, max(85.0, $paperWhite * 0.58));
         $markers = [];
 
         foreach ($zones as $key => $z) {
-            $center = $this->findMarkerInZone($im, $z['min_x'], $z['max_x'], $z['min_y'], $z['max_y']);
+            $center = $this->findMarkerInZone($im, $z['min_x'], $z['max_x'], $z['min_y'], $z['max_y'], $w, $h, $darkCutoff);
             if ($center) {
                 $markers[$key] = $center;
             } else {
-                // Fallback proporsional jika marker terpotong scanner
+                // Fallback proporsional pusat marker (17/210 = 0.081, 193/210 = 0.919, 17/297 = 0.057, 280/297 = 0.943)
                 $markers[$key] = match ($key) {
-                    'TL' => ['x' => (int)($w * 0.057), 'y' => (int)($h * 0.040)],
-                    'TR' => ['x' => (int)($w * 0.895), 'y' => (int)($h * 0.040)],
-                    'BL' => ['x' => (int)($w * 0.057), 'y' => (int)($h * 0.925)],
-                    'BR' => ['x' => (int)($w * 0.895), 'y' => (int)($h * 0.925)],
+                    'TL' => ['x' => (int)($w * 0.081), 'y' => (int)($h * 0.057)],
+                    'TR' => ['x' => (int)($w * 0.919), 'y' => (int)($h * 0.057)],
+                    'BL' => ['x' => (int)($w * 0.081), 'y' => (int)($h * 0.943)],
+                    'BR' => ['x' => (int)($w * 0.919), 'y' => (int)($h * 0.943)],
                 };
             }
         }
@@ -245,15 +334,17 @@ class OmrScannerService
     }
 
     /**
-     * Cari pusat titik hitam terpadat (marker kotak) di dalam zona pencarian
+     * Cari pusat titik hitam terpadat (marker kotak 10x10mm) di dalam zona pencarian lalu haluskan pusat massanya
      */
-    private function findMarkerInZone($im, int $x1, int $x2, int $y1, int $y2): ?array
+    private function findMarkerInZone($im, int $x1, int $x2, int $y1, int $y2, int $imgW, int $imgH, float $darkCutoff = 120.0): ?array
     {
-        $step = max(2, (int) round(($x2 - $x1) / 40));
-        $bestDensity = 0;
+        $zoneW = max(1, $x2 - $x1);
+        $step = max(2, (int) round($zoneW / 42));
+        $bestDensity = 0.0;
         $bestX = null;
         $bestY = null;
-        $radius = max(6, (int) round(($x2 - $x1) * 0.08));
+        // Setengah sisi kotak 10mm pada kertas 210mm ~= 0.0238 * imgW
+        $radius = max(6, (int) round($imgW * 0.018));
 
         for ($y = $y1 + $radius; $y < $y2 - $radius; $y += $step) {
             for ($x = $x1 + $radius; $x < $x2 - $radius; $x += $step) {
@@ -263,20 +354,19 @@ class OmrScannerService
                 for ($dy = -$radius; $dy <= $radius; $dy += $step) {
                     for ($dx = -$radius; $dx <= $radius; $dx += $step) {
                         $rgb = imagecolorat($im, $x + $dx, $y + $dy);
-                        $r = ($rgb >> 16) & 0xFF;
-                        $g = ($rgb >> 8) & 0xFF;
-                        $b = $rgb & 0xFF;
-                        $lum = (0.299 * $r + 0.587 * $g + 0.114 * $b);
+                        $lum = 0.299 * (($rgb >> 16) & 0xFF)
+                             + 0.587 * (($rgb >> 8) & 0xFF)
+                             + 0.114 * ($rgb & 0xFF);
 
-                        if ($lum < 90) {
+                        if ($lum < $darkCutoff) {
                             $darkCount++;
                         }
                         $sampleCount++;
                     }
                 }
 
-                $density = $sampleCount > 0 ? ($darkCount / $sampleCount) : 0;
-                if ($density > 0.70 && $density > $bestDensity) {
+                $density = $sampleCount > 0 ? ($darkCount / $sampleCount) : 0.0;
+                if ($density > 0.68 && $density > $bestDensity) {
                     $bestDensity = $density;
                     $bestX = $x;
                     $bestY = $y;
@@ -284,7 +374,110 @@ class OmrScannerService
             }
         }
 
-        return ($bestX !== null && $bestY !== null) ? ['x' => $bestX, 'y' => $bestY] : null;
+        if ($bestX === null || $bestY === null) {
+            return null;
+        }
+
+        // Haluskan pusat kotak dengan menghitung centroid piksel gelap di sekitar kandidat terbaik
+        $refineR = max($radius + 4, (int) round($imgW * 0.032));
+        $sumX = 0;
+        $sumY = 0;
+        $count = 0;
+
+        $rx1 = max($x1, $bestX - $refineR);
+        $rx2 = min($x2, $bestX + $refineR);
+        $ry1 = max($y1, $bestY - $refineR);
+        $ry2 = min($y2, $bestY + $refineR);
+
+        for ($y = $ry1; $y <= $ry2; $y += 2) {
+            for ($x = $rx1; $x <= $rx2; $x += 2) {
+                $rgb = imagecolorat($im, $x, $y);
+                $lum = 0.299 * (($rgb >> 16) & 0xFF)
+                     + 0.587 * (($rgb >> 8) & 0xFF)
+                     + 0.114 * ($rgb & 0xFF);
+
+                if ($lum < $darkCutoff) {
+                    $sumX += $x;
+                    $sumY += $y;
+                    $count++;
+                }
+            }
+        }
+
+        if ($count > 10) {
+            return [
+                'x' => (int) round($sumX / $count),
+                'y' => (int) round($sumY / $count),
+            ];
+        }
+
+        return ['x' => $bestX, 'y' => $bestY];
+    }
+
+    /**
+     * Deteksi otomatis tepi bawah bar header kolom hitam (.omr-col-header "NOMOR 1 - 10", dst)
+     * agar posisi vertikal grid tetap presisi meski jumlah baris peraturan ujian berubah.
+     */
+    private function detectHeaderBarBottomV($im, array $markers, int $jumlahSoal, int $w, int $h, float $paperWhite): ?float
+    {
+        $bands = LjkTemplateService::getColumnHeaderBands($jumlahSoal);
+        if (empty($bands)) {
+            return null;
+        }
+
+        $darkThreshold = $paperWhite * 0.52;
+        $vMin = 0.18;
+        $vMax = 0.50;
+        $vStep = 0.002;
+
+        $runStartV = null;
+        $bestRunHeight = 0.0;
+        $bestRunBottomV = null;
+
+        for ($v = $vMin; $v <= $vMax; $v += $vStep) {
+            $colsDark = 0;
+            foreach ($bands as $band) {
+                $darkPts = 0;
+                $totalPts = 0;
+                // Sample 7 titik horizontal di sepanjang bar kolom
+                for ($i = 0; $i < 7; $i++) {
+                    $u = $band['u1'] + (($band['u2'] - $band['u1']) * ($i / 6.0));
+                    $pt = $this->mapPoint($u, $v, $markers);
+                    if ($pt['x'] >= 0 && $pt['x'] < $w && $pt['y'] >= 0 && $pt['y'] < $h) {
+                        $rgb = imagecolorat($im, $pt['x'], $pt['y']);
+                        $lum = 0.299 * (($rgb >> 16) & 0xFF)
+                             + 0.587 * (($rgb >> 8) & 0xFF)
+                             + 0.114 * ($rgb & 0xFF);
+                        if ($lum < $darkThreshold) {
+                            $darkPts++;
+                        }
+                        $totalPts++;
+                    }
+                }
+                if ($totalPts > 0 && ($darkPts / $totalPts) >= 0.55) {
+                    $colsDark++;
+                }
+            }
+
+            $isHeaderRow = ($colsDark >= max(2, count($bands) - 1));
+            if ($isHeaderRow) {
+                if ($runStartV === null) {
+                    $runStartV = $v;
+                }
+            } else {
+                if ($runStartV !== null) {
+                    $runHeight = $v - $runStartV;
+                    // Tinggi bar .omr-col-header ~5mm = 0.019 (rentang wajar 0.009 - 0.038)
+                    if ($runHeight >= 0.009 && $runHeight <= 0.038 && $runHeight > $bestRunHeight) {
+                        $bestRunHeight = $runHeight;
+                        $bestRunBottomV = $v;
+                    }
+                    $runStartV = null;
+                }
+            }
+        }
+
+        return $bestRunBottomV;
     }
 
     /**
@@ -313,34 +506,36 @@ class OmrScannerService
     /**
      * Hitung tingkat kehitaman bulatan (0.0 s.d. 1.0)
      */
-    private function measureBubbleDarkness($im, int $cx, int $cy, int $radius, int $maxW, int $maxH): float
+    private function measureBubbleDarkness($im, int $cx, int $cy, int $radius, int $maxW, int $maxH, float $sheetPaperLum = 250.0): float
     {
         if ($cx < $radius || $cx >= $maxW - $radius || $cy < $radius || $cy >= $maxH - $radius) {
             return 0.0;
         }
 
-        // 1. Ukur latar belakang kertas di sekitar bulatan
+        // 1. Ukur latar belakang kertas di sekitar bulatan (ambil piksel tercerah agar tidak terganggu garis tepi/huruf)
+        $bgOffset = (int) round($radius * 1.45);
         $bgSamples = [
-            [$cx - $radius * 2, $cy],
-            [$cx + $radius * 2, $cy],
-            [$cx, $cy - $radius * 2],
-            [$cx, $cy + $radius * 2],
+            [$cx - $bgOffset, $cy - $bgOffset],
+            [$cx + $bgOffset, $cy - $bgOffset],
+            [$cx - $bgOffset, $cy + $bgOffset],
+            [$cx + $bgOffset, $cy + $bgOffset],
         ];
-        $bgLumTotal = 0;
-        $bgCount = 0;
+        $localMaxLum = 0.0;
 
         foreach ($bgSamples as $bg) {
             $bx = max(0, min($maxW - 1, $bg[0]));
             $by = max(0, min($maxH - 1, $bg[1]));
             $rgb = imagecolorat($im, $bx, $by);
-            $bgLumTotal += (0.299 * (($rgb >> 16) & 0xFF) + 0.587 * (($rgb >> 8) & 0xFF) + 0.114 * ($rgb & 0xFF));
-            $bgCount++;
+            $lum = 0.299 * (($rgb >> 16) & 0xFF) + 0.587 * (($rgb >> 8) & 0xFF) + 0.114 * ($rgb & 0xFF);
+            if ($lum > $localMaxLum) {
+                $localMaxLum = $lum;
+            }
         }
-        $paperLum = $bgCount > 0 ? ($bgLumTotal / $bgCount) : 255.0;
+        $paperLum = max($localMaxLum, $sheetPaperLum * 0.90, 120.0);
 
-        // 2. Ukur isi bulatan (hanya bagian dalam, r <= 0.65 * radius)
-        $innerRadius = max(2, (int) round($radius * 0.65));
-        $innerLumTotal = 0;
+        // 2. Ukur isi bulatan (bagian dalam, r <= 0.70 * radius agar tidak menangkap ring lingkaran luar)
+        $innerRadius = max(2, (int) round($radius * 0.70));
+        $innerLumTotal = 0.0;
         $innerCount = 0;
 
         for ($dy = -$innerRadius; $dy <= $innerRadius; $dy++) {
@@ -357,7 +552,7 @@ class OmrScannerService
             }
         }
 
-        $innerLum = $innerCount > 0 ? ($innerLumTotal / $innerCount) : 255.0;
+        $innerLum = $innerCount > 0 ? ($innerLumTotal / $innerCount) : $paperLum;
 
         // Darkness rasio = seberapa gelap isi bulatan dibanding kertas
         $darkness = ($paperLum - $innerLum) / max(1.0, $paperLum);
@@ -365,11 +560,10 @@ class OmrScannerService
     }
 
     /**
-     * Dekode QR Code untuk membaca data siswa dan ujian
+     * Dekode QR Code untuk membaca data siswa dan ujian (fallback server-side jika Zxing tersedia)
      */
     private function decodeQrCodeOrIdentity($im, array $markers, Ujian $ujian, int $w, int $h): array
     {
-        // Jika pustaka Zxing Decoder tersedia di vendor
         if (class_exists(\Zxing\QrReader::class)) {
             try {
                 $qrArea = LjkTemplateService::getQrCodeArea();
@@ -391,11 +585,9 @@ class OmrScannerService
                     $text = $qrcode->text();
                     @unlink($tmpCrop);
 
-                    if (!empty($text)) {
-                        $json = @json_decode($text, true);
-                        if (is_array($json) && !empty($json['s'])) {
-                            return ['siswa_id' => (int)$json['s'], 'ujian_id' => (int)($json['u'] ?? $ujian->id)];
-                        }
+                    $parsed = $this->parseQrPayload($text, $ujian);
+                    if (!empty($parsed['siswa_id'])) {
+                        return $parsed;
                     }
                 }
             } catch (Exception $e) {

@@ -24,12 +24,18 @@ class PdfImageExtractorService
             throw new RuntimeException("File sumber tidak ditemukan: $sourcePath");
         }
 
-        $mime = mime_content_type($sourcePath);
+        $mime = function_exists('mime_content_type') ? (string) (@mime_content_type($sourcePath) ?: '') : '';
         $extension = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
+        $imgInfo = @getimagesize($sourcePath);
 
-        // Jika file yang diunggah sudah berupa gambar tunggal
-        if (str_starts_with($mime, 'image/') || in_array($extension, ['jpg', 'jpeg', 'png'], true)) {
-            $tmpFile = tempnam(sys_get_temp_dir(), 'omr_page_') . '.' . ($extension === 'png' ? 'png' : 'jpg');
+        // Jika file yang diunggah sudah berupa gambar tunggal (deteksi via getimagesize, MIME, atau ekstensi)
+        if ($imgInfo !== false || str_starts_with($mime, 'image/') || in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+            $extOut = match ($imgInfo[2] ?? null) {
+                IMAGETYPE_PNG  => 'png',
+                IMAGETYPE_WEBP => 'webp',
+                default        => ($extension === 'png' ? 'png' : 'jpg'),
+            };
+            $tmpFile = tempnam(sys_get_temp_dir(), 'omr_page_') . '.' . $extOut;
             copy($sourcePath, $tmpFile);
             yield 1 => $tmpFile;
             self::unlinkSafe($tmpFile);

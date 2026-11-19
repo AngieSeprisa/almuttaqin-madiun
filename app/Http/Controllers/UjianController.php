@@ -598,21 +598,44 @@ class UjianController extends Controller
     }
 
     /**
-     * Proses Pemindaian File PDF / Gambar (Sequential Batch Processing)
+     * Proses Pemindaian File PDF / Gambar (Sequential Batch Processing & Per-Page Client-Rendered JPEG)
      */
     public function processScan(Request $request, Ujian $ujian)
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(120);
+        }
+
+        // Tangani kasus ukuran file melebihi batas upload PHP server sebelum validasi Laravel
+        $rawError = $_FILES['file_scan']['error'] ?? UPLOAD_ERR_OK;
+        if (in_array($rawError, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            $maxUpload = ini_get('upload_max_filesize') ?: '2M';
+            return response()->json([
+                'success' => false,
+                'message' => "Ukuran file melebihi batas upload server ({$maxUpload}). Silakan muat ulang halaman (Ctrl+F5) agar fitur kompresi otomatis per halaman aktif.",
+            ], 422);
+        }
+
         $request->validate([
-            'file_scan' => 'required|file|mimes:pdf,jpg,jpeg,png|max:51200',
+            'file_scan'   => 'required|file|mimes:pdf,jpg,jpeg,png,webp|max:51200',
+            'page_number' => 'nullable|integer|min:1|max:500',
+            'qr_payload'  => 'nullable|string|max:1000',
+        ], [
+            'file_scan.required' => 'Berkas hasil scan wajib dipilih.',
+            'file_scan.uploaded' => 'Berkas gagal diunggah ke server. Pastikan ukuran berkas tidak melebihi batas upload server (' . (ini_get('upload_max_filesize') ?: '2M') . ').',
+            'file_scan.mimes'    => 'Format berkas harus berupa PDF, JPG, JPEG, atau PNG.',
+            'file_scan.max'      => 'Ukuran berkas maksimal 50 MB.',
         ]);
 
         $file = $request->file('file_scan');
         $tempPath = $file->getRealPath();
+        $pageNumber = max(1, (int) $request->input('page_number', 1));
+        $qrPayload = $request->input('qr_payload');
 
         $scanner = new OmrScannerService();
 
         try {
-            $result = $scanner->processFile($ujian, $tempPath);
+            $result = $scanner->processFile($ujian, $tempPath, null, $pageNumber, is_string($qrPayload) ? $qrPayload : null);
 
             return response()->json([
                 'success' => true,
