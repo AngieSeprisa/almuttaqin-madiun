@@ -5,7 +5,7 @@
 @section('header-actions')
 @if($ujian)
 <div style="display:flex; align-items:center; gap:8px;">
-    <a href="{{ route('ujian.cetak-ljk', $ujian->id) }}" target="_blank" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 16px; font-size:13px; border-radius:8px; font-weight:600;">
+    <a href="{{ route('ujian.cetak-ljk', $ujian->id) }}" target="_blank" class="btn btn-primary ljk-print-link" data-base-href="{{ route('ujian.cetak-ljk', $ujian->id) }}" style="display:inline-flex; align-items:center; gap:6px; padding:7px 16px; font-size:13px; border-radius:8px; font-weight:600;">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 6 2 18 2 18 9"></polyline>
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
@@ -122,21 +122,32 @@
         <!-- Kolom Kanan: Pratinjau Daftar Siswa yang Siap Dicetak LJK -->
         <div class="panel-card">
             @if($ujian)
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
                 <div>
                     <h3 style="font-size:16px; font-weight:700; color:#1e293b; margin:0;">Daftar Siswa Kelas {{ $ujian->kelas?->nama_kelas ?? '-' }}</h3>
                     <p style="font-size:12.5px; color:#64748b; margin:2px 0 0;">
-                        Setiap lembar A4 akan memuat identitas nama, NISN, dan QR Code unik siswa.
+                        Pilih jenis kode identitas (QR Code atau Barcode Garis) yang ingin dicetak pada lembar LJK.
                     </p>
                 </div>
-                <a href="{{ route('ujian.cetak-ljk', $ujian->id) }}" target="_blank" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; font-size:13px; border-radius:8px; font-weight:600;">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                        <rect x="6" y="14" width="12" height="8"></rect>
-                    </svg>
-                    <span>Cetak Seluruh Kelas ({{ $siswas->count() }} LJK)</span>
-                </a>
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div style="display:inline-flex; align-items:center; background:#f1f5f9; padding:3px; border-radius:8px; border:1px solid #cbd5e1;">
+                        <button type="button" id="btnModeQr" onclick="setLjkCodeType('qr')" style="border:none; background:#0052FF; color:#ffffff; font-size:12px; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer; transition:all 0.15s;">
+                            QR Code
+                        </button>
+                        <button type="button" id="btnModeBarcode" onclick="setLjkCodeType('barcode')" style="border:none; background:transparent; color:#475569; font-size:12px; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer; transition:all 0.15s;">
+                            Barcode Garis
+                        </button>
+                    </div>
+
+                    <a href="{{ route('ujian.cetak-ljk', $ujian->id) }}" target="_blank" class="btn btn-primary ljk-print-link" data-base-href="{{ route('ujian.cetak-ljk', $ujian->id) }}" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; font-size:13px; border-radius:8px; font-weight:600;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                            <rect x="6" y="14" width="12" height="8"></rect>
+                        </svg>
+                        <span>Cetak Seluruh Kelas ({{ $siswas->count() }} LJK)</span>
+                    </a>
+                </div>
             </div>
 
             <div style="overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px;">
@@ -164,7 +175,7 @@
                                 {{ $s->kamar ?: '-' }}
                             </td>
                             <td style="padding:10px 14px; text-align:center;">
-                                <a href="{{ route('ujian.cetak-ljk', ['ujian' => $ujian->id, 'siswa_id' => $s->id]) }}" target="_blank" class="btn btn-secondary" style="font-size:11.5px; padding:4px 8px; border-radius:6px;">
+                                <a href="{{ route('ujian.cetak-ljk', ['ujian' => $ujian->id, 'siswa_id' => $s->id]) }}" target="_blank" class="btn btn-secondary ljk-print-link" data-base-href="{{ route('ujian.cetak-ljk', ['ujian' => $ujian->id, 'siswa_id' => $s->id]) }}" style="font-size:11.5px; padding:4px 8px; border-radius:6px;">
                                     Cetak 1 LJK
                                 </a>
                             </td>
@@ -199,6 +210,30 @@
         if (confirm('Gunakan teks peraturan ujian template bawaan?')) {
             document.querySelector('textarea[name="peraturan_ujian"]').value = defaultTemplateText;
         }
+    }
+
+    function setLjkCodeType(type) {
+        const btnQr = document.getElementById('btnModeQr');
+        const btnBc = document.getElementById('btnModeBarcode');
+        if (btnQr && btnBc) {
+            if (type === 'barcode') {
+                btnBc.style.background = '#0052FF';
+                btnBc.style.color = '#ffffff';
+                btnQr.style.background = 'transparent';
+                btnQr.style.color = '#475569';
+            } else {
+                btnQr.style.background = '#0052FF';
+                btnQr.style.color = '#ffffff';
+                btnBc.style.background = 'transparent';
+                btnBc.style.color = '#475569';
+            }
+        }
+
+        document.querySelectorAll('.ljk-print-link').forEach(link => {
+            const base = link.getAttribute('data-base-href') || link.href;
+            const sep = base.includes('?') ? '&' : '?';
+            link.href = base + sep + 'tipe_kode=' + encodeURIComponent(type);
+        });
     }
 </script>
 @endsection

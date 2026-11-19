@@ -262,10 +262,24 @@
 </head>
 <body>
 
+    @php
+        $activeCodeType = ($tipeKode ?? 'qr') === 'barcode' ? 'barcode' : 'qr';
+    @endphp
+
     <div class="no-print-bar">
         <span style="font-size:13px; font-weight:600; color:#334155;">
             {{ count($siswas) }} Lembar LJK Siap Cetak
         </span>
+
+        <div style="display:inline-flex; align-items:center; background:#f1f5f9; padding:3px; border-radius:8px; border:1px solid #cbd5e1;">
+            <button type="button" id="btnSwitchQr" onclick="switchIdentCode('qr')" style="border:none; background:{{ $activeCodeType === 'qr' ? '#2563eb' : 'transparent' }}; color:{{ $activeCodeType === 'qr' ? '#ffffff' : '#475569' }}; font-size:12px; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer;">
+                QR Code
+            </button>
+            <button type="button" id="btnSwitchBarcode" onclick="switchIdentCode('barcode')" style="border:none; background:{{ $activeCodeType === 'barcode' ? '#2563eb' : 'transparent' }}; color:{{ $activeCodeType === 'barcode' ? '#ffffff' : '#475569' }}; font-size:12px; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer;">
+                Barcode Garis
+            </button>
+        </div>
+
         <button type="button" class="btn-print" onclick="window.print()">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
                 <polyline points="6 9 6 2 18 2 18 9"></polyline>
@@ -328,10 +342,13 @@
                     </table>
                 </div>
 
-                {{-- QR CODE DI POJOK KANAN ATAS --}}
+                {{-- PILIHAN QR CODE ATAU BARCODE DI POJOK KANAN ATAS (TIDAK DICETAK KEDUANYA) --}}
                 <div class="qr-box-wrap">
-                    <div style="width:28mm; height:28mm; display:flex; align-items:center; justify-content:center;">
+                    <div class="code-view-qr" style="width:28mm; height:28mm; display:{{ $activeCodeType === 'qr' ? 'flex' : 'none' }}; align-items:center; justify-content:center; margin:0 auto;">
                         {!! $qrCodes[$siswa->id] ?? '' !!}
+                    </div>
+                    <div class="code-view-barcode" style="width:42mm; height:20mm; display:{{ $activeCodeType === 'barcode' ? 'flex' : 'none' }}; align-items:center; justify-content:center; margin:0 auto;">
+                        {!! $barcodes[$siswa->id] ?? '' !!}
                     </div>
                     <div class="qr-caption">ID: {{ $ujian->kode_ujian }}-{{ str_pad($siswa->id, 4, '0', STR_PAD_LEFT) }}</div>
                 </div>
@@ -386,6 +403,26 @@
     </div>
     @endforeach
 
+    <script>
+        function switchIdentCode(mode) {
+            const isBarcode = (mode === 'barcode');
+            document.querySelectorAll('.code-view-qr').forEach(el => {
+                el.style.display = isBarcode ? 'none' : 'flex';
+            });
+            document.querySelectorAll('.code-view-barcode').forEach(el => {
+                el.style.display = isBarcode ? 'flex' : 'none';
+            });
+
+            const btnQr = document.getElementById('btnSwitchQr');
+            const btnBc = document.getElementById('btnSwitchBarcode');
+            if (btnQr && btnBc) {
+                btnQr.style.background = isBarcode ? 'transparent' : '#2563eb';
+                btnQr.style.color = isBarcode ? '#475569' : '#ffffff';
+                btnBc.style.background = isBarcode ? '#2563eb' : 'transparent';
+                btnBc.style.color = isBarcode ? '#ffffff' : '#475569';
+            }
+        }
+    </script>
 </body>
 </html>
 

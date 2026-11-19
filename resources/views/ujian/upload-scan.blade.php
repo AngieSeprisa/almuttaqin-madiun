@@ -434,7 +434,7 @@
 
         if (!qrDetectorInstance && typeof window.BarcodeDetector !== 'undefined') {
             try {
-                qrDetectorInstance = new window.BarcodeDetector({ formats: ['qr_code'] });
+                qrDetectorInstance = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39'] });
             } catch (e) {
                 try { qrDetectorInstance = new window.BarcodeDetector(); } catch (e2) {}
             }

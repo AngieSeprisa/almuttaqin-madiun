@@ -115,6 +115,88 @@ class QrCodeGenerator
     }
 
     /**
+     * Generate Barcode 1D (Code 128B) dalam format SVG standar ISO/IEC 15417
+     */
+    public static function barcode128Svg(string $data, int $width = 160, int $height = 56, string $fgColor = '#000000', string $bgColor = '#FFFFFF'): string
+    {
+        $bars = self::encodeCode128B($data);
+        $modCount = max(1, count($bars));
+        $modWidth = $width / $modCount;
+
+        $svg = "<svg class=\"barcode-svg\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 $width $height\" width=\"$width\" height=\"$height\" style=\"max-width:100%; height:auto;\">\n";
+        $svg .= "  <rect width=\"$width\" height=\"$height\" fill=\"$bgColor\"/>\n";
+
+        $i = 0;
+        while ($i < $modCount) {
+            if ($bars[$i] === 1) {
+                $start = $i;
+                while ($i < $modCount && $bars[$i] === 1) {
+                    $i++;
+                }
+                $runMods = $i - $start;
+                $x = round($start * $modWidth, 3);
+                $w = round($runMods * $modWidth, 3);
+                $svg .= "  <rect x=\"$x\" y=\"2\" width=\"$w\" height=\"" . ($height - 4) . "\" fill=\"$fgColor\"/>\n";
+            } else {
+                $i++;
+            }
+        }
+
+        $svg .= "</svg>";
+        return $svg;
+    }
+
+    /**
+     * Encode teks ASCII ke array bit modul (0/1) Code 128B
+     */
+    public static function encodeCode128B(string $text): array
+    {
+        $patterns = LjkOcrService::CODE128_PATTERNS;
+        $codes = [104]; // Start Code B
+        $checksum = 104;
+        $len = strlen($text);
+
+        for ($i = 0; $i < $len; $i++) {
+            $ascii = ord($text[$i]);
+            if ($ascii < 32 || $ascii > 126) {
+                continue;
+            }
+            $val = $ascii - 32;
+            $codes[] = $val;
+            $checksum += $val * ($i + 1);
+        }
+
+        $codes[] = $checksum % 103;
+        $codes[] = 106; // Stop Code
+
+        $bars = [];
+        // Quiet zone awal (10 modul putih)
+        for ($q = 0; $q < 10; $q++) {
+            $bars[] = 0;
+        }
+
+        foreach ($codes as $code) {
+            $pat = $patterns[$code] ?? '111111';
+            $isBar = true;
+            $pLen = strlen($pat);
+            for ($p = 0; $p < $pLen; $p++) {
+                $w = (int) $pat[$p];
+                for ($k = 0; $k < $w; $k++) {
+                    $bars[] = $isBar ? 1 : 0;
+                }
+                $isBar = !$isBar;
+            }
+        }
+
+        // Quiet zone akhir (10 modul putih)
+        for ($q = 0; $q < 10; $q++) {
+            $bars[] = 0;
+        }
+
+        return $bars;
+    }
+
+    /**
      * QR Code Matrix Encoder (Standard QR Version 1-3 with Error Correction)
      */
     public static function encode(string $text): array

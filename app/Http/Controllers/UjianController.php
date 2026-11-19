@@ -499,15 +499,21 @@ class UjianController extends Controller
             ]);
         }
 
+        $tipeKode = $request->input('tipe_kode', 'qr') === 'barcode' ? 'barcode' : 'qr';
+
         $qrCodes = [];
+        $barcodes = [];
         foreach ($siswas as $s) {
             $payload = LjkTemplateService::makeQrPayload($ujian, $s);
             $qrCodes[$s->id] = QrCodeGenerator::svg($payload, 110);
+
+            $barcodePayload = LjkTemplateService::makeBarcodePayload($ujian, $s);
+            $barcodes[$s->id] = QrCodeGenerator::barcode128Svg($barcodePayload, 165, 62);
         }
 
         $bubbleCoords = LjkTemplateService::getBubbleCoordinates($ujian->jumlah_soal, $ujian->jumlah_opsi);
 
-        return view('ujian.cetak-ljk', compact('ujian', 'siswas', 'qrCodes', 'bubbleCoords'));
+        return view('ujian.cetak-ljk', compact('ujian', 'siswas', 'qrCodes', 'barcodes', 'tipeKode', 'bubbleCoords'));
     }
 
     // =========================================================================

@@ -282,7 +282,15 @@ class OmrScannerService
             ];
         }
 
-        // Fallback pola teks ID: UJN-202611-001-0192
+        // Pola Barcode 1D: LJK-{ujian_id}-{siswa_id}
+        if (preg_match('/^LJK-(\d+)-(\d{1,6})$/i', $trimmed, $m)) {
+            return [
+                'ujian_id' => (int) $m[1],
+                'siswa_id' => (int) $m[2],
+            ];
+        }
+
+        // Fallback pola teks ID: ID: UJN-202611-001-0192
         if (preg_match('/-(\d{1,6})$/', $trimmed, $m)) {
             return [
                 'siswa_id' => (int) $m[1],
@@ -587,6 +595,16 @@ class OmrScannerService
             } catch (Exception $e) {
                 Log::warning("Gagal membaca QR code LJK: " . $e->getMessage());
             }
+        }
+
+        // Fallback Otomatis: Decode Barcode 1D (Code 128) + OCR Teks "ID: UJN-..." + OCR "Nama Siswa"
+        try {
+            $ocrIdentity = LjkOcrService::identifyStudent($im, $markers, $ujian);
+            if (!empty($ocrIdentity['siswa_id'])) {
+                return $ocrIdentity;
+            }
+        } catch (Exception $e) {
+            Log::warning("Gagal membaca OCR identitas LJK: " . $e->getMessage());
         }
 
         return [];

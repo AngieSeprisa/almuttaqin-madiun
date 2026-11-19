@@ -741,4 +741,96 @@ class UjianOmrTest extends TestCase
             'siswa_id' => $siswaNova->id,
         ]);
     }
+
+    public function test_pilihan_cetak_ljk_qrcode_atau_barcode_1d_dan_deteksi_barcode_serta_ocr(): void
+    {
+        $siswaPertama = Siswa::create([
+            'nama_lengkap' => 'Abdillah Wakhidul Akhir',
+            'kelas'        => $this->kelas->nama_kelas,
+            'status'       => 'aktif',
+        ]);
+        $siswaNova = Siswa::create([
+            'nama_lengkap' => 'NOVA ABDUL MUTTHALIB',
+            'kelas'        => $this->kelas->nama_kelas,
+            'status'       => 'aktif',
+        ]);
+
+        $ujian = Ujian::create([
+            'kode_ujian'    => 'UJN-202611-001',
+            'nama_ujian'    => 'SAS Informatika',
+            'mapel_id'      => $this->mapel->id,
+            'kelas_id'      => $this->kelas->id,
+            'guru_id'       => $this->admin->id,
+            'jumlah_soal'   => 5,
+            'jumlah_opsi'   => 4,
+            'bobot_benar'   => 20.0,
+            'tanggal_ujian' => now()->format('Y-m-d'),
+            'status'        => 'aktif',
+        ]);
+
+        for ($no = 1; $no <= 5; $no++) {
+            UjianKunci::create([
+                'ujian_id'      => $ujian->id,
+                'nomor_soal'    => $no,
+                'kunci_jawaban' => 'A',
+                'bobot'         => 20.0,
+            ]);
+        }
+
+        // 1. Uji cetak LJK mode QR Code (Barcode disembunyikan)
+        $resQr = $this->actingAs($this->admin)->get(route('ujian.cetak-ljk', ['ujian' => $ujian->id, 'tipe_kode' => 'qr']));
+        $resQr->assertStatus(200);
+        $resQr->assertSee('code-view-qr" style="width:28mm; height:28mm; display:flex;', false);
+        $resQr->assertSee('code-view-barcode" style="width:42mm; height:20mm; display:none;', false);
+
+        // 2. Uji cetak LJK mode Barcode 1D (QR Code disembunyikan)
+        $resBc = $this->actingAs($this->admin)->get(route('ujian.cetak-ljk', ['ujian' => $ujian->id, 'tipe_kode' => 'barcode']));
+        $resBc->assertStatus(200);
+        $resBc->assertSee('code-view-qr" style="width:28mm; height:28mm; display:none;', false);
+        $resBc->assertSee('code-view-barcode" style="width:42mm; height:20mm; display:flex;', false);
+        $resBc->assertSee('<svg class="barcode-svg"', false);
+
+        // 3. Uji pemindaian lembar LJK yang memiliki Barcode 1D (tanpa client qr_payload)
+        $w = 1400; $h = 1925;
+        $img = imagecreatetruecolor($w, $h);
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $black = imagecolorallocate($img, 0, 0, 0);
+        imagefill($img, 0, 0, $white);
+
+        // 4 Fiducial markers (TL: 72,104; TR: 1215,104; BL: 72,1802; BR: 1215,1802)
+        imagefilledrectangle($img, 42, 74, 102, 134, $black);
+        imagefilledrectangle($img, 1185, 74, 1245, 134, $black);
+        imagefilledrectangle($img, 42, 1772, 102, 1832, $black);
+        imagefilledrectangle($img, 1185, 1772, 1245, 1832, $black);
+
+        // Gambar Barcode 1D (Code 128B) di area kotak identitas kanan atas (u: 0.72..0.92, v: 0.02..0.08)
+        $barcodePayload = LjkTemplateService::makeBarcodePayload($ujian, $siswaNova);
+        $bars = \App\Services\Omr\QrCodeGenerator::encodeCode128B($barcodePayload);
+        $bcStartX = 910;
+        $bcStartY = 145;
+        $bcHeight = 70;
+        $scaleBar = 1;
+        foreach ($bars as $bIdx => $isDark) {
+            if ($isDark) {
+                imagefilledrectangle($img, $bcStartX + ($bIdx * $scaleBar), $bcStartY, $bcStartX + (($bIdx + 1) * $scaleBar) - 1, $bcStartY + $bcHeight, $black);
+            }
+        }
+
+        $tmpBcJpg = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test_bc_ljk_' . uniqid() . '.jpg';
+        imagejpeg($img, $tmpBcJpg, 92);
+        imagedestroy($img);
+
+        $uploadedBcFile = new \Illuminate\Http\UploadedFile($tmpBcJpg, 'ljk_barcode.jpg', 'image/jpeg', null, true);
+        $scanRes = $this->actingAs($this->admin)->postJson(route('ujian.process-scan', $ujian->id), [
+            'file_scan'   => $uploadedBcFile,
+            'page_number' => 1,
+            'qr_payload'  => null,
+        ]);
+        @unlink($tmpBcJpg);
+
+        $scanRes->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.rincian.0.siswa_id', $siswaNova->id)
+            ->assertJsonPath('data.rincian.0.nama_siswa', 'NOVA ABDUL MUTTHALIB');
+    }
 }

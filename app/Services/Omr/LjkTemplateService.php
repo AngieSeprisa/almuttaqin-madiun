@@ -162,5 +162,13 @@ class LjkTemplateService
             'c' => $checksum,
         ]);
     }
+
+    /**
+     * Buat payload ringkas untuk Barcode 1D (Code 128B) LJK Siswa
+     */
+    public static function makeBarcodePayload(Ujian $ujian, Siswa $siswa): string
+    {
+        return 'LJK-' . $ujian->id . '-' . str_pad((string) $siswa->id, 4, '0', STR_PAD_LEFT);
+    }
 }
 
