@@ -176,30 +176,45 @@
         border-radius: 14px;
         width: 100%;
         max-width: 840px;
-        max-height: 90vh;
+        max-height: 88vh;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
         box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
     }
+    .modal-card > form {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: 88vh;
+        overflow: hidden;
+        margin: 0;
+    }
     .modal-head {
-        padding: 18px 24px;
+        padding: 16px 24px;
         border-bottom: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        flex-shrink: 0;
+        background: #ffffff;
     }
     .modal-body {
-        padding: 20px 24px;
+        padding: 18px 24px;
         overflow-y: auto;
+        flex: 1 1 auto;
+        min-height: 0;
     }
     .modal-foot {
-        padding: 16px 24px;
+        padding: 14px 24px;
         border-top: 1px solid #e2e8f0;
         display: flex;
         justify-content: flex-end;
         gap: 10px;
         background: #f8fafc;
         border-radius: 0 0 14px 14px;
+        flex-shrink: 0;
     }
 
     .opt-circle-btn {
