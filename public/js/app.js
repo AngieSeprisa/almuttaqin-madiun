@@ -443,6 +443,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (table.closest('form')) return;
       if (table.closest('.app-modal, .pk-modal-backdrop, [role="dialog"]')) return;
       if (table.id === 'tableSiswaAbsensi') return;
+      if (table.id === 'tableRecent' || table.dataset.noFilamentTable === 'true' || table.classList.contains('no-filament-table') || table.closest('.no-fi-enhance, .no-filament-table')) return;
       if (!table.tHead || !table.tHead.rows.length || !table.tBodies.length) return;
       if (table.tHead.rows[0].cells.length < 3) return;
 

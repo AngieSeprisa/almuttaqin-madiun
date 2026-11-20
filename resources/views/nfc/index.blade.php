@@ -2,27 +2,6 @@
 
 @section('title', 'Input NFC')
 
-@section('header-actions')
-<div class="nfc-top-stats">
-    <div class="nfc-stat-pill">
-        <span class="nfc-stat-label">Santri Terdaftar</span>
-        <strong class="nfc-stat-value" id="statTerdaftar">{{ $totalTerdaftar }}</strong>
-    </div>
-    <div class="nfc-stat-pill nfc-stat-pill-warn">
-        <span class="nfc-stat-label">Santri Belum</span>
-        <strong class="nfc-stat-value" id="statBelum">{{ $totalBelum }}</strong>
-    </div>
-    <div class="nfc-stat-pill">
-        <span class="nfc-stat-label">Guru Terdaftar</span>
-        <strong class="nfc-stat-value" id="statGuruTerdaftar">{{ $totalGuruTerdaftar ?? 0 }}</strong>
-    </div>
-    <div class="nfc-stat-pill nfc-stat-pill-warn">
-        <span class="nfc-stat-label">Guru Belum</span>
-        <strong class="nfc-stat-value" id="statGuruBelum">{{ $totalGuruBelum ?? 0 }}</strong>
-    </div>
-</div>
-@endsection
-
 @section('content')
 <div class="nfc-page-wrapper">
 
@@ -36,13 +15,77 @@
     </div>
     @endif
 
-    {{-- Form Utama Pairing Kartu (Filament Style Card) --}}
-    <div class="fi-section-card">
+    {{-- Mini Stats Grid Standar Aplikasi --}}
+    <div class="stats-grid" style="margin-bottom:0;">
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Santri Terdaftar</span>
+                <div class="stat-icon-wrapper stat-icon-aktif">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                        <line x1="2" y1="10" x2="22" y2="10"></line>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-card-body">
+                <div class="stat-number" id="statTerdaftar">{{ $totalTerdaftar }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Santri Belum</span>
+                <div class="stat-icon-wrapper stat-icon-pulang">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-card-body">
+                <div class="stat-number" id="statBelum">{{ $totalBelum }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Guru Terdaftar</span>
+                <div class="stat-icon-wrapper stat-icon-total">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-card-body">
+                <div class="stat-number" id="statGuruTerdaftar">{{ $totalGuruTerdaftar ?? 0 }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Guru Belum</span>
+                <div class="stat-icon-wrapper stat-icon-sakit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </div>
+            </div>
+            <div class="stat-card-body">
+                <div class="stat-number" id="statGuruBelum">{{ $totalGuruBelum ?? 0 }}</div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Form Utama Pairing Kartu --}}
+    <div class="form-section-card fi-section-card" style="margin-bottom:0;">
         <form id="nfcAssignForm" action="{{ route('nfc.assign', [], false) }}" method="POST" autocomplete="off">
             @csrf
 
             {{-- Mode Pemilihan Target: Santri vs Guru/Pegawai --}}
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid var(--border-light, #f1f5f9); flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--border-light, #e5e7eb); flex-wrap:wrap; gap:12px;">
                 <div class="nfc-target-pills">
                     <button type="button" class="nfc-pill-btn active" id="btnTabSiswa" data-target="siswa">
                         👨‍🎓 Santri
@@ -51,8 +94,8 @@
                         👨‍🏫 Guru / Pegawai
                     </button>
                 </div>
-                <span class="nfc-filter-hint" id="targetHintText" style="font-size:12px; color:var(--text-muted, #64748b);">
-                    Mode Pairing: <strong>Santri</strong>
+                <span class="nfc-filter-hint" id="targetHintText" style="font-size:12.5px; color:var(--text-secondary, #4b5563);">
+                    Mode Pairing: <strong style="color:var(--text-primary, #111827);">Santri</strong>
                 </span>
             </div>
             <input type="hidden" name="tipe" id="targetTypeInput" value="siswa">
@@ -176,10 +219,14 @@
         </form>
     </div>
 
-    {{-- Tabel Riwayat Input Terkini (Clean Filament Table) --}}
-    <div class="table-card nfc-table-card">
+    {{-- Tabel Riwayat Input Terkini (Clean Standard Table Card) --}}
+    <div class="table-card nfc-table-card no-fi-enhance" data-no-filament-table="true">
         <div class="nfc-card-header">
-            <div class="nfc-card-header-left">
+            <div class="nfc-card-header-left" style="display:flex; align-items:center; gap:8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--electric-blue, #0052ff);flex-shrink:0;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
                 <h3 class="nfc-card-title">Riwayat Input Terkini</h3>
             </div>
             <div class="nfc-card-header-right">
@@ -188,21 +235,21 @@
         </div>
 
         <div class="table-wrapper">
-            <table class="modern-table" id="tableRecent">
+            <table class="modern-table no-filament-table" id="tableRecent" data-no-filament-table="true">
                 <thead>
                     <tr>
-                        <th style="width: 50px;">No</th>
-                        <th>Nomor Serial Kartu</th>
+                        <th style="width: 50px; text-align: center;">No</th>
+                        <th style="width: 170px;">Nomor Serial Kartu</th>
                         <th>Nama (Santri / Guru)</th>
-                        <th>Peran / Jenjang</th>
-                        <th>Kamar / Staf</th>
-                        <th style="width: 140px; text-align: center;">Aksi</th>
+                        <th style="width: 160px;">Peran / Jenjang</th>
+                        <th style="width: 180px;">Kamar / Staf</th>
+                        <th style="width: 120px; text-align: center;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="recentListBody">
                     @forelse($recentPairings as $idx => $r)
                     <tr id="row-{{ $r->tipe ?? 'siswa' }}-{{ $r->id }}" data-id="{{ $r->id }}" data-tipe="{{ $r->tipe ?? 'siswa' }}" data-serial="{{ $r->rfid_uid }}">
-                        <td style="color:var(--text-muted); font-size:12px;">{{ $idx + 1 }}</td>
+                        <td style="color:var(--text-muted); font-size:12px; text-align: center;">{{ $idx + 1 }}</td>
                         <td>
                             <span class="nfc-table-serial-badge">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
@@ -307,41 +354,9 @@
     padding-bottom: 40px;
 }
 
-/* Header Top Stats */
-.nfc-top-stats {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-
-.nfc-stat-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    background: var(--card-bg, #ffffff);
-    border: 1px solid var(--border-light, #e5e7eb);
-    border-radius: 8px;
-    font-size: 12.5px;
-    color: var(--text-main, #1e293b);
-}
-
-.nfc-stat-label {
-    color: var(--text-muted, #64748b);
-    font-size: 11.5px;
-}
-
-.nfc-stat-value {
-    color: var(--primary-color, #0052ff);
-    font-weight: 700;
-}
-
-.nfc-stat-pill-warn .nfc-stat-value {
-    color: #f59e0b;
-}
-
 /* Section Card (Filament Styled) */
-.fi-section-card {
+.fi-section-card,
+.form-section-card {
     background: var(--card-bg, #ffffff);
     border: 1px solid var(--border-light, #e5e7eb);
     border-radius: 12px;
@@ -718,20 +733,54 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 20px;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border-light, #e5e7eb);
+    background: var(--bg-surface, #f8fafc);
 }
 
 .nfc-card-title {
-    font-size: 14px;
+    font-size: 14.5px;
     font-weight: 700;
-    color: var(--text-main, #1e293b);
+    color: var(--text-primary, #111827);
     margin: 0;
 }
 
 .nfc-card-subtext {
+    font-size: 12.5px;
+    color: var(--text-secondary, #64748b);
+}
+
+.nfc-table-card .modern-table {
+    width: 100%;
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.nfc-table-card .modern-table th {
+    background: var(--bg-surface, #f8fafc);
+    color: var(--text-secondary, #475569);
     font-size: 12px;
-    color: var(--text-muted, #64748b);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light, #e2e8f0);
+}
+
+.nfc-table-card .modern-table td {
+    padding: 14px 16px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border-light, #f1f5f9);
+    font-size: 13.5px;
+}
+
+.nfc-table-card .modern-table tr:last-child td {
+    border-bottom: none;
+}
+
+.nfc-table-card .modern-table tr:hover td {
+    background: rgba(0, 82, 255, 0.02);
 }
 
 .nfc-table-serial-badge {
@@ -1390,18 +1439,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         recentTbody.insertBefore(tr, recentTbody.firstChild);
     }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-});
-</script>
 
     function escapeHtml(str) {
         if (!str) return '';
