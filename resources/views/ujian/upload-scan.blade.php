@@ -271,23 +271,25 @@
             </div>
         </div>
 
-        <div style="overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px;">
-            <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                <thead>
-                    <tr style="background:#f8fafc; border-bottom:1px solid #e2e8f0; text-align:left; color:#475569;">
-                        <th style="padding:10px 14px;">Hal</th>
-                        <th style="padding:10px 14px;">Nama Siswa</th>
-                        <th style="padding:10px 14px; text-align:center;">Benar</th>
-                        <th style="padding:10px 14px; text-align:center;">Salah</th>
-                        <th style="padding:10px 14px; text-align:center;">Kosong</th>
-                        <th style="padding:10px 14px; text-align:center;">Nilai</th>
-                        <th style="padding:10px 14px;">Status Scan</th>
-                    </tr>
-                </thead>
-                <tbody id="resultTableBody">
-                    <!-- Populated via JS -->
-                </tbody>
-            </table>
+        <div class="table-card" style="margin-top:16px;">
+            <div class="table-wrapper">
+                <table class="modern-table">
+                    <thead>
+                        <tr>
+                            <th style="width:65px; text-align:center;">Hal</th>
+                            <th>Nama Siswa</th>
+                            <th style="width:85px; text-align:center;">Benar</th>
+                            <th style="width:85px; text-align:center;">Salah</th>
+                            <th style="width:85px; text-align:center;">Kosong</th>
+                            <th style="width:100px; text-align:center;">Nilai</th>
+                            <th style="width:160px; text-align:center;">Status Scan</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultTableBody">
+                        <!-- Populated via JS -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -779,7 +781,7 @@
 
             const badgeEl = document.getElementById(`status_badge_${halaman}`);
             if (badgeEl) {
-                badgeEl.innerHTML = '<span style="background:#ecfdf5; color:#059669; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Valid (Tersimpan)</span>';
+                badgeEl.innerHTML = '<span class="status-pill status-sudah_kembali" style="font-size:11.5px; font-weight:700;">Valid (Tersimpan)</span>';
             }
 
             const noticeEl = document.getElementById(`unassigned_notice_${halaman}`);
@@ -808,21 +810,21 @@
             data.rincian.forEach(r => {
                 const isIdentified = !!r.siswa_id;
                 const statusBadge = (r.status_scan === 'valid' && isIdentified)
-                    ? '<span style="background:#ecfdf5; color:#059669; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Valid</span>'
-                    : '<span style="background:#fffbeb; color:#d97706; font-weight:600; padding:3px 8px; border-radius:6px; font-size:11px;">Perlu Cek Manual</span>';
+                    ? '<span class="status-pill status-sudah_kembali" style="font-size:11.5px; font-weight:700;">Valid</span>'
+                    : '<span class="status-pill status-pending" style="font-size:11.5px; font-weight:700;">Perlu Cek Manual</span>';
 
                 const jawabanEscaped = JSON.stringify(r.jawaban || {}).replace(/"/g, '&quot;');
 
                 rowsHtml += `
-                    <tr style="border-bottom:1px solid #f1f5f9;">
-                        <td style="padding:10px 14px; font-weight:600; color:#64748b;">#${r.halaman}</td>
-                        <td style="padding:10px 14px;">
+                    <tr>
+                        <td style="text-align:center; font-weight:700; color:var(--text-muted);">#${r.halaman}</td>
+                        <td class="cell-nama">
                             <div id="unassigned_notice_${r.halaman}" style="${isIdentified ? 'display:none;' : 'display:block; margin-bottom:4px; color:#d97706; font-weight:700;'}">
                                 ⚠️ ${r.nama_siswa || 'Siswa Belum Dipilih'}
                             </div>
                             <div id="siswa_display_${r.halaman}" style="${isIdentified ? 'display:flex;' : 'display:none;'} align-items:center; gap:8px;">
-                                <div style="font-weight:600; color:#1e293b;" id="siswa_nama_${r.halaman}">${r.nama_siswa || 'Tidak Dikenali'}</div>
-                                <button type="button" onclick="toggleSiswaSelect(${r.halaman})" style="border:none; background:#eff6ff; color:#0052FF; font-size:11px; padding:2px 8px; border-radius:4px; cursor:pointer;" title="Ubah Siswa">Ubah</button>
+                                <div style="font-weight:700; color:var(--text-primary); font-size:13.5px;" id="siswa_nama_${r.halaman}">${r.nama_siswa || 'Tidak Dikenali'}</div>
+                                <button type="button" onclick="toggleSiswaSelect(${r.halaman})" class="btn btn-sm btn-secondary" style="font-size:11px; padding:2px 8px; border-radius:5px;" title="Ubah Siswa">Ubah</button>
                             </div>
                             <div id="siswa_select_wrap_${r.halaman}" style="${isIdentified ? 'display:none;' : 'display:block;'} margin-top:4px;">
                                 <select class="form-control" style="font-size:12px; padding:4px 8px; border-radius:6px; border:1px solid #3b82f6; max-width:280px; background:#f0f6ff;" onchange="assignSiswaFromSelect(${r.halaman}, ${r.hasil_id || 0}, this.value, ${jawabanEscaped})">
@@ -830,18 +832,20 @@
                                     ${buildSiswaOptionsHtml(r.siswa_id)}
                                 </select>
                             </div>
-                            <div style="font-size:11px; color:#94a3b8; margin-top:2px;" id="catatan_scan_${r.halaman}">${r.catatan_scan || '-'}</div>
+                            <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;" id="catatan_scan_${r.halaman}">${r.catatan_scan || '-'}</div>
                         </td>
-                        <td style="padding:10px 14px; text-align:center; color:#059669; font-weight:600;">${r.jumlah_benar ?? 0}</td>
-                        <td style="padding:10px 14px; text-align:center; color:#dc2626; font-weight:600;">${r.jumlah_salah ?? 0}</td>
-                        <td style="padding:10px 14px; text-align:center; color:#64748b;">${r.jumlah_kosong ?? 0}</td>
-                        <td style="padding:10px 14px; text-align:center; font-weight:800; color:#0052FF; font-size:14px;">${r.nilai_akhir ?? 0}</td>
-                        <td style="padding:10px 14px;" id="status_badge_${r.halaman}">${statusBadge}</td>
+                        <td style="text-align:center; color:#059669; font-weight:700; font-size:14px;">${r.jumlah_benar ?? 0}</td>
+                        <td style="text-align:center; color:#dc2626; font-weight:700; font-size:14px;">${r.jumlah_salah ?? 0}</td>
+                        <td style="text-align:center; color:var(--text-muted); font-size:14px;">${r.jumlah_kosong ?? 0}</td>
+                        <td style="text-align:center;">
+                            <span style="font-weight:800; color:var(--electric-blue, #0052FF); font-size:15px;">${r.nilai_akhir ?? 0}</span>
+                        </td>
+                        <td style="text-align:center;" id="status_badge_${r.halaman}">${statusBadge}</td>
                     </tr>
                 `;
             });
         } else {
-            rowsHtml = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8;">Tidak ada data hasil scan yang terdeteksi.</td></tr>';
+            rowsHtml = '<tr><td colspan="7" class="cell-empty">Tidak ada data hasil scan yang terdeteksi.</td></tr>';
         }
 
         resultTableBody.innerHTML = rowsHtml;

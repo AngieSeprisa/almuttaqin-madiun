@@ -382,39 +382,41 @@
 
     {{-- Tab 1: Nilai Siswa --}}
     <div id="tab-nilai" class="tab-pane active">
-        <div class="table-container">
-            <div style="padding:16px 20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-weight:700; color:#1e293b; font-size:15px;">Daftar Hasil Pengerjaan Siswa</div>
-                <div style="font-size:12px; color:#64748b;">
+        <div class="table-card">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="font-weight:700; color:var(--text-primary); font-size:15px;">Daftar Hasil Pengerjaan Siswa</div>
+                <div style="font-size:12.5px; color:var(--text-muted);">
                     Klik tombol <strong>Koreksi Manual</strong> untuk memeriksa atau mengubah jawaban siswa.
                 </div>
             </div>
 
-            <div style="overflow-x:auto;">
-                <table class="hasil-table">
+            <div class="table-wrapper">
+                <table class="modern-table">
                     <thead>
                         <tr>
-                            <th style="width:45px; text-align:center;">No</th>
-                            <th>NIS / NISN</th>
+                            <th style="width:50px; text-align:center;">No</th>
+                            <th style="width:140px;">NIS / NISN</th>
                             <th>Nama Siswa</th>
-                            <th style="text-align:center;">Benar</th>
-                            <th style="text-align:center;">Salah</th>
-                            <th style="text-align:center;">Kosong</th>
-                            <th style="text-align:center;">Nilai Akhir</th>
-                            <th style="text-align:center;">Status</th>
-                            <th>Waktu Scan</th>
-                            <th style="text-align:center;">Aksi</th>
+                            <th style="width:80px; text-align:center;">Benar</th>
+                            <th style="width:80px; text-align:center;">Salah</th>
+                            <th style="width:80px; text-align:center;">Kosong</th>
+                            <th style="width:110px; text-align:center;">Nilai Akhir</th>
+                            <th style="width:130px; text-align:center;">Status</th>
+                            <th style="width:140px;">Waktu Scan</th>
+                            <th style="width:140px; text-align:center;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse($ujian->hasils as $idx => $h)
                             <tr>
-                                <td style="text-align:center; color:#64748b;">{{ $idx + 1 }}</td>
-                                <td style="font-weight:600; font-family:monospace;">{{ $h->siswa->nisn ?? $h->siswa->nis ?? '-' }}</td>
-                                <td style="font-weight:600; color:#1e293b;">{{ $h->siswa->nama_lengkap ?? 'Siswa ID ' . $h->siswa_id }}</td>
-                                <td style="text-align:center; font-weight:700; color:#16a34a;">{{ $h->jumlah_benar }}</td>
-                                <td style="text-align:center; font-weight:700; color:#dc2626;">{{ $h->jumlah_salah }}</td>
-                                <td style="text-align:center; color:#64748b;">{{ $h->jumlah_kosong }}</td>
+                                <td style="text-align:center; color:var(--text-muted); font-weight:600;">{{ $idx + 1 }}</td>
+                                <td style="font-weight:600; font-family:monospace; color:var(--text-secondary);">{{ $h->siswa->nisn ?? $h->siswa->nis ?? '-' }}</td>
+                                <td class="cell-nama">
+                                    <div style="font-weight:700; color:var(--text-primary); font-size:13.5px;">{{ $h->siswa->nama_lengkap ?? 'Siswa ID ' . $h->siswa_id }}</div>
+                                </td>
+                                <td style="text-align:center; font-weight:700; color:#16a34a; font-size:14px;">{{ $h->jumlah_benar }}</td>
+                                <td style="text-align:center; font-weight:700; color:#dc2626; font-size:14px;">{{ $h->jumlah_salah }}</td>
+                                <td style="text-align:center; color:var(--text-muted); font-size:14px;">{{ $h->jumlah_kosong }}</td>
                                 <td style="text-align:center;">
                                     <span style="font-size:16px; font-weight:800; color:{{ $h->nilai_akhir >= 75 ? '#16a34a' : ($h->nilai_akhir >= 60 ? '#ca8a04' : '#dc2626') }};">
                                         {{ number_format($h->nilai_akhir, 1) }}
@@ -422,26 +424,33 @@
                                 </td>
                                 <td style="text-align:center;">
                                     @if($h->status_scan == 'perlu_cek_manual')
-                                        <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#fff7ed; color:#ea580c; border:1px solid #fed7aa;" title="{{ $h->catatan_scan }}">
+                                        <span class="status-pill status-pending" style="font-size:11px;" title="{{ $h->catatan_scan }}">
                                             Perlu Cek
                                         </span>
                                     @else
-                                        <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0;">
+                                        <span class="status-pill status-sudah_kembali" style="font-size:11px;">
                                             Valid
                                         </span>
                                     @endif
                                 </td>
-                                <td style="font-size:12px; color:#64748b;">{{ $h->waktu_scan ? $h->waktu_scan->format('d/m/Y H:i') : '-' }}</td>
-                                <td style="text-align:center; white-space:nowrap;">
-                                    <div style="display:inline-flex; gap:6px; align-items:center;">
-                                        <button type="button" class="btn btn-secondary" style="padding:4px 10px; font-size:11px; border-radius:6px;" onclick="openEditModal({{ $h->id }}, {{ $h->siswa_id }}, '{{ addslashes($h->siswa->nama_lengkap ?? 'Siswa') }}', {{ json_encode($h->jawaban_siswa) }}, '{{ addslashes($h->catatan_scan ?? '') }}')">
-                                            Koreksi Manual
+                                <td style="font-size:12.5px; color:var(--text-secondary);">{{ $h->waktu_scan ? $h->waktu_scan->format('d/m/Y H:i') : '-' }}</td>
+                                <td style="text-align:center;">
+                                    <div class="action-btn-group">
+                                        <button type="button" class="action-btn action-btn-edit" style="width:auto; padding:0 10px; gap:4px; font-size:11.5px; font-weight:600;" onclick="openEditModal({{ $h->id }}, {{ $h->siswa_id }}, '{{ addslashes($h->siswa->nama_lengkap ?? 'Siswa') }}', {{ json_encode($h->jawaban_siswa) }}, '{{ addslashes($h->catatan_scan ?? '') }}')" title="Koreksi Manual">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                            </svg>
+                                            <span>Koreksi</span>
                                         </button>
                                         <form method="POST" action="{{ route('ujian.destroy-hasil', [$ujian->id, $h->id]) }}" onsubmit="return confirm('Yakin ingin menghapus hasil scan {{ addslashes($h->siswa->nama_lengkap ?? 'siswa ini') }}?')" style="margin:0; display:inline;">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="btn btn-danger" style="padding:4px 8px; font-size:11px; border-radius:6px; background:#fef2f2; border:1px solid #fecaca; color:#dc2626;" title="Hapus Hasil Scan">
-                                                Hapus
+                                            <button type="submit" class="action-btn action-btn-delete" title="Hapus Hasil Scan">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                </svg>
                                             </button>
                                         </form>
                                     </div>
@@ -449,9 +458,9 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" style="text-align:center; padding:40px 20px; color:#94a3b8;">
+                                <td colspan="10" class="cell-empty">
                                     Belum ada lembar LJK yang dikoreksi untuk ujian ini.<br>
-                                    <a href="{{ route('ujian.upload-scan', $ujian->id) }}" class="btn btn-primary" style="margin-top:10px; display:inline-inline-flex; font-size:12px;">
+                                    <a href="{{ route('ujian.upload-scan', $ujian->id) }}" class="btn btn-primary" style="margin-top:12px; display:inline-flex; font-size:13px; padding:7px 16px;">
                                         Unggah PDF Scan LJK
                                     </a>
                                 </td>
@@ -498,30 +507,30 @@
             </div>
         </div>
 
-        <div class="table-container">
-            <div style="padding:16px 20px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-                <div style="font-weight:700; color:#1e293b; font-size:15px;">Tabel Sebaran Pilihan Jawaban & Tingkat Kesukaran</div>
-                <div style="font-size:12px; color:#64748b;">
-                    Badge hijau pada kolom A-E menunjukkan kunci jawaban yang benar.
+        <div class="table-card">
+            <div style="padding:16px 20px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="font-weight:700; color:var(--text-primary); font-size:15px;">Tabel Sebaran Pilihan Jawaban & Tingkat Kesukaran</div>
+                <div style="font-size:12.5px; color:var(--text-muted);">
+                    Badge hijau pada kolom pilihan menunjukkan kunci jawaban yang benar.
                 </div>
             </div>
 
-            <div style="overflow-x:auto;">
-                <table class="hasil-table">
+            <div class="table-wrapper">
+                <table class="modern-table">
                     <thead>
                         <tr>
                             <th style="width:50px; text-align:center;">No</th>
-                            <th style="text-align:center; width:60px;">Kunci</th>
-                            <th style="text-align:center; width:120px;">% Benar</th>
-                            <th style="text-align:center; width:100px;">Kategori</th>
+                            <th style="text-align:center; width:65px;">Kunci</th>
+                            <th style="text-align:center; width:130px;">% Benar</th>
+                            <th style="text-align:center; width:110px;">Kategori</th>
                             <th style="text-align:center; width:70px;">Benar</th>
                             <th style="text-align:center; width:70px;">Salah</th>
-                            <th style="text-align:center;">Pilihan Siswa: A</th>
-                            <th style="text-align:center;">B</th>
-                            <th style="text-align:center;">C</th>
-                            <th style="text-align:center;">D</th>
+                            <th style="text-align:center; width:70px;">Opsi A</th>
+                            <th style="text-align:center; width:70px;">B</th>
+                            <th style="text-align:center; width:70px;">C</th>
+                            <th style="text-align:center; width:70px;">D</th>
                             @if($ujian->jumlah_opsi == 5)
-                                <th style="text-align:center;">E</th>
+                                <th style="text-align:center; width:70px;">E</th>
                             @endif
                             <th style="text-align:center; width:70px;">Kosong</th>
                         </tr>
@@ -529,27 +538,27 @@
                     <tbody>
                         @foreach($analisis as $no => $item)
                             <tr>
-                                <td style="text-align:center; font-weight:700; color:#334155;">{{ $no }}</td>
+                                <td style="text-align:center; font-weight:700; color:var(--text-secondary);">{{ $no }}</td>
                                 <td style="text-align:center;">
-                                    <span style="display:inline-block; width:26px; height:26px; line-height:26px; border-radius:50%; background:#0284c7; color:#ffffff; font-weight:800; font-size:12px;">
+                                    <span style="display:inline-block; width:26px; height:26px; line-height:26px; border-radius:50%; background:var(--electric-blue, #0052FF); color:#ffffff; font-weight:800; font-size:12px;">
                                         {{ $item['kunci'] }}
                                     </span>
                                 </td>
                                 <td>
                                     <div style="display:flex; align-items:center; gap:8px;">
-                                        <div style="flex:1; background:#e2e8f0; height:8px; border-radius:4px; overflow:hidden;">
-                                            <div style="background:{{ $item['persen_benar'] >= 75 ? '#16a34a' : ($item['persen_benar'] >= 35 ? '#0284c7' : '#dc2626') }}; height:100%; width:{{ $item['persen_benar'] }}%;"></div>
+                                        <div style="flex:1; background:var(--border-light, #e2e8f0); height:8px; border-radius:4px; overflow:hidden;">
+                                            <div style="background:{{ $item['persen_benar'] >= 75 ? '#16a34a' : ($item['persen_benar'] >= 35 ? '#0052FF' : '#dc2626') }}; height:100%; width:{{ $item['persen_benar'] }}%;"></div>
                                         </div>
                                         <span style="font-size:12px; font-weight:700; min-width:38px; text-align:right;">{{ $item['persen_benar'] }}%</span>
                                     </div>
                                 </td>
                                 <td style="text-align:center;">
                                     @if($item['tingkat_kesukaran'] == 'Mudah')
-                                        <span style="padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#dcfce7; color:#166534;">Mudah</span>
+                                        <span class="status-pill status-sudah_kembali" style="font-size:11px;">Mudah</span>
                                     @elseif($item['tingkat_kesukaran'] == 'Sedang')
-                                        <span style="padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#e0f2fe; color:#0369a1;">Sedang</span>
+                                        <span class="status-pill status-pending" style="font-size:11px;">Sedang</span>
                                     @else
-                                        <span style="padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#fee2e2; color:#991b1b;">Sukar</span>
+                                        <span class="status-pill status-melewati_batas" style="font-size:11px;">Sukar</span>
                                     @endif
                                 </td>
                                 <td style="text-align:center; font-weight:700; color:#16a34a;">{{ $item['jumlah_benar'] }}</td>
@@ -571,7 +580,7 @@
                                     </td>
                                 @endif
 
-                                <td style="text-align:center; color:#94a3b8; font-size:12px;">{{ $item['jumlah_kosong'] }}</td>
+                                <td style="text-align:center; color:var(--text-muted); font-size:12px;">{{ $item['jumlah_kosong'] }}</td>
                             </tr>
                         @endforeach
                     </tbody>

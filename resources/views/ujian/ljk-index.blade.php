@@ -150,45 +150,53 @@
                 </div>
             </div>
 
-            <div style="overflow-x:auto; border:1px solid #e2e8f0; border-radius:10px;">
-                <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                    <thead>
-                        <tr style="background:#f8fafc; border-bottom:1px solid #e2e8f0; text-align:left; color:#475569;">
-                            <th style="padding:10px 14px; width:50px; text-align:center;">No</th>
-                            <th style="padding:10px 14px;">Nama Lengkap Siswa</th>
-                            <th style="padding:10px 14px; width:130px; text-align:center;">NISN</th>
-                            <th style="padding:10px 14px; width:100px; text-align:center;">Kamar</th>
-                            <th style="padding:10px 14px; width:110px; text-align:center;">Cetak Lembar</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($siswas as $idx => $s)
-                        <tr style="border-bottom:1px solid #f1f5f9;">
-                            <td style="padding:10px 14px; text-align:center; color:#64748b; font-weight:600;">{{ $idx + 1 }}</td>
-                            <td style="padding:10px 14px; font-weight:600; color:#1e293b;">
-                                {{ $s->nama_lengkap }}
-                            </td>
-                            <td style="padding:10px 14px; text-align:center; font-family:monospace; color:#475569;">
-                                {{ $s->nisn ?: '-' }}
-                            </td>
-                            <td style="padding:10px 14px; text-align:center; color:#64748b;">
-                                {{ $s->kamar ?: '-' }}
-                            </td>
-                            <td style="padding:10px 14px; text-align:center;">
-                                <a href="{{ route('ujian.cetak-ljk', ['ujian' => $ujian->id, 'siswa_id' => $s->id]) }}" target="_blank" class="btn btn-secondary ljk-print-link" data-base-href="{{ route('ujian.cetak-ljk', ['ujian' => $ujian->id, 'siswa_id' => $s->id]) }}" style="font-size:11.5px; padding:4px 8px; border-radius:6px;">
-                                    Cetak 1 LJK
-                                </a>
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="5" style="text-align:center; padding:30px; color:#94a3b8;">
-                                Belum ada siswa aktif terdaftar pada kelas ini.
-                            </td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            <div class="table-card" style="margin-top:14px;">
+                <div class="table-wrapper">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th style="width:50px; text-align:center;">No</th>
+                                <th>Nama Lengkap Siswa</th>
+                                <th style="width:140px; text-align:center;">NISN</th>
+                                <th style="width:110px; text-align:center;">Kamar</th>
+                                <th style="width:120px; text-align:center;">Cetak Lembar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($siswas as $idx => $s)
+                            <tr>
+                                <td style="text-align:center; color:var(--text-muted); font-weight:600;">{{ $idx + 1 }}</td>
+                                <td class="cell-nama">
+                                    <div style="font-weight:700; color:var(--text-primary); font-size:13.5px;">{{ $s->nama_lengkap }}</div>
+                                </td>
+                                <td style="text-align:center; font-family:monospace; font-weight:600; color:var(--text-secondary);">
+                                    {{ $s->nisn ?: '-' }}
+                                </td>
+                                <td style="text-align:center; color:var(--text-secondary);">
+                                    {{ $s->kamar ?: '-' }}
+                                </td>
+                                <td style="text-align:center;">
+                                    <div class="action-btn-group">
+                                        <a href="{{ route('ujian.cetak-ljk', ['ujian' => $ujian->id, 'siswa_id' => $s->id]) }}" target="_blank" class="action-btn action-btn-print ljk-print-link" data-base-href="{{ route('ujian.cetak-ljk', ['ujian' => $ujian->id, 'siswa_id' => $s->id]) }}" title="Cetak 1 Lembar LJK ({{ $s->nama_lengkap }})" aria-label="Cetak 1 LJK {{ $s->nama_lengkap }}">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                                                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                                                <rect x="6" y="14" width="12" height="8"></rect>
+                                            </svg>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="5" class="cell-empty">
+                                    Belum ada siswa aktif terdaftar pada kelas ini.
+                                </td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
             @else
             <div style="text-align:center; padding:50px; color:#94a3b8;">

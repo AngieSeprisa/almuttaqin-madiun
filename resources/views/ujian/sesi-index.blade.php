@@ -152,6 +152,74 @@
             </button>
         </form>
     </div>
+
+    {{-- Tabel Sesi Ujian Siap Ditampilkan --}}
+    <div class="table-card">
+        <div style="padding:16px 20px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h3 style="font-size:15px; font-weight:700; color:var(--text-primary); margin:0;">Daftar Ujian Siap Ditampilkan di Layar Proyektor</h3>
+                <p style="font-size:12.5px; color:var(--text-muted); margin:2px 0 0;">Pilih salah satu ujian di bawah atau gunakan formulir di atas untuk langsung membuka sesi ujian kelas.</p>
+            </div>
+            <span style="font-size:12px; font-weight:600; color:var(--text-secondary);">Total: {{ $ujians->count() }} Ujian</span>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th style="width:50px; text-align:center;">No</th>
+                        <th style="width:130px;">Kode Ujian</th>
+                        <th>Nama Ujian</th>
+                        <th>Kelas & Mapel</th>
+                        <th>Guru Pengampu</th>
+                        <th style="width:120px; text-align:center;">Soal & Timer</th>
+                        <th style="width:140px; text-align:center;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($ujians as $idx => $u)
+                    <tr>
+                        <td style="text-align:center; color:var(--text-muted); font-weight:600;">{{ $idx + 1 }}</td>
+                        <td>
+                            <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-family:monospace; font-size:12px; font-weight:700;">
+                                {{ $u->kode_ujian }}
+                            </span>
+                        </td>
+                        <td class="cell-nama">
+                            <div style="font-weight:700; color:var(--text-primary); font-size:13.5px;">{{ $u->nama_ujian }}</div>
+                            <div style="font-size:12px; color:var(--text-muted);">{{ $u->tanggal_ujian?->format('d M Y') ?? '-' }}</div>
+                        </td>
+                        <td>
+                            <div style="font-weight:600; color:var(--text-primary);">{{ $u->mapel?->mata_pelajaran ?? '-' }}</div>
+                            <div style="font-size:12px; color:var(--text-muted);">Kelas: {{ $u->kelas?->nama_kelas ?? '-' }}</div>
+                        </td>
+                        <td style="font-size:13px; color:var(--text-secondary);">
+                            {{ $u->guru?->name ?? '-' }}
+                        </td>
+                        <td style="text-align:center;">
+                            <div style="font-weight:700; color:var(--text-primary); font-size:13px;">{{ $u->jumlah_soal }} Butir</div>
+                            <div style="font-size:11.5px; color:var(--text-muted);">{{ $u->timer_default }} dtk/soal</div>
+                        </td>
+                        <td style="text-align:center;">
+                            <a href="{{ route('ujian.proyektor', $u->id) }}" class="btn btn-sm btn-primary" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:12px; font-weight:600; text-decoration:none;">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                <span>Mulai Sesi</span>
+                            </a>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="7" class="cell-empty">
+                            Belum ada naskah ujian yang dibuat.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <script>
