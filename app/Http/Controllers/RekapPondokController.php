@@ -1647,10 +1647,13 @@ class RekapPondokController extends Controller
             }
 
             $jurnalRecords = $jurnalQuery->get();
+            // Track sesi mana yang benar-benar ada jurnalnya (agar santri tidak tercatat = Alpa)
+            $jurnalSesiExists = [];
             foreach ($jurnalRecords as $jm) {
                 $dStr = Carbon::parse($jm->tanggal)->toDateString();
                 $slot = $jm->sesi_pengajian ?: 'bada_maghrib';
                 $datesWithData[$dStr][$slot] = true;
+                $jurnalSesiExists[$dStr][$slot] = true;
 
                 foreach ($jm->absensis as $abs) {
                     $jurnalAbsensiBySantri[$abs->siswa_id][$dStr][$slot] = $abs->status;
@@ -1658,30 +1661,7 @@ class RekapPondokController extends Controller
             }
         } catch (\Throwable $e) {
             // Abaikan jika tabel belum dimigrasikan
-        }
-
-        // Jika belum ada data tap aktual, susun jadwal representatif seperti Gambar 1
-        if (empty($datesWithData)) {
-            $sampleSchedule = [
-                1  => ['bada_maghrib', 'malam'],
-                2  => ['siang'],
-                6  => ['bada_maghrib', 'malam'],
-                13 => ['bada_maghrib', 'malam'],
-                14 => ['malam'],
-                15 => ['bada_maghrib', 'malam'],
-                16 => ['siang', 'malam'],
-                17 => ['pagi_2', 'siang', 'malam'],
-                19 => ['bada_maghrib', 'malam'],
-                20 => ['bada_maghrib', 'malam'],
-            ];
-            foreach ($sampleSchedule as $dayNum => $slots) {
-                if ($dayNum <= $endDate->day) {
-                    $dStr = sprintf('%04d-%02d-%02d', $tahun, $bulan, $dayNum);
-                    foreach ($slots as $sl) {
-                        $datesWithData[$dStr][$sl] = true;
-                    }
-                }
-            }
+            $jurnalSesiExists = [];
         }
 
         ksort($datesWithData);
@@ -1773,18 +1753,13 @@ class RekapPondokController extends Controller
                     } elseif ($izinInfo) {
                         $row['total_i']++;
                         $row['cells'][$cellKey] = ['code' => 'I', 'badge' => 'status-badge-i'];
+                    } elseif (isset($jurnalSesiExists[$dStr][$slotKey])) {
+                        // Jurnal ada tapi santri tidak tercatat = Alpa
+                        $row['total_a']++;
+                        $row['cells'][$cellKey] = ['code' => 'A', 'badge' => 'status-badge-a'];
                     } else {
-                        // Tentukan hadir/izin default jika sampel data seperti Gambar 1
-                        $isSampleIzin = (($idx === 0) && in_array(Carbon::parse($dStr)->day, [13, 14, 15, 16, 17], true))
-                            || (($idx === 1) && in_array(Carbon::parse($dStr)->day, [17], true));
-
-                        if ($isSampleIzin) {
-                            $row['total_i']++;
-                            $row['cells'][$cellKey] = ['code' => 'I', 'badge' => 'status-badge-i'];
-                        } else {
-                            $row['total_h']++;
-                            $row['cells'][$cellKey] = ['code' => 'H', 'badge' => 'status-badge-h'];
-                        }
+                        // Tidak ada jurnal untuk sesi ini = kosong/belum tercatat
+                        $row['cells'][$cellKey] = ['code' => '-', 'badge' => 'status-badge-empty'];
                     }
                 }
             }

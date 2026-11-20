@@ -376,7 +376,11 @@
                     @empty
                     <tr>
                         <td colspan="{{ 2 + max(1, count($dateColumns)) }}" style="padding: 40px; color: #94a3b8; text-align: center;">
-                            Tidak ada data santri pada kelas pengajian ini.
+                            @if($dateColumns)
+                                Tidak ada data santri pada kelas pengajian ini.
+                            @else
+                                Belum ada jurnal pengajian yang diisi oleh guru untuk kelas dan bulan ini.
+                            @endif
                         </td>
                     </tr>
                     @endforelse
