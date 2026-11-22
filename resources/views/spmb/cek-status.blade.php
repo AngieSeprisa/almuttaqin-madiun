@@ -42,10 +42,10 @@
                         <span class="detail-value">{{ $penerimaan->jadwal_seleksi }}</span>
                     </div>
                     @endif
-                    @if($penerimaan->lokasi_seleksi)
+                    @if(!empty($lokasiSeleksi))
                     <div class="detail-item">
                         <span class="detail-label">Lokasi Seleksi</span>
-                        <span class="detail-value">{{ $penerimaan->lokasi_seleksi }}</span>
+                        <span class="detail-value">{{ $lokasiSeleksi }}</span>
                     </div>
                     @endif
                 </div>

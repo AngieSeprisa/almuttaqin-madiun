@@ -264,8 +264,8 @@
                     @if($penerimaan->jadwal_seleksi)
                     <tr><td class="lbl">Jadwal Seleksi</td><td class="val">{{ $penerimaan->jadwal_seleksi }}</td></tr>
                     @endif
-                    @if($penerimaan->lokasi_seleksi)
-                    <tr><td class="lbl">Lokasi Seleksi</td><td class="val">{{ $penerimaan->lokasi_seleksi }}</td></tr>
+                    @if(!empty($lokasiSeleksi))
+                    <tr><td class="lbl">Lokasi Seleksi</td><td class="val">{{ $lokasiSeleksi }}</td></tr>
                     @endif
                     <tr><td class="lbl">Tanggal Daftar</td><td class="val">{{ $pendaftaran->created_at?->locale('id')->translatedFormat('d F Y, H:i') }} WIB</td></tr>
                 </table>

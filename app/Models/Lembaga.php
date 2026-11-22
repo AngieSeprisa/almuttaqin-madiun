@@ -62,19 +62,52 @@ class Lembaga extends Model
     }
 
     /**
-     * Temukan model Lembaga sesuai jenjang pendaftaran (SMP / SMA / Reguler).
+     * Daftar lembaga formal aktif yang terdaftar (untuk pilihan jenjang SPMB).
+     */
+    public static function formalOptions()
+    {
+        return static::where('kategori', 'formal')
+            ->where('is_active', true)
+            ->orderBy('urutan')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Kunci jenjang standar untuk lembaga ini (misal: SMP, SMA, SMK).
+     */
+    public function getJenjangKeyAttribute(): string
+    {
+        $key = trim((string) ($this->singkatan ?: strtoupper((string) $this->kode)));
+
+        return $key !== '' ? $key : strtoupper((string) $this->kode);
+    }
+
+    /**
+     * Temukan model Lembaga sesuai jenjang pendaftaran (dinamis dari tabel lembagas).
      */
     public static function resolveForJenjang(?string $jenjang): ?self
     {
-        $kode = match (strtoupper(trim((string) $jenjang))) {
-            'SMP'     => 'smp',
-            'SMA'     => 'sma',
-            'REGULER' => 'pondok',
-            default   => 'yayasan',
-        };
+        $clean = trim((string) $jenjang);
+        $lower = strtolower($clean);
 
-        return static::where('kode', $kode)->first()
-            ?? static::where('kode', 'yayasan')->first();
+        if ($lower === 'reguler' || $lower === 'pondok') {
+            return static::where('kode', 'pondok')->first()
+                ?? static::where('kode', 'yayasan')->first();
+        }
+
+        if ($clean !== '') {
+            $matched = static::whereRaw('LOWER(kode) = ?', [$lower])
+                ->orWhereRaw('LOWER(singkatan) = ?', [$lower])
+                ->orWhereRaw('LOWER(nama) = ?', [$lower])
+                ->first();
+
+            if ($matched) {
+                return $matched;
+            }
+        }
+
+        return static::where('kode', 'yayasan')->first();
     }
 
     /**

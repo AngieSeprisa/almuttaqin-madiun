@@ -58,9 +58,14 @@
         @if($penerimaan->jadwal_seleksi)
             <span class="spmb-chip">Seleksi: {{ $penerimaan->jadwal_seleksi }}</span>
         @endif
-        @if($penerimaan->lokasi_seleksi)
-            <span class="spmb-chip">{{ $penerimaan->lokasi_seleksi }}</span>
-        @endif
+        @php
+            $firstLokasi = count($availableJenjangs) === 1
+                ? ($lokasiMap[$availableJenjangs[0]] ?? $penerimaan->lokasiForJenjang($availableJenjangs[0]))
+                : $penerimaan->lokasiForJenjang(old('jenjang'));
+        @endphp
+        <span class="spmb-chip" id="chipLokasiSeleksi" style="{{ $firstLokasi ? '' : 'display:none;' }}">
+            Lokasi: <span id="chipLokasiText">{{ $firstLokasi }}</span>
+        </span>
     </div>
 
     @php $syaratList = $penerimaan->syaratList(); @endphp
@@ -131,13 +136,18 @@
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="jenjang">Jenjang <span style="color:#EF4444;">*</span></label>
                             @if(count($allowedJenjangs) === 1)
-                                <input type="hidden" name="jenjang" value="{{ $allowedJenjangs[0] }}">
+                                <input type="hidden" name="jenjang" id="jenjang" value="{{ $allowedJenjangs[0] }}">
                                 <input type="text" class="wizard-input" value="{{ $allowedJenjangs[0] }}" readonly style="background:#F8FAFC;">
                             @else
                                 <select name="jenjang" id="jenjang" class="wizard-select @error('jenjang') is-invalid @enderror" required>
                                     <option value="">Pilih Jenjang</option>
                                     @foreach($allowedJenjangs as $j)
-                                        <option value="{{ $j }}" {{ old('jenjang') === $j ? 'selected' : '' }}>{{ $j }}</option>
+                                        @php $isAvail = in_array($j, $availableJenjangs, true); @endphp
+                                        <option value="{{ $j }}"
+                                                {{ old('jenjang') === $j && $isAvail ? 'selected' : '' }}
+                                                {{ $isAvail ? '' : 'disabled' }}>
+                                            {{ $j }}{{ $isAvail ? '' : ' (Kuota Penuh)' }}
+                                        </option>
                                     @endforeach
                                 </select>
                             @endif
@@ -641,6 +651,24 @@ document.addEventListener('DOMContentLoaded', function () {
         selectKip.addEventListener('change', function () {
             wrapperKip.style.display = this.value === '1' ? 'flex' : 'none';
         });
+    }
+
+    // Update chip lokasi seleksi saat pendaftar memilih jenjang/lembaga
+    var lokasiMap = @json($lokasiMap);
+    var jenjangEl = document.getElementById('jenjang');
+    var chipLokasi = document.getElementById('chipLokasiSeleksi');
+    var chipLokasiText = document.getElementById('chipLokasiText');
+    if (jenjangEl && chipLokasi && chipLokasiText) {
+        var updateLokasiChip = function () {
+            var val = jenjangEl.value;
+            var loc = (val && lokasiMap[val]) ? lokasiMap[val] : '';
+            if (loc) {
+                chipLokasiText.textContent = loc;
+                chipLokasi.style.display = '';
+            }
+        };
+        jenjangEl.addEventListener('change', updateLokasiChip);
+        updateLokasiChip();
     }
 
     @if ($errors->any())

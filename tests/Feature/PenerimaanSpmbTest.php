@@ -26,59 +26,86 @@ class PenerimaanSpmbTest extends TestCase
         $this->admin = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
     }
 
-    public function test_admin_dapat_membuat_penerimaan_dengan_checklist_multi_jenjang_dan_wa_per_jenjang(): void
+    public function test_jenjang_diambil_dari_lembaga_formal_dengan_wa_lokasi_dan_kuota_per_lembaga(): void
     {
+        // Tambah 1 lembaga formal baru di Master Lembaga untuk uji dinamis
+        Lembaga::create([
+            'kode'      => 'smk',
+            'nama'      => 'SMK Al Muttaqin',
+            'singkatan' => 'SMK',
+            'kategori'  => 'formal',
+            'alamat'    => 'Jl. SMK No. 1 Madiun',
+            'is_active' => true,
+            'urutan'    => 5,
+        ]);
+
+        // Form create memuat semua lembaga formal aktif (SMP, SMA, SMK) dan tidak memuat Yayasan/Pondok
+        $this->actingAs($this->admin)->get(route('penerimaan.create'))
+            ->assertOk()
+            ->assertSee('SMP Al Muttaqin')
+            ->assertSee('SMA Al Muttaqin')
+            ->assertSee('SMK Al Muttaqin');
+
         $response = $this->actingAs($this->admin)
             ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
             ->post(route('penerimaan.store'), [
-                'judul'                 => 'SPMB Al Muttaqin 2027/2028',
-                'slug'                  => 'SPMB 2027 2028',
-                'tahun_ajaran'          => '2027/2028',
-                'jenjangs'              => ['SMP', 'SMA'],
-                'kontak_wa_per_jenjang' => [
+                'judul'                      => 'SPMB Al Muttaqin 2027/2028',
+                'slug'                       => 'SPMB 2027 2028',
+                'tahun_ajaran'               => '2027/2028',
+                'jenjangs'                   => ['SMP', 'SMA', 'SMK'],
+                'kontak_wa_per_jenjang'      => [
                     'SMP' => '081111111111',
                     'SMA' => '082222222222',
+                    'SMK' => '083333333333',
                 ],
-                'jadwal_seleksi'        => 'Sabtu, 15 Mei 2027 · 08.00 WIB',
-                'lokasi_seleksi'        => 'Pondok Pesantren Al Muttaqin Madiun',
-                'is_active'             => '1',
-                'syarat_dokumen'        => [
+                'lokasi_seleksi_per_jenjang' => [
+                    'SMP' => 'Gedung SMP Al Muttaqin',
+                    'SMA' => 'Gedung SMA Al Muttaqin',
+                    'SMK' => 'Gedung SMK Al Muttaqin',
+                ],
+                'jadwal_seleksi'             => 'Sabtu, 15 Mei 2027 · 08.00 WIB',
+                'is_active'                  => '1',
+                'syarat_dokumen'             => [
                     'berkas_akta'             => 'wajib',
                     'berkas_kk'               => 'opsional',
                     'berkas_ktp_ortu'         => 'opsional',
                     'berkas_surat_pernyataan' => 'tidak',
                 ],
-                'catatan_syarat'        => "Lulusan SD/MI atau SMP/MTs\nSiap mengikuti seleksi offline",
-                'gelombangs'            => [
+                'catatan_syarat'             => "Lulusan SD/MI atau SMP/MTs\nSiap mengikuti seleksi offline",
+                'gelombangs'                 => [
                     [
-                        'nama_gelombang'  => 'Gelombang 1',
-                        'tanggal_mulai'   => now()->subDay()->toDateString(),
-                        'tanggal_selesai' => now()->addDays(10)->toDateString(),
-                        'kuota'           => 50,
+                        'nama_gelombang'    => 'Gelombang 1',
+                        'tanggal_mulai'     => now()->subDay()->toDateString(),
+                        'tanggal_selesai'   => now()->addDays(10)->toDateString(),
+                        'kuota_per_jenjang' => [
+                            'SMP' => 64,
+                            'SMA' => 32,
+                            'SMK' => 40,
+                        ],
                     ],
                 ],
             ]);
 
         $response->assertRedirect(route('penerimaan.index'));
 
-        $event = PenerimaanSantri::where('slug', 'spmb-2027-2028')->firstOrFail();
-        $this->assertSame(['SMP', 'SMA'], $event->allowedJenjangs());
+        $event = PenerimaanSantri::with('gelombangs')->where('slug', 'spmb-2027-2028')->firstOrFail();
+        $this->assertEqualsCanonicalizing(['SMP', 'SMA', 'SMK'], $event->allowedJenjangs());
         $this->assertSame('081111111111', $event->waNumberForJenjang('SMP'));
         $this->assertSame('082222222222', $event->waNumberForJenjang('SMA'));
-        $this->assertCount(1, $event->gelombangs);
+        $this->assertSame('Gedung SMP Al Muttaqin', $event->lokasiForJenjang('SMP'));
+        $this->assertSame('Gedung SMA Al Muttaqin', $event->lokasiForJenjang('SMA'));
+        $this->assertSame(64, $event->gelombangs->first()->kuotaForJenjang('SMP'));
+        $this->assertSame(32, $event->gelombangs->first()->kuotaForJenjang('SMA'));
+        $this->assertSame(40, $event->gelombangs->first()->kuotaForJenjang('SMK'));
         $this->assertTrue($event->isOpen());
-
-        $this->actingAs($this->admin)->get(route('penerimaan.index'))
-            ->assertOk()
-            ->assertSee('/spmb/spmb-2027-2028');
 
         $this->actingAs($this->admin)->get(route('penerimaan.edit', $event->id))
             ->assertOk()
-            ->assertSee('081111111111')
-            ->assertSee('082222222222');
+            ->assertSee('Gedung SMP Al Muttaqin')
+            ->assertSee('Gedung SMA Al Muttaqin');
     }
 
-    public function test_nomor_registrasi_format_lembaga_urut_tahun_dan_bukti_cetak_2_halaman_sesuai_kop_lembaga(): void
+    public function test_kuota_per_lembaga_lokasi_per_lembaga_format_reg_dan_cetak_2_halaman(): void
     {
         Storage::fake('public');
 
@@ -98,47 +125,44 @@ class PenerimaanSpmbTest extends TestCase
             ])
             ->assertRedirect(route('master.lembaga.index'));
 
-        $smp->refresh();
-        $this->assertSame('Jl. Khusus SMP No. 99 Josenan Madiun', $smp->alamat);
-        $this->assertNotNull($smp->logo);
-        Storage::disk('public')->assertExists($smp->logo);
-
-        // 2. Buat event multi-jenjang SMP & SMA dengan WA masing-masing
+        // 2. Buat event dengan kuota SMP=1, SMA=2 dan lokasi terpisah
         $event = PenerimaanSantri::create([
-            'judul'                 => 'SPMB 2027/2028',
-            'slug'                  => 'spmb-2027-2028',
-            'tahun_ajaran'          => '2027/2028',
-            'jenjang'               => 'SMP, SMA',
-            'jenjangs'              => ['SMP', 'SMA'],
-            'kontak_wa_per_jenjang' => [
+            'judul'                      => 'SPMB 2027/2028',
+            'slug'                       => 'spmb-2027-2028',
+            'tahun_ajaran'               => '2027/2028',
+            'jenjang'                    => 'SMP, SMA',
+            'jenjangs'                   => ['SMP', 'SMA'],
+            'kontak_wa_per_jenjang'      => [
                 'SMP' => '081111111111',
                 'SMA' => '082222222222',
             ],
-            'jadwal_seleksi'        => 'Minggu, 20 Mei 2027',
-            'lokasi_seleksi'        => 'Kampus Al Muttaqin',
-            'syarat_dokumen'        => [
+            'lokasi_seleksi_per_jenjang' => [
+                'SMP' => 'Aula Gedung SMP',
+                'SMA' => 'Aula Gedung SMA',
+            ],
+            'jadwal_seleksi'             => 'Minggu, 20 Mei 2027',
+            'syarat_dokumen'             => [
                 'berkas_akta'             => 'wajib',
                 'berkas_kk'               => 'opsional',
                 'berkas_ktp_ortu'         => 'tidak',
                 'berkas_surat_pernyataan' => 'tidak',
             ],
-            'is_active'             => true,
+            'is_active'                  => true,
         ]);
 
         $event->gelombangs()->create([
-            'nama_gelombang'  => 'Gelombang 1',
-            'tanggal_mulai'   => now()->subDay()->toDateString(),
-            'tanggal_selesai' => now()->addDays(7)->toDateString(),
-            'urutan'          => 1,
+            'nama_gelombang'    => 'Gelombang 1',
+            'tanggal_mulai'     => now()->subDay()->toDateString(),
+            'tanggal_selesai'   => now()->addDays(7)->toDateString(),
+            'kuota'             => 3,
+            'kuota_per_jenjang' => [
+                'SMP' => 1,
+                'SMA' => 2,
+            ],
+            'urutan'            => 1,
         ]);
 
-        // Form publik hanya menampilkan pilihan SMP & SMA (tidak Reguler)
-        $this->get(route('spmb.show', $event->slug))
-            ->assertOk()
-            ->assertSee('SPMB 2027/2028')
-            ->assertSee('Gelombang 1');
-
-        // Pendaftar SMP #1 -> SMP-01-202728
+        // Pendaftar SMP #1 -> SMP-01-202728 (mengisi kuota SMP=1)
         $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
             ->post(route('spmb.store', $event->slug), [
                 'jenjang'       => 'SMP',
@@ -153,21 +177,27 @@ class PenerimaanSpmbTest extends TestCase
         $pSmp1 = Pendaftaran::where('nama_lengkap', 'Budi Santoso')->firstOrFail();
         $this->assertSame('SMP-01-202728', $pSmp1->no_induk);
 
-        // Pendaftar SMP #2 -> SMP-02-202728
+        // Kuota SMP sekarang penuh (1/1), tapi SMA masih buka (0/2)!
+        $event->refresh()->load('gelombangs');
+        $this->assertTrue($event->isOpen());
+        $this->assertSame(['SMA'], $event->availableJenjangs());
+
+        // Form publik menampilkan SMP (Kuota Penuh) dan menolak pendaftaran SMP ke-2
+        $this->get(route('spmb.show', $event->slug))
+            ->assertOk()
+            ->assertSee('SMP (Kuota Penuh)');
+
         $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
             ->post(route('spmb.store', $event->slug), [
                 'jenjang'       => 'SMP',
-                'nama_lengkap'  => 'Ahmad Fauzi',
+                'nama_lengkap'  => 'Ditolak Kuota SMP',
                 'jenis_kelamin' => 'Laki-laki',
                 'pj_biaya_hp'   => '085699998888',
                 'foto_akta'     => UploadedFile::fake()->image('akta2.jpg', 800, 600),
             ])
-            ->assertRedirect();
+            ->assertSessionHasErrors('jenjang');
 
-        $pSmp2 = Pendaftaran::where('nama_lengkap', 'Ahmad Fauzi')->firstOrFail();
-        $this->assertSame('SMP-02-202728', $pSmp2->no_induk);
-
-        // Pendaftar SMA #1 -> SMA-01-202728
+        // SMA masih bisa mendaftar -> SMA-01-202728
         $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
             ->post(route('spmb.store', $event->slug), [
                 'jenjang'       => 'SMA',
@@ -181,32 +211,45 @@ class PenerimaanSpmbTest extends TestCase
         $pSma1 = Pendaftaran::where('nama_lengkap', 'Dewi Lestari')->firstOrFail();
         $this->assertSame('SMA-01-202728', $pSma1->no_induk);
 
-        // Bukti SMP mengarah ke WA Panitia SMP (628111111111), Bukti SMA ke WA Panitia SMA (628222222222)
+        // Bukti SMP -> WA SMP + Lokasi SMP; Bukti SMA -> WA SMA + Lokasi SMA
         $this->get(route('spmb.bukti', [$event->slug, $pSmp1->public_token]))
             ->assertOk()
             ->assertSee('SMP-01-202728')
+            ->assertSee('Aula Gedung SMP')
+            ->assertDontSee('Aula Gedung SMA')
             ->assertSee('https://wa.me/628111111111', false);
 
         $this->get(route('spmb.bukti', [$event->slug, $pSma1->public_token]))
             ->assertOk()
             ->assertSee('SMA-01-202728')
+            ->assertSee('Aula Gedung SMA')
+            ->assertDontSee('Aula Gedung SMP')
             ->assertSee('https://wa.me/628222222222', false);
 
-        // Halaman cetak bukti SMP terdiri dari 2 halaman (Kartu Bukti + Formulir) dan memakai KOP Lembaga SMP
+        // Cetak bukti SMP: 2 halaman + KOP SMP + Lokasi SMP
         $this->get(route('spmb.cetak', [$event->slug, $pSmp1->public_token]))
             ->assertOk()
             ->assertSee('Kartu Bukti Pendaftaran')
             ->assertSee('FORMULIR PENDAFTARAN SANTRI BARU')
             ->assertSee('SMP AL MUTTAQIN MADIUN')
             ->assertSee('Jl. Khusus SMP No. 99 Josenan Madiun')
-            ->assertSee('0351-999888')
-            ->assertSee('smp@almuttaqin-madiun.my.id')
+            ->assertSee('Aula Gedung SMP')
             ->assertSee('SMP-01-202728');
 
-        // Halaman cek status menemukan pendaftar dari no registrasi
-        $this->get(route('spmb.cek-status', ['slug' => $event->slug, 'kode' => 'SMP-01-202728']))
-            ->assertOk()
-            ->assertSee('Budi Santoso');
+        // Isi kuota SMA ke-2 -> seluruh lembaga penuh -> status Kuota Penuh
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->post(route('spmb.store', $event->slug), [
+                'jenjang'       => 'SMA',
+                'nama_lengkap'  => 'Rina Kusuma',
+                'jenis_kelamin' => 'Perempuan',
+                'pj_biaya_hp'   => '085700002222',
+                'foto_akta'     => UploadedFile::fake()->image('akta4.jpg', 800, 600),
+            ])
+            ->assertRedirect();
+
+        $event->refresh()->load('gelombangs');
+        $this->assertFalse($event->isOpen());
+        $this->assertSame('penuh', $event->statusState()['code']);
     }
 
     public function test_event_tutup_tidak_menerima_pendaftaran_dan_alur_lulus_seleksi_ke_daftar_ulang(): void

@@ -17,61 +17,226 @@
     $actionUrl = $isEdit ? route('penerimaan.update', $penerimaan->id) : route('penerimaan.store');
     $basePublicUrl = url('/spmb') . '/';
     $dokumenConfig = old('syarat_dokumen', $penerimaan->dokumenConfig());
+
     $selectedJenjangs = old('jenjangs', $penerimaan->allowedJenjangs());
     if (!is_array($selectedJenjangs)) {
         $selectedJenjangs = $penerimaan->allowedJenjangs();
     }
+
     $waValues = old('kontak_wa_per_jenjang', $penerimaan->waMap());
     if (!is_array($waValues)) {
         $waValues = [];
     }
 
+    $lokasiValues = old('lokasi_seleksi_per_jenjang', $penerimaan->lokasiMap());
+    if (!is_array($lokasiValues)) {
+        $lokasiValues = [];
+    }
+
     $initialGelombangs = old('gelombangs');
     if ($initialGelombangs === null) {
-        $initialGelombangs = $gelombangs->map(fn ($g) => [
-            'id'              => $g->id,
-            'nama_gelombang'  => $g->nama_gelombang,
-            'tanggal_mulai'   => $g->tanggal_mulai?->format('Y-m-d'),
-            'tanggal_selesai' => $g->tanggal_selesai?->format('Y-m-d'),
-            'kuota'           => $g->kuota,
-        ])->values()->all();
+        $initialGelombangs = $gelombangs->map(function ($g) use ($selectedJenjangs) {
+            $kuotaMap = is_array($g->kuota_per_jenjang) ? $g->kuota_per_jenjang : [];
+            if (empty($kuotaMap) && $g->kuota !== null && count($selectedJenjangs) === 1) {
+                $kuotaMap[$selectedJenjangs[0]] = $g->kuota;
+            }
+            return [
+                'id'                => $g->id,
+                'nama_gelombang'    => $g->nama_gelombang,
+                'tanggal_mulai'     => $g->tanggal_mulai?->format('Y-m-d'),
+                'tanggal_selesai'   => $g->tanggal_selesai?->format('Y-m-d'),
+                'kuota_per_jenjang' => $kuotaMap,
+            ];
+        })->values()->all();
     }
 @endphp
 
 <style>
-    .jenjang-check-grid {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
+    /* Filament-style Multi-Select Dropdown */
+    .fi-ms-wrap {
+        position: relative;
+        width: 100%;
     }
-    .jenjang-check-card {
-        display: inline-flex;
-        align-items: center;
-        gap: 9px;
-        padding: 10px 16px;
-        border: 1.5px solid var(--border-color, #D1D5DB);
+    .fi-ms-trigger {
+        min-height: 44px;
+        width: 100%;
+        padding: 6px 38px 6px 10px;
+        border: 1px solid var(--border-color, #D1D5DB);
         border-radius: 10px;
         background: var(--input-bg, #FFFFFF);
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        cursor: pointer;
+        position: relative;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        box-sizing: border-box;
+    }
+    .fi-ms-trigger:hover {
+        border-color: #9CA3AF;
+    }
+    .fi-ms-wrap.is-open .fi-ms-trigger {
+        border-color: #0052FF;
+        box-shadow: 0 0 0 3px rgba(0, 82, 255, 0.12);
+    }
+    .fi-ms-placeholder {
+        font-size: 13.5px;
+        color: var(--text-muted, #9CA3AF);
+        padding: 3px 4px;
+    }
+    .fi-ms-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 8px 4px 10px;
+        border-radius: 7px;
+        background: rgba(0, 82, 255, 0.1);
+        border: 1px solid rgba(0, 82, 255, 0.22);
+        color: #0052FF;
+        font-size: 12.5px;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    html.dark-mode .fi-ms-chip {
+        background: rgba(59, 130, 246, 0.18);
+        border-color: rgba(59, 130, 246, 0.35);
+        color: #60A5FA;
+    }
+    .fi-ms-chip-rm {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border: none;
+        border-radius: 4px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        padding: 0;
+        opacity: 0.75;
+    }
+    .fi-ms-chip-rm:hover {
+        opacity: 1;
+        background: rgba(0, 82, 255, 0.14);
+    }
+    .fi-ms-chevron {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted, #6B7280);
+        pointer-events: none;
+        transition: transform 0.15s ease;
+    }
+    .fi-ms-wrap.is-open .fi-ms-chevron {
+        transform: translateY(-50%) rotate(180deg);
+    }
+    .fi-ms-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        z-index: 60;
+        background: var(--card-bg, #FFFFFF);
+        border: 1px solid var(--border-light, #E5E7EB);
+        border-radius: 12px;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+        overflow: hidden;
+        display: none;
+    }
+    .fi-ms-wrap.is-open .fi-ms-menu {
+        display: block;
+    }
+    .fi-ms-search-wrap {
+        padding: 8px;
+        border-bottom: 1px solid var(--border-light, #E5E7EB);
+    }
+    .fi-ms-search {
+        width: 100%;
+        padding: 7px 10px;
+        font-size: 13px;
+        border: 1px solid var(--border-light, #E5E7EB);
+        border-radius: 8px;
+        background: var(--bg-surface, #F9FAFB);
+        color: var(--text-primary);
+        outline: none;
+        box-sizing: border-box;
+    }
+    .fi-ms-search:focus {
+        border-color: #0052FF;
+    }
+    .fi-ms-list {
+        max-height: 220px;
+        overflow-y: auto;
+        padding: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .fi-ms-option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: 8px;
         cursor: pointer;
         font-size: 13.5px;
-        font-weight: 600;
         color: var(--text-primary);
-        transition: all 0.15s ease;
+        transition: background 0.12s ease;
         user-select: none;
     }
-    .jenjang-check-card:hover {
-        border-color: var(--electric-blue, #0052FF);
+    .fi-ms-option:hover {
+        background: var(--bg-surface, #F3F4F6);
     }
-    .jenjang-check-card.is-checked {
-        border-color: var(--electric-blue, #0052FF);
-        background: rgba(0, 82, 255, 0.06);
-        color: var(--electric-blue, #0052FF);
+    .fi-ms-option.is-selected {
+        background: rgba(0, 82, 255, 0.08);
+        color: #0052FF;
+        font-weight: 600;
     }
-    .jenjang-check-card input[type="checkbox"] {
+    html.dark-mode .fi-ms-option.is-selected {
+        background: rgba(59, 130, 246, 0.16);
+        color: #60A5FA;
+    }
+    .fi-ms-option-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+    .fi-ms-option input[type="checkbox"] {
         width: 16px;
         height: 16px;
         accent-color: #0052FF;
         cursor: pointer;
+        flex-shrink: 0;
+    }
+    .fi-ms-option-code {
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 6px;
+        background: var(--bg-surface, #F1F5F9);
+        color: var(--text-secondary);
+        flex-shrink: 0;
+    }
+    .per-lembaga-box {
+        border: 1px solid var(--border-light, #E5E7EB);
+        border-radius: 12px;
+        padding: 14px 16px;
+        background: var(--bg-surface, #F8FAFC);
+        display: grid;
+        grid-template-columns: 120px 1fr 1.4fr;
+        gap: 14px;
+        align-items: end;
+    }
+    @media (max-width: 768px) {
+        .per-lembaga-box {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
     }
 </style>
 
@@ -187,43 +352,6 @@
                             </select>
                         </div>
 
-                        {{-- Checklist Jenjang (Multi-pilih) --}}
-                        <div class="wizard-form-group" style="grid-column: 1 / -1;">
-                            <label class="wizard-label">
-                                Jenjang <span style="color:#EF4444;">*</span>
-                            </label>
-                            <div class="jenjang-check-grid" id="jenjangCheckGroup">
-                                @foreach($jenjangItems as $val => $label)
-                                @php $checked = in_array($val, $selectedJenjangs, true); @endphp
-                                <label class="jenjang-check-card {{ $checked ? 'is-checked' : '' }}" data-jenjang-card="{{ $val }}">
-                                    <input type="checkbox" name="jenjangs[]" value="{{ $val }}" class="js-jenjang-checkbox" {{ $checked ? 'checked' : '' }}>
-                                    <span>{{ $label }}</span>
-                                </label>
-                                @endforeach
-                            </div>
-                            @error('jenjangs')
-                                <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        {{-- No. WA Panitia per Jenjang yang di-checklist --}}
-                        <div class="wizard-form-group" style="grid-column: 1 / -1;" id="waPerJenjangWrap">
-                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
-                                @foreach($jenjangItems as $val => $label)
-                                @php $isVisible = in_array($val, $selectedJenjangs, true); @endphp
-                                <div class="wizard-form-group js-wa-jenjang-item" data-wa-jenjang="{{ $val }}" style="{{ $isVisible ? '' : 'display:none;' }} margin-bottom:0;">
-                                    <label class="wizard-label" for="wa_{{ $val }}">No. WA Panitia {{ $val }}</label>
-                                    <input type="text"
-                                           name="kontak_wa_per_jenjang[{{ $val }}]"
-                                           id="wa_{{ $val }}"
-                                           value="{{ $waValues[$val] ?? '' }}"
-                                           class="wizard-input"
-                                           placeholder="08xxxxxxxxxx">
-                                </div>
-                                @endforeach
-                            </div>
-                        </div>
-
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="jadwal_seleksi">Jadwal Seleksi Offline</label>
                             <input type="text" name="jadwal_seleksi" id="jadwal_seleksi"
@@ -232,12 +360,70 @@
                                    placeholder="Sabtu, 15 Mei 2027 · 08.00 WIB">
                         </div>
 
+                        {{-- Dropdown Multi-Select ala Filament (diambil dari Master Lembaga Formal) --}}
                         <div class="wizard-form-group">
-                            <label class="wizard-label" for="lokasi_seleksi">Lokasi Seleksi Offline</label>
-                            <input type="text" name="lokasi_seleksi" id="lokasi_seleksi"
-                                   value="{{ old('lokasi_seleksi', $penerimaan->lokasi_seleksi) }}"
-                                   class="wizard-input"
-                                   placeholder="Pondok Pesantren Al Muttaqin Madiun">
+                            <label class="wizard-label">
+                                Jenjang / Lembaga <span style="color:#EF4444;">*</span>
+                            </label>
+                            <div class="fi-ms-wrap" id="jenjangDropdown">
+                                <div class="fi-ms-trigger" id="jenjangTrigger" tabindex="0" role="combobox" aria-expanded="false">
+                                    <div id="jenjangChips" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;"></div>
+                                    <span class="fi-ms-placeholder" id="jenjangPlaceholder">Pilih lembaga...</span>
+                                    <svg class="fi-ms-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="fi-ms-menu" id="jenjangMenu">
+                                    <div class="fi-ms-search-wrap">
+                                        <input type="text" class="fi-ms-search" id="jenjangSearch" placeholder="Cari lembaga...">
+                                    </div>
+                                    <div class="fi-ms-list" id="jenjangOptionList">
+                                        @foreach($jenjangItems as $val => $label)
+                                        @php $checked = in_array($val, $selectedJenjangs, true); @endphp
+                                        <label class="fi-ms-option {{ $checked ? 'is-selected' : '' }}" data-option-label="{{ strtolower($val . ' ' . $label) }}">
+                                            <span class="fi-ms-option-left">
+                                                <input type="checkbox" name="jenjangs[]" value="{{ $val }}" data-label="{{ $label }}" class="js-jenjang-checkbox" {{ $checked ? 'checked' : '' }}>
+                                                <span>{{ $label }}</span>
+                                            </span>
+                                            <span class="fi-ms-option-code">{{ $val }}</span>
+                                        </label>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+                            @error('jenjangs')
+                                <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        {{-- No. WA Panitia & Lokasi Seleksi per Lembaga terpilih --}}
+                        <div class="wizard-form-group" style="grid-column: 1 / -1; display:flex; flex-direction:column; gap:12px;" id="perLembagaConfigWrap">
+                            @foreach($jenjangItems as $val => $label)
+                            @php $isVisible = in_array($val, $selectedJenjangs, true); @endphp
+                            <div class="per-lembaga-box js-per-lembaga-row" data-lembaga-row="{{ $val }}" style="{{ $isVisible ? '' : 'display:none;' }}">
+                                <div style="display:flex; flex-direction:column; justify-content:center; height:42px;">
+                                    <span class="jenjang-pill {{ $val === 'SMP' ? 'jenjang-pill-smp' : ($val === 'SMA' ? 'jenjang-pill-sma' : 'jenjang-pill-reguler') }}" style="align-self:flex-start;">{{ $val }}</span>
+                                </div>
+                                <div class="wizard-form-group" style="margin-bottom:0;">
+                                    <label class="wizard-label" for="wa_{{ $val }}">No. WA Panitia {{ $val }}</label>
+                                    <input type="text"
+                                           name="kontak_wa_per_jenjang[{{ $val }}]"
+                                           id="wa_{{ $val }}"
+                                           value="{{ $waValues[$val] ?? '' }}"
+                                           class="wizard-input"
+                                           placeholder="08xxxxxxxxxx">
+                                </div>
+                                <div class="wizard-form-group" style="margin-bottom:0;">
+                                    <label class="wizard-label" for="lokasi_{{ $val }}">Lokasi Seleksi {{ $val }}</label>
+                                    <input type="text"
+                                           name="lokasi_seleksi_per_jenjang[{{ $val }}]"
+                                           id="lokasi_{{ $val }}"
+                                           value="{{ $lokasiValues[$val] ?? '' }}"
+                                           class="wizard-input"
+                                           placeholder="Lokasi seleksi {{ $val }}">
+                                </div>
+                            </div>
+                            @endforeach
                         </div>
                     </div>
 
@@ -292,7 +478,7 @@
                     </div>
                 </div>
 
-                {{-- TAHAP 03: GELOMBANG PENDAFTARAN --}}
+                {{-- TAHAP 03: GELOMBANG PENDAFTARAN (KUOTA PER LEMBAGA) --}}
                 <div class="wizard-step-pane" id="p_pane_3">
                     <div style="display:flex; justify-content:flex-end; margin-bottom:14px;">
                         <button type="button" id="btnAddGelombang" class="btn btn-secondary btn-sm">
@@ -363,25 +549,101 @@ document.addEventListener('DOMContentLoaded', function () {
         b.addEventListener('click', function () { goToStep(parseInt(this.getAttribute('data-prev'), 10)); });
     });
 
-    // 2. Checklist Jenjang -> tampilkan input WA Panitia sesuai jenjang terpilih
-    function syncJenjangWaFields() {
-        var anyChecked = false;
-        document.querySelectorAll('.js-jenjang-checkbox').forEach(function (cb) {
-            var val = cb.value;
-            var card = cb.closest('[data-jenjang-card]');
-            var waBox = document.querySelector('[data-wa-jenjang="' + val + '"]');
-            if (card) card.classList.toggle('is-checked', cb.checked);
-            if (waBox) waBox.style.display = cb.checked ? '' : 'none';
-            if (cb.checked) anyChecked = true;
-        });
-        var wrap = document.getElementById('waPerJenjangWrap');
-        if (wrap) wrap.style.display = anyChecked ? '' : 'none';
+    // 2. Filament-style Multi-Select Dropdown
+    var ddWrap = document.getElementById('jenjangDropdown');
+    var ddTrigger = document.getElementById('jenjangTrigger');
+    var ddChips = document.getElementById('jenjangChips');
+    var ddPlaceholder = document.getElementById('jenjangPlaceholder');
+    var ddSearch = document.getElementById('jenjangSearch');
+    var checkboxes = Array.from(document.querySelectorAll('.js-jenjang-checkbox'));
+
+    function getSelectedJenjangs() {
+        return checkboxes.filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
     }
 
-    document.querySelectorAll('.js-jenjang-checkbox').forEach(function (cb) {
-        cb.addEventListener('change', syncJenjangWaFields);
+    function escapeHtml(val) {
+        return String(val === null || val === undefined ? '' : val)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    function renderChipsAndSync() {
+        var selected = getSelectedJenjangs();
+        ddChips.innerHTML = '';
+
+        checkboxes.forEach(function (cb) {
+            var opt = cb.closest('.fi-ms-option');
+            if (opt) opt.classList.toggle('is-selected', cb.checked);
+
+            var row = document.querySelector('[data-lembaga-row="' + cb.value + '"]');
+            if (row) row.style.display = cb.checked ? '' : 'none';
+
+            if (cb.checked) {
+                var chip = document.createElement('span');
+                chip.className = 'fi-ms-chip';
+                chip.innerHTML = '<span>' + escapeHtml(cb.value) + '</span>' +
+                    '<button type="button" class="fi-ms-chip-rm" aria-label="Hapus ' + escapeHtml(cb.value) + '">&times;</button>';
+                chip.querySelector('.fi-ms-chip-rm').addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    cb.checked = false;
+                    renderChipsAndSync();
+                });
+                ddChips.appendChild(chip);
+            }
+        });
+
+        ddPlaceholder.style.display = selected.length > 0 ? 'none' : '';
+        var configWrap = document.getElementById('perLembagaConfigWrap');
+        if (configWrap) configWrap.style.display = selected.length > 0 ? 'flex' : 'none';
+
+        syncAllGelombangQuotas();
+    }
+
+    if (ddTrigger && ddWrap) {
+        ddTrigger.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var isOpen = ddWrap.classList.toggle('is-open');
+            ddTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            if (isOpen && ddSearch) {
+                ddSearch.value = '';
+                filterOptions('');
+                setTimeout(function () { ddSearch.focus(); }, 30);
+            }
+        });
+    }
+
+    function filterOptions(q) {
+        var term = String(q || '').toLowerCase().trim();
+        document.querySelectorAll('#jenjangOptionList .fi-ms-option').forEach(function (opt) {
+            var lbl = opt.getAttribute('data-option-label') || '';
+            opt.style.display = (!term || lbl.indexOf(term) !== -1) ? '' : 'none';
+        });
+    }
+
+    if (ddSearch) {
+        ddSearch.addEventListener('input', function () { filterOptions(this.value); });
+        ddSearch.addEventListener('click', function (e) { e.stopPropagation(); });
+    }
+
+    checkboxes.forEach(function (cb) {
+        cb.addEventListener('change', renderChipsAndSync);
     });
-    syncJenjangWaFields();
+
+    document.addEventListener('click', function (e) {
+        if (ddWrap && !ddWrap.contains(e.target)) {
+            ddWrap.classList.remove('is-open');
+            if (ddTrigger) ddTrigger.setAttribute('aria-expanded', 'false');
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && ddWrap) {
+            ddWrap.classList.remove('is-open');
+            if (ddTrigger) ddTrigger.setAttribute('aria-expanded', 'false');
+        }
+    });
 
     // 3. Auto-slug dari Judul
     var judulEl = document.getElementById('judul');
@@ -407,23 +669,51 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 4. Dynamic Gelombang Rows
+    // 4. Dynamic Gelombang Rows + Kuota per Lembaga
     var listEl = document.getElementById('gelombangList');
     var emptyEl = document.getElementById('gelombangEmpty');
     var addBtn = document.getElementById('btnAddGelombang');
-    var rows = @json($initialGelombangs);
+    var initialRows = @json($initialGelombangs);
     var counter = 0;
 
     function updateEmptyState() {
         emptyEl.style.display = listEl.children.length > 0 ? 'none' : 'block';
     }
 
-    function escapeAttr(val) {
-        return String(val === null || val === undefined ? '' : val)
-            .replace(/&/g, '&amp;')
-            .replace(/"/g, '&quot;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+    function renderQuotaInputsForRow(rowEl) {
+        var idx = rowEl.getAttribute('data-row-idx');
+        var quotaContainer = rowEl.querySelector('.js-gel-quotas');
+        if (!quotaContainer) return;
+
+        // Simpan nilai yang sudah ada di DOM ke cache rowEl._quotaCache
+        rowEl._quotaCache = rowEl._quotaCache || {};
+        quotaContainer.querySelectorAll('input[data-quota-jenjang]').forEach(function (inp) {
+            rowEl._quotaCache[inp.getAttribute('data-quota-jenjang')] = inp.value;
+        });
+
+        var selected = getSelectedJenjangs();
+        quotaContainer.innerHTML = '';
+
+        selected.forEach(function (jKey) {
+            var currentVal = rowEl._quotaCache[jKey] !== undefined && rowEl._quotaCache[jKey] !== null
+                ? rowEl._quotaCache[jKey]
+                : '';
+
+            var field = document.createElement('div');
+            field.className = 'wizard-form-group';
+            field.style.marginBottom = '0';
+            field.innerHTML =
+                '<label class="wizard-label">Kuota ' + escapeHtml(jKey) + '</label>' +
+                '<input type="number" min="1" data-quota-jenjang="' + escapeHtml(jKey) + '" ' +
+                    'name="gelombangs[' + idx + '][kuota_per_jenjang][' + escapeHtml(jKey) + ']" ' +
+                    'value="' + escapeHtml(currentVal) + '" class="wizard-input" placeholder="∞">';
+            quotaContainer.appendChild(field);
+        });
+    }
+
+    function syncAllGelombangQuotas() {
+        if (!listEl) return;
+        Array.from(listEl.children).forEach(renderQuotaInputsForRow);
     }
 
     function addGelombangRow(data) {
@@ -435,29 +725,29 @@ document.addEventListener('DOMContentLoaded', function () {
         var wrap = document.createElement('div');
         wrap.className = 'wizard-subcard';
         wrap.style.marginBottom = '0';
+        wrap.setAttribute('data-row-idx', idx);
+        wrap._quotaCache = Object.assign({}, item.kuota_per_jenjang || {});
+
         wrap.innerHTML =
-            '<input type="hidden" name="gelombangs[' + idx + '][id]" value="' + escapeAttr(item.id || '') + '">' +
-            '<div style="display:grid; grid-template-columns: 2fr 1.2fr 1.2fr 0.8fr auto; gap:12px; align-items:end;">' +
+            '<input type="hidden" name="gelombangs[' + idx + '][id]" value="' + escapeHtml(item.id || '') + '">' +
+            '<div style="display:grid; grid-template-columns: 2fr 1.2fr 1.2fr auto; gap:12px; align-items:end;">' +
                 '<div class="wizard-form-group" style="margin-bottom:0;">' +
                     '<label class="wizard-label">Nama Gelombang</label>' +
-                    '<input type="text" name="gelombangs[' + idx + '][nama_gelombang]" value="' + escapeAttr(nama) + '" class="wizard-input" placeholder="Gelombang 1">' +
+                    '<input type="text" name="gelombangs[' + idx + '][nama_gelombang]" value="' + escapeHtml(nama) + '" class="wizard-input" placeholder="Gelombang 1">' +
                 '</div>' +
                 '<div class="wizard-form-group" style="margin-bottom:0;">' +
                     '<label class="wizard-label">Tanggal Mulai</label>' +
-                    '<input type="date" name="gelombangs[' + idx + '][tanggal_mulai]" value="' + escapeAttr(item.tanggal_mulai || '') + '" class="wizard-input">' +
+                    '<input type="date" name="gelombangs[' + idx + '][tanggal_mulai]" value="' + escapeHtml(item.tanggal_mulai || '') + '" class="wizard-input">' +
                 '</div>' +
                 '<div class="wizard-form-group" style="margin-bottom:0;">' +
                     '<label class="wizard-label">Tanggal Selesai</label>' +
-                    '<input type="date" name="gelombangs[' + idx + '][tanggal_selesai]" value="' + escapeAttr(item.tanggal_selesai || '') + '" class="wizard-input">' +
-                '</div>' +
-                '<div class="wizard-form-group" style="margin-bottom:0;">' +
-                    '<label class="wizard-label">Kuota</label>' +
-                    '<input type="number" min="1" name="gelombangs[' + idx + '][kuota]" value="' + escapeAttr(item.kuota || '') + '" class="wizard-input" placeholder="∞">' +
+                    '<input type="date" name="gelombangs[' + idx + '][tanggal_selesai]" value="' + escapeHtml(item.tanggal_selesai || '') + '" class="wizard-input">' +
                 '</div>' +
                 '<button type="button" class="btn btn-secondary js-del-gel" title="Hapus" style="height:42px; padding:0 12px; color:#DC2626;">' +
                     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
                 '</button>' +
-            '</div>';
+            '</div>' +
+            '<div class="js-gel-quotas" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border-light, #E5E7EB);"></div>';
 
         wrap.querySelector('.js-del-gel').addEventListener('click', function () {
             wrap.remove();
@@ -465,11 +755,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         listEl.appendChild(wrap);
+        renderQuotaInputsForRow(wrap);
         updateEmptyState();
     }
 
-    if (Array.isArray(rows) && rows.length > 0) {
-        rows.forEach(addGelombangRow);
+    if (Array.isArray(initialRows) && initialRows.length > 0) {
+        initialRows.forEach(addGelombangRow);
     } else {
         updateEmptyState();
     }
@@ -477,6 +768,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (addBtn) {
         addBtn.addEventListener('click', function () { addGelombangRow({}); });
     }
+
+    // Render awal dropdown chips, WA/Lokasi per lembaga, & kuota gelombang
+    renderChipsAndSync();
 
     @if ($errors->any())
         @php

@@ -23,8 +23,8 @@ class PendaftaranRequest extends FormRequest
         $id = $routeParam instanceof \App\Models\Pendaftaran ? $routeParam->id : $routeParam;
 
         return [
-            // Pilihan Jenjang Pendidikan
-            'jenjang' => 'nullable|in:SMP,SMA,Reguler',
+            // Pilihan Jenjang Pendidikan (mendukung lembaga formal dinamis)
+            'jenjang' => 'nullable|string|max:50',
 
             // Identitas Pribadi
             'no_induk' => 'nullable|string|max:50',

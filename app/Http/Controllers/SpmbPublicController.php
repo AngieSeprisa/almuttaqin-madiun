@@ -17,7 +17,7 @@ class SpmbPublicController extends Controller
 {
     public function show(string $slug)
     {
-        $penerimaan = PenerimaanSantri::with(['gelombangs' => fn ($q) => $q->withCount('pendaftarans')])
+        $penerimaan = PenerimaanSantri::with('gelombangs')
             ->where('slug', $slug)
             ->firstOrFail();
 
@@ -25,7 +25,9 @@ class SpmbPublicController extends Controller
         $activeGelombang = $penerimaan->activeGelombang();
         $statusState = $penerimaan->statusState();
         $allowedJenjangs = $penerimaan->allowedJenjangs();
+        $availableJenjangs = $penerimaan->availableJenjangs();
         $dokumenConfig = $penerimaan->dokumenConfig();
+        $lokasiMap = $penerimaan->lokasiMap();
 
         return view('spmb.form', compact(
             'penerimaan',
@@ -33,13 +35,15 @@ class SpmbPublicController extends Controller
             'activeGelombang',
             'statusState',
             'allowedJenjangs',
-            'dokumenConfig'
+            'availableJenjangs',
+            'dokumenConfig',
+            'lokasiMap'
         ));
     }
 
     public function store(Request $request, string $slug, ImageCompressor $compressor)
     {
-        $penerimaan = PenerimaanSantri::with(['gelombangs' => fn ($q) => $q->withCount('pendaftarans')])
+        $penerimaan = PenerimaanSantri::with('gelombangs')
             ->where('slug', $slug)
             ->firstOrFail();
 
@@ -54,7 +58,7 @@ class SpmbPublicController extends Controller
         }
 
         $activeGelombang = $penerimaan->activeGelombang();
-        $allowedJenjangs = $penerimaan->allowedJenjangs();
+        $availableJenjangs = $penerimaan->availableJenjangs();
         $dokumenConfig = $penerimaan->dokumenConfig();
 
         $baseRequest = new PendaftaranRequest();
@@ -62,7 +66,8 @@ class SpmbPublicController extends Controller
         $attributes = $baseRequest->attributes();
         $messages = $baseRequest->messages();
 
-        $rules['jenjang'] = ['required', Rule::in($allowedJenjangs)];
+        $rules['jenjang'] = ['required', Rule::in($availableJenjangs)];
+        $messages['jenjang.in'] = 'Kuota untuk lembaga/jenjang yang dipilih sudah penuh atau tidak tersedia.';
         $rules['nama_lengkap'] = 'required|string|max:255';
         $rules['jenis_kelamin'] = 'required|in:Laki-laki,Perempuan';
         $rules['pj_biaya_hp'] = 'required|string|max:30';
@@ -91,8 +96,8 @@ class SpmbPublicController extends Controller
             $input[$flagKey] = $request->boolean($flagKey);
         }
 
-        if (count($allowedJenjangs) === 1 && empty($input['jenjang'])) {
-            $input['jenjang'] = $allowedJenjangs[0];
+        if (count($availableJenjangs) === 1 && empty($input['jenjang'])) {
+            $input['jenjang'] = $availableJenjangs[0];
         }
 
         $validator = Validator::make($input, $rules, $messages, $attributes);
@@ -170,8 +175,9 @@ class SpmbPublicController extends Controller
             . "Nama: {$pendaftaran->nama_lengkap}\n"
             . "Jenjang: {$pendaftaran->jenjang}";
         $waConfirmUrl = $penerimaan->waUrl($waMessage, $pendaftaran->jenjang);
+        $lokasiSeleksi = $penerimaan->lokasiForJenjang($pendaftaran->jenjang);
 
-        return view('spmb.bukti', compact('penerimaan', 'pendaftaran', 'waConfirmUrl'));
+        return view('spmb.bukti', compact('penerimaan', 'pendaftaran', 'waConfirmUrl', 'lokasiSeleksi'));
     }
 
     public function cetak(string $slug, string $token)
@@ -183,8 +189,9 @@ class SpmbPublicController extends Controller
             ->firstOrFail();
 
         $kop = Lembaga::kopForJenjang($pendaftaran->jenjang);
+        $lokasiSeleksi = $penerimaan->lokasiForJenjang($pendaftaran->jenjang);
 
-        return view('spmb.cetak', compact('penerimaan', 'pendaftaran', 'kop'));
+        return view('spmb.cetak', compact('penerimaan', 'pendaftaran', 'kop', 'lokasiSeleksi'));
     }
 
     public function cekStatus(Request $request, string $slug)
@@ -192,6 +199,7 @@ class SpmbPublicController extends Controller
         $penerimaan = PenerimaanSantri::where('slug', $slug)->firstOrFail();
         $kode = trim((string) $request->query('kode', ''));
         $pendaftaran = null;
+        $lokasiSeleksi = null;
         $searched = false;
 
         if ($kode !== '') {
@@ -204,22 +212,24 @@ class SpmbPublicController extends Controller
                 })
                 ->latest()
                 ->first();
+
+            if ($pendaftaran) {
+                $lokasiSeleksi = $penerimaan->lokasiForJenjang($pendaftaran->jenjang);
+            }
         }
 
-        return view('spmb.cek-status', compact('penerimaan', 'kode', 'pendaftaran', 'searched'));
+        return view('spmb.cek-status', compact('penerimaan', 'kode', 'pendaftaran', 'lokasiSeleksi', 'searched'));
     }
 
     /**
      * Format nomor registrasi: {LEMBAGA}-{NOMOR_URUT}-{TAHUN_AJARAN}
-     * Contoh: SMP-01-202728, SMA-02-202728, PONDOK-01-202728
+     * Contoh: SMP-01-202728, SMA-02-202728, SMK-01-202728
      */
     protected function generateRegistrationNumber(PenerimaanSantri $penerimaan, string $jenjang): string
     {
         $lembagaCode = match (strtoupper(trim($jenjang))) {
-            'SMP'     => 'SMP',
-            'SMA'     => 'SMA',
             'REGULER' => 'PONDOK',
-            default   => strtoupper(Str::slug($jenjang, '')),
+            default   => strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $jenjang)),
         };
 
         $tahunCode = $penerimaan->tahunAjaranCode();

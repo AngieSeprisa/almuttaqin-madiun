@@ -38,6 +38,9 @@
             <span><span class="box">{!! $ck(($p->jenjang ?? '') === 'SMP') !!}</span>SMP</span>
             <span><span class="box">{!! $ck(($p->jenjang ?? '') === 'SMA') !!}</span>SMA</span>
             <span><span class="box">{!! $ck(($p->jenjang ?? 'Reguler') === 'Reguler') !!}</span>Reguler</span>
+            @if($p->jenjang && !in_array($p->jenjang, ['SMP', 'SMA', 'Reguler'], true))
+                <span><span class="box">✓</span>{{ $p->jenjang }}</span>
+            @endif
             @if($p->nisn)
                 <span class="gap"></span>
                 <span style="font-weight:700;">NISN :</span>

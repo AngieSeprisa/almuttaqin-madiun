@@ -10,12 +10,6 @@ class PenerimaanSantri extends Model
 {
     use HasFactory;
 
-    public const JENJANG_ITEMS = [
-        'SMP'     => 'SMP',
-        'SMA'     => 'SMA',
-        'Reguler' => 'Reguler (Pondok)',
-    ];
-
     public const DOKUMEN_DEFAULTS = [
         'berkas_akta'             => 'opsional',
         'berkas_kk'               => 'opsional',
@@ -40,6 +34,7 @@ class PenerimaanSantri extends Model
         'kontak_wa_per_jenjang',
         'jadwal_seleksi',
         'lokasi_seleksi',
+        'lokasi_seleksi_per_jenjang',
         'syarat_dokumen',
         'catatan_syarat',
         'is_active',
@@ -47,11 +42,34 @@ class PenerimaanSantri extends Model
     ];
 
     protected $casts = [
-        'jenjangs'              => 'array',
-        'kontak_wa_per_jenjang' => 'array',
-        'syarat_dokumen'        => 'array',
-        'is_active'             => 'boolean',
+        'jenjangs'                   => 'array',
+        'kontak_wa_per_jenjang'      => 'array',
+        'lokasi_seleksi_per_jenjang' => 'array',
+        'syarat_dokumen'             => 'array',
+        'is_active'                  => 'boolean',
     ];
+
+    /**
+     * Daftar lembaga formal terdaftar dalam format [key => label].
+     * Contoh: ['SMP' => 'SMP Al Muttaqin', 'SMA' => 'SMA Al Muttaqin']
+     */
+    public static function formalJenjangOptions(): array
+    {
+        $lembagas = Lembaga::formalOptions();
+        if ($lembagas->isEmpty()) {
+            return [
+                'SMP' => 'SMP',
+                'SMA' => 'SMA',
+            ];
+        }
+
+        $options = [];
+        foreach ($lembagas as $lem) {
+            $options[$lem->jenjang_key] = $lem->nama;
+        }
+
+        return $options;
+    }
 
     public function gelombangs()
     {
@@ -76,27 +94,54 @@ class PenerimaanSantri extends Model
     }
 
     /**
-     * Mengembalikan gelombang yang sedang aktif pada tanggal tertentu (dan kuota belum penuh).
+     * Mengembalikan gelombang yang sedang aktif pada tanggal tertentu dan masih memiliki kuota minimal pada 1 lembaga.
      */
     public function activeGelombang(?Carbon $date = null): ?PenerimaanGelombang
     {
         $today = ($date ?? now())->toDateString();
         $gelombangs = $this->relationLoaded('gelombangs')
             ? $this->gelombangs
-            : $this->gelombangs()->withCount('pendaftarans')->get();
+            : $this->gelombangs()->get();
+
+        $allowed = $this->allowedJenjangs();
 
         foreach ($gelombangs as $gel) {
             $start = $gel->tanggal_mulai?->toDateString();
             $end = $gel->tanggal_selesai?->toDateString();
             if ($start && $end && $today >= $start && $today <= $end) {
-                $count = $gel->pendaftarans_count ?? $gel->pendaftarans()->count();
-                if ($gel->kuota === null || $count < $gel->kuota) {
+                if (!empty($gel->availableJenjangs($allowed))) {
                     return $gel;
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * Daftar jenjang yang kuotanya masih tersedia saat ini.
+     */
+    public function availableJenjangs(?Carbon $date = null): array
+    {
+        $allowed = $this->allowedJenjangs();
+        if (!$this->is_active) {
+            return [];
+        }
+
+        $gelombangs = $this->relationLoaded('gelombangs')
+            ? $this->gelombangs
+            : $this->gelombangs()->get();
+
+        if ($gelombangs->isEmpty()) {
+            return $allowed;
+        }
+
+        $active = $this->activeGelombang($date);
+        if (!$active) {
+            return [];
+        }
+
+        return $active->availableJenjangs($allowed);
     }
 
     /**
@@ -110,7 +155,7 @@ class PenerimaanSantri extends Model
 
         $gelombangs = $this->relationLoaded('gelombangs')
             ? $this->gelombangs
-            : $this->gelombangs()->withCount('pendaftarans')->get();
+            : $this->gelombangs()->get();
 
         if ($gelombangs->isEmpty()) {
             return true;
@@ -130,7 +175,7 @@ class PenerimaanSantri extends Model
 
         $gelombangs = $this->relationLoaded('gelombangs')
             ? $this->gelombangs
-            : $this->gelombangs()->withCount('pendaftarans')->get();
+            : $this->gelombangs()->get();
 
         if ($gelombangs->isEmpty()) {
             return ['code' => 'buka', 'label' => 'Dibuka'];
@@ -160,29 +205,27 @@ class PenerimaanSantri extends Model
     }
 
     /**
-     * Pilihan jenjang yang diizinkan pada form publik event ini (mendukung multi-checklist).
+     * Pilihan jenjang yang diizinkan pada form publik event ini (dinamis dari lembaga formal).
      */
     public function allowedJenjangs(): array
     {
-        $validOrder = array_keys(self::JENJANG_ITEMS);
+        $formalKeys = array_keys(self::formalJenjangOptions());
 
         if (is_array($this->jenjangs) && !empty($this->jenjangs)) {
-            $filtered = array_values(array_intersect($validOrder, $this->jenjangs));
-            if (!empty($filtered)) {
-                return $filtered;
+            $cleaned = array_values(array_unique(array_filter(array_map('trim', $this->jenjangs))));
+            if (!empty($cleaned)) {
+                return $cleaned;
             }
         }
 
-        // Fallback untuk data lama yang hanya mengisi kolom string `jenjang`
         $legacy = trim((string) $this->jenjang);
         if ($legacy === '' || strcasecmp($legacy, 'Semua') === 0) {
-            return $validOrder;
+            return $formalKeys;
         }
 
-        $parts = array_map('trim', explode(',', $legacy));
-        $filtered = array_values(array_intersect($validOrder, $parts));
+        $parts = array_values(array_unique(array_filter(array_map('trim', explode(',', $legacy)))));
 
-        return !empty($filtered) ? $filtered : $validOrder;
+        return !empty($parts) ? $parts : $formalKeys;
     }
 
     /**
@@ -194,7 +237,7 @@ class PenerimaanSantri extends Model
     }
 
     /**
-     * Map nomor WA panitia per jenjang (dengan fallback ke kontak_wa lama jika perlu).
+     * Map nomor WA panitia per jenjang.
      */
     public function waMap(): array
     {
@@ -213,7 +256,50 @@ class PenerimaanSantri extends Model
     }
 
     /**
-     * Nomor WA mentah untuk jenjang tertentu (fallback ke kontak_wa umum / nomor pertama yg tersedia).
+     * Map lokasi seleksi per jenjang.
+     */
+    public function lokasiMap(): array
+    {
+        $saved = is_array($this->lokasi_seleksi_per_jenjang) ? $this->lokasi_seleksi_per_jenjang : [];
+        $map = [];
+
+        foreach ($this->allowedJenjangs() as $j) {
+            $val = trim((string) ($saved[$j] ?? ''));
+            if ($val === '' && filled($this->lokasi_seleksi)) {
+                $val = trim((string) $this->lokasi_seleksi);
+            }
+            $map[$j] = $val;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Lokasi seleksi untuk jenjang tertentu (fallback ke lokasi_seleksi umum).
+     */
+    public function lokasiForJenjang(?string $jenjang = null): ?string
+    {
+        $saved = is_array($this->lokasi_seleksi_per_jenjang) ? $this->lokasi_seleksi_per_jenjang : [];
+
+        if ($jenjang !== null && !empty($saved[$jenjang])) {
+            return trim((string) $saved[$jenjang]);
+        }
+
+        if (filled($this->lokasi_seleksi)) {
+            return trim((string) $this->lokasi_seleksi);
+        }
+
+        foreach ($saved as $loc) {
+            if (filled($loc)) {
+                return trim((string) $loc);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Nomor WA mentah untuk jenjang tertentu.
      */
     public function waNumberForJenjang(?string $jenjang = null): ?string
     {
@@ -237,7 +323,7 @@ class PenerimaanSantri extends Model
     }
 
     /**
-     * URL WhatsApp panitia sesuai jenjang (null bila tidak ada nomor).
+     * URL WhatsApp panitia sesuai jenjang.
      */
     public function waUrl(?string $message = null, ?string $jenjang = null): ?string
     {
