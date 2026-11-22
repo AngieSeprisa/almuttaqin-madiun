@@ -25,13 +25,15 @@
             box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
         }
         .spmb-topbar-inner {
-            max-width: 960px;
+            width: 100%;
+            max-width: 100%;
             margin: 0 auto;
-            padding: 12px 20px;
+            padding: 12px 28px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 14px;
+            box-sizing: border-box;
         }
         .spmb-brand {
             display: flex;
@@ -118,9 +120,11 @@
 
         /* ===== Main Container ===== */
         .spmb-container {
-            max-width: 960px;
+            width: 100%;
+            max-width: 100%;
             margin: 0 auto;
-            padding: 20px 20px 48px;
+            padding: 20px 28px 48px;
+            box-sizing: border-box;
         }
 
         /* ===== Info Summary Card ===== */

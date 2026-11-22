@@ -3,7 +3,7 @@
 @section('title', 'Cek Status - ' . $penerimaan->judul)
 
 @section('content')
-<div class="spmb-card" style="max-width:640px; margin:0 auto;">
+<div class="spmb-card" style="width:100%;">
     <h1 style="font-size:17px; font-weight:800; color:#0F172A; margin:0 0 14px 0;">Cek Status Pendaftaran</h1>
 
     <form action="{{ route('spmb.cek-status', $penerimaan->slug) }}" method="GET" style="display:flex; gap:10px; flex-wrap:wrap;">

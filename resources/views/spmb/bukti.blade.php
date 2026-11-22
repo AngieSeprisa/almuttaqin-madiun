@@ -3,7 +3,7 @@
 @section('title', 'Bukti Pendaftaran - ' . $pendaftaran->no_induk)
 
 @section('content')
-<div class="spmb-card" style="max-width:700px; margin:0 auto;">
+<div class="spmb-card" style="width:100%;">
     <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:16px 18px; border-radius:12px; background:#EFF6FF; border:1px solid #BFDBFE; margin-bottom:20px;">
         <div>
             <div style="font-size:11px; font-weight:700; color:#1E40AF; text-transform:uppercase; letter-spacing:0.05em;">Nomor Registrasi</div>

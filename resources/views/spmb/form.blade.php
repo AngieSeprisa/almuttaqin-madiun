@@ -11,7 +11,7 @@
 @endif
 
 @if (!$isOpen)
-    <div class="spmb-card" style="max-width:620px; margin:24px auto; text-align:center; padding:36px 24px;">
+    <div class="spmb-card" style="width:100%; text-align:center; padding:36px 24px;">
         <div style="margin-bottom:14px;">
             <span class="status-pill status-ditolak" style="font-size:13px; padding:6px 16px;">{{ $statusState['label'] }}</span>
         </div>
