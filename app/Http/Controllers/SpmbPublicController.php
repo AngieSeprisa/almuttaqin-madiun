@@ -330,6 +330,51 @@ class SpmbPublicController extends Controller
             }
         }
 
+        if ($request->wantsJson() || $request->query('format') === 'json') {
+            $corsHeaders = [
+                'Access-Control-Allow-Origin'  => '*',
+                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Content-Type, Accept',
+                'Cache-Control'                => 'no-store',
+            ];
+
+            if ($kode === '') {
+                return response()->json([
+                    'found'   => false,
+                    'message' => 'Masukkan Nomor Registrasi atau NIK.',
+                ], 422, $corsHeaders);
+            }
+
+            if (!$pendaftaran) {
+                return response()->json([
+                    'found'   => false,
+                    'message' => 'Data pendaftaran tidak ditemukan.',
+                ], 404, $corsHeaders);
+            }
+
+            return response()->json([
+                'found' => true,
+                'data'  => [
+                    'no_registrasi'  => $pendaftaran->no_induk,
+                    'nama_lengkap'   => $pendaftaran->nama_lengkap,
+                    'jenjang'        => $pendaftaran->jenjang,
+                    'gelombang'      => $pendaftaran->gelombang?->nama_gelombang,
+                    'status'         => $pendaftaran->status_pendaftaran,
+                    'status_code'    => Str::slug($pendaftaran->status_pendaftaran ?? 'pending'),
+                    'tanggal_daftar' => $pendaftaran->created_at?->toDateString(),
+                    'jadwal_seleksi' => $penerimaan->jadwal_seleksi,
+                    'lokasi_seleksi' => $lokasiSeleksi,
+                    'bukti_url'      => $pendaftaran->public_token
+                        ? route('spmb.bukti', ['slug' => $penerimaan->slug, 'token' => $pendaftaran->public_token])
+                        : null,
+                    'cetak_url'      => $pendaftaran->public_token
+                        ? route('spmb.cetak', ['slug' => $penerimaan->slug, 'token' => $pendaftaran->public_token])
+                        : null,
+                    'wa_panitia_url' => $penerimaan->waUrl(null, $pendaftaran->jenjang),
+                ],
+            ], 200, $corsHeaders);
+        }
+
         return view('spmb.cek-status', compact('penerimaan', 'kode', 'pendaftaran', 'lokasiSeleksi', 'searched'));
     }
 

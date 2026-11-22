@@ -52,7 +52,9 @@ Route::prefix('spmb')->name('spmb.')->group(function () {
     Route::post('/{slug}', [SpmbPublicController::class, 'store'])
         ->middleware('throttle:15,1')
         ->name('store');
-    Route::get('/{slug}/cek-status', [SpmbPublicController::class, 'cekStatus'])->name('cek-status');
+    Route::get('/{slug}/cek-status', [SpmbPublicController::class, 'cekStatus'])
+        ->middleware('throttle:30,1')
+        ->name('cek-status');
     Route::get('/{slug}/bukti/{token}', [SpmbPublicController::class, 'bukti'])->name('bukti');
     Route::get('/{slug}/bukti/{token}/cetak', [SpmbPublicController::class, 'cetak'])->name('cetak');
 });

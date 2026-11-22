@@ -364,4 +364,69 @@ class PenerimaanSpmbTest extends TestCase
             ->assertJsonPath('lembaga.1.terisi', 0)
             ->assertJsonPath('lembaga.1.sisa', 20);
     }
+
+    public function test_cek_status_json_dengan_cors_untuk_landing_page(): void
+    {
+        $event = PenerimaanSantri::create([
+            'judul'                      => 'SPMB 2027/2028',
+            'slug'                       => 'spmb-cek-json',
+            'tahun_ajaran'               => '2027/2028',
+            'jenjang'                    => 'SMP',
+            'jenjangs'                   => ['SMP'],
+            'kontak_wa_per_jenjang'      => ['SMP' => '081111111111'],
+            'lokasi_seleksi_per_jenjang' => ['SMP' => 'Aula SMP Al Muttaqin'],
+            'jadwal_seleksi'             => 'Sabtu, 15 Mei 2027',
+            'is_active'                  => true,
+        ]);
+
+        $gel = $event->gelombangs()->create([
+            'nama_gelombang'  => 'Gelombang 1',
+            'tanggal_mulai'   => now()->subDay()->toDateString(),
+            'tanggal_selesai' => now()->addDays(10)->toDateString(),
+            'urutan'          => 1,
+        ]);
+
+        Pendaftaran::create([
+            'penerimaan_santri_id'    => $event->id,
+            'penerimaan_gelombang_id' => $gel->id,
+            'no_induk'                => 'SMP-01-202728',
+            'public_token'            => 'tokencekstatus1234567890',
+            'nik'                     => '3577010101129999',
+            'jenjang'                 => 'SMP',
+            'nama_lengkap'            => 'Ahmad Zaki',
+            'pj_biaya_hp'             => '085611112222',
+            'alamat_jalan'            => 'Jl. Rahasia No. 1',
+            'status_pendaftaran'      => 'Lulus Seleksi',
+        ]);
+
+        // Ditemukan via ?format=json (tanpa membocorkan NIK/HP/alamat)
+        $res = $this->get(route('spmb.cek-status', [
+            'slug'   => $event->slug,
+            'kode'   => 'SMP-01-202728',
+            'format' => 'json',
+        ]));
+
+        $res->assertOk()
+            ->assertHeader('Access-Control-Allow-Origin', '*')
+            ->assertJsonPath('found', true)
+            ->assertJsonPath('data.no_registrasi', 'SMP-01-202728')
+            ->assertJsonPath('data.nama_lengkap', 'Ahmad Zaki')
+            ->assertJsonPath('data.jenjang', 'SMP')
+            ->assertJsonPath('data.gelombang', 'Gelombang 1')
+            ->assertJsonPath('data.status', 'Lulus Seleksi')
+            ->assertJsonPath('data.status_code', 'lulus-seleksi')
+            ->assertJsonPath('data.lokasi_seleksi', 'Aula SMP Al Muttaqin')
+            ->assertJsonMissing(['nik' => '3577010101129999'])
+            ->assertJsonMissing(['pj_biaya_hp' => '085611112222']);
+
+        // Tidak ditemukan -> 404 dengan CORS
+        $notFound = $this->getJson(route('spmb.cek-status', [
+            'slug' => $event->slug,
+            'kode' => 'TIDAK-ADA',
+        ]));
+
+        $notFound->assertStatus(404)
+            ->assertHeader('Access-Control-Allow-Origin', '*')
+            ->assertJsonPath('found', false);
+    }
 }
