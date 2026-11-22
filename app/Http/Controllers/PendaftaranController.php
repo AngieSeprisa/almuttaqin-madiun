@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PendaftaranRequest;
+use App\Models\Lembaga;
 use App\Models\Pendaftaran;
 use App\Models\PenerimaanSantri;
 use App\Models\Siswa;
@@ -80,9 +81,13 @@ class PendaftaranController extends Controller
 
         $penerimaanQuery = PenerimaanSantri::query()->latest();
         if ($activeRoom === 'smp') {
-            $penerimaanQuery->whereIn('jenjang', ['SMP', 'Semua']);
+            $penerimaanQuery->where(function ($q) {
+                $q->where('jenjang', 'Semua')->orWhere('jenjang', 'like', '%SMP%');
+            });
         } elseif ($activeRoom === 'sma') {
-            $penerimaanQuery->whereIn('jenjang', ['SMA', 'Semua']);
+            $penerimaanQuery->where(function ($q) {
+                $q->where('jenjang', 'Semua')->orWhere('jenjang', 'like', '%SMA%');
+            });
         }
         $penerimaanList = $penerimaanQuery->get(['id', 'judul', 'tahun_ajaran']);
 
@@ -183,8 +188,9 @@ class PendaftaranController extends Controller
     public function cetak($id)
     {
         $pendaftaran = Pendaftaran::findOrFail($id);
+        $kop = Lembaga::kopForJenjang($pendaftaran->jenjang);
 
-        return view('pendaftaran.cetak', compact('pendaftaran'));
+        return view('pendaftaran.cetak', compact('pendaftaran', 'kop'));
     }
 
     /**

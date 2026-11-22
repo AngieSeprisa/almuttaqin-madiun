@@ -25,11 +25,7 @@ class PenerimaanSantriController extends Controller
             ])
             ->latest();
 
-        if ($activeRoom === 'smp') {
-            $query->whereIn('jenjang', ['SMP', 'Semua']);
-        } elseif ($activeRoom === 'sma') {
-            $query->whereIn('jenjang', ['SMA', 'Semua']);
-        }
+        $this->applyRoomScope($query, $activeRoom);
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -43,11 +39,7 @@ class PenerimaanSantriController extends Controller
         $penerimaans = $query->paginate(12)->withQueryString();
 
         $allEvents = PenerimaanSantri::query();
-        if ($activeRoom === 'smp') {
-            $allEvents->whereIn('jenjang', ['SMP', 'Semua']);
-        } elseif ($activeRoom === 'sma') {
-            $allEvents->whereIn('jenjang', ['SMA', 'Semua']);
-        }
+        $this->applyRoomScope($allEvents, $activeRoom);
 
         $stats = [
             'total_event' => (clone $allEvents)->count(),
@@ -62,45 +54,50 @@ class PenerimaanSantriController extends Controller
     public function create()
     {
         $activeRoom = session('active_lembaga');
-        $defaultJenjang = match ($activeRoom) {
-            'smp' => 'SMP',
-            'sma' => 'SMA',
-            default => 'Semua',
+        $defaultJenjangs = match ($activeRoom) {
+            'smp' => ['SMP'],
+            'sma' => ['SMA'],
+            default => ['SMP', 'SMA', 'Reguler'],
         };
 
         $penerimaan = new PenerimaanSantri([
-            'tahun_ajaran'   => date('Y') . '/' . (date('Y') + 1),
-            'jenjang'        => $defaultJenjang,
-            'is_active'      => true,
-            'syarat_dokumen' => PenerimaanSantri::DOKUMEN_DEFAULTS,
+            'tahun_ajaran'          => date('Y') . '/' . (date('Y') + 1),
+            'jenjang'               => count($defaultJenjangs) === 3 ? 'Semua' : implode(', ', $defaultJenjangs),
+            'jenjangs'              => $defaultJenjangs,
+            'kontak_wa_per_jenjang' => [],
+            'is_active'             => true,
+            'syarat_dokumen'        => PenerimaanSantri::DOKUMEN_DEFAULTS,
         ]);
 
         return view('penerimaan.form', [
-            'penerimaan'     => $penerimaan,
-            'isEdit'         => false,
-            'dokumenMeta'    => PenerimaanSantri::DOKUMEN_META,
-            'jenjangOptions' => PenerimaanSantri::JENJANG_OPTIONS,
-            'gelombangs'     => collect(),
+            'penerimaan'   => $penerimaan,
+            'isEdit'       => false,
+            'dokumenMeta'  => PenerimaanSantri::DOKUMEN_META,
+            'jenjangItems' => PenerimaanSantri::JENJANG_ITEMS,
+            'gelombangs'   => collect(),
         ]);
     }
 
     public function store(Request $request)
     {
         $validated = $this->validateEvent($request);
+        [$jenjangs, $jenjangSummary, $waPerJenjang, $fallbackWa] = $this->extractJenjangAndWa($validated);
 
-        $penerimaan = DB::transaction(function () use ($validated, $request) {
+        $penerimaan = DB::transaction(function () use ($validated, $request, $jenjangs, $jenjangSummary, $waPerJenjang, $fallbackWa) {
             $event = PenerimaanSantri::create([
-                'judul'          => $validated['judul'],
-                'slug'           => $validated['slug'],
-                'tahun_ajaran'   => $validated['tahun_ajaran'],
-                'jenjang'        => $validated['jenjang'],
-                'kontak_wa'      => $validated['kontak_wa'] ?? null,
-                'jadwal_seleksi' => $validated['jadwal_seleksi'] ?? null,
-                'lokasi_seleksi' => $validated['lokasi_seleksi'] ?? null,
-                'syarat_dokumen' => $this->normalizeDokumen($validated['syarat_dokumen'] ?? []),
-                'catatan_syarat' => $validated['catatan_syarat'] ?? null,
-                'is_active'      => $request->boolean('is_active', true),
-                'created_by'     => auth()->id(),
+                'judul'                 => $validated['judul'],
+                'slug'                  => $validated['slug'],
+                'tahun_ajaran'          => $validated['tahun_ajaran'],
+                'jenjang'               => $jenjangSummary,
+                'jenjangs'              => $jenjangs,
+                'kontak_wa'             => $fallbackWa,
+                'kontak_wa_per_jenjang' => $waPerJenjang,
+                'jadwal_seleksi'        => $validated['jadwal_seleksi'] ?? null,
+                'lokasi_seleksi'        => $validated['lokasi_seleksi'] ?? null,
+                'syarat_dokumen'        => $this->normalizeDokumen($validated['syarat_dokumen'] ?? []),
+                'catatan_syarat'        => $validated['catatan_syarat'] ?? null,
+                'is_active'             => $request->boolean('is_active', true),
+                'created_by'            => auth()->id(),
             ]);
 
             $this->syncGelombangs($event, $validated['gelombangs'] ?? []);
@@ -117,11 +114,11 @@ class PenerimaanSantriController extends Controller
         $penerimaan = PenerimaanSantri::with('gelombangs')->findOrFail($id);
 
         return view('penerimaan.form', [
-            'penerimaan'     => $penerimaan,
-            'isEdit'         => true,
-            'dokumenMeta'    => PenerimaanSantri::DOKUMEN_META,
-            'jenjangOptions' => PenerimaanSantri::JENJANG_OPTIONS,
-            'gelombangs'     => $penerimaan->gelombangs,
+            'penerimaan'   => $penerimaan,
+            'isEdit'       => true,
+            'dokumenMeta'  => PenerimaanSantri::DOKUMEN_META,
+            'jenjangItems' => PenerimaanSantri::JENJANG_ITEMS,
+            'gelombangs'   => $penerimaan->gelombangs,
         ]);
     }
 
@@ -129,19 +126,22 @@ class PenerimaanSantriController extends Controller
     {
         $penerimaan = PenerimaanSantri::with('gelombangs')->findOrFail($id);
         $validated = $this->validateEvent($request, $penerimaan->id);
+        [$jenjangs, $jenjangSummary, $waPerJenjang, $fallbackWa] = $this->extractJenjangAndWa($validated);
 
-        DB::transaction(function () use ($penerimaan, $validated, $request) {
+        DB::transaction(function () use ($penerimaan, $validated, $request, $jenjangs, $jenjangSummary, $waPerJenjang, $fallbackWa) {
             $penerimaan->update([
-                'judul'          => $validated['judul'],
-                'slug'           => $validated['slug'],
-                'tahun_ajaran'   => $validated['tahun_ajaran'],
-                'jenjang'        => $validated['jenjang'],
-                'kontak_wa'      => $validated['kontak_wa'] ?? null,
-                'jadwal_seleksi' => $validated['jadwal_seleksi'] ?? null,
-                'lokasi_seleksi' => $validated['lokasi_seleksi'] ?? null,
-                'syarat_dokumen' => $this->normalizeDokumen($validated['syarat_dokumen'] ?? []),
-                'catatan_syarat' => $validated['catatan_syarat'] ?? null,
-                'is_active'      => $request->boolean('is_active'),
+                'judul'                 => $validated['judul'],
+                'slug'                  => $validated['slug'],
+                'tahun_ajaran'          => $validated['tahun_ajaran'],
+                'jenjang'               => $jenjangSummary,
+                'jenjangs'              => $jenjangs,
+                'kontak_wa'             => $fallbackWa,
+                'kontak_wa_per_jenjang' => $waPerJenjang,
+                'jadwal_seleksi'        => $validated['jadwal_seleksi'] ?? null,
+                'lokasi_seleksi'        => $validated['lokasi_seleksi'] ?? null,
+                'syarat_dokumen'        => $this->normalizeDokumen($validated['syarat_dokumen'] ?? []),
+                'catatan_syarat'        => $validated['catatan_syarat'] ?? null,
+                'is_active'             => $request->boolean('is_active'),
             ]);
 
             $this->syncGelombangs($penerimaan, $validated['gelombangs'] ?? []);
@@ -174,10 +174,34 @@ class PenerimaanSantriController extends Controller
             ->with('success', 'Link penerimaan "' . $judul . '" berhasil dihapus.');
     }
 
+    protected function applyRoomScope($query, ?string $activeRoom): void
+    {
+        if ($activeRoom === 'smp') {
+            $query->where(function ($q) {
+                $q->where('jenjang', 'Semua')
+                    ->orWhere('jenjang', 'like', '%SMP%');
+            });
+        } elseif ($activeRoom === 'sma') {
+            $query->where(function ($q) {
+                $q->where('jenjang', 'Semua')
+                    ->orWhere('jenjang', 'like', '%SMA%');
+            });
+        }
+    }
+
     protected function validateEvent(Request $request, ?int $ignoreId = null): array
     {
         $rawSlug = trim((string) $request->input('slug', ''));
         $normalizedSlug = Str::slug($rawSlug !== '' ? $rawSlug : (string) $request->input('judul', ''));
+
+        // Backward compatibility bila ada request lama mengirim `jenjang` string alih-alih `jenjangs[]`
+        $jenjangsInput = $request->input('jenjangs');
+        if (!is_array($jenjangsInput) && $request->filled('jenjang')) {
+            $legacy = trim((string) $request->input('jenjang'));
+            $jenjangsInput = strcasecmp($legacy, 'Semua') === 0
+                ? array_keys(PenerimaanSantri::JENJANG_ITEMS)
+                : array_values(array_filter(array_map('trim', explode(',', $legacy))));
+        }
 
         $rawGelombangs = $request->input('gelombangs', []);
         $filteredGelombangs = [];
@@ -204,6 +228,7 @@ class PenerimaanSantriController extends Controller
 
         $request->merge([
             'slug'       => $normalizedSlug,
+            'jenjangs'   => $jenjangsInput,
             'gelombangs' => $filteredGelombangs,
         ]);
 
@@ -217,8 +242,11 @@ class PenerimaanSantriController extends Controller
                 Rule::unique('penerimaan_santris', 'slug')->ignore($ignoreId),
             ],
             'tahun_ajaran'                 => 'required|string|max:30',
-            'jenjang'                      => 'required|in:Semua,SMP,SMA,Reguler',
+            'jenjangs'                     => 'required|array|min:1',
+            'jenjangs.*'                   => 'in:SMP,SMA,Reguler',
             'kontak_wa'                    => 'nullable|string|max:30',
+            'kontak_wa_per_jenjang'        => 'nullable|array',
+            'kontak_wa_per_jenjang.*'      => 'nullable|string|max:30',
             'jadwal_seleksi'               => 'nullable|string|max:255',
             'lokasi_seleksi'               => 'nullable|string|max:255',
             'syarat_dokumen'               => 'nullable|array',
@@ -236,11 +264,44 @@ class PenerimaanSantriController extends Controller
             'slug.unique'                           => 'Slug sudah digunakan oleh penerimaan lain.',
             'slug.regex'                            => 'Slug hanya boleh berisi huruf kecil, angka, dan tanda hubung (-).',
             'tahun_ajaran.required'                 => 'Tahun pendaftaran wajib diisi.',
+            'jenjangs.required'                     => 'Pilih minimal satu jenjang.',
+            'jenjangs.min'                          => 'Pilih minimal satu jenjang.',
             'gelombangs.*.nama_gelombang.required'  => 'Nama gelombang wajib diisi.',
             'gelombangs.*.tanggal_mulai.required'   => 'Tanggal mulai gelombang wajib diisi.',
             'gelombangs.*.tanggal_selesai.required' => 'Tanggal selesai gelombang wajib diisi.',
             'gelombangs.*.tanggal_selesai.after_or_equal' => 'Tanggal selesai tidak boleh lebih awal dari tanggal mulai.',
         ]);
+    }
+
+    protected function extractJenjangAndWa(array $validated): array
+    {
+        $validOrder = array_keys(PenerimaanSantri::JENJANG_ITEMS);
+        $jenjangs = array_values(array_intersect($validOrder, $validated['jenjangs'] ?? []));
+        $summary = count($jenjangs) === count($validOrder)
+            ? 'Semua'
+            : implode(', ', $jenjangs);
+
+        $waInput = is_array($validated['kontak_wa_per_jenjang'] ?? null)
+            ? $validated['kontak_wa_per_jenjang']
+            : [];
+        $legacyWa = trim((string) ($validated['kontak_wa'] ?? ''));
+
+        $waPerJenjang = [];
+        foreach ($jenjangs as $j) {
+            $num = trim((string) ($waInput[$j] ?? ''));
+            if ($num === '' && $legacyWa !== '' && empty($waInput)) {
+                $num = $legacyWa;
+            }
+            if ($num !== '') {
+                $waPerJenjang[$j] = $num;
+            }
+        }
+
+        $fallbackWa = !empty($waPerJenjang)
+            ? reset($waPerJenjang)
+            : ($legacyWa !== '' ? $legacyWa : null);
+
+        return [$jenjangs, $summary, $waPerJenjang, $fallbackWa];
     }
 
     protected function normalizeDokumen(array $input): array

@@ -10,8 +10,7 @@ class PenerimaanSantri extends Model
 {
     use HasFactory;
 
-    public const JENJANG_OPTIONS = [
-        'Semua'   => 'Semua Jenjang (SMP, SMA, Reguler)',
+    public const JENJANG_ITEMS = [
         'SMP'     => 'SMP',
         'SMA'     => 'SMA',
         'Reguler' => 'Reguler (Pondok)',
@@ -36,7 +35,9 @@ class PenerimaanSantri extends Model
         'slug',
         'tahun_ajaran',
         'jenjang',
+        'jenjangs',
         'kontak_wa',
+        'kontak_wa_per_jenjang',
         'jadwal_seleksi',
         'lokasi_seleksi',
         'syarat_dokumen',
@@ -46,8 +47,10 @@ class PenerimaanSantri extends Model
     ];
 
     protected $casts = [
-        'syarat_dokumen' => 'array',
-        'is_active'      => 'boolean',
+        'jenjangs'              => 'array',
+        'kontak_wa_per_jenjang' => 'array',
+        'syarat_dokumen'        => 'array',
+        'is_active'             => 'boolean',
     ];
 
     public function gelombangs()
@@ -140,7 +143,6 @@ class PenerimaanSantri extends Model
 
         $today = ($date ?? now())->toDateString();
 
-        // Cek apakah sedang dalam rentang tanggal tetapi kuota penuh
         foreach ($gelombangs as $gel) {
             $start = $gel->tanggal_mulai?->toDateString();
             $end = $gel->tanggal_selesai?->toDateString();
@@ -158,16 +160,132 @@ class PenerimaanSantri extends Model
     }
 
     /**
-     * Pilihan jenjang yang diizinkan pada form publik event ini.
+     * Pilihan jenjang yang diizinkan pada form publik event ini (mendukung multi-checklist).
      */
     public function allowedJenjangs(): array
     {
-        return match ($this->jenjang) {
-            'SMP'     => ['SMP'],
-            'SMA'     => ['SMA'],
-            'Reguler' => ['Reguler'],
-            default   => ['SMP', 'SMA', 'Reguler'],
-        };
+        $validOrder = array_keys(self::JENJANG_ITEMS);
+
+        if (is_array($this->jenjangs) && !empty($this->jenjangs)) {
+            $filtered = array_values(array_intersect($validOrder, $this->jenjangs));
+            if (!empty($filtered)) {
+                return $filtered;
+            }
+        }
+
+        // Fallback untuk data lama yang hanya mengisi kolom string `jenjang`
+        $legacy = trim((string) $this->jenjang);
+        if ($legacy === '' || strcasecmp($legacy, 'Semua') === 0) {
+            return $validOrder;
+        }
+
+        $parts = array_map('trim', explode(',', $legacy));
+        $filtered = array_values(array_intersect($validOrder, $parts));
+
+        return !empty($filtered) ? $filtered : $validOrder;
+    }
+
+    /**
+     * Label ringkas jenjang terpilih.
+     */
+    public function jenjangLabel(): string
+    {
+        return implode(', ', $this->allowedJenjangs());
+    }
+
+    /**
+     * Map nomor WA panitia per jenjang (dengan fallback ke kontak_wa lama jika perlu).
+     */
+    public function waMap(): array
+    {
+        $saved = is_array($this->kontak_wa_per_jenjang) ? $this->kontak_wa_per_jenjang : [];
+        $map = [];
+
+        foreach ($this->allowedJenjangs() as $j) {
+            $val = trim((string) ($saved[$j] ?? ''));
+            if ($val === '' && filled($this->kontak_wa) && count($this->allowedJenjangs()) === 1) {
+                $val = trim((string) $this->kontak_wa);
+            }
+            $map[$j] = $val;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Nomor WA mentah untuk jenjang tertentu (fallback ke kontak_wa umum / nomor pertama yg tersedia).
+     */
+    public function waNumberForJenjang(?string $jenjang = null): ?string
+    {
+        $saved = is_array($this->kontak_wa_per_jenjang) ? $this->kontak_wa_per_jenjang : [];
+
+        if ($jenjang !== null && !empty($saved[$jenjang])) {
+            return trim((string) $saved[$jenjang]);
+        }
+
+        if (filled($this->kontak_wa)) {
+            return trim((string) $this->kontak_wa);
+        }
+
+        foreach ($saved as $num) {
+            if (filled($num)) {
+                return trim((string) $num);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * URL WhatsApp panitia sesuai jenjang (null bila tidak ada nomor).
+     */
+    public function waUrl(?string $message = null, ?string $jenjang = null): ?string
+    {
+        $number = $this->waNumberForJenjang($jenjang);
+        $digits = preg_replace('/\D+/', '', (string) $number);
+        if (!$digits) {
+            return null;
+        }
+
+        if (str_starts_with($digits, '0')) {
+            $digits = '62' . substr($digits, 1);
+        } elseif (!str_starts_with($digits, '62')) {
+            $digits = '62' . $digits;
+        }
+
+        $url = 'https://wa.me/' . $digits;
+        if ($message !== null && $message !== '') {
+            $url .= '?text=' . rawurlencode($message);
+        }
+
+        return $url;
+    }
+
+    /**
+     * Daftar URL WA panitia untuk setiap jenjang yang memiliki nomor WA.
+     */
+    public function waLinksByJenjang(?string $message = null): array
+    {
+        $links = [];
+        $saved = is_array($this->kontak_wa_per_jenjang) ? $this->kontak_wa_per_jenjang : [];
+
+        foreach ($this->allowedJenjangs() as $j) {
+            if (!empty($saved[$j])) {
+                $url = $this->waUrl($message, $j);
+                if ($url) {
+                    $links[$j] = $url;
+                }
+            }
+        }
+
+        if (empty($links)) {
+            $fallback = $this->waUrl($message);
+            if ($fallback) {
+                $links['Panitia'] = $fallback;
+            }
+        }
+
+        return $links;
     }
 
     /**
@@ -202,26 +320,25 @@ class PenerimaanSantri extends Model
     }
 
     /**
-     * URL WhatsApp panitia (null bila kontak_wa kosong).
+     * Format tahun ajaran ringkas untuk nomor registrasi: "2027/2028" -> "202728".
      */
-    public function waUrl(?string $message = null): ?string
+    public function tahunAjaranCode(): string
     {
-        $digits = preg_replace('/\D+/', '', (string) $this->kontak_wa);
-        if (!$digits) {
-            return null;
+        $raw = trim((string) $this->tahun_ajaran);
+
+        if (preg_match('/(\d{4})\D+(\d{2,4})/', $raw, $m)) {
+            return $m[1] . substr($m[2], -2);
         }
 
-        if (str_starts_with($digits, '0')) {
-            $digits = '62' . substr($digits, 1);
-        } elseif (!str_starts_with($digits, '62')) {
-            $digits = '62' . $digits;
+        $digits = preg_replace('/\D+/', '', $raw);
+        if (strlen($digits) === 8) {
+            return substr($digits, 0, 4) . substr($digits, -2);
+        }
+        if (strlen($digits) >= 4) {
+            return $digits;
         }
 
-        $url = 'https://wa.me/' . $digits;
-        if ($message !== null && $message !== '') {
-            $url .= '?text=' . rawurlencode($message);
-        }
-
-        return $url;
+        $y = (int) date('Y');
+        return $y . substr((string) ($y + 1), -2);
     }
 }

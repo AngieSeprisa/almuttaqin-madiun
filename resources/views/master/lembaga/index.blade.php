@@ -508,6 +508,17 @@
                     <span style="font-size:12px; color:var(--text-secondary); font-weight:600;">({{ $item->singkatan }})</span>
                     @endif
                 </div>
+                @if($item->alamat)
+                <div style="font-size:12px; color:var(--text-secondary); line-height:1.4; margin-top:4px;">
+                    {{ $item->alamat }}
+                </div>
+                @endif
+                @if($item->telepon || $item->email)
+                <div style="font-size:11.5px; color:var(--text-muted); display:flex; flex-wrap:wrap; gap:8px;">
+                    @if($item->telepon)<span>{{ $item->telepon }}</span>@endif
+                    @if($item->email)<span>{{ $item->email }}</span>@endif
+                </div>
+                @endif
 
                 <div class="lembaga-meta-grid">
                     <div class="lembaga-meta-item">
@@ -546,17 +557,26 @@
 
                 <div style="display:flex; align-items:center; gap:8px;">
                     @if($isYayasan || (auth()->check() && auth()->user()->canDo('master_lembaga', 'edit')))
+                    @php
+                        $editPayload = [
+                            'id'              => $item->id,
+                            'kode'            => $item->kode,
+                            'nama'            => $item->nama,
+                            'singkatan'       => $item->singkatan,
+                            'kategori'        => $item->kategori,
+                            'alamat'          => $item->alamat ?? '',
+                            'telepon'         => $item->telepon ?? '',
+                            'email'           => $item->email ?? '',
+                            'logo_url'        => $item->logo_url,
+                            'has_custom_logo' => !empty($item->logo),
+                            'urutan'          => $item->urutan,
+                            'is_core'         => $isCore,
+                            'is_active'       => (bool) $item->is_active,
+                        ];
+                    @endphp
                     <button type="button" class="mstr-btn-icon" title="Edit Lembaga"
-                            onclick="bukaModalEditLembaga({
-                                id: {{ $item->id }},
-                                kode: '{{ $item->kode }}',
-                                nama: '{{ addslashes($item->nama) }}',
-                                singkatan: '{{ addslashes($item->singkatan) }}',
-                                kategori: '{{ $item->kategori }}',
-                                urutan: {{ $item->urutan }},
-                                is_core: {{ $isCore ? 'true' : 'false' }},
-                                is_active: {{ $item->is_active ? 'true' : 'false' }}
-                            })">
+                            data-lembaga='@json($editPayload)'
+                            onclick="bukaModalEditLembaga(JSON.parse(this.getAttribute('data-lembaga')))">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -585,59 +605,76 @@
 
 {{-- MODAL TAMBAH LEMBAGA --}}
 <div class="mstr-modal-overlay" id="modalTambahLembaga" onclick="if(event.target === this) tutupModalTambahLembaga()">
-    <div class="mstr-modal-box">
-        <form action="{{ route('master.lembaga.store') }}" method="POST">
+    <div class="mstr-modal-box" style="max-width:540px; max-height:92vh; display:flex; flex-direction:column;">
+        <form action="{{ route('master.lembaga.store') }}" method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; max-height:92vh;">
             @csrf
             <div class="mstr-modal-header">
-                <h3 class="mstr-modal-title">Tambah Lembaga Pendidikan Baru</h3>
+                <h3 class="mstr-modal-title">Tambah Lembaga</h3>
                 <button type="button" class="mstr-modal-close" onclick="tutupModalTambahLembaga()">&times;</button>
             </div>
-            <div class="mstr-modal-body">
-                <div class="mstr-form-group">
-                    <label class="mstr-form-label">Kode Unik Sistem *</label>
-                    <input type="text" name="kode" class="mstr-form-control" placeholder="Contoh: smk, madin, sd" required pattern="[a-zA-Z0-9_-]+" title="Gunakan huruf kecil atau angka tanpa spasi">
-                    <span style="font-size:11.5px; color:var(--text-muted);">Digunakan untuk identifikasi internal (tanpa spasi).</span>
+            <div class="mstr-modal-body" style="overflow-y:auto;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="mstr-form-group">
+                        <label class="mstr-form-label">Kode Unik *</label>
+                        <input type="text" name="kode" class="mstr-form-control" placeholder="smk / madin / sd" required pattern="[a-zA-Z0-9_-]+">
+                    </div>
+                    <div class="mstr-form-group">
+                        <label class="mstr-form-label">Singkatan *</label>
+                        <input type="text" name="singkatan" class="mstr-form-control" placeholder="SMK" required>
+                    </div>
                 </div>
 
                 <div class="mstr-form-group">
                     <label class="mstr-form-label">Nama Lembaga *</label>
-                    <input type="text" name="nama" class="mstr-form-control" placeholder="Contoh: SMK AL MUTTAQIN" required>
+                    <input type="text" name="nama" class="mstr-form-control" placeholder="SMK AL MUTTAQIN" required>
+                </div>
+
+                <div class="mstr-form-group">
+                    <label class="mstr-form-label">Alamat Lengkap</label>
+                    <textarea name="alamat" rows="2" class="mstr-form-control" placeholder="Jln. Nogososro No. 26 Josenan Taman Kota Madiun..."></textarea>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
-                        <label class="mstr-form-label">Singkatan *</label>
-                        <input type="text" name="singkatan" class="mstr-form-control" placeholder="Contoh: SMK" required>
+                        <label class="mstr-form-label">No. Telepon</label>
+                        <input type="text" name="telepon" class="mstr-form-control" placeholder="+62857...">
                     </div>
+                    <div class="mstr-form-group">
+                        <label class="mstr-form-label">Email</label>
+                        <input type="email" name="email" class="mstr-form-control" placeholder="info@almuttaqin.id">
+                    </div>
+                </div>
 
+                <div class="mstr-form-group">
+                    <label class="mstr-form-label">Logo Lembaga</label>
+                    <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" class="mstr-form-control">
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Kategori *</label>
                         <select name="kategori" class="mstr-form-control" required>
-                            <option value="formal">Formal (Sekolah)</option>
-                            <option value="pesantren">Pesantren / Non-Formal</option>
+                            <option value="formal">Formal</option>
+                            <option value="pesantren">Pesantren</option>
                             <option value="yayasan">Yayasan</option>
                         </select>
                     </div>
-                </div>
-
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
-                        <label class="mstr-form-label">Urutan Tampilan</label>
+                        <label class="mstr-form-label">Urutan</label>
                         <input type="number" name="urutan" class="mstr-form-control" placeholder="Otomatis" min="1">
                     </div>
-
                     <div class="mstr-form-group" style="justify-content:center;">
                         <label class="mstr-form-label">&nbsp;</label>
                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:600;">
                             <input type="checkbox" name="is_active" value="1" checked style="width:16px;height:16px;">
-                            <span>Status Aktif</span>
+                            <span>Aktif</span>
                         </label>
                     </div>
                 </div>
             </div>
             <div class="mstr-modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="tutupModalTambahLembaga()">Batal</button>
-                <button type="submit" class="btn btn-primary">Simpan Lembaga</button>
+                <button type="submit" class="btn btn-primary">Simpan</button>
             </div>
         </form>
     </div>
@@ -645,19 +682,24 @@
 
 {{-- MODAL EDIT LEMBAGA --}}
 <div class="mstr-modal-overlay" id="modalEditLembaga" onclick="if(event.target === this) tutupModalEditLembaga()">
-    <div class="mstr-modal-box">
-        <form id="formEditLembaga" method="POST">
+    <div class="mstr-modal-box" style="max-width:540px; max-height:92vh; display:flex; flex-direction:column;">
+        <form id="formEditLembaga" method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; max-height:92vh;">
             @csrf
             @method('PUT')
             <div class="mstr-modal-header">
-                <h3 class="mstr-modal-title">Edit Lembaga Pendidikan</h3>
+                <h3 class="mstr-modal-title">Edit Lembaga</h3>
                 <button type="button" class="mstr-modal-close" onclick="tutupModalEditLembaga()">&times;</button>
             </div>
-            <div class="mstr-modal-body">
-                <div class="mstr-form-group">
-                    <label class="mstr-form-label">Kode Unik Sistem</label>
-                    <input type="text" name="kode" id="editKode" class="mstr-form-control" readonly style="background:var(--table-th-bg);">
-                    <span id="editKodeNotice" style="font-size:11.5px; color:var(--text-muted); display:none;">Kode lembaga sistem utama terkunci untuk menjaga integritas data.</span>
+            <div class="mstr-modal-body" style="overflow-y:auto;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="mstr-form-group">
+                        <label class="mstr-form-label">Kode Unik</label>
+                        <input type="text" name="kode" id="editKode" class="mstr-form-control" readonly style="background:var(--table-th-bg);">
+                    </div>
+                    <div class="mstr-form-group">
+                        <label class="mstr-form-label">Singkatan *</label>
+                        <input type="text" name="singkatan" id="editSingkatan" class="mstr-form-control" required>
+                    </div>
                 </div>
 
                 <div class="mstr-form-group">
@@ -665,33 +707,56 @@
                     <input type="text" name="nama" id="editNama" class="mstr-form-control" required>
                 </div>
 
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                    <div class="mstr-form-group">
-                        <label class="mstr-form-label">Singkatan *</label>
-                        <input type="text" name="singkatan" id="editSingkatan" class="mstr-form-control" required>
-                    </div>
-
-                    <div class="mstr-form-group">
-                        <label class="mstr-form-label">Kategori *</label>
-                        <select name="kategori" id="editKategori" class="mstr-form-control" required>
-                            <option value="formal">Formal (Sekolah)</option>
-                            <option value="pesantren">Pesantren / Non-Formal</option>
-                            <option value="yayasan">Yayasan</option>
-                        </select>
-                    </div>
+                <div class="mstr-form-group">
+                    <label class="mstr-form-label">Alamat Lengkap</label>
+                    <textarea name="alamat" id="editAlamat" rows="2" class="mstr-form-control" placeholder="Alamat lengkap lembaga untuk KOP surat"></textarea>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
-                        <label class="mstr-form-label">Urutan Tampilan</label>
+                        <label class="mstr-form-label">No. Telepon</label>
+                        <input type="text" name="telepon" id="editTelepon" class="mstr-form-control" placeholder="+62857...">
+                    </div>
+                    <div class="mstr-form-group">
+                        <label class="mstr-form-label">Email</label>
+                        <input type="email" name="email" id="editEmail" class="mstr-form-control" placeholder="info@almuttaqin.id">
+                    </div>
+                </div>
+
+                <div class="mstr-form-group">
+                    <label class="mstr-form-label">Logo Lembaga</label>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div class="lembaga-logo-wrap" style="width:48px; height:48px;">
+                            <img id="editLogoPreview" src="" alt="Logo" class="lembaga-logo-img" style="width:36px; height:36px;">
+                        </div>
+                        <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+                            <input type="file" name="logo" id="editLogoInput" accept="image/png,image/jpeg,image/webp" class="mstr-form-control">
+                            <label id="editHapusLogoWrap" style="display:none; align-items:center; gap:6px; font-size:12px; color:#DC2626; cursor:pointer;">
+                                <input type="checkbox" name="hapus_logo" id="editHapusLogo" value="1">
+                                <span>Hapus logo unggahan</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
+                    <div class="mstr-form-group">
+                        <label class="mstr-form-label">Kategori *</label>
+                        <select name="kategori" id="editKategori" class="mstr-form-control" required>
+                            <option value="formal">Formal</option>
+                            <option value="pesantren">Pesantren</option>
+                            <option value="yayasan">Yayasan</option>
+                        </select>
+                    </div>
+                    <div class="mstr-form-group">
+                        <label class="mstr-form-label">Urutan</label>
                         <input type="number" name="urutan" id="editUrutan" class="mstr-form-control" min="1">
                     </div>
-
                     <div class="mstr-form-group" style="justify-content:center;">
                         <label class="mstr-form-label">&nbsp;</label>
                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:600;">
                             <input type="checkbox" name="is_active" id="editIsActive" value="1" style="width:16px;height:16px;">
-                            <span>Status Aktif</span>
+                            <span>Aktif</span>
                         </label>
                     </div>
                 </div>
@@ -718,22 +783,25 @@
         form.action = "{{ url('master/lembaga') }}/" + data.id;
 
         var kodeInput = document.getElementById('editKode');
-        var notice = document.getElementById('editKodeNotice');
-        kodeInput.value = data.kode;
-
+        kodeInput.value = data.kode || '';
         if (data.is_core) {
             kodeInput.setAttribute('readonly', 'readonly');
-            notice.style.display = 'block';
         } else {
             kodeInput.removeAttribute('readonly');
-            notice.style.display = 'none';
         }
 
-        document.getElementById('editNama').value = data.nama;
-        document.getElementById('editSingkatan').value = data.singkatan;
-        document.getElementById('editKategori').value = data.kategori;
-        document.getElementById('editUrutan').value = data.urutan;
+        document.getElementById('editNama').value = data.nama || '';
+        document.getElementById('editSingkatan').value = data.singkatan || '';
+        document.getElementById('editKategori').value = data.kategori || 'formal';
+        document.getElementById('editAlamat').value = data.alamat || '';
+        document.getElementById('editTelepon').value = data.telepon || '';
+        document.getElementById('editEmail').value = data.email || '';
+        document.getElementById('editUrutan').value = data.urutan || '';
         document.getElementById('editIsActive').checked = Boolean(data.is_active);
+        document.getElementById('editLogoPreview').src = data.logo_url || '';
+        document.getElementById('editLogoInput').value = '';
+        document.getElementById('editHapusLogo').checked = false;
+        document.getElementById('editHapusLogoWrap').style.display = data.has_custom_logo ? 'inline-flex' : 'none';
 
         document.getElementById('modalEditLembaga').classList.add('show');
     }
@@ -741,6 +809,17 @@
     function tutupModalEditLembaga() {
         document.getElementById('modalEditLembaga').classList.remove('show');
     }
+
+    document.getElementById('editLogoInput')?.addEventListener('change', function (e) {
+        var file = e.target.files && e.target.files[0];
+        if (file) {
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                document.getElementById('editLogoPreview').src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
 
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {

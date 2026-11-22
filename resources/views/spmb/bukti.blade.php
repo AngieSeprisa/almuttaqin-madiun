@@ -57,11 +57,11 @@
 
     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:24px; padding-top:18px; border-top:1px solid #E5E7EB;">
         <a href="{{ route('spmb.cetak', ['slug' => $penerimaan->slug, 'token' => $pendaftaran->public_token]) }}" target="_blank" class="btn btn-primary">
-            Cetak Kartu Peserta
+            Cetak Bukti &amp; Formulir (2 Hal)
         </a>
         @if($waConfirmUrl)
             <a href="{{ $waConfirmUrl }}" target="_blank" class="btn btn-success">
-                Konfirmasi WhatsApp
+                Konfirmasi WA Panitia {{ $pendaftaran->jenjang }}
             </a>
         @endif
         <a href="{{ route('spmb.cek-status', ['slug' => $penerimaan->slug, 'kode' => $pendaftaran->no_induk]) }}" class="btn btn-secondary">

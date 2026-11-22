@@ -8,6 +8,7 @@ use App\Models\MataPelajaran;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class LembagaController extends Controller
@@ -63,12 +64,21 @@ class LembagaController extends Controller
             'nama'      => 'required|string|max:100',
             'singkatan' => 'required|string|max:30',
             'kategori'  => 'required|in:formal,pesantren,yayasan',
+            'alamat'    => 'nullable|string|max:1000',
+            'telepon'   => 'nullable|string|max:40',
+            'email'     => 'nullable|email|max:120',
+            'logo'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'urutan'    => 'nullable|integer',
             'is_active' => 'nullable|boolean',
         ], [
             'kode.unique' => 'Kode lembaga tersebut sudah digunakan. Gunakan kode unik lain.',
             'kode.alpha_dash' => 'Kode lembaga hanya boleh berupa huruf kecil, angka, atau tanda minus (-).',
         ]);
+
+        unset($validated['logo']);
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $request->file('logo')->store('lembaga', 'public');
+        }
 
         $validated['kode'] = strtolower(trim($validated['kode']));
         $validated['is_active'] = $request->has('is_active');
@@ -99,9 +109,27 @@ class LembagaController extends Controller
             'nama'      => 'required|string|max:100',
             'singkatan' => 'required|string|max:30',
             'kategori'  => 'required|in:formal,pesantren,yayasan',
+            'alamat'    => 'nullable|string|max:1000',
+            'telepon'   => 'nullable|string|max:40',
+            'email'     => 'nullable|email|max:120',
+            'logo'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'urutan'    => 'nullable|integer',
             'is_active' => 'nullable|boolean',
         ]);
+
+        unset($validated['logo']);
+        if ($request->hasFile('logo')) {
+            $newLogo = $request->file('logo')->store('lembaga', 'public');
+            if ($lembaga->logo && Storage::disk('public')->exists($lembaga->logo)) {
+                Storage::disk('public')->delete($lembaga->logo);
+            }
+            $validated['logo'] = $newLogo;
+        } elseif ($request->boolean('hapus_logo')) {
+            if ($lembaga->logo && Storage::disk('public')->exists($lembaga->logo)) {
+                Storage::disk('public')->delete($lembaga->logo);
+            }
+            $validated['logo'] = null;
+        }
 
         // Jangan izinkan ubah kode core jika core lembaga
         $isCore = in_array(strtolower($lembaga->kode), ['yayasan', 'pondok', 'smp', 'sma']);

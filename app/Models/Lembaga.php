@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Lembaga extends Model
 {
@@ -14,6 +15,10 @@ class Lembaga extends Model
         'nama',
         'singkatan',
         'kategori',
+        'alamat',
+        'logo',
+        'telepon',
+        'email',
         'icon',
         'is_active',
         'urutan',
@@ -33,10 +38,14 @@ class Lembaga extends Model
     }
 
     /**
-     * URL logo khusus lembaga atau fallback ke logo utama.
+     * URL logo khusus lembaga atau fallback ke logo bawaan.
      */
     public function getLogoUrlAttribute(): string
     {
+        if (!empty($this->logo) && Storage::disk('public')->exists($this->logo)) {
+            return asset('storage/' . $this->logo);
+        }
+
         if ($this->kode === 'smp' && file_exists(public_path('images/logo-smp.png'))) {
             return asset('images/logo-smp.png');
         }
@@ -45,7 +54,69 @@ class Lembaga extends Model
             return asset('images/logo-sma.png');
         }
 
+        if ($this->kode === 'pondok' && file_exists(public_path('images/logo-pondok.png'))) {
+            return asset('images/logo-pondok.png');
+        }
+
         return asset('images/logo.png');
+    }
+
+    /**
+     * Temukan model Lembaga sesuai jenjang pendaftaran (SMP / SMA / Reguler).
+     */
+    public static function resolveForJenjang(?string $jenjang): ?self
+    {
+        $kode = match (strtoupper(trim((string) $jenjang))) {
+            'SMP'     => 'smp',
+            'SMA'     => 'sma',
+            'REGULER' => 'pondok',
+            default   => 'yayasan',
+        };
+
+        return static::where('kode', $kode)->first()
+            ?? static::where('kode', 'yayasan')->first();
+    }
+
+    /**
+     * Data KOP surat siap pakai sesuai jenjang / lembaga masing-masing.
+     */
+    public static function kopForJenjang(?string $jenjang): array
+    {
+        $lembaga = static::resolveForJenjang($jenjang);
+        $yayasan = ($lembaga && $lembaga->kode === 'yayasan')
+            ? $lembaga
+            : static::where('kode', 'yayasan')->first();
+
+        $defaultAlamat = 'Jln. Nogososro No. 26 Josenan Taman Kota Madiun Jawa Timur Kode Pos : 63134';
+        $defaultTelepon = '+6285785028124';
+        $defaultEmail = 'ponpesalmuttaqin001@gmail.com';
+
+        $nama = $lembaga
+            ? strtoupper($lembaga->nama)
+            : 'YAYASAN PONDOK PESANTREN MUTTAQIN JOSENAN MADIUN';
+
+        $alamat = ($lembaga && filled($lembaga->alamat))
+            ? $lembaga->alamat
+            : (($yayasan && filled($yayasan->alamat)) ? $yayasan->alamat : $defaultAlamat);
+
+        $telepon = ($lembaga && filled($lembaga->telepon))
+            ? $lembaga->telepon
+            : (($yayasan && filled($yayasan->telepon)) ? $yayasan->telepon : $defaultTelepon);
+
+        $email = ($lembaga && filled($lembaga->email))
+            ? $lembaga->email
+            : (($yayasan && filled($yayasan->email)) ? $yayasan->email : $defaultEmail);
+
+        $logoUrl = $lembaga ? $lembaga->logo_url : asset('images/logo.png');
+
+        return [
+            'lembaga'  => $lembaga,
+            'nama'     => $nama,
+            'alamat'   => $alamat,
+            'telepon'  => $telepon,
+            'email'    => $email,
+            'logo_url' => $logoUrl,
+        ];
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PendaftaranRequest;
+use App\Models\Lembaga;
 use App\Models\Pendaftaran;
 use App\Models\PenerimaanSantri;
 use App\Services\ImageCompressor;
@@ -56,26 +57,22 @@ class SpmbPublicController extends Controller
         $allowedJenjangs = $penerimaan->allowedJenjangs();
         $dokumenConfig = $penerimaan->dokumenConfig();
 
-        // Base rules & labels dari PendaftaranRequest agar konsisten
         $baseRequest = new PendaftaranRequest();
         $rules = $baseRequest->rules();
         $attributes = $baseRequest->attributes();
         $messages = $baseRequest->messages();
 
-        // Override aturan khusus pendaftaran publik
         $rules['jenjang'] = ['required', Rule::in($allowedJenjangs)];
         $rules['nama_lengkap'] = 'required|string|max:255';
         $rules['jenis_kelamin'] = 'required|in:Laki-laki,Perempuan';
         $rules['pj_biaya_hp'] = 'required|string|max:30';
-        $rules['nik'] = [
+        $rules['nik'] = array_values(array_filter([
             'nullable',
             'string',
             'max:16',
             $request->filled('nik') ? Rule::unique('pendaftarans', 'nik') : null,
-        ];
-        $rules['nik'] = array_values(array_filter($rules['nik']));
+        ]));
 
-        // Terapkan aturan wajib/opsional/tidak untuk foto berkas sesuai pengaturan event
         foreach (PenerimaanSantri::DOKUMEN_META as $flagKey => $meta) {
             $fotoField = $meta['foto'];
             $mode = $dokumenConfig[$flagKey] ?? 'opsional';
@@ -94,7 +91,6 @@ class SpmbPublicController extends Controller
             $input[$flagKey] = $request->boolean($flagKey);
         }
 
-        // Jika event hanya 1 jenjang, pastikan terisi otomatis
         if (count($allowedJenjangs) === 1 && empty($input['jenjang'])) {
             $input['jenjang'] = $allowedJenjangs[0];
         }
@@ -106,7 +102,6 @@ class SpmbPublicController extends Controller
 
         $data = $validator->validated();
 
-        // Kompres & simpan foto berkas
         $stored = [];
         try {
             foreach (Pendaftaran::FOTO_BERKAS as $field => [$flag]) {
@@ -134,7 +129,6 @@ class SpmbPublicController extends Controller
             $data['nik'] = null;
         }
 
-        // Normalisasi nomor WA
         foreach (['pj_biaya_hp', 'ayah_hp', 'ibu_hp'] as $hpField) {
             if (!empty($data[$hpField])) {
                 $data[$hpField] = preg_replace('/[^0-9+]/', '', (string) $data[$hpField]);
@@ -144,7 +138,7 @@ class SpmbPublicController extends Controller
         $data['penerimaan_santri_id'] = $penerimaan->id;
         $data['penerimaan_gelombang_id'] = $activeGelombang?->id;
         $data['status_pendaftaran'] = 'Pending';
-        $data['no_induk'] = $this->generateRegistrationNumber();
+        $data['no_induk'] = $this->generateRegistrationNumber($penerimaan, $data['jenjang']);
         $data['public_token'] = Str::random(40);
 
         try {
@@ -170,12 +164,12 @@ class SpmbPublicController extends Controller
             ->where('public_token', $token)
             ->firstOrFail();
 
-        $waMessage = "Assalamu'alaikum Panitia {$penerimaan->judul},\n"
+        $waMessage = "Assalamu'alaikum Panitia {$penerimaan->judul} ({$pendaftaran->jenjang}),\n"
             . "Saya telah mendaftar secara online:\n"
             . "No. Registrasi: {$pendaftaran->no_induk}\n"
             . "Nama: {$pendaftaran->nama_lengkap}\n"
             . "Jenjang: {$pendaftaran->jenjang}";
-        $waConfirmUrl = $penerimaan->waUrl($waMessage);
+        $waConfirmUrl = $penerimaan->waUrl($waMessage, $pendaftaran->jenjang);
 
         return view('spmb.bukti', compact('penerimaan', 'pendaftaran', 'waConfirmUrl'));
     }
@@ -188,7 +182,9 @@ class SpmbPublicController extends Controller
             ->where('public_token', $token)
             ->firstOrFail();
 
-        return view('spmb.cetak', compact('penerimaan', 'pendaftaran'));
+        $kop = Lembaga::kopForJenjang($pendaftaran->jenjang);
+
+        return view('spmb.cetak', compact('penerimaan', 'pendaftaran', 'kop'));
     }
 
     public function cekStatus(Request $request, string $slug)
@@ -213,17 +209,45 @@ class SpmbPublicController extends Controller
         return view('spmb.cek-status', compact('penerimaan', 'kode', 'pendaftaran', 'searched'));
     }
 
-    protected function generateRegistrationNumber(): string
+    /**
+     * Format nomor registrasi: {LEMBAGA}-{NOMOR_URUT}-{TAHUN_AJARAN}
+     * Contoh: SMP-01-202728, SMA-02-202728, PONDOK-01-202728
+     */
+    protected function generateRegistrationNumber(PenerimaanSantri $penerimaan, string $jenjang): string
     {
-        $tahun = date('Y');
-        $seq = Pendaftaran::whereYear('created_at', $tahun)->count() + 1;
+        $lembagaCode = match (strtoupper(trim($jenjang))) {
+            'SMP'     => 'SMP',
+            'SMA'     => 'SMA',
+            'REGULER' => 'PONDOK',
+            default   => strtoupper(Str::slug($jenjang, '')),
+        };
 
+        $tahunCode = $penerimaan->tahunAjaranCode();
+        $prefix = $lembagaCode . '-';
+        $suffix = '-' . $tahunCode;
+
+        $existingCodes = Pendaftaran::where('no_induk', 'like', $prefix . '%' . $suffix)
+            ->pluck('no_induk');
+
+        $maxSeq = 0;
+        $pattern = '/^' . preg_quote($lembagaCode, '/') . '-(\d+)-' . preg_quote($tahunCode, '/') . '$/';
+        foreach ($existingCodes as $code) {
+            if (preg_match($pattern, (string) $code, $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxSeq) {
+                    $maxSeq = $num;
+                }
+            }
+        }
+
+        $seq = $maxSeq + 1;
         do {
-            $code = 'SPMB-' . $tahun . '-' . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
-            $exists = Pendaftaran::where('no_induk', $code)->exists();
+            $urut = str_pad((string) $seq, 2, '0', STR_PAD_LEFT);
+            $candidate = "{$lembagaCode}-{$urut}-{$tahunCode}";
+            $exists = Pendaftaran::where('no_induk', $candidate)->exists();
             $seq++;
         } while ($exists);
 
-        return $code;
+        return $candidate;
     }
 }

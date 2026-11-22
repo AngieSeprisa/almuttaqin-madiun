@@ -163,7 +163,18 @@
                             </div>
                         </td>
                         <td>
-                            <span class="jenjang-pill {{ $jenjangClass }}">{{ $event->jenjang }}</span>
+                            <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                                @foreach($event->allowedJenjangs() as $jItem)
+                                    @php
+                                        $jPill = match($jItem) {
+                                            'SMP' => 'jenjang-pill-smp',
+                                            'SMA' => 'jenjang-pill-sma',
+                                            default => 'jenjang-pill-reguler',
+                                        };
+                                    @endphp
+                                    <span class="jenjang-pill {{ $jPill }}">{{ $jItem }}</span>
+                                @endforeach
+                            </div>
                         </td>
                         <td>
                             @if($event->gelombangs->isEmpty())

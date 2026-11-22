@@ -38,11 +38,12 @@
         </div>
         @endif
 
+        @php $waLinks = $penerimaan->waLinksByJenjang(); @endphp
         <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
             <a href="{{ route('spmb.cek-status', $penerimaan->slug) }}" class="btn btn-primary">Cek Status Pendaftaran</a>
-            @if($penerimaan->waUrl())
-                <a href="{{ $penerimaan->waUrl() }}" target="_blank" class="btn btn-secondary">Hubungi Panitia</a>
-            @endif
+            @foreach($waLinks as $jLabel => $jUrl)
+                <a href="{{ $jUrl }}" target="_blank" class="btn btn-secondary">WA Panitia {{ $jLabel }}</a>
+            @endforeach
         </div>
     </div>
 @else
@@ -53,7 +54,7 @@
         @else
             <span class="spmb-chip spmb-chip-primary">Pendaftaran Dibuka</span>
         @endif
-        <span class="spmb-chip">Jenjang: {{ $penerimaan->jenjang }}</span>
+        <span class="spmb-chip">Jenjang: {{ $penerimaan->jenjangLabel() }}</span>
         @if($penerimaan->jadwal_seleksi)
             <span class="spmb-chip">Seleksi: {{ $penerimaan->jadwal_seleksi }}</span>
         @endif

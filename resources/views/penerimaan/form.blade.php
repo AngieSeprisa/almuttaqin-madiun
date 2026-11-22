@@ -17,6 +17,14 @@
     $actionUrl = $isEdit ? route('penerimaan.update', $penerimaan->id) : route('penerimaan.store');
     $basePublicUrl = url('/spmb') . '/';
     $dokumenConfig = old('syarat_dokumen', $penerimaan->dokumenConfig());
+    $selectedJenjangs = old('jenjangs', $penerimaan->allowedJenjangs());
+    if (!is_array($selectedJenjangs)) {
+        $selectedJenjangs = $penerimaan->allowedJenjangs();
+    }
+    $waValues = old('kontak_wa_per_jenjang', $penerimaan->waMap());
+    if (!is_array($waValues)) {
+        $waValues = [];
+    }
 
     $initialGelombangs = old('gelombangs');
     if ($initialGelombangs === null) {
@@ -29,6 +37,43 @@
         ])->values()->all();
     }
 @endphp
+
+<style>
+    .jenjang-check-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .jenjang-check-card {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 10px 16px;
+        border: 1.5px solid var(--border-color, #D1D5DB);
+        border-radius: 10px;
+        background: var(--input-bg, #FFFFFF);
+        cursor: pointer;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--text-primary);
+        transition: all 0.15s ease;
+        user-select: none;
+    }
+    .jenjang-check-card:hover {
+        border-color: var(--electric-blue, #0052FF);
+    }
+    .jenjang-check-card.is-checked {
+        border-color: var(--electric-blue, #0052FF);
+        background: rgba(0, 82, 255, 0.06);
+        color: var(--electric-blue, #0052FF);
+    }
+    .jenjang-check-card input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: #0052FF;
+        cursor: pointer;
+    }
+</style>
 
 <div class="form-container" style="width: 100%; max-width: 100%;">
 
@@ -135,33 +180,48 @@
                         </div>
 
                         <div class="wizard-form-group">
-                            <label class="wizard-label" for="jenjang">
-                                Jenjang <span style="color:#EF4444;">*</span>
-                            </label>
-                            <select name="jenjang" id="jenjang" class="wizard-select @error('jenjang') is-invalid @enderror" required>
-                                @foreach($jenjangOptions as $val => $label)
-                                    <option value="{{ $val }}" {{ old('jenjang', $penerimaan->jenjang) === $val ? 'selected' : '' }}>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            @error('jenjang')
-                                <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="kontak_wa">No. WhatsApp Panitia</label>
-                            <input type="text" name="kontak_wa" id="kontak_wa"
-                                   value="{{ old('kontak_wa', $penerimaan->kontak_wa) }}"
-                                   class="wizard-input @error('kontak_wa') is-invalid @enderror"
-                                   placeholder="08xxxxxxxxxx">
-                        </div>
-
-                        <div class="wizard-form-group">
                             <label class="wizard-label" for="is_active">Status</label>
                             <select name="is_active" id="is_active" class="wizard-select">
                                 <option value="1" {{ old('is_active', $penerimaan->is_active ? '1' : '0') == '1' ? 'selected' : '' }}>Dibuka</option>
                                 <option value="0" {{ old('is_active', $penerimaan->is_active ? '1' : '0') == '0' ? 'selected' : '' }}>Ditutup</option>
                             </select>
+                        </div>
+
+                        {{-- Checklist Jenjang (Multi-pilih) --}}
+                        <div class="wizard-form-group" style="grid-column: 1 / -1;">
+                            <label class="wizard-label">
+                                Jenjang <span style="color:#EF4444;">*</span>
+                            </label>
+                            <div class="jenjang-check-grid" id="jenjangCheckGroup">
+                                @foreach($jenjangItems as $val => $label)
+                                @php $checked = in_array($val, $selectedJenjangs, true); @endphp
+                                <label class="jenjang-check-card {{ $checked ? 'is-checked' : '' }}" data-jenjang-card="{{ $val }}">
+                                    <input type="checkbox" name="jenjangs[]" value="{{ $val }}" class="js-jenjang-checkbox" {{ $checked ? 'checked' : '' }}>
+                                    <span>{{ $label }}</span>
+                                </label>
+                                @endforeach
+                            </div>
+                            @error('jenjangs')
+                                <div class="invalid-feedback" style="display:block;">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        {{-- No. WA Panitia per Jenjang yang di-checklist --}}
+                        <div class="wizard-form-group" style="grid-column: 1 / -1;" id="waPerJenjangWrap">
+                            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
+                                @foreach($jenjangItems as $val => $label)
+                                @php $isVisible = in_array($val, $selectedJenjangs, true); @endphp
+                                <div class="wizard-form-group js-wa-jenjang-item" data-wa-jenjang="{{ $val }}" style="{{ $isVisible ? '' : 'display:none;' }} margin-bottom:0;">
+                                    <label class="wizard-label" for="wa_{{ $val }}">No. WA Panitia {{ $val }}</label>
+                                    <input type="text"
+                                           name="kontak_wa_per_jenjang[{{ $val }}]"
+                                           id="wa_{{ $val }}"
+                                           value="{{ $waValues[$val] ?? '' }}"
+                                           class="wizard-input"
+                                           placeholder="08xxxxxxxxxx">
+                                </div>
+                                @endforeach
+                            </div>
                         </div>
 
                         <div class="wizard-form-group">
@@ -277,7 +337,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // 1. Stepper navigation
-    var currentStep = 1;
     var panes = [1, 2, 3].map(function (i) { return document.getElementById('p_pane_' + i); });
     var tabs = [1, 2, 3].map(function (i) { return document.getElementById('p_tab_' + i); });
 
@@ -292,7 +351,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (idx + 1 === step) t.classList.add('is-active');
             else if (idx + 1 < step) t.classList.add('is-completed');
         });
-        currentStep = step;
     }
 
     tabs.forEach(function (t, idx) {
@@ -305,7 +363,27 @@ document.addEventListener('DOMContentLoaded', function () {
         b.addEventListener('click', function () { goToStep(parseInt(this.getAttribute('data-prev'), 10)); });
     });
 
-    // 2. Auto-slug dari Judul (hanya saat slug belum diubah manual)
+    // 2. Checklist Jenjang -> tampilkan input WA Panitia sesuai jenjang terpilih
+    function syncJenjangWaFields() {
+        var anyChecked = false;
+        document.querySelectorAll('.js-jenjang-checkbox').forEach(function (cb) {
+            var val = cb.value;
+            var card = cb.closest('[data-jenjang-card]');
+            var waBox = document.querySelector('[data-wa-jenjang="' + val + '"]');
+            if (card) card.classList.toggle('is-checked', cb.checked);
+            if (waBox) waBox.style.display = cb.checked ? '' : 'none';
+            if (cb.checked) anyChecked = true;
+        });
+        var wrap = document.getElementById('waPerJenjangWrap');
+        if (wrap) wrap.style.display = anyChecked ? '' : 'none';
+    }
+
+    document.querySelectorAll('.js-jenjang-checkbox').forEach(function (cb) {
+        cb.addEventListener('change', syncJenjangWaFields);
+    });
+    syncJenjangWaFields();
+
+    // 3. Auto-slug dari Judul
     var judulEl = document.getElementById('judul');
     var slugEl = document.getElementById('slug');
     var slugTouched = {{ $isEdit || old('slug') ? 'true' : 'false' }};
@@ -320,22 +398,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (slugEl) {
-        slugEl.addEventListener('input', function () {
-            slugTouched = true;
-        });
-        slugEl.addEventListener('blur', function () {
-            this.value = toSlug(this.value);
-        });
+        slugEl.addEventListener('input', function () { slugTouched = true; });
+        slugEl.addEventListener('blur', function () { this.value = toSlug(this.value); });
     }
     if (judulEl && slugEl) {
         judulEl.addEventListener('input', function () {
-            if (!slugTouched) {
-                slugEl.value = toSlug(this.value);
-            }
+            if (!slugTouched) slugEl.value = toSlug(this.value);
         });
     }
 
-    // 3. Dynamic Gelombang Rows
+    // 4. Dynamic Gelombang Rows
     var listEl = document.getElementById('gelombangList');
     var emptyEl = document.getElementById('gelombangEmpty');
     var addBtn = document.getElementById('btnAddGelombang');
@@ -343,8 +415,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var counter = 0;
 
     function updateEmptyState() {
-        var hasRows = listEl.children.length > 0;
-        emptyEl.style.display = hasRows ? 'none' : 'block';
+        emptyEl.style.display = listEl.children.length > 0 ? 'none' : 'block';
     }
 
     function escapeAttr(val) {
@@ -404,9 +475,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (addBtn) {
-        addBtn.addEventListener('click', function () {
-            addGelombangRow({});
-        });
+        addBtn.addEventListener('click', function () { addGelombangRow({}); });
     }
 
     @if ($errors->any())
