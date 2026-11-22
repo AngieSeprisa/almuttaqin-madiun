@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\PendaftaranRequest;
 use App\Models\Pendaftaran;
+use App\Models\PenerimaanSantri;
 use App\Models\Siswa;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use App\Services\ImageCompressor;
 use RuntimeException;
 
@@ -17,13 +19,18 @@ class PendaftaranController extends Controller
     public function index(Request $request)
     {
         $activeRoom = session('active_lembaga');
-        $query = Pendaftaran::query()->latest();
+        $query = Pendaftaran::query()->with(['penerimaan', 'gelombang'])->latest();
 
         // Scope berdasarkan ruang kerja
         if ($activeRoom === 'smp') {
             $query->where('jenjang', 'SMP');
         } elseif ($activeRoom === 'sma') {
             $query->where('jenjang', 'SMA');
+        }
+
+        // Filter Event Penerimaan
+        if ($request->filled('penerimaan_id')) {
+            $query->where('penerimaan_santri_id', $request->penerimaan_id);
         }
 
         // Filter status
@@ -59,15 +66,27 @@ class PendaftaranController extends Controller
         } elseif ($activeRoom === 'sma') {
             $baseStats->where('jenjang', 'SMA');
         }
+        if ($request->filled('penerimaan_id')) {
+            $baseStats->where('penerimaan_santri_id', $request->penerimaan_id);
+        }
 
         $stats = [
-            'total' => (clone $baseStats)->count(),
-            'pending' => (clone $baseStats)->where('status_pendaftaran', 'Pending')->count(),
-            'diterima' => (clone $baseStats)->where('status_pendaftaran', 'Diterima')->count(),
-            'ditolak' => (clone $baseStats)->where('status_pendaftaran', 'Ditolak')->count(),
+            'total'         => (clone $baseStats)->count(),
+            'pending'       => (clone $baseStats)->where('status_pendaftaran', 'Pending')->count(),
+            'lulus_seleksi' => (clone $baseStats)->where('status_pendaftaran', 'Lulus Seleksi')->count(),
+            'diterima'      => (clone $baseStats)->where('status_pendaftaran', 'Diterima')->count(),
+            'ditolak'       => (clone $baseStats)->where('status_pendaftaran', 'Ditolak')->count(),
         ];
 
-        return view('pendaftaran.index', compact('pendaftarans', 'stats', 'activeRoom'));
+        $penerimaanQuery = PenerimaanSantri::query()->latest();
+        if ($activeRoom === 'smp') {
+            $penerimaanQuery->whereIn('jenjang', ['SMP', 'Semua']);
+        } elseif ($activeRoom === 'sma') {
+            $penerimaanQuery->whereIn('jenjang', ['SMA', 'Semua']);
+        }
+        $penerimaanList = $penerimaanQuery->get(['id', 'judul', 'tahun_ajaran']);
+
+        return view('pendaftaran.index', compact('pendaftarans', 'stats', 'activeRoom', 'penerimaanList'));
     }
 
     /**
@@ -124,9 +143,15 @@ class PendaftaranController extends Controller
         // Generate No. Induk otomatis jika kosong
         if (empty($data['no_induk'])) {
             $tahun = date('Y');
-            $urut = str_pad(Pendaftaran::whereYear('created_at', $tahun)->count() + 1, 4, '0', STR_PAD_LEFT);
-            $data['no_induk'] = "PSB-{$tahun}-{$urut}";
+            $seq = Pendaftaran::whereYear('created_at', $tahun)->count() + 1;
+            do {
+                $code = 'PSB-' . $tahun . '-' . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+                $exists = Pendaftaran::where('no_induk', $code)->exists();
+                $seq++;
+            } while ($exists);
+            $data['no_induk'] = $code;
         }
+        $data['public_token'] = Str::random(40);
 
         try {
             $pendaftaran = Pendaftaran::create($data);
@@ -147,7 +172,7 @@ class PendaftaranController extends Controller
      */
     public function show($id)
     {
-        $pendaftaran = Pendaftaran::findOrFail($id);
+        $pendaftaran = Pendaftaran::with(['penerimaan', 'gelombang'])->findOrFail($id);
 
         return view('pendaftaran.show', compact('pendaftaran'));
     }
@@ -163,16 +188,15 @@ class PendaftaranController extends Controller
     }
 
     /**
-     * Update status pendaftaran (Pending/Diterima/Ditolak).
+     * Update status pendaftaran (Pending / Lulus Seleksi / Diterima / Ditolak).
      */
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'status_pendaftaran' => 'required|in:Pending,Diterima,Ditolak',
+            'status_pendaftaran' => 'required|in:Pending,Lulus Seleksi,Diterima,Ditolak',
         ]);
 
         $pendaftaran = Pendaftaran::findOrFail($id);
-        $oldStatus = $pendaftaran->status_pendaftaran;
         $newStatus = $request->status_pendaftaran;
 
         $pendaftaran->update([
@@ -180,7 +204,7 @@ class PendaftaranController extends Controller
         ]);
 
         if ($newStatus === 'Diterima') {
-            // Jika diterima, pastikan terdaftar di tabel Siswa
+            // Jika sudah daftar ulang / diterima resmi, pastikan terdaftar di tabel Siswa
             $siswa = Siswa::where('pendaftaran_id', $pendaftaran->id)
                 ->orWhere('nama_lengkap', $pendaftaran->nama_lengkap)
                 ->first();
@@ -188,6 +212,7 @@ class PendaftaranController extends Controller
             if (!$siswa) {
                 Siswa::create([
                     'nama_lengkap'   => $pendaftaran->nama_lengkap,
+                    'jenjang'        => $pendaftaran->jenjang ?? 'Reguler',
                     'kamar'          => 'Reguler',
                     'status'         => 'aktif',
                     'pendaftaran_id' => $pendaftaran->id,
@@ -195,14 +220,13 @@ class PendaftaranController extends Controller
             } else {
                 $siswa->update([
                     'pendaftaran_id' => $pendaftaran->id,
+                    'jenjang'        => $pendaftaran->jenjang ?? $siswa->jenjang,
                     'status'         => 'aktif',
                 ]);
             }
-        } elseif ($newStatus === 'Ditolak' || $newStatus === 'Pending') {
-            // Jika pendaftaran Ditolak atau Pending, hapus dari daftar Siswa
-            Siswa::where('pendaftaran_id', $pendaftaran->id)
-                ->orWhere('nama_lengkap', $pendaftaran->nama_lengkap)
-                ->delete();
+        } else {
+            // Jika Pending / Lulus Seleksi / Ditolak, hapus dari daftar Siswa aktif yang terikat pendaftaran ini
+            Siswa::where('pendaftaran_id', $pendaftaran->id)->delete();
         }
 
         return redirect()->back()->with('success', 'Status pendaftaran berhasil diperbarui menjadi ' . $newStatus . '.');

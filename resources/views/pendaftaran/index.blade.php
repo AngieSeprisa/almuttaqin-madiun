@@ -3,15 +3,20 @@
 @section('title', 'Pendaftaran Santri')
 
 @section('header-actions')
-@if(!auth()->check() || auth()->user()->canDo('pendaftaran', 'create'))
-<a href="{{ route('pendaftaran.create') }}" class="btn btn-primary">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
-    </svg>
-    Formulir Pendaftaran Baru
-</a>
-@endif
+<div style="display:flex; gap:10px; align-items:center;">
+    <a href="{{ route('penerimaan.index') }}" class="btn btn-secondary">
+        Link Penerimaan
+    </a>
+    @if(!auth()->check() || auth()->user()->canDo('pendaftaran', 'create'))
+    <a href="{{ route('pendaftaran.create') }}" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Formulir Pendaftaran Baru
+    </a>
+    @endif
+</div>
 @endsection
 
 @section('content')
@@ -94,6 +99,29 @@
     <div class="form-section-card filter-card">
         <form action="{{ route('pendaftaran.index') }}" method="GET" class="filter-form">
             <div class="filter-group-left">
+                {{-- Filter Event Penerimaan --}}
+                @if(isset($penerimaanList) && $penerimaanList->isNotEmpty())
+                <div class="filter-select-wrap">
+                    <div class="filter-select-icon-left">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                    </div>
+                    <select name="penerimaan_id" id="filter_penerimaan_id" class="form-select filter-select" onchange="this.form.submit()">
+                        <option value="">Semua Event</option>
+                        @foreach($penerimaanList as $ev)
+                            <option value="{{ $ev->id }}" {{ (string) request('penerimaan_id') === (string) $ev->id ? 'selected' : '' }}>{{ $ev->judul }}</option>
+                        @endforeach
+                    </select>
+                    <div class="filter-select-icon-right">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                </div>
+                @endif
+
                 {{-- Filter Status Pendaftaran --}}
                 <div class="filter-select-wrap">
                     <div class="filter-select-icon-left">
@@ -105,6 +133,7 @@
                     <select name="status" id="filter_status_pendaftaran" class="form-select filter-select" onchange="this.form.submit()">
                         <option value="">Semua Status</option>
                         <option value="Pending" {{ request('status') === 'Pending' ? 'selected' : '' }}>Pending ({{ $stats['pending'] }})</option>
+                        <option value="Lulus Seleksi" {{ request('status') === 'Lulus Seleksi' ? 'selected' : '' }}>Lulus Seleksi ({{ $stats['lulus_seleksi'] ?? 0 }})</option>
                         <option value="Diterima" {{ request('status') === 'Diterima' ? 'selected' : '' }}>Diterima ({{ $stats['diterima'] }})</option>
                         <option value="Ditolak" {{ request('status') === 'Ditolak' ? 'selected' : '' }}>Ditolak ({{ $stats['ditolak'] }})</option>
                     </select>
@@ -137,7 +166,7 @@
                 </div>
                 @endif
 
-                @if(request('status') || request('jenjang') || request('search'))
+                @if(request('penerimaan_id') || request('status') || request('jenjang') || request('search'))
                     <a href="{{ route('pendaftaran.index') }}" class="btn btn-sm btn-secondary filter-btn-reset" title="Reset Filter">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -197,6 +226,11 @@
                                     • <span style="font-family:monospace; font-weight:600;">NISN: {{ $pendaftar->nisn }}</span>
                                 @endif
                             </div>
+                            @if($pendaftar->penerimaan)
+                            <div style="font-size:11.5px; color:var(--electric-blue); font-weight:600; margin-top:2px;">
+                                {{ $pendaftar->penerimaan->judul }}@if($pendaftar->gelombang) · {{ $pendaftar->gelombang->nama_gelombang }}@endif
+                            </div>
+                            @endif
                         </td>
                         <td>
                             @php
@@ -226,7 +260,7 @@
                             </div>
                         </td>
                         <td>
-                            <span class="status-pill status-{{ strtolower($pendaftar->status_pendaftaran) }}">
+                            <span class="status-pill status-{{ \Illuminate\Support\Str::slug($pendaftar->status_pendaftaran) }}">
                                 {{ $pendaftar->status_pendaftaran }}
                             </span>
                         </td>
@@ -266,8 +300,8 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="cell-empty">
-                            Belum ada calon santri yang mendaftar. Silakan klik tombol <strong>"Formulir Pendaftaran Baru"</strong> untuk menginput data formulir.
+                        <td colspan="8" class="cell-empty">
+                            Belum ada data pendaftar.
                         </td>
                     </tr>
                     @endforelse
@@ -287,7 +321,7 @@
         @forelse ($pendaftarans as $pendaftar)
         @php
             $jenjangText = $pendaftar->jenjang ?? 'Reguler';
-            $statusKey = strtolower($pendaftar->status_pendaftaran ?? 'pending');
+            $statusKey = \Illuminate\Support\Str::slug($pendaftar->status_pendaftaran ?? 'pending');
             $usiaText = $pendaftar->tanggal_lahir ? $pendaftar->tanggal_lahir->age . ' Thn' : '-';
             $jkText = $pendaftar->jenis_kelamin ? ($pendaftar->jenis_kelamin === 'Laki-laki' ? 'L' : 'P') : '-';
         @endphp

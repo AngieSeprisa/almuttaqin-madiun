@@ -19,9 +19,19 @@ class Pendaftaran extends Model
         'foto_surat_pernyataan' => ['berkas_surat_pernyataan', 'Surat Pernyataan'],
     ];
 
+    public const STATUSES = [
+        'Pending',
+        'Lulus Seleksi',
+        'Diterima',
+        'Ditolak',
+    ];
+
     protected $fillable = [
+        'penerimaan_santri_id',
+        'penerimaan_gelombang_id',
         'jenjang',
         'no_induk',
+        'public_token',
         'nik',
         'nisn',
         'nama_lengkap',
@@ -123,5 +133,21 @@ class Pendaftaran extends Model
     public function siswa()
     {
         return $this->hasOne(Siswa::class);
+    }
+
+    /**
+     * Relasi ke event penerimaan santri
+     */
+    public function penerimaan()
+    {
+        return $this->belongsTo(PenerimaanSantri::class, 'penerimaan_santri_id');
+    }
+
+    /**
+     * Relasi ke gelombang penerimaan
+     */
+    public function gelombang()
+    {
+        return $this->belongsTo(PenerimaanGelombang::class, 'penerimaan_gelombang_id');
     }
 }

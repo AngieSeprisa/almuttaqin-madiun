@@ -13,6 +13,7 @@ use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\LembagaController;
 use App\Http\Controllers\NfcInputController;
 use App\Http\Controllers\PendaftaranController;
+use App\Http\Controllers\PenerimaanSantriController;
 use App\Http\Controllers\PengaturanAbsensiController;
 use App\Http\Controllers\PengaturanSesiController;
 use App\Http\Controllers\PlottingKamarController;
@@ -32,10 +33,26 @@ use App\Http\Controllers\RekapEkskulController;
 use App\Http\Controllers\RekapPondokController;
 use App\Http\Controllers\SekolahController;
 use App\Http\Controllers\SiswaController;
+use App\Http\Controllers\SpmbPublicController;
 use App\Http\Controllers\TimeSlotController;
 use App\Http\Controllers\UjianController;
 use App\Http\Controllers\UserController;
 
+
+/*
+|--------------------------------------------------------------------------
+| Halaman Publik SPMB / Penerimaan Santri (Tanpa Login)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('spmb')->name('spmb.')->group(function () {
+    Route::get('/{slug}', [SpmbPublicController::class, 'show'])->name('show');
+    Route::post('/{slug}', [SpmbPublicController::class, 'store'])
+        ->middleware('throttle:15,1')
+        ->name('store');
+    Route::get('/{slug}/cek-status', [SpmbPublicController::class, 'cekStatus'])->name('cek-status');
+    Route::get('/{slug}/bukti/{token}', [SpmbPublicController::class, 'bukti'])->name('bukti');
+    Route::get('/{slug}/bukti/{token}/cetak', [SpmbPublicController::class, 'cetak'])->name('cetak');
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -131,6 +148,27 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:nfc,edit|delete')->group(function () {
         Route::post('/nfc-input/unpair', [NfcInputController::class, 'unpair'])->name('nfc.unpair');
     });
+
+    // Menu Kelola Link Event Penerimaan (SPMB / Slug)
+    Route::middleware('permission:pendaftaran,view')->prefix('penerimaan')->name('penerimaan.')->group(function () {
+        Route::get('/', [PenerimaanSantriController::class, 'index'])->name('index');
+    });
+
+    Route::middleware('permission:pendaftaran,create')->prefix('penerimaan')->name('penerimaan.')->group(function () {
+        Route::get('/create', [PenerimaanSantriController::class, 'create'])->name('create');
+        Route::post('/', [PenerimaanSantriController::class, 'store'])->name('store');
+    });
+
+    Route::middleware('permission:pendaftaran,edit')->prefix('penerimaan')->name('penerimaan.')->group(function () {
+        Route::get('/{id}/edit', [PenerimaanSantriController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::put('/{id}', [PenerimaanSantriController::class, 'update'])->whereNumber('id')->name('update');
+        Route::patch('/{id}/toggle', [PenerimaanSantriController::class, 'toggleStatus'])->whereNumber('id')->name('toggle');
+    });
+
+    Route::delete('/penerimaan/{id}', [PenerimaanSantriController::class, 'destroy'])
+        ->whereNumber('id')
+        ->middleware('permission:pendaftaran,delete')
+        ->name('penerimaan.destroy');
 
     // Menu Pendaftaran Santri Baru (PSB)
     Route::middleware('permission:pendaftaran,view')->prefix('pendaftaran')->name('pendaftaran.')->group(function () {

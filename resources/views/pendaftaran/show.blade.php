@@ -82,12 +82,17 @@
                     </span>
                 @endif
             </div>
-            <div style="display:flex; align-items:center; gap:10px;">
-                <span class="status-pill status-{{ strtolower($pendaftaran->status_pendaftaran) }}" style="font-size:13px; padding:6px 14px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span class="status-pill status-{{ \Illuminate\Support\Str::slug($pendaftaran->status_pendaftaran) }}" style="font-size:13px; padding:6px 14px;">
                     Status: {{ $pendaftaran->status_pendaftaran }}
                 </span>
+                @if($pendaftaran->penerimaan)
+                    <span class="jenjang-pill jenjang-pill-reguler" style="font-size:12px; padding:4px 10px;">
+                        {{ $pendaftaran->penerimaan->judul }}@if($pendaftaran->gelombang) · {{ $pendaftaran->gelombang->nama_gelombang }}@endif
+                    </span>
+                @endif
                 <span style="font-size:13px; color:var(--text-secondary);">
-                    Terdaftar pada {{ $pendaftaran->created_at ? $pendaftaran->created_at->format('d F Y, H:i') : '-' }} WIB
+                    {{ $pendaftaran->created_at ? $pendaftaran->created_at->format('d F Y, H:i') : '-' }} WIB
                 </span>
             </div>
         </div>
@@ -95,14 +100,21 @@
         {{-- Form Ubah Status --}}
         <div style="display:flex; flex-direction:column; gap:8px;">
             <span style="font-size:12px; font-weight:700; color:var(--text-secondary);">Tindakan Verifikasi:</span>
-            <form action="{{ route('pendaftaran.updateStatus', $pendaftaran->id) }}" method="POST" style="display:flex; gap:8px;">
+            <form action="{{ route('pendaftaran.updateStatus', $pendaftaran->id) }}" method="POST" style="display:flex; gap:8px; flex-wrap:wrap;">
                 @csrf
                 @method('PATCH')
 
+                @if($pendaftaran->status_pendaftaran !== 'Lulus Seleksi')
+                <button type="submit" name="status_pendaftaran" value="Lulus Seleksi" class="btn btn-secondary"
+                    style="padding:8px 16px; font-size:13px; border-color:#F59E0B; color:#B45309;">
+                    Lulus Seleksi
+                </button>
+                @endif
+
                 @if($pendaftaran->status_pendaftaran !== 'Diterima')
                 <button type="button" name="status_pendaftaran" value="Diterima" class="btn btn-success js-swal-confirm"
-                    data-title="Terima Calon Santri?"
-                    data-html="Konfirmasi penerimaan santri <strong>{{ $pendaftaran->nama_lengkap }}</strong>.<br><span style='font-size:13px; color:var(--text-muted);'>Status pendaftaran akan diubah menjadi <strong>Diterima</strong>.</span>"
+                    data-title="Terima & Daftar Ulang?"
+                    data-html="Konfirmasi penerimaan & daftar ulang <strong>{{ $pendaftaran->nama_lengkap }}</strong>."
                     data-icon="question"
                     data-confirm-text="Ya, Terima Santri"
                     data-confirm-color="#10B981"
@@ -111,14 +123,14 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">
                         <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
-                    Terima Santri
+                    Terima (Daftar Ulang)
                 </button>
                 @endif
 
                 @if($pendaftaran->status_pendaftaran !== 'Ditolak')
                 <button type="button" name="status_pendaftaran" value="Ditolak" class="btn btn-danger js-swal-confirm"
                     data-title="Tolak Pendaftaran?"
-                    data-html="Apakah Anda yakin ingin menolak pendaftaran calon santri <strong>{{ $pendaftaran->nama_lengkap }}</strong>?<br><span style='font-size:13px; color:var(--text-muted);'>Status pendaftaran akan diubah menjadi <strong>Ditolak</strong>.</span>"
+                    data-html="Tolak pendaftaran <strong>{{ $pendaftaran->nama_lengkap }}</strong>?"
                     data-icon="warning"
                     data-confirm-text="Ya, Tolak"
                     data-confirm-color="#DC2626"
@@ -134,7 +146,7 @@
 
                 @if($pendaftaran->status_pendaftaran !== 'Pending')
                 <button type="submit" name="status_pendaftaran" value="Pending" class="btn btn-secondary" style="padding:8px 16px; font-size:13px;">
-                    Kembalikan ke Pending
+                    Pending
                 </button>
                 @endif
             </form>

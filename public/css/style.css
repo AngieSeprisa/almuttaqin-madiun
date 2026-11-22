@@ -3496,6 +3496,12 @@ html.dark-mode .alert-error {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+.status-pill.status-lulus-seleksi {
+  background-color: #FEF3C7;
+  color: #B45309;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
 html.dark-mode .status-pill.status-pending {
   background-color: rgba(59, 130, 246, 0.15);
   color: #60A5FA;
@@ -3512,6 +3518,12 @@ html.dark-mode .status-pill.status-ditolak {
   background-color: rgba(239, 68, 68, 0.15);
   color: #F87171;
   border-color: rgba(239, 68, 68, 0.3);
+}
+
+html.dark-mode .status-pill.status-lulus-seleksi {
+  background-color: rgba(245, 158, 11, 0.18);
+  color: #FBBF24;
+  border-color: rgba(245, 158, 11, 0.35);
 }
 
 /* Status Perizinan (Sambang & Sakit) */
