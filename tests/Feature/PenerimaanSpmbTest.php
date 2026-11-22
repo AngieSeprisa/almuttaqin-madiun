@@ -306,4 +306,62 @@ class PenerimaanSpmbTest extends TestCase
         $this->assertSame('Siti Aisyah', $siswa->nama_lengkap);
         $this->assertSame('SMA', $siswa->jenjang);
     }
+
+    public function test_endpoint_info_publik_mengembalikan_kuota_dan_ketersediaan_dengan_cors(): void
+    {
+        $event = PenerimaanSantri::create([
+            'judul'                      => 'SPMB 2027/2028',
+            'slug'                       => 'spmb-api-2027',
+            'tahun_ajaran'               => '2027/2028',
+            'jenjang'                    => 'SMP, SMA',
+            'jenjangs'                   => ['SMP', 'SMA'],
+            'kontak_wa_per_jenjang'      => [
+                'SMP' => '081111111111',
+                'SMA' => '082222222222',
+            ],
+            'lokasi_seleksi_per_jenjang' => [
+                'SMP' => 'Gedung SMP',
+                'SMA' => 'Gedung SMA',
+            ],
+            'jadwal_seleksi'             => 'Sabtu, 15 Mei 2027',
+            'is_active'                  => true,
+        ]);
+
+        $gel = $event->gelombangs()->create([
+            'nama_gelombang'    => 'Gelombang 1',
+            'tanggal_mulai'     => now()->subDay()->toDateString(),
+            'tanggal_selesai'   => now()->addDays(10)->toDateString(),
+            'kuota'             => 30,
+            'kuota_per_jenjang' => ['SMP' => 10, 'SMA' => 20],
+            'urutan'            => 1,
+        ]);
+
+        Pendaftaran::create([
+            'penerimaan_santri_id'    => $event->id,
+            'penerimaan_gelombang_id' => $gel->id,
+            'jenjang'                 => 'SMP',
+            'nama_lengkap'            => 'Pendaftar Satu',
+            'status_pendaftaran'      => 'Pending',
+        ]);
+
+        $res = $this->get(route('spmb.info', $event->slug));
+        $res->assertOk()
+            ->assertHeader('Access-Control-Allow-Origin', '*')
+            ->assertJsonPath('slug', 'spmb-api-2027')
+            ->assertJsonPath('is_open', true)
+            ->assertJsonPath('gelombang_aktif.nama', 'Gelombang 1')
+            ->assertJsonPath('ringkasan.total_pendaftar', 1)
+            ->assertJsonPath('ringkasan.total_kuota', 30)
+            ->assertJsonPath('ringkasan.total_sisa', 29)
+            ->assertJsonPath('lembaga.0.kode', 'SMP')
+            ->assertJsonPath('lembaga.0.kuota', 10)
+            ->assertJsonPath('lembaga.0.terisi', 1)
+            ->assertJsonPath('lembaga.0.sisa', 9)
+            ->assertJsonPath('lembaga.0.penuh', false)
+            ->assertJsonPath('lembaga.0.lokasi_seleksi', 'Gedung SMP')
+            ->assertJsonPath('lembaga.1.kode', 'SMA')
+            ->assertJsonPath('lembaga.1.kuota', 20)
+            ->assertJsonPath('lembaga.1.terisi', 0)
+            ->assertJsonPath('lembaga.1.sisa', 20);
+    }
 }

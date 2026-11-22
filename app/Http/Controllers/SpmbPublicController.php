@@ -7,6 +7,7 @@ use App\Models\Lembaga;
 use App\Models\Pendaftaran;
 use App\Models\PenerimaanSantri;
 use App\Services\ImageCompressor;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -15,6 +16,117 @@ use RuntimeException;
 
 class SpmbPublicController extends Controller
 {
+    /**
+     * Endpoint JSON publik (read-only + CORS) untuk sinkronisasi kuota & info SPMB ke Landing Page.
+     */
+    public function info(string $slug): JsonResponse
+    {
+        $penerimaan = PenerimaanSantri::with('gelombangs')
+            ->where('slug', $slug)
+            ->firstOrFail();
+
+        $today = now()->toDateString();
+        $isOpen = $penerimaan->isOpen();
+        $statusState = $penerimaan->statusState();
+        $activeGelombang = $penerimaan->activeGelombang();
+        $allowedJenjangs = $penerimaan->allowedJenjangs();
+
+        // Tentukan gelombang acuan (gelombang aktif, atau gelombang yang tanggalnya sedang berjalan namun penuh)
+        $refGelombang = $activeGelombang;
+        if (!$refGelombang && $penerimaan->gelombangs->isNotEmpty()) {
+            $refGelombang = $penerimaan->gelombangs->first(function ($g) use ($today) {
+                $s = $g->tanggal_mulai?->toDateString();
+                $e = $g->tanggal_selesai?->toDateString();
+                return $s && $e && $today >= $s && $today <= $e;
+            });
+        }
+
+        $countsByJenjang = $refGelombang
+            ? $refGelombang->countsByJenjang()
+            : $penerimaan->pendaftarans()
+                ->selectRaw('jenjang, COUNT(*) as total')
+                ->groupBy('jenjang')
+                ->pluck('total', 'jenjang')
+                ->all();
+
+        $lembagaItems = [];
+        $totalKuota = 0;
+        $hasAllQuotas = !empty($allowedJenjangs);
+        $totalTerisi = 0;
+
+        foreach ($allowedJenjangs as $jKey) {
+            $lemModel = Lembaga::resolveForJenjang($jKey);
+            $kuota = $refGelombang ? $refGelombang->kuotaForJenjang($jKey) : null;
+            $terisi = (int) ($countsByJenjang[$jKey] ?? 0);
+            $sisa = $kuota !== null ? max(0, $kuota - $terisi) : null;
+            $persen = ($kuota !== null && $kuota > 0)
+                ? (int) min(100, round(($terisi / $kuota) * 100))
+                : null;
+            $penuh = $kuota !== null ? ($terisi >= $kuota) : false;
+
+            $totalTerisi += $terisi;
+            if ($kuota === null) {
+                $hasAllQuotas = false;
+            } else {
+                $totalKuota += $kuota;
+            }
+
+            $lembagaItems[] = [
+                'kode'           => $jKey,
+                'nama'           => $lemModel ? $lemModel->nama : $jKey,
+                'logo_url'       => $lemModel ? $lemModel->logo_url : asset('images/logo.png'),
+                'kuota'          => $kuota,
+                'terisi'         => $terisi,
+                'sisa'           => $sisa,
+                'persen_terisi'  => $persen,
+                'penuh'          => $penuh,
+                'lokasi_seleksi' => $penerimaan->lokasiForJenjang($jKey),
+                'wa_url'         => $penerimaan->waUrl(null, $jKey),
+            ];
+        }
+
+        $payload = [
+            'slug'            => $penerimaan->slug,
+            'judul'           => $penerimaan->judul,
+            'tahun_ajaran'    => $penerimaan->tahun_ajaran,
+            'is_open'         => $isOpen,
+            'status'          => $statusState,
+            'jadwal_seleksi'  => $penerimaan->jadwal_seleksi,
+            'urls'            => [
+                'form'       => route('spmb.show', $penerimaan->slug),
+                'cek_status' => route('spmb.cek-status', $penerimaan->slug),
+            ],
+            'gelombang_aktif' => $activeGelombang ? [
+                'id'              => $activeGelombang->id,
+                'nama'            => $activeGelombang->nama_gelombang,
+                'tanggal_mulai'   => $activeGelombang->tanggal_mulai?->toDateString(),
+                'tanggal_selesai' => $activeGelombang->tanggal_selesai?->toDateString(),
+            ] : null,
+            'gelombangs'      => $penerimaan->gelombangs->map(fn ($g) => [
+                'id'                => $g->id,
+                'nama'              => $g->nama_gelombang,
+                'tanggal_mulai'     => $g->tanggal_mulai?->toDateString(),
+                'tanggal_selesai'   => $g->tanggal_selesai?->toDateString(),
+                'kuota_per_jenjang' => $g->kuota_per_jenjang ?? [],
+            ])->values()->all(),
+            'ringkasan'       => [
+                'total_pendaftar' => $totalTerisi,
+                'total_kuota'     => $hasAllQuotas ? $totalKuota : null,
+                'total_sisa'      => $hasAllQuotas ? max(0, $totalKuota - $totalTerisi) : null,
+            ],
+            'lembaga'         => $lembagaItems,
+            'syarat'          => $penerimaan->syaratList(),
+            'updated_at'      => now()->toIso8601String(),
+        ];
+
+        return response()->json($payload, 200, [
+            'Access-Control-Allow-Origin'  => '*',
+            'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Content-Type, Accept',
+            'Cache-Control'                => 'public, max-age=30',
+        ]);
+    }
+
     public function show(string $slug)
     {
         $penerimaan = PenerimaanSantri::with('gelombangs')

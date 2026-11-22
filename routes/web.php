@@ -45,6 +45,9 @@ use App\Http\Controllers\UserController;
 |--------------------------------------------------------------------------
 */
 Route::prefix('spmb')->name('spmb.')->group(function () {
+    Route::get('/{slug}/info', [SpmbPublicController::class, 'info'])
+        ->middleware('throttle:120,1')
+        ->name('info');
     Route::get('/{slug}', [SpmbPublicController::class, 'show'])->name('show');
     Route::post('/{slug}', [SpmbPublicController::class, 'store'])
         ->middleware('throttle:15,1')
