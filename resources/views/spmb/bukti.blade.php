@@ -4,17 +4,17 @@
 
 @section('content')
 <div class="spmb-card" style="max-width:700px; margin:0 auto;">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; padding-bottom:18px; border-bottom:1px solid #E5E7EB;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:16px 18px; border-radius:12px; background:#EFF6FF; border:1px solid #BFDBFE; margin-bottom:20px;">
         <div>
-            <div style="font-size:12px; font-weight:700; color:#64748B; text-transform:uppercase; letter-spacing:0.05em;">Nomor Registrasi</div>
-            <div style="font-size:24px; font-weight:800; color:#0052FF; font-family:monospace; margin-top:2px;">{{ $pendaftaran->no_induk }}</div>
+            <div style="font-size:11px; font-weight:700; color:#1E40AF; text-transform:uppercase; letter-spacing:0.05em;">Nomor Registrasi</div>
+            <div style="font-size:22px; font-weight:800; color:#0052FF; font-family:monospace; margin-top:2px; letter-spacing:0.02em;">{{ $pendaftaran->no_induk }}</div>
         </div>
-        <span class="status-pill status-{{ \Illuminate\Support\Str::slug($pendaftaran->status_pendaftaran) }}" style="font-size:13px; padding:6px 14px;">
+        <span class="status-pill status-{{ \Illuminate\Support\Str::slug($pendaftaran->status_pendaftaran) }}" style="font-size:12.5px; padding:6px 14px;">
             {{ $pendaftaran->status_pendaftaran }}
         </span>
     </div>
 
-    <div class="detail-grid" style="margin-top:20px;">
+    <div class="detail-grid">
         <div class="detail-item">
             <span class="detail-label">Nama Lengkap</span>
             <span class="detail-value">{{ $pendaftaran->nama_lengkap }}</span>
@@ -55,7 +55,7 @@
         @endif
     </div>
 
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:24px; padding-top:18px; border-top:1px solid #E5E7EB;">
+    <div class="spmb-actions-stack" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; padding-top:18px; border-top:1px solid #E2E8F0;">
         <a href="{{ route('spmb.cetak', ['slug' => $penerimaan->slug, 'token' => $pendaftaran->public_token]) }}" target="_blank" class="btn btn-primary">
             Cetak Bukti &amp; Formulir (2 Hal)
         </a>

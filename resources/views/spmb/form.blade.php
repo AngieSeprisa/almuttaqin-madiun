@@ -39,7 +39,7 @@
         @endif
 
         @php $waLinks = $penerimaan->waLinksByJenjang(); @endphp
-        <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+        <div class="spmb-actions-stack" style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
             <a href="{{ route('spmb.cek-status', $penerimaan->slug) }}" class="btn btn-primary">Cek Status Pendaftaran</a>
             @foreach($waLinks as $jLabel => $jUrl)
                 <a href="{{ $jUrl }}" target="_blank" class="btn btn-secondary">WA Panitia {{ $jLabel }}</a>
@@ -47,32 +47,47 @@
         </div>
     </div>
 @else
-    {{-- Ringkasan Info Event --}}
-    <div class="spmb-meta-strip">
-        @if($activeGelombang)
-            <span class="spmb-chip spmb-chip-primary">{{ $activeGelombang->nama_gelombang }} · s/d {{ $activeGelombang->tanggal_selesai->translatedFormat('d M Y') }}</span>
-        @else
-            <span class="spmb-chip spmb-chip-primary">Pendaftaran Dibuka</span>
-        @endif
-        <span class="spmb-chip">Jenjang: {{ $penerimaan->jenjangLabel() }}</span>
-        @if($penerimaan->jadwal_seleksi)
-            <span class="spmb-chip">Seleksi: {{ $penerimaan->jadwal_seleksi }}</span>
-        @endif
-        @php
-            $firstLokasi = count($availableJenjangs) === 1
-                ? ($lokasiMap[$availableJenjangs[0]] ?? $penerimaan->lokasiForJenjang($availableJenjangs[0]))
-                : $penerimaan->lokasiForJenjang(old('jenjang'));
-        @endphp
-        <span class="spmb-chip" id="chipLokasiSeleksi" style="{{ $firstLokasi ? '' : 'display:none;' }}">
-            Lokasi: <span id="chipLokasiText">{{ $firstLokasi }}</span>
-        </span>
+    {{-- Ringkasan Info Event (1 Kartu Rapi & Mobile-Friendly) --}}
+    @php
+        $firstLokasi = count($availableJenjangs) === 1
+            ? ($lokasiMap[$availableJenjangs[0]] ?? $penerimaan->lokasiForJenjang($availableJenjangs[0]))
+            : $penerimaan->lokasiForJenjang(old('jenjang'));
+    @endphp
+    <div class="spmb-info-card">
+        <div class="spmb-info-top">
+            <span class="spmb-wave-badge">
+                <span class="spmb-wave-dot"></span>
+                @if($activeGelombang)
+                    {{ $activeGelombang->nama_gelombang }} · s/d {{ $activeGelombang->tanggal_selesai->translatedFormat('d M Y') }}
+                @else
+                    Pendaftaran Dibuka
+                @endif
+            </span>
+        </div>
+
+        <div class="spmb-info-grid">
+            <div class="spmb-info-item">
+                <span class="spmb-info-label">Jenjang</span>
+                <span class="spmb-info-value">{{ $penerimaan->jenjangLabel() }}</span>
+            </div>
+            @if($penerimaan->jadwal_seleksi)
+            <div class="spmb-info-item">
+                <span class="spmb-info-label">Seleksi</span>
+                <span class="spmb-info-value">{{ $penerimaan->jadwal_seleksi }}</span>
+            </div>
+            @endif
+            <div class="spmb-info-item spmb-info-wide" id="chipLokasiSeleksi" style="{{ $firstLokasi ? '' : 'display:none;' }}">
+                <span class="spmb-info-label">Lokasi Seleksi</span>
+                <span class="spmb-info-value" id="chipLokasiText">{{ $firstLokasi }}</span>
+            </div>
+        </div>
     </div>
 
     @php $syaratList = $penerimaan->syaratList(); @endphp
     @if(!empty($syaratList))
-    <div class="spmb-card" style="padding:14px 18px; margin-bottom:18px;">
-        <div style="font-size:13px; font-weight:700; color:#0F172A; margin-bottom:6px;">Persyaratan</div>
-        <ul style="margin:0; padding-left:18px; font-size:13px; color:#334155; display:flex; flex-direction:column; gap:3px;">
+    <div class="spmb-card" style="padding:14px 16px; margin-bottom:14px;">
+        <div style="font-size:12.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#64748B; margin-bottom:6px;">Persyaratan</div>
+        <ul style="margin:0; padding-left:18px; font-size:13.5px; color:#1E293B; display:flex; flex-direction:column; gap:4px; line-height:1.45;">
             @foreach($syaratList as $item)
                 <li>{{ $item }}</li>
             @endforeach
@@ -81,7 +96,7 @@
     @endif
 
     @if ($errors->any())
-    <div class="alert-banner alert-error" style="margin-bottom: 18px;">
+    <div class="alert-banner alert-error" style="margin-bottom: 16px; border-radius:12px;">
         <div>
             <ul style="margin: 0 0 0 18px; font-size: 13px;">
                 @foreach ($errors->all() as $error)
@@ -103,36 +118,51 @@
             <div class="wizard-stepper" id="wizardStepper">
                 <div class="wizard-step is-active" data-step="1" id="tab_step_1">
                     <div class="wizard-step-circle">01</div>
-                    <div class="wizard-step-title">Identitas</div>
+                    <div class="wizard-step-title">
+                        <span class="spmb-step-full">Identitas</span>
+                        <span class="spmb-step-short">Identitas</span>
+                    </div>
                 </div>
                 <div class="wizard-divider" aria-hidden="true">
                     <svg viewBox="0 0 16 60" fill="none" preserveAspectRatio="none"><path d="M0 0 L14 30 L0 60" stroke="currentColor" stroke-width="1.5" /></svg>
                 </div>
                 <div class="wizard-step" data-step="2" id="tab_step_2">
                     <div class="wizard-step-circle">02</div>
-                    <div class="wizard-step-title">Data Pribadi</div>
+                    <div class="wizard-step-title">
+                        <span class="spmb-step-full">Data Pribadi</span>
+                        <span class="spmb-step-short">Pribadi</span>
+                    </div>
                 </div>
                 <div class="wizard-divider" aria-hidden="true">
                     <svg viewBox="0 0 16 60" fill="none" preserveAspectRatio="none"><path d="M0 0 L14 30 L0 60" stroke="currentColor" stroke-width="1.5" /></svg>
                 </div>
                 <div class="wizard-step" data-step="3" id="tab_step_3">
                     <div class="wizard-step-circle">03</div>
-                    <div class="wizard-step-title">Keluarga</div>
+                    <div class="wizard-step-title">
+                        <span class="spmb-step-full">Keluarga</span>
+                        <span class="spmb-step-short">Keluarga</span>
+                    </div>
                 </div>
                 <div class="wizard-divider" aria-hidden="true">
                     <svg viewBox="0 0 16 60" fill="none" preserveAspectRatio="none"><path d="M0 0 L14 30 L0 60" stroke="currentColor" stroke-width="1.5" /></svg>
                 </div>
                 <div class="wizard-step" data-step="4" id="tab_step_4">
                     <div class="wizard-step-circle">04</div>
-                    <div class="wizard-step-title">Alamat & Berkas</div>
+                    <div class="wizard-step-title">
+                        <span class="spmb-step-full">Alamat &amp; Berkas</span>
+                        <span class="spmb-step-short">Berkas</span>
+                    </div>
                 </div>
+            </div>
+            <div class="spmb-progress-track">
+                <div class="spmb-progress-bar" id="spmbProgressBar"></div>
             </div>
 
             <div class="wizard-body">
 
                 {{-- STEP 1: IDENTITAS --}}
                 <div class="wizard-step-pane is-active" id="pane_step_1">
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:18px;">
+                    <div class="spmb-form-grid">
                         <div class="wizard-form-group">
                             <label class="wizard-label" for="jenjang">Jenjang <span style="color:#EF4444;">*</span></label>
                             @if(count($allowedJenjangs) === 1)
@@ -606,6 +636,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (idx + 1 === step) t.classList.add('is-active');
             else if (idx + 1 < step) t.classList.add('is-completed');
         });
+        var bar = document.getElementById('spmbProgressBar');
+        if (bar) bar.style.width = (step * 25) + '%';
         currentStep = step;
         var stepper = document.getElementById('wizardStepper');
         if (stepper) stepper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
