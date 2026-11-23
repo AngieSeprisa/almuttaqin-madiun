@@ -38,37 +38,8 @@ jobs:
             php artisan optimize
             chown -R www-data:www-data storage bootstrap/cache
             chmod -R ug+rwX storage bootstrap/cache
-
-            # Sinkronisasi & restart daemon RFID (presensi_daemon.py)
-            if [ -f /var/www/al-muttaqin/rfid_backend/presensi_daemon.py ]; then
-              if [ "$(id -u)" -ne 0 ]; then SUDO="sudo"; else SUDO=""; fi
-              $SUDO mkdir -p /opt/rfid-backend
-              $SUDO cp -f /var/www/al-muttaqin/rfid_backend/presensi_daemon.py /opt/rfid-backend/presensi_daemon.py
-              $SUDO chmod +x /opt/rfid-backend/presensi_daemon.py
-
-              RFID_SVC="rfid-presensi"
-              FOUND_UNIT=$(grep -rl "presensi_daemon.py" /etc/systemd/system/ 2>/dev/null | head -n 1 || true)
-              if [ -n "$FOUND_UNIT" ]; then
-                RFID_SVC=$(basename "$FOUND_UNIT" .service)
-                UNIT_EXEC_PY=$(grep -oE '/[^[:space:]]+presensi_daemon\.py' "$FOUND_UNIT" | head -n 1 || true)
-                if [ -n "$UNIT_EXEC_PY" ] && [ "$UNIT_EXEC_PY" != "/opt/rfid-backend/presensi_daemon.py" ] && [ "$UNIT_EXEC_PY" != "/var/www/al-muttaqin/rfid_backend/presensi_daemon.py" ]; then
-                  $SUDO mkdir -p "$(dirname "$UNIT_EXEC_PY")"
-                  $SUDO cp -f /var/www/al-muttaqin/rfid_backend/presensi_daemon.py "$UNIT_EXEC_PY"
-                fi
-                if ! grep -q 'TZ=Asia/Jakarta' "$FOUND_UNIT"; then
-                  $SUDO sed -i '/^\[Service\]/a Environment="TZ=Asia/Jakarta"' "$FOUND_UNIT"
-                fi
-              else
-                $SUDO cp -f /var/www/al-muttaqin/rfid_backend/rfid-presensi.service /etc/systemd/system/rfid-presensi.service
-              fi
-
-              $SUDO systemctl daemon-reload || true
-              $SUDO systemctl enable "$RFID_SVC" || true
-              $SUDO systemctl restart "$RFID_SVC" || true
-              sleep 2
-              $SUDO systemctl status "$RFID_SVC" --no-pager -n 15 || true
-              $SUDO journalctl -u "$RFID_SVC" -n 20 --no-pager || true
-            fi
+            sed -i 's/\r$//' /var/www/al-muttaqin/rfid_backend/deploy_rfid_daemon.sh
+            bash /var/www/al-muttaqin/rfid_backend/deploy_rfid_daemon.sh
 
       - name: Retry Deploy via SSH on transient failure
         if: steps.ssh_primary.outcome == 'failure'
@@ -94,34 +65,5 @@ jobs:
             php artisan optimize
             chown -R www-data:www-data storage bootstrap/cache
             chmod -R ug+rwX storage bootstrap/cache
-
-            # Sinkronisasi & restart daemon RFID (presensi_daemon.py)
-            if [ -f /var/www/al-muttaqin/rfid_backend/presensi_daemon.py ]; then
-              if [ "$(id -u)" -ne 0 ]; then SUDO="sudo"; else SUDO=""; fi
-              $SUDO mkdir -p /opt/rfid-backend
-              $SUDO cp -f /var/www/al-muttaqin/rfid_backend/presensi_daemon.py /opt/rfid-backend/presensi_daemon.py
-              $SUDO chmod +x /opt/rfid-backend/presensi_daemon.py
-
-              RFID_SVC="rfid-presensi"
-              FOUND_UNIT=$(grep -rl "presensi_daemon.py" /etc/systemd/system/ 2>/dev/null | head -n 1 || true)
-              if [ -n "$FOUND_UNIT" ]; then
-                RFID_SVC=$(basename "$FOUND_UNIT" .service)
-                UNIT_EXEC_PY=$(grep -oE '/[^[:space:]]+presensi_daemon\.py' "$FOUND_UNIT" | head -n 1 || true)
-                if [ -n "$UNIT_EXEC_PY" ] && [ "$UNIT_EXEC_PY" != "/opt/rfid-backend/presensi_daemon.py" ] && [ "$UNIT_EXEC_PY" != "/var/www/al-muttaqin/rfid_backend/presensi_daemon.py" ]; then
-                  $SUDO mkdir -p "$(dirname "$UNIT_EXEC_PY")"
-                  $SUDO cp -f /var/www/al-muttaqin/rfid_backend/presensi_daemon.py "$UNIT_EXEC_PY"
-                fi
-                if ! grep -q 'TZ=Asia/Jakarta' "$FOUND_UNIT"; then
-                  $SUDO sed -i '/^\[Service\]/a Environment="TZ=Asia/Jakarta"' "$FOUND_UNIT"
-                fi
-              else
-                $SUDO cp -f /var/www/al-muttaqin/rfid_backend/rfid-presensi.service /etc/systemd/system/rfid-presensi.service
-              fi
-
-              $SUDO systemctl daemon-reload || true
-              $SUDO systemctl enable "$RFID_SVC" || true
-              $SUDO systemctl restart "$RFID_SVC" || true
-              sleep 2
-              $SUDO systemctl status "$RFID_SVC" --no-pager -n 15 || true
-              $SUDO journalctl -u "$RFID_SVC" -n 20 --no-pager || true
-            fi
+            sed -i 's/\r$//' /var/www/al-muttaqin/rfid_backend/deploy_rfid_daemon.sh
+            bash /var/www/al-muttaqin/rfid_backend/deploy_rfid_daemon.sh
