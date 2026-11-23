@@ -51,14 +51,16 @@
         }
 
         /* ===== Kop surat ===== */
-        .kop { display: flex; align-items: center; gap: 3mm; }
-        .kop-logo { width: 23mm; height: 23mm; object-fit: contain; flex: none; }
-        .kop-text { flex: 1; text-align: center; font-family: "Times New Roman", Times, serif; }
-        .kop-text .nama { font-size: 14.5pt; font-weight: 700; line-height: 1.15; }
-        .kop-text .alamat { font-size: 9pt; margin-top: 1mm; }
+        .kop { display: flex; align-items: center; gap: 4mm; padding: 0 1mm; }
+        .kop-logo { width: 26mm; height: 26mm; object-fit: contain; flex: none; }
+        .kop-text { flex: 1; text-align: center; font-family: "Times New Roman", Times, serif; color: #000; }
+        .kop-text .yayasan { font-size: 11pt; font-weight: 700; line-height: 1.2; letter-spacing: 0.1px; }
+        .kop-text .nama { font-size: 15.5pt; font-weight: 700; line-height: 1.12; margin-top: 0.6mm; }
+        .kop-text .alamat { font-size: 9.5pt; line-height: 1.25; margin-top: 1.2mm; }
+        .kop-text .kop-kontak { margin-top: 0.4mm; }
         .kop-text .email { color: #1d4ed8; text-decoration: underline; }
-        .garis-tebal { height: 0.9mm; background: #000; margin-top: 1.5mm; }
-        .garis-tipis { height: 0.25mm; background: #000; margin-top: 0.6mm; }
+        .garis-tipis { height: 0.3mm; background: #000; margin-top: 2mm; }
+        .garis-tebal { height: 0.9mm; background: #000; margin-top: 0.5mm; }
 
         .judul {
             text-align: center; font-weight: 700; font-size: 11pt;

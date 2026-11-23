@@ -123,10 +123,16 @@ class Lembaga extends Model
         $defaultAlamat = 'Jln. Nogososro No. 26 Josenan Taman Kota Madiun Jawa Timur Kode Pos : 63134';
         $defaultTelepon = '+6285785028124';
         $defaultEmail = 'ponpesalmuttaqin001@gmail.com';
+        $defaultYayasanHeader = 'YAYASAN PONDOK PESANTREN MUTTAQIN JOSENAN MADIUN';
 
-        $nama = $lembaga
-            ? strtoupper($lembaga->nama)
-            : 'YAYASAN PONDOK PESANTREN MUTTAQIN JOSENAN MADIUN';
+        $isYayasanSelf = !$lembaga || strtolower((string) $lembaga->kode) === 'yayasan';
+        $yayasanHeader = $isYayasanSelf ? null : $defaultYayasanHeader;
+
+        $rawNama = $lembaga
+            ? strtoupper(trim((string) $lembaga->nama))
+            : $defaultYayasanHeader;
+
+        $namaLines = static::formatKopNamaLines($rawNama);
 
         $alamat = ($lembaga && filled($lembaga->alamat))
             ? $lembaga->alamat
@@ -143,13 +149,47 @@ class Lembaga extends Model
         $logoUrl = $lembaga ? $lembaga->logo_url : asset('images/logo.png');
 
         return [
-            'lembaga'  => $lembaga,
-            'nama'     => $nama,
-            'alamat'   => $alamat,
-            'telepon'  => $telepon,
-            'email'    => $email,
-            'logo_url' => $logoUrl,
+            'lembaga'      => $lembaga,
+            'yayasan_nama' => $yayasanHeader,
+            'nama'         => $rawNama,
+            'nama_lines'   => $namaLines,
+            'alamat'       => $alamat,
+            'telepon'      => $telepon,
+            'email'        => $email,
+            'logo_url'     => $logoUrl,
         ];
+    }
+
+    /**
+     * Format nama lembaga pada KOP surat menjadi 1-2 baris proporsional.
+     */
+    protected static function formatKopNamaLines(string $rawNama): array
+    {
+        $normalized = preg_replace('/\s+/', ' ', strtoupper(trim($rawNama)));
+
+        $expansions = [
+            'SMP AL MUTTAQIN'                => ['SEKOLAH MENENGAH PERTAMA', 'AL MUTTAQIN'],
+            'SMA AL MUTTAQIN'                => ['SEKOLAH MENENGAH ATAS', 'AL MUTTAQIN'],
+            'SMK AL MUTTAQIN'                => ['SEKOLAH MENENGAH KEJURUAN', 'AL MUTTAQIN'],
+            'SD IT AL MUTTAQIN'              => ['SEKOLAH DASAR ISLAM TERPADU', 'AL MUTTAQIN'],
+            'SDIT AL MUTTAQIN'               => ['SEKOLAH DASAR ISLAM TERPADU', 'AL MUTTAQIN'],
+            'RA AL MUTTAQIN'                 => ['RAUDHATUL ATHFAL', 'AL MUTTAQIN'],
+            'PONDOK PESANTREN AL MUTTAQIN'   => ['PONDOK PESANTREN', 'AL MUTTAQIN'],
+        ];
+
+        if (isset($expansions[$normalized])) {
+            return $expansions[$normalized];
+        }
+
+        // Bila admin menulis nama panjang berakhiran "AL MUTTAQIN", pecah rapi sebelum "AL MUTTAQIN"
+        if (str_ends_with($normalized, ' AL MUTTAQIN') && strlen($normalized) > 22) {
+            $prefix = trim(substr($normalized, 0, -strlen(' AL MUTTAQIN')));
+            if ($prefix !== '') {
+                return [$prefix, 'AL MUTTAQIN'];
+            }
+        }
+
+        return [$normalized];
     }
 
     /**

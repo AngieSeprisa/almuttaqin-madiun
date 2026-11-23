@@ -62,14 +62,16 @@
         }
 
         /* ===== Kop Surat Resmi ===== */
-        .kop { display: flex; align-items: center; gap: 3mm; }
-        .kop-logo { width: 23mm; height: 23mm; object-fit: contain; flex: none; }
-        .kop-text { flex: 1; text-align: center; font-family: "Times New Roman", Times, serif; }
-        .kop-text .nama { font-size: 14.5pt; font-weight: 700; line-height: 1.15; }
-        .kop-text .alamat { font-size: 9pt; margin-top: 1mm; }
+        .kop { display: flex; align-items: center; gap: 4mm; padding: 0 1mm; }
+        .kop-logo { width: 26mm; height: 26mm; object-fit: contain; flex: none; }
+        .kop-text { flex: 1; text-align: center; font-family: "Times New Roman", Times, serif; color: #000; }
+        .kop-text .yayasan { font-size: 11pt; font-weight: 700; line-height: 1.2; letter-spacing: 0.1px; }
+        .kop-text .nama { font-size: 15.5pt; font-weight: 700; line-height: 1.12; margin-top: 0.6mm; }
+        .kop-text .alamat { font-size: 9.5pt; line-height: 1.25; margin-top: 1.2mm; }
+        .kop-text .kop-kontak { margin-top: 0.4mm; }
         .kop-text .email { color: #1d4ed8; text-decoration: underline; }
-        .garis-tebal { height: 0.9mm; background: #000; margin-top: 1.5mm; }
-        .garis-tipis { height: 0.25mm; background: #000; margin-top: 0.6mm; }
+        .garis-tipis { height: 0.3mm; background: #000; margin-top: 2mm; }
+        .garis-tebal { height: 0.9mm; background: #000; margin-top: 0.5mm; }
 
         /* ===== Halaman 1: Kartu Bukti Pendaftaran ===== */
         .kartu-title {
@@ -216,24 +218,7 @@
 
             {{-- ===== HALAMAN 1: KARTU BUKTI PENDAFTARAN & PESERTA SELEKSI ===== --}}
             <div class="paper page-break">
-                <div class="kop">
-                    <img src="{{ $kop['logo_url'] }}" alt="Logo" class="kop-logo">
-                    <div class="kop-text">
-                        <div class="nama">{{ $kop['nama'] }}</div>
-                        @if(!empty($kop['alamat']))
-                            <div class="alamat">{{ $kop['alamat'] }}</div>
-                        @endif
-                        @if(!empty($kop['telepon']) || !empty($kop['email']))
-                            <div class="alamat">
-                                @if(!empty($kop['telepon']))Telp. {{ $kop['telepon'] }}@endif
-                                @if(!empty($kop['telepon']) && !empty($kop['email'])) &nbsp; @endif
-                                @if(!empty($kop['email']))Email : <span class="email">{{ $kop['email'] }}</span>@endif
-                            </div>
-                        @endif
-                    </div>
-                </div>
-                <div class="garis-tebal"></div>
-                <div class="garis-tipis"></div>
+                @include('pendaftaran._kop_surat', ['kop' => $kop])
 
                 <div class="kartu-title">Kartu Bukti Pendaftaran &amp; Peserta Seleksi</div>
                 <div class="kartu-sub">{{ $penerimaan->judul }} · Tahun {{ $penerimaan->tahun_ajaran }}</div>

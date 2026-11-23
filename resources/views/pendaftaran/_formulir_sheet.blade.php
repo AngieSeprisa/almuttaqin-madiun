@@ -10,25 +10,7 @@
 @endphp
 
 <div class="paper" @if(!empty($paperId)) id="{{ $paperId }}" @endif>
-    {{-- ===== KOP SURAT LEMBAGA ===== --}}
-    <div class="kop">
-        <img src="{{ $kop['logo_url'] }}" alt="Logo" class="kop-logo">
-        <div class="kop-text">
-            <div class="nama">{{ $kop['nama'] }}</div>
-            @if(!empty($kop['alamat']))
-                <div class="alamat">{{ $kop['alamat'] }}</div>
-            @endif
-            @if(!empty($kop['telepon']) || !empty($kop['email']))
-                <div class="alamat">
-                    @if(!empty($kop['telepon']))Telp. {{ $kop['telepon'] }}@endif
-                    @if(!empty($kop['telepon']) && !empty($kop['email'])) &nbsp; @endif
-                    @if(!empty($kop['email']))Email : <span class="email">{{ $kop['email'] }}</span>@endif
-                </div>
-            @endif
-        </div>
-    </div>
-    <div class="garis-tebal"></div>
-    <div class="garis-tipis"></div>
+    @include('pendaftaran._kop_surat', ['kop' => $kop])
 
     <div class="judul">FORMULIR PENDAFTARAN SANTRI BARU</div>
 
