@@ -309,14 +309,19 @@ class SpmbPublicController extends Controller
     public function cekStatus(Request $request, string $slug)
     {
         $penerimaan = PenerimaanSantri::where('slug', $slug)->firstOrFail();
-        $kode = trim((string) $request->query('kode', ''));
+        $kode = trim((string) ($request->query('kode') ?: $request->query('nama', '')));
+        $tanggalLahir = trim((string) $request->query('tanggal_lahir', ''));
         $pendaftaran = null;
         $lokasiSeleksi = null;
         $searched = false;
+        $errorMessage = null;
+        $httpErrorCode = 404;
 
         if ($kode !== '') {
             $searched = true;
-            $pendaftaran = Pendaftaran::with('gelombang')
+
+            // 1. Cek exact match berdasarkan Nomor Registrasi atau NIK
+            $exactMatch = Pendaftaran::with('gelombang')
                 ->where('penerimaan_santri_id', $penerimaan->id)
                 ->where(function ($q) use ($kode) {
                     $q->where('no_induk', $kode)
@@ -325,8 +330,36 @@ class SpmbPublicController extends Controller
                 ->latest()
                 ->first();
 
+            if ($exactMatch) {
+                $pendaftaran = $exactMatch;
+            } else {
+                // 2. Pencarian berdasarkan Nama Lengkap wajib verifikasi Tanggal Lahir
+                if ($tanggalLahir === '') {
+                    $errorMessage = 'Masukkan Tanggal Lahir untuk verifikasi pencarian dengan nama.';
+                    $httpErrorCode = 422;
+                } elseif (mb_strlen($kode) < 3) {
+                    $errorMessage = 'Masukkan minimal 3 huruf nama.';
+                    $httpErrorCode = 422;
+                } else {
+                    try {
+                        $parsedDate = \Illuminate\Support\Carbon::parse($tanggalLahir)->toDateString();
+                        $pendaftaran = Pendaftaran::with('gelombang')
+                            ->where('penerimaan_santri_id', $penerimaan->id)
+                            ->where('nama_lengkap', 'like', "%{$kode}%")
+                            ->whereDate('tanggal_lahir', $parsedDate)
+                            ->latest()
+                            ->first();
+                    } catch (\Throwable $e) {
+                        $errorMessage = 'Format Tanggal Lahir tidak valid.';
+                        $httpErrorCode = 422;
+                    }
+                }
+            }
+
             if ($pendaftaran) {
                 $lokasiSeleksi = $penerimaan->lokasiForJenjang($pendaftaran->jenjang);
+            } elseif ($errorMessage === null) {
+                $errorMessage = 'Data pendaftaran tidak ditemukan.';
             }
         }
 
@@ -341,15 +374,15 @@ class SpmbPublicController extends Controller
             if ($kode === '') {
                 return response()->json([
                     'found'   => false,
-                    'message' => 'Masukkan Nomor Registrasi atau NIK.',
+                    'message' => 'Masukkan Nama Lengkap beserta Tanggal Lahir, atau Nomor Registrasi.',
                 ], 422, $corsHeaders);
             }
 
             if (!$pendaftaran) {
                 return response()->json([
                     'found'   => false,
-                    'message' => 'Data pendaftaran tidak ditemukan.',
-                ], 404, $corsHeaders);
+                    'message' => $errorMessage ?? 'Data pendaftaran tidak ditemukan.',
+                ], $httpErrorCode, $corsHeaders);
             }
 
             return response()->json([
@@ -375,7 +408,7 @@ class SpmbPublicController extends Controller
             ], 200, $corsHeaders);
         }
 
-        return view('spmb.cek-status', compact('penerimaan', 'kode', 'pendaftaran', 'lokasiSeleksi', 'searched'));
+        return view('spmb.cek-status', compact('penerimaan', 'kode', 'tanggalLahir', 'pendaftaran', 'lokasiSeleksi', 'searched', 'errorMessage'));
     }
 
     /**

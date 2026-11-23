@@ -6,10 +6,17 @@
 <div class="spmb-card" style="width:100%;">
     <h1 style="font-size:17px; font-weight:800; color:#0F172A; margin:0 0 14px 0;">Cek Status Pendaftaran</h1>
 
-    <form action="{{ route('spmb.cek-status', $penerimaan->slug) }}" method="GET" style="display:flex; gap:10px; flex-wrap:wrap;">
-        <input type="text" name="kode" value="{{ $kode }}" class="wizard-input" style="flex:1; min-width:200px;"
-               placeholder="Nomor Registrasi atau NIK" required>
-        <button type="submit" class="btn btn-primary" style="min-height:46px; padding:0 22px; border-radius:11px;">Cari</button>
+    <form action="{{ route('spmb.cek-status', $penerimaan->slug) }}" method="GET" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; align-items:end;">
+        <div class="wizard-form-group" style="margin-bottom:0;">
+            <label class="wizard-label" for="kode">Nama Lengkap / No. Registrasi / NIK</label>
+            <input type="text" name="kode" id="kode" value="{{ $kode }}" class="wizard-input"
+                   placeholder="Nama atau No. Registrasi" required>
+        </div>
+        <div class="wizard-form-group" style="margin-bottom:0;">
+            <label class="wizard-label" for="tanggal_lahir">Tanggal Lahir</label>
+            <input type="date" name="tanggal_lahir" id="tanggal_lahir" value="{{ $tanggalLahir ?? '' }}" class="wizard-input">
+        </div>
+        <button type="submit" class="btn btn-primary" style="min-height:46px; padding:0 24px; border-radius:11px; justify-content:center;">Cari</button>
     </form>
 
     @if($searched)
@@ -51,15 +58,18 @@
                 </div>
 
                 @if($pendaftaran->public_token)
-                <div class="spmb-actions-stack" style="margin-top:18px;">
+                <div class="spmb-actions-stack" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:18px;">
                     <a href="{{ route('spmb.bukti', ['slug' => $penerimaan->slug, 'token' => $pendaftaran->public_token]) }}" class="btn btn-primary">
                         Lihat Bukti Pendaftaran
+                    </a>
+                    <a href="{{ route('spmb.cetak', ['slug' => $penerimaan->slug, 'token' => $pendaftaran->public_token]) }}" target="_blank" class="btn btn-secondary">
+                        Cetak Bukti &amp; Formulir (2 Hal)
                     </a>
                 </div>
                 @endif
             @else
                 <div class="alert-banner alert-error" style="margin-bottom:0; border-radius:12px;">
-                    <div>Data tidak ditemukan.</div>
+                    <div>{{ $errorMessage ?? 'Data tidak ditemukan.' }}</div>
                 </div>
             @endif
         </div>

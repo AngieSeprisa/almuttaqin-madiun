@@ -394,12 +394,13 @@ class PenerimaanSpmbTest extends TestCase
             'nik'                     => '3577010101129999',
             'jenjang'                 => 'SMP',
             'nama_lengkap'            => 'Ahmad Zaki',
+            'tanggal_lahir'           => '2014-05-10',
             'pj_biaya_hp'             => '085611112222',
             'alamat_jalan'            => 'Jl. Rahasia No. 1',
             'status_pendaftaran'      => 'Lulus Seleksi',
         ]);
 
-        // Ditemukan via ?format=json (tanpa membocorkan NIK/HP/alamat)
+        // Ditemukan via No. Registrasi (?format=json) tanpa membocorkan NIK/HP/alamat
         $res = $this->get(route('spmb.cek-status', [
             'slug'   => $event->slug,
             'kode'   => 'SMP-01-202728',
@@ -419,10 +420,35 @@ class PenerimaanSpmbTest extends TestCase
             ->assertJsonMissing(['nik' => '3577010101129999'])
             ->assertJsonMissing(['pj_biaya_hp' => '085611112222']);
 
+        // Cari pakai Nama tanpa Tanggal Lahir -> ditolak 422
+        $this->getJson(route('spmb.cek-status', [
+            'slug' => $event->slug,
+            'nama' => 'Ahmad Zaki',
+        ]))->assertStatus(422)->assertJsonPath('found', false);
+
+        // Cari pakai Nama + Tanggal Lahir salah -> tidak ditemukan 404
+        $this->getJson(route('spmb.cek-status', [
+            'slug'          => $event->slug,
+            'nama'          => 'Ahmad Zaki',
+            'tanggal_lahir' => '2014-05-11',
+        ]))->assertStatus(404)->assertJsonPath('found', false);
+
+        // Cari pakai Nama + Tanggal Lahir benar -> berhasil 200 lengkap dengan bukti_url & cetak_url
+        $this->getJson(route('spmb.cek-status', [
+            'slug'          => $event->slug,
+            'nama'          => 'Ahmad Zaki',
+            'tanggal_lahir' => '2014-05-10',
+        ]))->assertOk()
+            ->assertHeader('Access-Control-Allow-Origin', '*')
+            ->assertJsonPath('found', true)
+            ->assertJsonPath('data.no_registrasi', 'SMP-01-202728')
+            ->assertJsonPath('data.status', 'Lulus Seleksi');
+
         // Tidak ditemukan -> 404 dengan CORS
         $notFound = $this->getJson(route('spmb.cek-status', [
-            'slug' => $event->slug,
-            'kode' => 'TIDAK-ADA',
+            'slug'          => $event->slug,
+            'kode'          => 'TIDAK-ADA',
+            'tanggal_lahir' => '2014-05-10',
         ]));
 
         $notFound->assertStatus(404)
