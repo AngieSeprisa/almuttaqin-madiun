@@ -723,18 +723,37 @@
                 @endif
 
                 @if(!$authUser || $authUser->canDo('pengguna', 'view'))
-                <a href="{{ route('pengguna.index') }}" class="nav-item {{ request()->routeIs('pengguna*') ? 'active' : '' }}" title="Pengguna & Akses">
-
-                    <span class="nav-item-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 2a5 5 0 1 0 5 5 5 5 0 0 0-5-5zm0 8a3 3 0 1 1 3-3 3 3 0 0 1-3 3z"></path>
-                            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="19" cy="11" r="2"></circle>
-                            <path d="M22 20v-1a3 3 0 0 0-2-2.8"></path>
-                        </svg>
-                    </span>
-                    <span class="nav-item-text">Pengguna & Akses</span>
-                </a>
+                @php
+                    $isPenggunaGroupActive = request()->routeIs('pengguna.*') || request()->routeIs('template-akses.*');
+                @endphp
+                <div class="nav-group {{ $isPenggunaGroupActive ? 'open' : '' }}" id="navGroupPengguna">
+                    <button type="button" class="nav-item nav-item-has-sub {{ $isPenggunaGroupActive ? 'active' : '' }}" id="togglePengguna" title="Pengguna & Akses">
+                        <span class="nav-item-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2a5 5 0 1 0 5 5 5 5 0 0 0-5-5zm0 8a3 3 0 1 1 3-3 3 3 0 0 1-3 3z"></path>
+                                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="19" cy="11" r="2"></circle>
+                                <path d="M22 20v-1a3 3 0 0 0-2-2.8"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-item-text">Pengguna & Akses</span>
+                        <span class="nav-item-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="sidebar-subnav">
+                        <a href="{{ route('pengguna.index') }}" class="subnav-item {{ request()->routeIs('pengguna.*') ? 'active' : '' }}" title="Daftar Pengguna">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Daftar Pengguna</span>
+                        </a>
+                        <a href="{{ route('template-akses.index') }}" class="subnav-item {{ request()->routeIs('template-akses.*') ? 'active' : '' }}" title="Template Hak Akses">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Template Hak Akses</span>
+                        </a>
+                    </div>
+                </div>
                 @endif
             </nav>
         </aside>

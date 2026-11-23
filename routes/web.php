@@ -16,6 +16,7 @@ use App\Http\Controllers\PendaftaranController;
 use App\Http\Controllers\PenerimaanSantriController;
 use App\Http\Controllers\PengaturanAbsensiController;
 use App\Http\Controllers\PengaturanSesiController;
+use App\Http\Controllers\PermissionTemplateController;
 use App\Http\Controllers\PlottingKamarController;
 use App\Http\Controllers\PlottingKelasController;
 use App\Http\Controllers\PlottingKelasPengajianController;
@@ -807,6 +808,28 @@ Route::middleware('auth')->group(function () {
             ->name('resetPassword');
 
         Route::delete('/{pengguna}', [UserController::class, 'destroy'])
+            ->middleware('permission:pengguna,delete')
+            ->name('destroy');
+    });
+
+    // Menu Template Hak Akses
+    Route::prefix('template-akses')->name('template-akses.')->group(function () {
+        Route::get('/', [PermissionTemplateController::class, 'index'])
+            ->middleware('permission:pengguna,view')
+            ->name('index');
+        Route::get('/create', [PermissionTemplateController::class, 'create'])
+            ->middleware('permission:pengguna,create')
+            ->name('create');
+        Route::post('/', [PermissionTemplateController::class, 'store'])
+            ->middleware('permission:pengguna,create')
+            ->name('store');
+        Route::get('/{templateAkses}/edit', [PermissionTemplateController::class, 'edit'])
+            ->middleware('permission:pengguna,edit')
+            ->name('edit');
+        Route::put('/{templateAkses}', [PermissionTemplateController::class, 'update'])
+            ->middleware('permission:pengguna,edit')
+            ->name('update');
+        Route::delete('/{templateAkses}', [PermissionTemplateController::class, 'destroy'])
             ->middleware('permission:pengguna,delete')
             ->name('destroy');
     });

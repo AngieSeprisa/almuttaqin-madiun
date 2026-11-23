@@ -144,6 +144,14 @@
                     </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    @if(isset($permissionTemplates) && $permissionTemplates->isNotEmpty())
+                        <select id="selectCustomTemplate" class="wizard-select" style="width:auto; min-width:190px; padding:6px 32px 6px 12px; font-size:12.5px; height:34px;" onchange="applyCustomTemplate(this.value)">
+                            <option value="">Terapkan Template...</option>
+                            @foreach($permissionTemplates as $tpl)
+                                <option value="{{ $tpl->id }}">{{ $tpl->nama }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                     <button type="button" class="btn btn-sm btn-secondary" onclick="applyPreset('guru')" style="font-size:12px; padding:6px 12px;">
                         Template Guru
                     </button>
@@ -153,6 +161,9 @@
                     <button type="button" class="btn btn-sm btn-secondary" id="btnToggleAllPerms" style="font-size:12px; padding:6px 12px;">
                         Centang Semua
                     </button>
+                    <a href="{{ route('template-akses.index') }}" class="btn btn-sm btn-secondary" style="font-size:12px; padding:6px 12px; text-decoration:none;">
+                        Kelola Template
+                    </a>
                 </div>
             </div>
 
@@ -334,6 +345,54 @@
                 const cb = document.querySelector(selector);
                 if (cb) cb.checked = true;
             });
+        }
+    }
+
+    @php
+        $customTemplatesPayload = ($permissionTemplates ?? collect())->mapWithKeys(function ($t) {
+            return [
+                $t->id => [
+                    'default_role' => $t->default_role,
+                    'lembaga_ids'  => $t->lembaga_ids ?? [],
+                    'permissions'  => $t->permissions ?? [],
+                ],
+            ];
+        })->all();
+    @endphp
+    const customTemplatesMap = @json($customTemplatesPayload);
+
+    function applyCustomTemplate(templateId) {
+        if (!templateId || !customTemplatesMap[templateId]) return;
+        const tpl = customTemplatesMap[templateId];
+
+        if (tpl.default_role) {
+            const roleEl = document.getElementById('role');
+            if (roleEl) roleEl.value = tpl.default_role;
+        }
+
+        if (Array.isArray(tpl.lembaga_ids) && tpl.lembaga_ids.length > 0) {
+            const idSet = new Set(tpl.lembaga_ids.map(String));
+            document.querySelectorAll('.js-lembaga-check').forEach(function(cb) {
+                cb.checked = idSet.has(String(cb.value));
+            });
+        }
+
+        document.querySelectorAll('.js-perm-check').forEach(function(cb) {
+            cb.checked = false;
+        });
+
+        for (const [menu, actions] of Object.entries(tpl.permissions || {})) {
+            if (!Array.isArray(actions)) continue;
+            actions.forEach(function(action) {
+                const cb = document.querySelector(`input[name="permissions[${menu}][${action}]"]`);
+                if (cb) cb.checked = true;
+            });
+        }
+
+        const btnToggle = document.getElementById('btnToggleAllPerms');
+        const allCbs = document.querySelectorAll('.js-perm-check');
+        if (btnToggle && allCbs.length > 0) {
+            btnToggle.textContent = Array.from(allCbs).every(function(c) { return c.checked; }) ? 'Hapus Semua' : 'Centang Semua';
         }
     }
 

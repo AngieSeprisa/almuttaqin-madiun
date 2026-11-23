@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lembaga;
+use App\Models\PermissionTemplate;
 use App\Models\User;
 use App\Models\UserPermission;
 use Illuminate\Http\Request;
@@ -143,8 +144,9 @@ class UserController extends Controller
         $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
         $menus = self::systemMenus();
         $menuGroups = self::systemMenuGroups();
+        $permissionTemplates = PermissionTemplate::orderBy('nama')->get();
 
-        return view('pengguna.create', compact('lembagas', 'menus', 'menuGroups'));
+        return view('pengguna.create', compact('lembagas', 'menus', 'menuGroups', 'permissionTemplates'));
     }
 
     /**
@@ -245,7 +247,9 @@ class UserController extends Controller
             }
         }
 
-        return view('pengguna.edit', compact('pengguna', 'lembagas', 'menus', 'menuGroups', 'userPerms'));
+        $permissionTemplates = PermissionTemplate::orderBy('nama')->get();
+
+        return view('pengguna.edit', compact('pengguna', 'lembagas', 'menus', 'menuGroups', 'userPerms', 'permissionTemplates'));
     }
 
     /**

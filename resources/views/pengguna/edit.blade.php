@@ -112,7 +112,7 @@
                 <label style="display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:10px; border:1px solid var(--border-light); background:var(--bg-surface); cursor:pointer;">
                     <input type="checkbox" name="lembagas[]" value="{{ $lem->id }}" 
                            {{ in_array($lem->id, $assignedLembagas) ? 'checked' : '' }}
-                           class="permission-checkbox">
+                           class="permission-checkbox js-lembaga-check">
                     <span style="font-size:13.5px; font-weight:600; color:var(--text-primary);">{{ $lem->nama_singkat }}</span>
                 </label>
                 @endforeach
@@ -121,7 +121,7 @@
 
         {{-- Seksi Matriks Hak Akses Menu --}}
         <div class="form-section-card">
-            <div class="form-section-header" style="justify-content:space-between; align-items:center;">
+            <div class="form-section-header" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <div style="display:flex; align-items:center; gap:14px;">
                     <div class="form-section-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -133,9 +133,22 @@
                         <h2 class="form-section-title">Matriks Hak Akses Menu</h2>
                     </div>
                 </div>
-                <button type="button" class="btn btn-sm btn-secondary" id="btnToggleAllPerms" style="font-size:12px; padding:6px 12px;">
-                    Centang Semua
-                </button>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    @if(isset($permissionTemplates) && $permissionTemplates->isNotEmpty())
+                        <select id="selectCustomTemplate" class="wizard-select" style="width:auto; min-width:190px; padding:6px 32px 6px 12px; font-size:12.5px; height:34px;" onchange="applyCustomTemplate(this.value)">
+                            <option value="">Terapkan Template...</option>
+                            @foreach($permissionTemplates as $tpl)
+                                <option value="{{ $tpl->id }}">{{ $tpl->nama }}</option>
+                            @endforeach
+                        </select>
+                    @endif
+                    <button type="button" class="btn btn-sm btn-secondary" id="btnToggleAllPerms" style="font-size:12px; padding:6px 12px;">
+                        Centang Semua
+                    </button>
+                    <a href="{{ route('template-akses.index') }}" class="btn btn-sm btn-secondary" style="font-size:12px; padding:6px 12px; text-decoration:none;">
+                        Kelola Template
+                    </a>
+                </div>
             </div>
 
             <div style="overflow-x:auto;">
@@ -228,6 +241,54 @@
 </div>
 
 <script>
+    @php
+        $customTemplatesPayload = ($permissionTemplates ?? collect())->mapWithKeys(function ($t) {
+            return [
+                $t->id => [
+                    'default_role' => $t->default_role,
+                    'lembaga_ids'  => $t->lembaga_ids ?? [],
+                    'permissions'  => $t->permissions ?? [],
+                ],
+            ];
+        })->all();
+    @endphp
+    const customTemplatesMap = @json($customTemplatesPayload);
+
+    function applyCustomTemplate(templateId) {
+        if (!templateId || !customTemplatesMap[templateId]) return;
+        const tpl = customTemplatesMap[templateId];
+
+        if (tpl.default_role) {
+            const roleEl = document.getElementById('role');
+            if (roleEl) roleEl.value = tpl.default_role;
+        }
+
+        if (Array.isArray(tpl.lembaga_ids) && tpl.lembaga_ids.length > 0) {
+            const idSet = new Set(tpl.lembaga_ids.map(String));
+            document.querySelectorAll('.js-lembaga-check').forEach(function(cb) {
+                cb.checked = idSet.has(String(cb.value));
+            });
+        }
+
+        document.querySelectorAll('.js-perm-check').forEach(function(cb) {
+            cb.checked = false;
+        });
+
+        for (const [menu, actions] of Object.entries(tpl.permissions || {})) {
+            if (!Array.isArray(actions)) continue;
+            actions.forEach(function(action) {
+                const cb = document.querySelector(`input[name="permissions[${menu}][${action}]"]`);
+                if (cb) cb.checked = true;
+            });
+        }
+
+        const btnToggle = document.getElementById('btnToggleAllPerms');
+        const allCbs = document.querySelectorAll('.js-perm-check');
+        if (btnToggle && allCbs.length > 0) {
+            btnToggle.textContent = Array.from(allCbs).every(function(c) { return c.checked; }) ? 'Hapus Semua' : 'Centang Semua';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         var btnToggle = document.getElementById('btnToggleAllPerms');
         var checkboxes = document.querySelectorAll('.js-perm-check');

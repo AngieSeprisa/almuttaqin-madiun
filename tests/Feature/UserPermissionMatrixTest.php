@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\UserController;
 use App\Models\Lembaga;
+use App\Models\PermissionTemplate;
 use App\Models\PondokMateri;
 use App\Models\User;
 use Database\Seeders\LembagaAndUserSeeder;
@@ -224,6 +225,78 @@ class UserPermissionMatrixTest extends TestCase
 
         $deleteJsonRes = $this->actingAs($adminSmp)->deleteJson(route('guru-sekolah.destroy', $targetGuru->id));
         $deleteJsonRes->assertStatus(403);
+    }
+
+    public function test_menu_template_hak_akses_crud_dan_tampil_di_form_pengguna(): void
+    {
+        $yayasan = User::where('email', 'yayasan@almuttaqin.id')->firstOrFail();
+        $guru = User::where('email', 'guru.pondok.smp@almuttaqin.id')->firstOrFail();
+        $smp = Lembaga::where('kode', 'smp')->firstOrFail();
+
+        // 1. Halaman daftar & buat template terbuka
+        $this->actingAs($yayasan)->get(route('template-akses.index'))->assertOk();
+        $this->actingAs($yayasan)->get(route('template-akses.create'))->assertOk();
+
+        // 2. Simpan template baru (auto-include view saat create dicentang)
+        $this->actingAs($yayasan)
+            ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->post(route('template-akses.store'), [
+                'nama'         => 'Panitia SPMB SMP',
+                'default_role' => 'admin_lembaga',
+                'lembagas'     => [$smp->id],
+                'permissions'  => [
+                    'pendaftaran' => ['create' => 1, 'edit' => 1],
+                    'siswa'       => ['view' => 1],
+                ],
+            ])
+            ->assertRedirect(route('template-akses.index'));
+
+        $tpl = PermissionTemplate::where('nama', 'Panitia SPMB SMP')->firstOrFail();
+        $this->assertSame('admin_lembaga', $tpl->default_role);
+        $this->assertSame([$smp->id], $tpl->lembaga_ids);
+        $this->assertSame(['view', 'create', 'edit'], $tpl->permissions['pendaftaran']);
+        $this->assertSame(['view'], $tpl->permissions['siswa']);
+
+        // 3. Template tampil di daftar, form Tambah Pengguna, dan form Edit Pengguna
+        $this->actingAs($yayasan)->get(route('template-akses.index'))
+            ->assertOk()
+            ->assertSee('Panitia SPMB SMP');
+
+        $this->actingAs($yayasan)->get(route('pengguna.create'))
+            ->assertOk()
+            ->assertSee('Panitia SPMB SMP');
+
+        $this->actingAs($yayasan)->get(route('pengguna.edit', $guru->id))
+            ->assertOk()
+            ->assertSee('Panitia SPMB SMP');
+
+        // 4. Edit & update template
+        $this->actingAs($yayasan)->get(route('template-akses.edit', $tpl->id))
+            ->assertOk()
+            ->assertSee('Panitia SPMB SMP');
+
+        $this->actingAs($yayasan)
+            ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->put(route('template-akses.update', $tpl->id), [
+                'nama'         => 'Panitia SPMB Terpadu',
+                'default_role' => 'guru',
+                'lembagas'     => [$smp->id],
+                'permissions'  => [
+                    'pendaftaran' => ['view' => 1],
+                ],
+            ])
+            ->assertRedirect(route('template-akses.index'));
+
+        $this->assertSame('Panitia SPMB Terpadu', $tpl->fresh()->nama);
+        $this->assertSame(1, $tpl->fresh()->menuCount());
+
+        // 5. Hapus template
+        $this->actingAs($yayasan)
+            ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->delete(route('template-akses.destroy', $tpl->id))
+            ->assertRedirect(route('template-akses.index'));
+
+        $this->assertDatabaseMissing('permission_templates', ['id' => $tpl->id]);
     }
 }
 
