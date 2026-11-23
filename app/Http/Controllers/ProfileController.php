@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Lembaga;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,8 +22,19 @@ class ProfileController extends Controller
 
         $theme = $this->resolveTheme($user);
 
-        // Ambil mata pelajaran yang disinkronkan langsung dari menu Plotting Mata Pelajaran
-        $daftarMapel = \App\Models\MataPelajaran::orderBy('mata_pelajaran')
+        // Ambil mata pelajaran yang disinkronkan langsung dari Plotting Mata Pelajaran sesuai room/lembaga user
+        $scopedFormal = Lembaga::activeScopedFormal($user);
+        $mapelQuery = \App\Models\MataPelajaran::orderBy('mata_pelajaran');
+        if ($scopedFormal) {
+            $mapelQuery->where('lembaga_id', $scopedFormal->id);
+        } elseif (!$user->isYayasan()) {
+            $formalIds = $user->accessibleLembagas()->filter(fn (Lembaga $l) => $l->isFormalSchool())->pluck('id')->all();
+            if (!empty($formalIds)) {
+                $mapelQuery->whereIn('lembaga_id', $formalIds);
+            }
+        }
+
+        $daftarMapel = $mapelQuery
             ->pluck('mata_pelajaran')
             ->filter()
             ->unique()
@@ -205,11 +217,11 @@ class ProfileController extends Controller
                 'label'     => 'Baby Blue',
             ],
             default => [
-                'kode'      => 'yayasan',
-                'name'      => 'Yayasan Pondok Pesantren Muttaqin',
+                'kode'      => $kode,
+                'name'      => $currentLembaga?->nama ?: 'Yayasan Pondok Pesantren Muttaqin',
                 'btn_class' => 'btn-theme-yayasan',
                 'color'     => '#38BDF8',
-                'label'     => 'Baby Blue',
+                'label'     => $currentLembaga?->nama_singkat ?: 'Baby Blue',
             ],
         };
     }

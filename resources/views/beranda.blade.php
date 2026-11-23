@@ -86,8 +86,11 @@
         <!-- Siswa Keseluruhan -->
         <div class="stat-card">
             <div class="stat-card-header">
+                @php
+                    $berandaScopedFormal = \App\Models\Lembaga::activeScopedFormal(auth()->user(), $activeRoom ?? null);
+                @endphp
                 <span class="stat-card-title">
-                    {{ $activeRoom === 'smp' ? 'Siswa SMP' : ($activeRoom === 'sma' ? 'Siswa SMA' : 'Santri Keseluruhan') }}
+                    {{ $berandaScopedFormal ? 'Siswa ' . $berandaScopedFormal->nama_singkat : 'Santri Keseluruhan' }}
                 </span>
                 <div class="stat-icon-wrapper stat-icon-total">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

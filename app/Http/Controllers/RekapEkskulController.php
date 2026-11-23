@@ -26,50 +26,55 @@ class RekapEkskulController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membuka Rekap Ekstrakurikuler.');
         }
 
-        // Lembaga sekolah formal: SMP & SMA
-        $sekolahLembagas = $authUser->accessibleLembagas()->filter(function ($l) {
-            return in_array(strtolower($l->kode), ['smp', 'sma']) || $l->kategori === 'formal';
-        })->values();
+        $isYayasan = $authUser->isYayasan();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
 
-        if ($sekolahLembagas->isEmpty()) {
-            $sekolahLembagas = Lembaga::whereIn('kode', ['smp', 'sma'])->get();
+        // Lembaga sekolah formal dinamis (SMP, SMA, SD IT, RA, dll)
+        if ($isYayasan) {
+            $sekolahLembagas = Lembaga::formalOptions();
+        } elseif ($scopedFormal) {
+            $sekolahLembagas = collect([$scopedFormal]);
+        } else {
+            $sekolahLembagas = $authUser->accessibleLembagas()
+                ->filter(fn (Lembaga $l) => $l->isFormalSchool())
+                ->values();
         }
 
-        $isYayasan = $authUser->isYayasan();
         $selectedLembaga = null;
-
         if ($isYayasan) {
-            $reqKode = strtolower($request->get('lembaga', ''));
-            if ($reqKode && in_array($reqKode, ['smp', 'sma'])) {
-                $selectedLembaga = $sekolahLembagas->firstWhere('kode', $reqKode);
-            }
-            if (!$selectedLembaga) {
-                $activeKode = strtolower((string) session('active_lembaga'));
-                if (in_array($activeKode, ['smp', 'sma'])) {
-                    $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode);
+            $reqKode = trim((string) $request->get('lembaga', ''));
+            if ($reqKode !== '') {
+                $resolved = Lembaga::resolveByKode($reqKode);
+                if ($resolved) {
+                    $selectedLembaga = $sekolahLembagas->firstWhere('id', $resolved->id);
                 }
+            }
+            if (!$selectedLembaga && $scopedFormal) {
+                $selectedLembaga = $sekolahLembagas->firstWhere('id', $scopedFormal->id);
             }
             if (!$selectedLembaga) {
                 $selectedLembaga = $sekolahLembagas->firstWhere('kode', 'smp') ?: $sekolahLembagas->first();
             }
         } else {
-            $activeKode = strtolower((string) session('active_lembaga'));
-            $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode)
+            $selectedLembaga = $scopedFormal
                 ?: ($sekolahLembagas->firstWhere('id', $authUser->primary_lembaga_id) ?: $sekolahLembagas->first());
         }
 
         if (!$selectedLembaga) {
-            $selectedLembaga = Lembaga::where('kode', 'smp')->first() ?: Lembaga::first();
+            abort(403, 'Anda tidak memiliki akses ke lembaga sekolah formal.');
         }
 
         $kodeLembaga = strtolower($selectedLembaga->kode);
-        $jenjang = strtoupper($kodeLembaga); // 'SMP' atau 'SMA'
+        $jenjang = $selectedLembaga->jenjang_key;
+        $aliasesLower = array_map('strtolower', Lembaga::jenjangAliasesForRoom($selectedLembaga->kode));
 
-        // Ambil daftar ekskul
-        $ekskuls = Ekstrakurikuler::where(function ($q) use ($selectedLembaga, $jenjang) {
+        // Ambil daftar ekskul khusus lembaga terpilih
+        $ekskuls = Ekstrakurikuler::where(function ($q) use ($selectedLembaga, $aliasesLower) {
                 $q->where('lembaga_id', $selectedLembaga->id)
-                  ->orWhere('jenjang', $jenjang)
                   ->orWhere('jenjang', 'ALL');
+                if (!empty($aliasesLower)) {
+                    $q->orWhereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(jenjang))'), $aliasesLower);
+                }
             })
             ->where(function ($q) {
                 $q->whereNull('is_active')->orWhere('is_active', true);
@@ -77,19 +82,21 @@ class RekapEkskulController extends Controller
             ->orderBy('nama_ekskul')
             ->get();
 
-        if ($ekskuls->isEmpty() && !$request->filled('lembaga')) {
+        // Fallback lintas sekolah HANYA untuk Yayasan di room global
+        if ($ekskuls->isEmpty() && $isYayasan && !$scopedFormal && !$request->filled('lembaga')) {
             $fallbackEkskuls = Ekstrakurikuler::where(function ($q) {
                     $q->whereNull('is_active')->orWhere('is_active', true);
                 })
                 ->orderBy('nama_ekskul')
                 ->get();
             if ($fallbackEkskuls->isNotEmpty()) {
-                $firstMatch = $fallbackEkskuls->first(fn($e) => $e->lembaga_id && $sekolahLembagas->contains('id', $e->lembaga_id));
+                $firstMatch = $fallbackEkskuls->first(fn ($e) => $e->lembaga_id && $sekolahLembagas->contains('id', $e->lembaga_id));
                 if ($firstMatch) {
                     $selectedLembaga = $sekolahLembagas->firstWhere('id', $firstMatch->lembaga_id);
                     $kodeLembaga = strtolower($selectedLembaga->kode);
-                    $jenjang = strtoupper($kodeLembaga);
-                    $ekskuls = $fallbackEkskuls->filter(fn($e) => $e->lembaga_id == $selectedLembaga->id || $e->jenjang === $jenjang || $e->jenjang === 'ALL')->values();
+                    $jenjang = $selectedLembaga->jenjang_key;
+                    $aliasesLower = array_map('strtolower', Lembaga::jenjangAliasesForRoom($selectedLembaga->kode));
+                    $ekskuls = $fallbackEkskuls->filter(fn ($e) => $e->lembaga_id == $selectedLembaga->id || $e->jenjang === 'ALL' || in_array(strtolower(trim((string) $e->jenjang)), $aliasesLower, true))->values();
                 } else {
                     $ekskuls = $fallbackEkskuls;
                 }

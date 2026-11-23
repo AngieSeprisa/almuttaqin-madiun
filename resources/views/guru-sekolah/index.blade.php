@@ -89,33 +89,34 @@
             </div>
         </div>
 
-        {{-- Guru SMP --}}
+        {{-- Statistik per Lembaga Sekolah Dinamis --}}
+        @php
+            $statColors = [
+                ['bg' => 'rgba(2, 132, 199, 0.08)', 'border' => 'rgba(2, 132, 199, 0.15)', 'fg' => '#0284c7'],
+                ['bg' => 'rgba(16, 185, 129, 0.08)', 'border' => 'rgba(16, 185, 129, 0.15)', 'fg' => '#059669'],
+                ['bg' => 'rgba(139, 92, 246, 0.08)', 'border' => 'rgba(139, 92, 246, 0.15)', 'fg' => '#7c3aed'],
+                ['bg' => 'rgba(234, 88, 12, 0.08)', 'border' => 'rgba(234, 88, 12, 0.15)', 'fg' => '#ea580c'],
+            ];
+            $displayLembagaStats = $lembagaStats ?? [
+                ['singkatan' => 'SMP', 'count' => $stats['smp'] ?? 0],
+                ['singkatan' => 'SMA', 'count' => $stats['sma'] ?? 0],
+            ];
+        @endphp
+        @foreach($displayLembagaStats as $lIdx => $lStat)
+        @php $c = $statColors[$lIdx % count($statColors)]; @endphp
         <div style="background:var(--bg-surface); border:1px solid var(--border-light, #e2e8f0); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-            <div style="width:42px; height:42px; border-radius:10px; background:rgba(2, 132, 199, 0.08); display:flex; align-items:center; justify-content:center; color:#0284c7; flex-shrink:0; border:1px solid rgba(2, 132, 199, 0.15);">
+            <div style="width:42px; height:42px; border-radius:10px; background:{{ $c['bg'] }}; display:flex; align-items:center; justify-content:center; color:{{ $c['fg'] }}; flex-shrink:0; border:1px solid {{ $c['border'] }};">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
                 </svg>
             </div>
             <div>
-                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted, #64748b);">Guru SMP</div>
-                <div style="font-size:24px; font-weight:800; color:#0284c7; margin-top:2px; line-height:1.2;">{{ $stats['smp'] }}</div>
+                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted, #64748b);">Guru {{ $lStat['singkatan'] }}</div>
+                <div style="font-size:24px; font-weight:800; color:{{ $c['fg'] }}; margin-top:2px; line-height:1.2;">{{ $lStat['count'] }}</div>
             </div>
         </div>
-
-        {{-- Guru SMA --}}
-        <div style="background:var(--bg-surface); border:1px solid var(--border-light, #e2e8f0); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
-            <div style="width:42px; height:42px; border-radius:10px; background:rgba(16, 185, 129, 0.08); display:flex; align-items:center; justify-content:center; color:#059669; flex-shrink:0; border:1px solid rgba(16, 185, 129, 0.15);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;">
-                    <circle cx="12" cy="8" r="7"></circle>
-                    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline>
-                </svg>
-            </div>
-            <div>
-                <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted, #64748b);">Guru SMA</div>
-                <div style="font-size:24px; font-weight:800; color:#059669; margin-top:2px; line-height:1.2;">{{ $stats['sma'] }}</div>
-            </div>
-        </div>
+        @endforeach
 
         {{-- Menunggu Persetujuan --}}
         <div style="background:var(--bg-surface); border:1px solid {{ $stats['menunggu'] > 0 ? 'rgba(245, 158, 11, 0.4)' : 'var(--border-light, #e2e8f0)' }}; border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
@@ -402,13 +403,15 @@
                     </select>
                 </div>
 
-                {{-- Lembaga (HANYA SMP dan SMA) --}}
+                {{-- Lembaga Sekolah --}}
                 <div style="position:relative; z-index:20;">
                     <label class="form-label" style="font-size:12.5px; font-weight:600; color:var(--text-primary); margin-bottom:5px; display:block;">Lembaga <span style="color:#ef4444;">*</span></label>
                     <select name="lembaga_id" id="tambah_lembaga_id" class="form-select" required onchange="filterMapelTambah(this.value)" style="width:100%;">
-                        <option value="">-- Pilih Lembaga (SMP / SMA) --</option>
+                        @if($sekolahLembagas->count() > 1)
+                        <option value="">-- Pilih Lembaga Sekolah --</option>
+                        @endif
                         @foreach($sekolahLembagas as $lem)
-                            <option value="{{ $lem->id }}">{{ $lem->nama_singkat ?? $lem->singkatan }}</option>
+                            <option value="{{ $lem->id }}" {{ ($sekolahLembagas->count() === 1 || (isset($selectedLembagaId) && (int)$selectedLembagaId === (int)$lem->id)) ? 'selected' : '' }}>{{ $lem->nama_singkat ?? $lem->singkatan }}</option>
                         @endforeach
                     </select>
                 </div>

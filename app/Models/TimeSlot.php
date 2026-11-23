@@ -70,15 +70,20 @@ class TimeSlot extends Model
     }
 
     /**
-     * Scope filter jenjang (SMP, SMA, atau Semua).
+     * Scope filter jenjang (SMP, SMA, SD IT, RA, atau Semua).
      */
     public function scopeForJenjang($query, string $jenjang)
     {
-        $jenjang = strtoupper($jenjang);
-        return $query->where(function ($q) use ($jenjang) {
-            $q->where('jenjang', $jenjang)
-              ->orWhere('jenjang', 'Semua');
-        });
+        $aliases = Lembaga::jenjangAliasesForRoom($jenjang);
+        if (empty($aliases)) {
+            $aliases = [strtoupper(trim($jenjang))];
+        }
+        $lowerAliases = array_values(array_unique(array_merge(array_map('strtolower', $aliases), ['semua'])));
+
+        return $query->whereRaw(
+            'LOWER(TRIM(jenjang)) IN (' . implode(',', array_fill(0, count($lowerAliases), '?')) . ')',
+            $lowerAliases
+        );
     }
 
     /**

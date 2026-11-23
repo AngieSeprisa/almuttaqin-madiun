@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Lembaga;
 use App\Models\Pendaftaran;
 use App\Models\Siswa;
 use App\Models\User;
@@ -315,6 +316,10 @@ class QuickSearchController extends Controller
             ];
         }
 
+        // Scope room aktif untuk mengisolasi hasil pencarian lintas lembaga
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
+
         // 2. Data Siswa (Dapat dicari oleh Yayasan, Admin Lembaga, Guru, atau pemegang izin siswa)
         $canSearchSiswa = !$authUser 
             || $authUser->isYayasan() 
@@ -324,6 +329,7 @@ class QuickSearchController extends Controller
         if ($canSearchSiswa) {
             try {
                 $siswas = Siswa::query()
+                    ->forLembaga($activeRoom)
                     ->where(function($query) use ($q, $qLower) {
                         $query->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$qLower}%"])
                             ->orWhere('nama_lengkap', 'like', "%{$q}%")
@@ -360,6 +366,7 @@ class QuickSearchController extends Controller
                 // Fallback query tanpa relasi jika schema relasi belum termigrasi
                 try {
                     $siswas = Siswa::query()
+                        ->forLembaga($activeRoom)
                         ->where(function($query) use ($q, $qLower) {
                             $query->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$qLower}%"])
                                 ->orWhere('nama_lengkap', 'like', "%{$q}%")
@@ -396,7 +403,20 @@ class QuickSearchController extends Controller
         $canSearchGuru = !$authUser || $authUser->canDo('guru_sekolah', 'view') || $authUser->canDo('guru_pondok', 'view') || $authUser->canDo('pengguna', 'view') || $authUser->isYayasan() || in_array($authUser->role, ['admin_lembaga', 'guru']);
         if ($canSearchGuru) {
             try {
-                $users = User::query()
+                $usersQuery = User::query();
+                if ($scopedFormal) {
+                    $usersQuery->forLembagaModel($scopedFormal);
+                } elseif ($authUser && !$authUser->isYayasan()) {
+                    $allowedIds = $authUser->accessibleLembagas()->pluck('id')->all();
+                    if (!empty($allowedIds)) {
+                        $usersQuery->where(function ($sub) use ($allowedIds) {
+                            $sub->whereIn('primary_lembaga_id', $allowedIds)
+                                ->orWhereHas('lembagas', fn ($l) => $l->whereIn('lembagas.id', $allowedIds));
+                        });
+                    }
+                }
+
+                $users = $usersQuery
                     ->where(function($query) use ($q, $qLower) {
                         $query->whereRaw('LOWER(name) LIKE ?', ["%{$qLower}%"])
                             ->orWhere('name', 'like', "%{$q}%")
@@ -439,6 +459,7 @@ class QuickSearchController extends Controller
         if (!$authUser || $authUser->canDo('pendaftaran', 'view') || $authUser->isYayasan()) {
             try {
                 $pendaftar = Pendaftaran::query()
+                    ->forLembaga($activeRoom)
                     ->where(function($query) use ($q, $qLower) {
                         $query->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$qLower}%"])
                             ->orWhere('nama_lengkap', 'like', "%{$q}%")

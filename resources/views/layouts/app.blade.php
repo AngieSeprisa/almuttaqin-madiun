@@ -650,7 +650,12 @@
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Guru Sekolah</span>
                             @php
-                                $pendingGuruCount = \App\Models\User::where('mapel_status', 'menunggu')->count();
+                                $scopedSidebarFormal = \App\Models\Lembaga::activeScopedFormal($authUser);
+                                $pendingGuruQuery = \App\Models\User::where('mapel_status', 'menunggu');
+                                if ($scopedSidebarFormal) {
+                                    $pendingGuruQuery->forLembagaModel($scopedSidebarFormal);
+                                }
+                                $pendingGuruCount = $pendingGuruQuery->count();
                             @endphp
                             @if($pendingGuruCount > 0)
                             <span style="margin-left:auto; background:#EF4444; color:#ffffff; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:10px; line-height:1.2;">{{ $pendingGuruCount }}</span>

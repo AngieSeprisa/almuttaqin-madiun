@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Kamar;
+use App\Models\Lembaga;
 use App\Models\MasterDevice;
 use App\Models\MasterSesi;
 use App\Models\Presensi;
@@ -20,10 +21,12 @@ class PresensiDashboardController extends Controller
     {
         $now = Carbon::now('Asia/Jakarta');
         $currentTime = $now->format('H:i:s');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
 
+        $defaultTab = $scopedFormal ? 'sekolah' : 'pondok';
         $initialTab = in_array($request->get('tab'), ['pondok', 'sekolah', 'pegawai'], true)
             ? $request->get('tab')
-            : 'pondok';
+            : $defaultTab;
 
         // 1. Ambil Sesi yang sedang aktif saat ini sesuai tab awal
         $sesiQuery = MasterSesi::query();
@@ -113,9 +116,27 @@ class PresensiDashboardController extends Controller
             }
         }
 
-        // Live Feed 12 Tap Terakhir (Global Hari Ini)
-        $liveFeeds = Presensi::with(['sesi', 'siswa', 'user'])
-            ->whereDate('waktu_tap', $today)
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+
+        // Live Feed 12 Tap Terakhir (discope ke room formal bila aktif)
+        $liveFeedsQuery = Presensi::with(['sesi', 'siswa', 'user'])
+            ->whereDate('waktu_tap', $today);
+
+        if ($scopedFormal) {
+            $scopedSiswaIds = Siswa::forLembaga($scopedFormal->kode)->pluck('id')->all();
+            $scopedUserIds = User::forLembagaModel($scopedFormal)->pluck('id')->all();
+            $liveFeedsQuery->where(function ($q) use ($scopedSiswaIds, $scopedUserIds) {
+                $q->where(function ($s) use ($scopedSiswaIds) {
+                    $s->where('tipe_entitas', 'santri')
+                      ->whereIn('entitas_id', empty($scopedSiswaIds) ? [0] : $scopedSiswaIds);
+                })->orWhere(function ($u) use ($scopedUserIds) {
+                    $u->where('tipe_entitas', 'guru_pegawai')
+                      ->whereIn('entitas_id', empty($scopedUserIds) ? [0] : $scopedUserIds);
+                });
+            });
+        }
+
+        $liveFeeds = $liveFeedsQuery
             ->latest('waktu_tap')
             ->take(12)
             ->get()
@@ -146,6 +167,9 @@ class PresensiDashboardController extends Controller
 
         if ($tab === 'pondok') {
             $querySantri = Siswa::where('status', 'aktif');
+            if ($scopedFormal) {
+                $querySantri->forLembaga($scopedFormal->kode);
+            }
             if ($kamar && $kamar !== 'all') {
                 $querySantri->where('kamar', $kamar);
             }
@@ -184,10 +208,14 @@ class PresensiDashboardController extends Controller
             ])->values();
 
         } elseif ($tab === 'sekolah') {
-            $targetEntities = Siswa::where('status', 'aktif')
-                ->whereIn('jenjang', ['SMP', 'SMA'])
-                ->orderBy('nama_lengkap')
-                ->get();
+            $sekolahQuery = Siswa::where('status', 'aktif');
+            if ($scopedFormal) {
+                $sekolahQuery->forLembaga($scopedFormal->kode);
+            } else {
+                $sekolahQuery->whereNotNull('jenjang')
+                    ->whereRaw('LOWER(TRIM(jenjang)) != ?', ['reguler']);
+            }
+            $targetEntities = $sekolahQuery->orderBy('nama_lengkap')->get();
             $totalTarget = $targetEntities->count();
 
             $presensiMap = Presensi::whereDate('waktu_tap', $today)
@@ -226,7 +254,11 @@ class PresensiDashboardController extends Controller
             })->values();
 
         } else { // 'pegawai'
-            $targetEntities = User::with('primaryLembaga')->orderBy('name')->get();
+            $pegawaiQuery = User::with('primaryLembaga');
+            if ($scopedFormal) {
+                $pegawaiQuery->forLembagaModel($scopedFormal);
+            }
+            $targetEntities = $pegawaiQuery->orderBy('name')->get();
             $totalTarget = $targetEntities->count();
 
             // Cek apakah sesi aktif merupakan sesi pulang

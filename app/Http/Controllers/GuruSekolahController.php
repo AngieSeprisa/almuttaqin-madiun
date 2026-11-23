@@ -11,6 +11,52 @@ use Illuminate\Support\Facades\Auth;
 class GuruSekolahController extends Controller
 {
     /**
+     * Daftar lembaga formal yang dapat diakses user sesuai room aktif.
+     */
+    protected function resolveAllowedFormalLembagas(User $authUser)
+    {
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($authUser->isYayasan()) {
+            return Lembaga::formalOptions();
+        }
+
+        if ($scopedFormal) {
+            return collect([$scopedFormal]);
+        }
+
+        return $authUser->accessibleLembagas()
+            ->filter(fn (Lembaga $l) => $l->isFormalSchool())
+            ->values();
+    }
+
+    /**
+     * Pastikan target guru termasuk dalam room/lembaga yang dapat dikelola user aktif.
+     */
+    protected function ensureTargetTeacherInRoom(User $authUser, User $target): void
+    {
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal) {
+            $inRoom = User::forLembagaModel($scopedFormal)->whereKey($target->id)->exists();
+            if (!$inRoom) {
+                abort(403, 'Anda tidak memiliki akses untuk mengelola guru dari lembaga lain.');
+            }
+            return;
+        }
+
+        if (!$authUser->isYayasan()) {
+            $allowedIds = $this->resolveAllowedFormalLembagas($authUser)->pluck('id')->all();
+            $inAllowed = User::whereKey($target->id)
+                ->where(function ($q) use ($allowedIds) {
+                    $q->whereIn('primary_lembaga_id', $allowedIds)
+                      ->orWhereHas('lembagas', fn ($l) => $l->whereIn('lembagas.id', $allowedIds));
+                })->exists();
+            if (!$inAllowed) {
+                abort(403, 'Anda tidak memiliki akses untuk mengelola guru dari lembaga lain.');
+            }
+        }
+    }
+
+    /**
      * Tampilkan data guru sekolah dan daftar pengajuan mata pelajaran ke yayasan.
      * Hanya menampilkan akun yang didaftarkan sebagai Guru Sekolah atau yang sedang mengajukan mapel.
      */
@@ -24,23 +70,34 @@ class GuruSekolahController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membuka menu Guru Sekolah.');
         }
 
-        // Ambil lembaga sekolah resmi: HANYA SMP dan SMA
-        $sekolahLembagas = Lembaga::where(function ($q) {
-            $q->whereIn('kode', ['smp', 'sma'])
-              ->orWhere(function ($sub) {
-                  $sub->where('kategori', 'formal')->whereIn('kode', ['smp', 'sma']);
-              })
-              ->orWhere('singkatan', 'SMP')
-              ->orWhere('singkatan', 'SMA');
-        })->where('is_active', true)->orderBy('urutan')->get();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $sekolahLembagas = $this->resolveAllowedFormalLembagas($authUser);
+        $sekolahIds = $sekolahLembagas->pluck('id')->toArray();
 
-        if ($sekolahLembagas->isEmpty()) {
-            $sekolahLembagas = Lembaga::where('singkatan', 'like', '%SMP%')
-                ->orWhere('singkatan', 'like', '%SMA%')
-                ->get();
+        // Tentukan filter lembaga aktif (terkunci untuk non-Yayasan di room formal; default ke room aktif untuk Yayasan)
+        $selectedLembaga = null;
+        if (!$authUser->isYayasan() && $scopedFormal) {
+            $selectedLembaga = $scopedFormal;
+        } elseif ($request->filled('lembaga_id')) {
+            $selectedLembaga = $sekolahLembagas->firstWhere('id', (int) $request->lembaga_id);
+        } elseif ($scopedFormal) {
+            $selectedLembaga = $scopedFormal;
         }
 
-        $sekolahIds = $sekolahLembagas->pluck('id')->toArray();
+        $applyScope = function ($q) use ($selectedLembaga, $sekolahIds, $authUser) {
+            if ($selectedLembaga) {
+                $q->forLembagaModel($selectedLembaga);
+            } elseif (!$authUser->isYayasan()) {
+                if (empty($sekolahIds)) {
+                    $q->whereRaw('1 = 0');
+                } else {
+                    $q->where(function ($sub) use ($sekolahIds) {
+                        $sub->whereIn('primary_lembaga_id', $sekolahIds)
+                            ->orWhereHas('lembagas', fn ($l) => $l->whereIn('lembagas.id', $sekolahIds));
+                    });
+                }
+            }
+        };
 
         // Query: HANYA akun yang terdaftar sebagai guru sekolah atau yang sedang menunggu persetujuan mapel
         $query = User::with(['primaryLembaga', 'lembagas', 'mapelDiverifikasiBy'])
@@ -48,6 +105,7 @@ class GuruSekolahController extends Controller
                 $q->where('is_guru_sekolah', true)
                   ->orWhere('mapel_status', 'menunggu');
             });
+        $applyScope($query);
 
         // Filter status pengajuan
         if ($request->filled('status')) {
@@ -59,16 +117,6 @@ class GuruSekolahController extends Controller
             } elseif ($status === 'ditolak') {
                 $query->where('mapel_status', 'ditolak');
             }
-        }
-
-        // Filter lembaga sekolah
-        if ($request->filled('lembaga_id')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('primary_lembaga_id', $request->lembaga_id)
-                  ->orWhereHas('lembagas', function ($l) use ($request) {
-                      $l->where('lembagas.id', $request->lembaga_id);
-                  });
-            });
         }
 
         // Filter pencarian teks
@@ -83,22 +131,35 @@ class GuruSekolahController extends Controller
             });
         }
 
-        // Statistik
-        $smpLembaga = $sekolahLembagas->first(fn($l) => strtolower($l->kode) === 'smp' || strtoupper($l->singkatan) === 'SMP');
-        $smaLembaga = $sekolahLembagas->first(fn($l) => strtolower($l->kode) === 'sma' || strtoupper($l->singkatan) === 'SMA');
+        // Statistik dinamis sesuai ruang kerja/lembaga yang dapat diakses
+        $baseTotalQuery = User::where('is_guru_sekolah', true);
+        $baseMenungguQuery = User::where('mapel_status', 'menunggu');
+        $baseDisetujuiQuery = User::where('is_guru_sekolah', true)->where('mapel_status', 'disetujui');
+        $applyScope($baseTotalQuery);
+        $applyScope($baseMenungguQuery);
+        $applyScope($baseDisetujuiQuery);
+
+        $statsLembagas = $selectedLembaga ? collect([$selectedLembaga]) : $sekolahLembagas;
+        $lembagaStats = [];
+        foreach ($statsLembagas as $lemb) {
+            $lembagaStats[] = [
+                'id'        => $lemb->id,
+                'kode'      => $lemb->kode,
+                'nama'      => $lemb->nama,
+                'singkatan' => $lemb->nama_singkat,
+                'count'     => User::where('is_guru_sekolah', true)->forLembagaModel($lemb)->count(),
+            ];
+        }
+
+        $smpLembaga = $statsLembagas->first(fn ($l) => strtolower($l->kode) === 'smp' || strtoupper((string) $l->singkatan) === 'SMP');
+        $smaLembaga = $statsLembagas->first(fn ($l) => strtolower($l->kode) === 'sma' || strtoupper((string) $l->singkatan) === 'SMA');
 
         $stats = [
-            'total_guru' => User::where('is_guru_sekolah', true)->count(),
-            'menunggu'   => User::where('mapel_status', 'menunggu')->count(),
-            'disetujui'  => User::where('is_guru_sekolah', true)->where('mapel_status', 'disetujui')->count(),
-            'smp'        => $smpLembaga ? User::where('is_guru_sekolah', true)->where(function ($q) use ($smpLembaga) {
-                $q->where('primary_lembaga_id', $smpLembaga->id)
-                  ->orWhereHas('lembagas', fn($l) => $l->where('lembagas.id', $smpLembaga->id));
-            })->count() : 0,
-            'sma'        => $smaLembaga ? User::where('is_guru_sekolah', true)->where(function ($q) use ($smaLembaga) {
-                $q->where('primary_lembaga_id', $smaLembaga->id)
-                  ->orWhereHas('lembagas', fn($l) => $l->where('lembagas.id', $smaLembaga->id));
-            })->count() : 0,
+            'total_guru' => $baseTotalQuery->count(),
+            'menunggu'   => $baseMenungguQuery->count(),
+            'disetujui'  => $baseDisetujuiQuery->count(),
+            'smp'        => $smpLembaga ? User::where('is_guru_sekolah', true)->forLembagaModel($smpLembaga)->count() : 0,
+            'sma'        => $smaLembaga ? User::where('is_guru_sekolah', true)->forLembagaModel($smaLembaga)->count() : 0,
         ];
 
         $perPage = (int) $request->get('per_page', 15);
@@ -113,18 +174,39 @@ class GuruSekolahController extends Controller
             ->withQueryString();
 
         // Ambil data mata pelajaran yang disinkronkan langsung dari menu Plotting Mata Pelajaran
+        $mapelLembagaIds = $selectedLembaga ? [$selectedLembaga->id] : $sekolahIds;
         $plottingMapels = MataPelajaran::with('lembaga')
-            ->whereIn('lembaga_id', $sekolahIds)
+            ->whereIn('lembaga_id', $mapelLembagaIds)
             ->orderBy('mata_pelajaran')
             ->get();
 
         // Daftar akun terdaftar yang BELUM masuk sebagai Guru Sekolah (untuk pilihan pop up form tambah guru)
-        $akunUsers = User::where('is_active', true)
-            ->where('is_guru_sekolah', false)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email', 'nip']);
+        $akunUsersQuery = User::where('is_active', true)
+            ->where('is_guru_sekolah', false);
+        if ($selectedLembaga) {
+            $akunUsersQuery->forLembagaModel($selectedLembaga);
+        } elseif (!$authUser->isYayasan()) {
+            $akunUsersQuery->where(function ($sub) use ($sekolahIds) {
+                $sub->whereIn('primary_lembaga_id', $sekolahIds)
+                    ->orWhereHas('lembagas', fn ($l) => $l->whereIn('lembagas.id', $sekolahIds));
+            });
+        }
+        $akunUsers = $akunUsersQuery->orderBy('name')->get(['id', 'name', 'email', 'nip']);
 
-        return view('guru-sekolah.index', compact('users', 'stats', 'sekolahLembagas', 'plottingMapels', 'akunUsers', 'authUser'));
+        $selectedLembagaId = $selectedLembaga?->id;
+
+        return view('guru-sekolah.index', compact(
+            'users',
+            'stats',
+            'lembagaStats',
+            'sekolahLembagas',
+            'selectedLembaga',
+            'selectedLembagaId',
+            'scopedFormal',
+            'plottingMapels',
+            'akunUsers',
+            'authUser'
+        ));
     }
 
     /**
@@ -145,13 +227,21 @@ class GuruSekolahController extends Controller
             'mata_pelajaran' => 'required',
         ], [
             'user_id.required'        => 'Pilih akun guru yang akan didaftarkan.',
-            'lembaga_id.required'     => 'Pilih lembaga sekolah (SMP atau SMA).',
+            'lembaga_id.required'     => 'Pilih lembaga sekolah tujuan.',
             'mata_pelajaran.required' => 'Pilih setidaknya satu mata pelajaran yang diampu.',
         ]);
 
         $lembaga = Lembaga::findOrFail($request->lembaga_id);
-        if (!in_array(strtolower($lembaga->kode), ['smp', 'sma']) && !in_array(strtoupper($lembaga->singkatan), ['SMP', 'SMA'])) {
-            return redirect()->back()->withErrors(['lembaga_id' => 'Lembaga hanya boleh SMP atau SMA.']);
+        if (!$lembaga->isFormalSchool()) {
+            return redirect()->back()->withErrors(['lembaga_id' => 'Lembaga yang dipilih harus merupakan lembaga sekolah formal.']);
+        }
+
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal && !$authUser->isYayasan() && (int) $lembaga->id !== (int) $scopedFormal->id) {
+            abort(403, 'Anda hanya dapat mendaftarkan guru pada lembaga ruang kerja Anda.');
+        }
+        if (!$authUser->isYayasan() && !$authUser->hasAccessToLembaga($lembaga->kode)) {
+            abort(403, 'Anda tidak memiliki akses ke lembaga tersebut.');
         }
 
         $user = User::findOrFail($request->user_id);
@@ -184,7 +274,7 @@ class GuruSekolahController extends Controller
         }
 
         $school = $user->resolveSchoolLembaga();
-        if ($school && in_array(strtolower($school->kode ?? ''), ['smp', 'sma'])) {
+        if ($school && $school->isFormalSchool()) {
             $user->lembagas()->syncWithoutDetaching([$school->id]);
             if (!$user->isYayasan() || empty($user->primary_lembaga_id)) {
                 $user->primary_lembaga_id = $school->id;
@@ -194,7 +284,7 @@ class GuruSekolahController extends Controller
         $user->save();
 
         return redirect()->route('guru-sekolah.index')
-            ->with('success', "Guru {$user->name} berhasil didaftarkan sebagai Guru {$lembaga->singkatan} ({$mapel}).");
+            ->with('success', "Guru {$user->name} berhasil didaftarkan sebagai Guru {$lembaga->nama_singkat} ({$mapel}).");
     }
 
     /**
@@ -208,6 +298,8 @@ class GuruSekolahController extends Controller
         if (!$authUser->isYayasan() && !$authUser->canDo('guru_sekolah', 'edit')) {
             abort(403, 'Anda tidak memiliki hak untuk menyetujui pengajuan.');
         }
+
+        $this->ensureTargetTeacherInRoom($authUser, $user);
 
         $rawMapel = $request->input('mata_pelajaran');
         if (!empty($rawMapel)) {
@@ -239,7 +331,7 @@ class GuruSekolahController extends Controller
         }
 
         $school = $user->resolveSchoolLembaga();
-        if ($school && in_array(strtolower($school->kode ?? ''), ['smp', 'sma'])) {
+        if ($school && $school->isFormalSchool()) {
             $user->lembagas()->syncWithoutDetaching([$school->id]);
             if (!$user->isYayasan() || empty($user->primary_lembaga_id)) {
                 $user->primary_lembaga_id = $school->id;
@@ -262,6 +354,8 @@ class GuruSekolahController extends Controller
         if (!$authUser->isYayasan() && !$authUser->canDo('guru_sekolah', 'edit')) {
             abort(403, 'Anda tidak memiliki hak untuk menolak pengajuan.');
         }
+
+        $this->ensureTargetTeacherInRoom($authUser, $user);
 
         $request->validate([
             'catatan' => 'required|string|max:500',
@@ -290,6 +384,8 @@ class GuruSekolahController extends Controller
             abort(403, 'Anda tidak memiliki hak untuk mengubah data guru sekolah.');
         }
 
+        $this->ensureTargetTeacherInRoom($authUser, $user);
+
         $rawMapel = $request->input('mata_pelajaran');
         if (is_array($rawMapel)) {
             $items = array_values(array_unique(array_filter(array_map('trim', $rawMapel))));
@@ -313,7 +409,10 @@ class GuruSekolahController extends Controller
 
         if ($request->filled('primary_lembaga_id')) {
             $lembaga = Lembaga::find($request->primary_lembaga_id);
-            if ($lembaga && (in_array(strtolower($lembaga->kode), ['smp', 'sma']) || in_array(strtoupper($lembaga->singkatan), ['SMP', 'SMA']))) {
+            $scopedFormal = Lembaga::activeScopedFormal($authUser);
+            $canAssignLembaga = $lembaga && $lembaga->isFormalSchool()
+                && ($authUser->isYayasan() || ($authUser->hasAccessToLembaga($lembaga->kode) && (!$scopedFormal || (int) $scopedFormal->id === (int) $lembaga->id)));
+            if ($canAssignLembaga) {
                 $user->primary_lembaga_id = $lembaga->id;
                 $user->lembagas()->syncWithoutDetaching([$lembaga->id]);
             }
@@ -324,7 +423,7 @@ class GuruSekolahController extends Controller
         }
 
         $school = $user->resolveSchoolLembaga();
-        if ($school && in_array(strtolower($school->kode ?? ''), ['smp', 'sma'])) {
+        if ($school && $school->isFormalSchool()) {
             $user->lembagas()->syncWithoutDetaching([$school->id]);
             if (!$user->isYayasan() || empty($user->primary_lembaga_id)) {
                 $user->primary_lembaga_id = $school->id;
@@ -347,6 +446,8 @@ class GuruSekolahController extends Controller
         if (!$authUser->isYayasan() && !$authUser->canDo('guru_sekolah', 'delete')) {
             abort(403, 'Anda tidak memiliki hak untuk menghapus Guru Sekolah.');
         }
+
+        $this->ensureTargetTeacherInRoom($authUser, $user);
 
         $nama = $user->name;
         $user->is_guru_sekolah = false;
@@ -371,6 +472,8 @@ class GuruSekolahController extends Controller
         if (!$authUser->isYayasan() && !$authUser->canDo('guru_sekolah', 'edit')) {
             abort(403, 'Akses tidak diizinkan.');
         }
+
+        $this->ensureTargetTeacherInRoom($authUser, $user);
 
         $user->mapel_status = !empty($user->mata_pelajaran) ? 'disetujui' : 'belum_mengajukan';
         $user->mapel_diajukan = $user->mata_pelajaran;

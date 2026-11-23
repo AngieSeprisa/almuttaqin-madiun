@@ -13,30 +13,62 @@ use Illuminate\Support\Facades\Schema;
 class RekapAbsensiController extends Controller
 {
     /**
-     * Submenu: Rekap Absensi Guru.
+     * Tentukan daftar lembaga yang diizinkan dan filter lembaga terpilih secara ketat sesuai room aktif.
      */
-    public function guru(Request $request)
+    protected function resolveScopedLembagaFilter(User $user, Request $request): array
     {
-        $user = auth()->user();
-        $lembagas = $user->accessibleLembagas();
-
-        // Filter Lembaga (Dukung "Semua Lembaga" jika lembaga_id dikirim kosong/all)
-        $isSemuaLembaga = $request->exists('lembaga_id') && (
-            $request->get('lembaga_id') === '' || 
-            $request->get('lembaga_id') === 'all' || 
+        $scopedFormal = Lembaga::activeScopedFormal($user);
+        $isSemuaRequested = $request->exists('lembaga_id') && (
+            $request->get('lembaga_id') === '' ||
+            $request->get('lembaga_id') === 'all' ||
             is_null($request->get('lembaga_id'))
         );
 
-        $defaultLembaga = $user->currentLembaga() ?: $lembagas->first();
-        $defaultLembagaId = $defaultLembaga ? $defaultLembaga->id : null;
+        if ($user->isYayasan()) {
+            $lembagas = $user->accessibleLembagas();
+            $defaultLembaga = $scopedFormal ?: ($user->currentLembaga() ?: $lembagas->first());
+            $defaultLembagaId = $defaultLembaga?->id;
 
-        if ($isSemuaLembaga) {
+            if ($isSemuaRequested) {
+                $lembagaId = null;
+            } elseif ($request->filled('lembaga_id')) {
+                $lembagaId = (int) $request->get('lembaga_id');
+            } else {
+                $lembagaId = $defaultLembagaId;
+            }
+
+            return [$lembagas, $lembagaId, $defaultLembagaId, null, $scopedFormal];
+        }
+
+        // Non-Yayasan di room formal: terkunci ketat pada lembaga room aktifnya
+        if ($scopedFormal) {
+            return [collect([$scopedFormal]), $scopedFormal->id, $scopedFormal->id, [$scopedFormal->id], $scopedFormal];
+        }
+
+        $lembagas = $user->accessibleLembagas();
+        $allowedIds = $lembagas->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $defaultLembaga = $user->currentLembaga() ?: $lembagas->first();
+        $defaultLembagaId = $defaultLembaga?->id;
+
+        if ($isSemuaRequested && count($allowedIds) > 1) {
             $lembagaId = null;
-        } elseif ($request->filled('lembaga_id')) {
+        } elseif ($request->filled('lembaga_id') && in_array((int) $request->get('lembaga_id'), $allowedIds, true)) {
             $lembagaId = (int) $request->get('lembaga_id');
         } else {
             $lembagaId = $defaultLembagaId;
         }
+
+        return [$lembagas, $lembagaId, $defaultLembagaId, $allowedIds, $scopedFormal];
+    }
+
+    /**
+     * Submenu: Rekap Absensi Guru.
+     */
+    public function guru(Request $request)
+    {
+        /** @var User $user */
+        $user = auth()->user();
+        [$lembagas, $lembagaId, $defaultLembagaId, $allowedLembagaIds, $scopedFormal] = $this->resolveScopedLembagaFilter($user, $request);
 
         // Filter Periode (Default otomatis ke tanggal hari ini)
         $todayStr = Carbon::today()->toDateString();
@@ -60,7 +92,7 @@ class RekapAbsensiController extends Controller
             ->first() : null;
 
         // Query Presensi Terpadu yang Disesuaikan Ketat Berdasarkan Lembaga Terdaftar Guru
-        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, $status, $search);
+        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, $status, $search, $allowedLembagaIds);
 
         // Summary Statistik (sebelum paginate)
         $summaryQuery = clone $query;
@@ -83,6 +115,7 @@ class RekapAbsensiController extends Controller
             'lembagas',
             'lembagaId',
             'defaultLembagaId',
+            'scopedFormal',
             'todayStr',
             'bulan',
             'tahun',
@@ -107,6 +140,18 @@ class RekapAbsensiController extends Controller
 
         $presensi = PresensiGuru::findOrFail($id);
 
+        /** @var User|null $authUser */
+        $authUser = auth()->user();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($authUser && !$authUser->isYayasan()) {
+            $allowedIds = $scopedFormal
+                ? [$scopedFormal->id]
+                : $authUser->accessibleLembagas()->pluck('id')->map(fn ($i) => (int) $i)->all();
+            if (!in_array((int) $presensi->lembaga_id, $allowedIds, true)) {
+                abort(403, 'Anda tidak memiliki akses untuk mengoreksi presensi guru lembaga lain.');
+            }
+        }
+
         $ketBaru = isset($validated['keterangan']) ? trim($validated['keterangan']) : '';
         $keteranganFinal = $presensi->keterangan;
         if ($ketBaru !== '' && $ketBaru !== (string) $presensi->keterangan) {
@@ -130,20 +175,9 @@ class RekapAbsensiController extends Controller
      */
     public function export(Request $request)
     {
-        $isSemuaLembaga = $request->exists('lembaga_id') && (
-            $request->get('lembaga_id') === '' || 
-            $request->get('lembaga_id') === 'all' || 
-            is_null($request->get('lembaga_id'))
-        );
-
-        if ($isSemuaLembaga) {
-            $lembagaId = null;
-        } elseif ($request->filled('lembaga_id')) {
-            $lembagaId = (int) $request->get('lembaga_id');
-        } else {
-            $user = auth()->user();
-            $lembagaId = $user->currentLembaga()?->id ?: $user->accessibleLembagas()->first()?->id;
-        }
+        /** @var User $user */
+        $user = auth()->user();
+        [$lembagas, $lembagaId, $defaultLembagaId, $allowedLembagaIds] = $this->resolveScopedLembagaFilter($user, $request);
 
         $bulan = (int) $request->get('bulan', Carbon::now()->month);
         $tahun = (int) $request->get('tahun', Carbon::now()->year);
@@ -151,7 +185,7 @@ class RekapAbsensiController extends Controller
 
         $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
 
-        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun);
+        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, null, null, $allowedLembagaIds);
         $records = $query->orderBy('tanggal', 'asc')->orderBy('jam_masuk', 'asc')->get();
 
         $fileName = 'rekap_absensi_guru_' . $tahun . '_' . str_pad($bulan, 2, '0', STR_PAD_LEFT) . '.csv';
@@ -199,20 +233,9 @@ class RekapAbsensiController extends Controller
      */
     public function cetak(Request $request)
     {
-        $isSemuaLembaga = $request->exists('lembaga_id') && (
-            $request->get('lembaga_id') === '' || 
-            $request->get('lembaga_id') === 'all' || 
-            is_null($request->get('lembaga_id'))
-        );
-
-        if ($isSemuaLembaga) {
-            $lembagaId = null;
-        } elseif ($request->filled('lembaga_id')) {
-            $lembagaId = (int) $request->get('lembaga_id');
-        } else {
-            $user = auth()->user();
-            $lembagaId = $user->currentLembaga()?->id ?: $user->accessibleLembagas()->first()?->id;
-        }
+        /** @var User $user */
+        $user = auth()->user();
+        [$lembagas, $lembagaId, $defaultLembagaId, $allowedLembagaIds] = $this->resolveScopedLembagaFilter($user, $request);
 
         $bulan = (int) $request->get('bulan', Carbon::now()->month);
         $tahun = (int) $request->get('tahun', Carbon::now()->year);
@@ -220,9 +243,9 @@ class RekapAbsensiController extends Controller
 
         $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
 
-        $lembaga = $lembagaId ? Lembaga::find($lembagaId) : (auth()->user()->currentLembaga() ?: Lembaga::first());
+        $lembaga = $lembagaId ? Lembaga::find($lembagaId) : ($user->currentLembaga() ?: Lembaga::first());
 
-        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun);
+        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, null, null, $allowedLembagaIds);
         $records = $query->orderBy('tanggal', 'asc')->orderBy('jam_masuk', 'asc')->get();
 
         $namaBulan = [
@@ -239,14 +262,20 @@ class RekapAbsensiController extends Controller
      * - Walaupun akun berstatus yayasan, jika terdaftarnya sebagai guru SMP,
      *   maka absensinya HANYA terlihat saat memilih lembaga SMP.
      * - Tidak akan bocor ke SMA atau lembaga lainnya.
-     * - Opsi "Semua Lembaga" tetap menampilkan seluruh guru.
+     * - Opsi "Semua Lembaga" tetap menampilkan seluruh guru sesuai hak akses lembaga user.
      */
-    protected function buildPresensiQuery(?int $lembagaId, ?string $tanggal, int $bulan, int $tahun, ?string $status = null, ?string $search = null)
+    protected function buildPresensiQuery(?int $lembagaId, ?string $tanggal, int $bulan, int $tahun, ?string $status = null, ?string $search = null, ?array $allowedLembagaIds = null)
     {
         $query = PresensiGuru::with(['user', 'lembaga']);
 
         if ($lembagaId) {
             $query->where('lembaga_id', $lembagaId);
+        } elseif ($allowedLembagaIds !== null) {
+            if (empty($allowedLembagaIds)) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('lembaga_id', $allowedLembagaIds);
+            }
         }
 
         if ($tanggal) {
@@ -308,7 +337,7 @@ class RekapAbsensiController extends Controller
                 return "{$tap->entitas_id}_{$date}";
             });
 
-            $fallbackLembaga = Lembaga::whereIn('kode', ['smp', 'sma'])->first() ?: Lembaga::first();
+            $fallbackLembaga = Lembaga::formalOptions()->first() ?: Lembaga::first();
 
             foreach ($grouped as $key => $tapList) {
                 try {
@@ -340,8 +369,8 @@ class RekapAbsensiController extends Controller
                         continue;
                     }
 
-                    // Jika guru sekolah teridentifikasi sebagai SMP/SMA dan primary_lembaga_id belum sesuai, selaraskan
-                    if ($schoolLembaga && in_array(strtolower($schoolLembaga->kode ?? ''), ['smp', 'sma'])) {
+                    // Jika guru sekolah teridentifikasi sebagai lembaga formal dan primary_lembaga_id belum sesuai, selaraskan
+                    if ($schoolLembaga && $schoolLembaga->isFormalSchool()) {
                         if ($user->primary_lembaga_id !== $schoolLembaga->id && !$user->isYayasan()) {
                             $user->primary_lembaga_id = $schoolLembaga->id;
                             $user->save();

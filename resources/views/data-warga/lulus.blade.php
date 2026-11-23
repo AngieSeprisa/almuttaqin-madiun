@@ -81,6 +81,7 @@
                     </select>
                 </div>
 
+                @if(count($jenjangList ?? []) > 1)
                 <div class="filter-select-wrap">
                     <select name="jenjang" class="form-select filter-select" onchange="this.form.submit()">
                         <option value="">Semua Jenjang</option>
@@ -89,6 +90,7 @@
                         @endforeach
                     </select>
                 </div>
+                @endif
 
                 @if($tahunList->isNotEmpty())
                 <div class="filter-select-wrap">

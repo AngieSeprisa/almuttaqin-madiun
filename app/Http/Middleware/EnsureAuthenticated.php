@@ -29,8 +29,9 @@ class EnsureAuthenticated
             return redirect()->route('login')->with('error', 'Akun Anda sedang dinonaktifkan. Silakan hubungi admin yayasan.');
         }
 
-        // Inisialisasi active_lembaga jika belum ada di session
-        if (!$request->session()->has('active_lembaga')) {
+        // Inisialisasi & validasi active_lembaga agar non-Yayasan tidak pernah berada di room tanpa akses
+        $activeKode = $request->session()->get('active_lembaga');
+        if (!$activeKode || !$user->hasAccessToLembaga($activeKode)) {
             $current = $user->currentLembaga();
             if ($current) {
                 $request->session()->put('active_lembaga', $current->kode);

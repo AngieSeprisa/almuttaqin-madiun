@@ -12,6 +12,7 @@ class Ujian extends Model
     protected $table = 'ujian';
 
     protected $fillable = [
+        'lembaga_id',
         'kode_ujian',
         'nama_ujian',
         'mapel_id',
@@ -36,6 +37,30 @@ class Ujian extends Model
         'bobot_benar'   => 'decimal:2',
         'tanggal_ujian' => 'date',
     ];
+
+    /**
+     * Relasi ke Lembaga
+     */
+    public function lembaga()
+    {
+        return $this->belongsTo(Lembaga::class, 'lembaga_id');
+    }
+
+    /**
+     * Scope filter ujian berdasarkan lembaga/room tertentu.
+     */
+    public function scopeForLembaga($query, ?Lembaga $lembaga)
+    {
+        if (!$lembaga || Lembaga::isGlobalRoom($lembaga->kode)) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($lembaga) {
+            $q->where('lembaga_id', $lembaga->id)
+              ->orWhereHas('kelas', fn ($k) => $k->where('lembaga_id', $lembaga->id))
+              ->orWhereHas('mapel', fn ($m) => $m->where('lembaga_id', $lembaga->id));
+        });
+    }
 
     /**
      * Relasi ke Butir Soal Ujian

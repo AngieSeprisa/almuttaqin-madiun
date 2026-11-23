@@ -106,11 +106,67 @@ class UserController extends Controller
 
 
     /**
+     * Pastikan target pengguna dapat dikelola dari room aktif (khusus non-Yayasan).
+     */
+    protected function ensureManagedUserInRoom(?User $authUser, User $target): void
+    {
+        if (!$authUser || $authUser->isYayasan()) {
+            return;
+        }
+
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal) {
+            if (!User::forLembagaModel($scopedFormal)->whereKey($target->id)->exists() || $target->isYayasan()) {
+                abort(403, 'Anda hanya dapat mengelola akun pengguna pada lembaga ruang kerja Anda.');
+            }
+            return;
+        }
+
+        $allowedIds = $authUser->accessibleLembagas()->pluck('id')->all();
+        $inScope = User::whereKey($target->id)->where(function ($q) use ($allowedIds) {
+            $q->whereIn('primary_lembaga_id', $allowedIds)
+              ->orWhereHas('lembagas', fn ($l) => $l->whereIn('lembagas.id', $allowedIds));
+        })->exists();
+        if (!$inScope || $target->isYayasan()) {
+            abort(403, 'Anda tidak memiliki akses untuk mengelola pengguna lembaga lain.');
+        }
+    }
+
+    /**
      * Menampilkan daftar pengguna
      */
     public function index(Request $request)
     {
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+
         $query = User::with(['primaryLembaga', 'lembagas']);
+
+        if ($authUser && !$authUser->isYayasan()) {
+            if ($scopedFormal) {
+                $query->forLembagaModel($scopedFormal);
+                $lembagas = collect([$scopedFormal]);
+            } else {
+                $lembagas = $authUser->accessibleLembagas();
+                $allowedIds = $lembagas->pluck('id')->all();
+                $query->where(function ($q) use ($allowedIds) {
+                    $q->whereIn('primary_lembaga_id', $allowedIds)
+                      ->orWhereHas('lembagas', fn ($l) => $l->whereIn('lembagas.id', $allowedIds));
+                });
+            }
+            $query->where('role', '!=', 'yayasan');
+        } else {
+            $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
+            if ($request->filled('lembaga_id')) {
+                $query->where(function ($q) use ($request) {
+                    $q->where('primary_lembaga_id', $request->lembaga_id)
+                      ->orWhereHas('lembagas', function ($l) use ($request) {
+                          $l->where('lembagas.id', $request->lembaga_id);
+                      });
+                });
+            }
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -125,14 +181,7 @@ class UserController extends Controller
             $query->where('role', $request->role);
         }
 
-        if ($request->filled('lembaga_id')) {
-            $query->whereHas('lembagas', function ($q) use ($request) {
-                $q->where('lembagas.id', $request->lembaga_id);
-            });
-        }
-
         $users = $query->latest('id')->paginate(15)->withQueryString();
-        $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
 
         return view('pengguna.index', compact('users', 'lembagas'));
     }
@@ -142,7 +191,15 @@ class UserController extends Controller
      */
     public function create()
     {
-        $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+
+        if ($authUser && !$authUser->isYayasan()) {
+            $lembagas = $scopedFormal ? collect([$scopedFormal]) : $authUser->accessibleLembagas();
+        } else {
+            $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
+        }
         $menus = self::systemMenus();
         $menuGroups = self::systemMenuGroups();
         $permissionTemplates = PermissionTemplate::orderBy('nama')->get();
@@ -155,11 +212,17 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+
+        $allowedRoles = ($authUser && !$authUser->isYayasan()) ? 'admin_lembaga,guru' : 'yayasan,admin_lembaga,guru';
+
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'email'       => 'required|email|unique:users,email|max:255',
             'password'    => 'required|string|min:6',
-            'role'        => 'required|in:yayasan,admin_lembaga,guru',
+            'role'        => "required|in:{$allowedRoles}",
             'jabatan'     => 'nullable|string|max:100',
             'lembagas'    => 'required|array|min:1',
             'lembagas.*'  => 'exists:lembagas,id',
@@ -173,6 +236,19 @@ class UserController extends Controller
             'role.required'       => 'Peran pengguna wajib dipilih.',
             'lembagas.required'   => 'Pilih minimal satu lembaga.',
         ]);
+
+        if ($authUser && !$authUser->isYayasan()) {
+            $allowedLembagaIds = $scopedFormal
+                ? [$scopedFormal->id]
+                : $authUser->accessibleLembagas()->pluck('id')->all();
+            $validated['lembagas'] = array_values(array_intersect(
+                array_map('intval', $validated['lembagas']),
+                array_map('intval', $allowedLembagaIds)
+            ));
+            if (empty($validated['lembagas'])) {
+                abort(403, 'Anda hanya dapat membuat akun untuk ruang kerja lembaga Anda.');
+            }
+        }
 
         $primaryLembagaId = $validated['lembagas'][0] ?? null;
         if (!empty($validated['jabatan'])) {
@@ -221,8 +297,17 @@ class UserController extends Controller
      */
     public function edit(User $pengguna)
     {
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        $this->ensureManagedUserInRoom($authUser, $pengguna);
+
         $pengguna->load(['lembagas', 'permissions']);
-        $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($authUser && !$authUser->isYayasan()) {
+            $lembagas = $scopedFormal ? collect([$scopedFormal]) : $authUser->accessibleLembagas();
+        } else {
+            $lembagas = Lembaga::where('is_active', true)->orderBy('urutan')->get();
+        }
         $menus = self::systemMenus();
         $menuGroups = self::systemMenuGroups();
 
@@ -258,11 +343,17 @@ class UserController extends Controller
      */
     public function update(Request $request, User $pengguna)
     {
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        $this->ensureManagedUserInRoom($authUser, $pengguna);
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $allowedRoles = ($authUser && !$authUser->isYayasan()) ? 'admin_lembaga,guru' : 'yayasan,admin_lembaga,guru';
+
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'email'       => ['required', 'email', 'max:255', Rule::unique('users')->ignore($pengguna->id)],
             'password'    => 'nullable|string|min:6',
-            'role'        => 'required|in:yayasan,admin_lembaga,guru',
+            'role'        => "required|in:{$allowedRoles}",
             'jabatan'     => 'nullable|string|max:100',
             'lembagas'    => 'required|array|min:1',
             'lembagas.*'  => 'exists:lembagas,id',
@@ -275,6 +366,19 @@ class UserController extends Controller
             'role.required'       => 'Peran pengguna wajib dipilih.',
             'lembagas.required'   => 'Pilih minimal satu lembaga.',
         ]);
+
+        if ($authUser && !$authUser->isYayasan()) {
+            $allowedLembagaIds = $scopedFormal
+                ? [$scopedFormal->id]
+                : $authUser->accessibleLembagas()->pluck('id')->all();
+            $validated['lembagas'] = array_values(array_intersect(
+                array_map('intval', $validated['lembagas']),
+                array_map('intval', $allowedLembagaIds)
+            ));
+            if (empty($validated['lembagas'])) {
+                abort(403, 'Anda hanya dapat menugaskan lembaga ruang kerja Anda.');
+            }
+        }
 
         $primaryLembagaId = $validated['lembagas'][0] ?? null;
         if (!empty($validated['jabatan'])) {
@@ -314,6 +418,7 @@ class UserController extends Controller
      */
     public function destroy(User $pengguna)
     {
+        $this->ensureManagedUserInRoom(Auth::user(), $pengguna);
         if (Auth::id() === $pengguna->id) {
             return back()->with('error', 'Anda tidak dapat menghapus akun Anda sendiri.');
         }
@@ -328,6 +433,7 @@ class UserController extends Controller
      */
     public function resetPassword(Request $request, User $pengguna)
     {
+        $this->ensureManagedUserInRoom(Auth::user(), $pengguna);
         $validated = $request->validate([
             'password' => 'required|string|min:6',
         ], [

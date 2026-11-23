@@ -134,11 +134,17 @@
                             <label class="wizard-label" for="jenjang">
                                 Daftar Sebagai 
                             </label>
+                            @php
+                                $pendaftaranJenjangOptions = $jenjangList ?? \App\Models\Lembaga::allJenjangOptions(true);
+                                $selectedCreateJenjang = old('jenjang', (!empty($scopedFormal) ? $scopedFormal->jenjang_key : ''));
+                            @endphp
                             <select name="jenjang" id="jenjang" class="wizard-select @error('jenjang') is-invalid @enderror">
+                                @if(empty($scopedFormal))
                                 <option value="">Pilih salah satu opsi</option>
-                                <option value="SMP" {{ old('jenjang') == 'SMP' ? 'selected' : '' }}>SMP</option>
-                                <option value="SMA" {{ old('jenjang') == 'SMA' ? 'selected' : '' }}>SMA</option>
-                                <option value="Reguler" {{ old('jenjang') == 'Reguler' ? 'selected' : '' }}>Reguler</option>
+                                @endif
+                                @foreach($pendaftaranJenjangOptions as $jOpt)
+                                <option value="{{ $jOpt }}" {{ $selectedCreateJenjang == $jOpt ? 'selected' : '' }}>{{ $jOpt }}</option>
+                                @endforeach
                             </select>
                             @error('jenjang')
                                 <div class="invalid-feedback" style="display:block;">{{ $message }}</div>

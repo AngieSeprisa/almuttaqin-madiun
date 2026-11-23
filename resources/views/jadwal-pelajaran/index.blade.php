@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Master Jadwal Pelajaran (SMP & SMA)')
+@section('title', 'Master Jadwal Pelajaran')
 
 @section('header-actions')
 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -76,24 +76,22 @@
     {{-- Top Switcher: Tab SMP vs SMA --}}
     <div class="form-section-card" style="padding:12px 18px;">
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;">
-            {{-- Jenjang Segmented Buttons --}}
-            <div style="display:inline-flex; background:var(--bg-subtle, #f3f4f6); padding:4px; border-radius:10px; border:1px solid var(--border-color, #e5e7eb);">
-                <a href="{{ route('jadwal-pelajaran.index', ['jenjang' => 'SMP', 'hari' => $hariFilter]) }}" 
-                   style="display:inline-flex; align-items:center; gap:8px; padding:8px 18px; border-radius:8px; font-weight:700; font-size:13.5px; text-decoration:none; transition:all 0.15s ease; {{ $jenjang === 'SMP' ? 'background:var(--primary, #10B981); color:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.1);' : 'color:var(--text-muted, #64748b);' }}">
+            {{-- Jenjang Segmented Buttons (Dinamis sesuai lembaga formal yang diakses) --}}
+            <div style="display:inline-flex; flex-wrap:wrap; background:var(--bg-subtle, #f3f4f6); padding:4px; border-radius:10px; border:1px solid var(--border-color, #e5e7eb); gap:4px;">
+                @foreach(($formalLembagas ?? collect()) as $lemb)
+                @php
+                    $isActiveLemb = ($selectedLembaga && (int)$selectedLembaga->id === (int)$lemb->id)
+                        || (!$selectedLembaga && strcasecmp($jenjang, $lemb->jenjang_key) === 0);
+                @endphp
+                <a href="{{ route('jadwal-pelajaran.index', ['jenjang' => $lemb->jenjang_key, 'hari' => $hariFilter]) }}" 
+                   style="display:inline-flex; align-items:center; gap:8px; padding:8px 16px; border-radius:8px; font-weight:700; font-size:13.5px; text-decoration:none; transition:all 0.15s ease; {{ $isActiveLemb ? 'background:var(--primary, #10B981); color:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.1);' : 'color:var(--text-muted, #64748b);' }}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
                         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
                     </svg>
-                    <span>Jadwal SMP (Kelas 7, 8, 9)</span>
+                    <span>Jadwal {{ $lemb->nama_singkat }}</span>
                 </a>
-                <a href="{{ route('jadwal-pelajaran.index', ['jenjang' => 'SMA', 'hari' => $hariFilter]) }}" 
-                   style="display:inline-flex; align-items:center; gap:8px; padding:8px 18px; border-radius:8px; font-weight:700; font-size:13.5px; text-decoration:none; transition:all 0.15s ease; {{ $jenjang === 'SMA' ? 'background:var(--primary, #10B981); color:#ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.1);' : 'color:var(--text-muted, #64748b);' }}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
-                        <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-                        <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-                    </svg>
-                    <span>Jadwal SMA (Kelas 10, 11, 12)</span>
-                </a>
+                @endforeach
             </div>
 
             {{-- Filter Hari Pills --}}

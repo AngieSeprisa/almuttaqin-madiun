@@ -62,15 +62,160 @@ class Lembaga extends Model
     }
 
     /**
-     * Daftar lembaga formal aktif yang terdaftar (untuk pilihan jenjang SPMB).
+     * Cek apakah kode room merupakan ruang global (Yayasan / Pondok).
+     */
+    public static function isGlobalRoom(?string $kode): bool
+    {
+        $clean = strtolower(trim((string) $kode));
+
+        return $clean === '' || in_array($clean, ['yayasan', 'pondok'], true);
+    }
+
+    /**
+     * Cek apakah lembaga ini termasuk lembaga pendidikan formal (SMP, SMA, SD IT, RA, dll).
+     */
+    public function isFormalSchool(): bool
+    {
+        $kode = strtolower(trim((string) $this->kode));
+        if (in_array($kode, ['yayasan', 'pondok'], true)) {
+            return false;
+        }
+
+        return in_array(strtolower(trim((string) $this->kategori)), ['formal', 'sekolah'], true)
+            || in_array($kode, ['smp', 'sma', 'smk', 'sdit', 'sd', 'ra', 'tk', 'mi', 'mts', 'ma'], true);
+    }
+
+    /**
+     * Daftar lembaga formal aktif yang terdaftar (SMP, SMA, SD IT, RA, dll).
      */
     public static function formalOptions()
     {
-        return static::where('kategori', 'formal')
-            ->where('is_active', true)
+        return static::where('is_active', true)
+            ->whereRaw("LOWER(kode) NOT IN ('yayasan', 'pondok')")
+            ->where(function ($q) {
+                $q->whereRaw("LOWER(COALESCE(kategori, '')) IN ('formal', 'sekolah')")
+                  ->orWhereRaw("LOWER(kode) IN ('smp', 'sma', 'smk', 'sdit', 'sd', 'ra', 'tk', 'mi', 'mts', 'ma')");
+            })
             ->orderBy('urutan')
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * Temukan lembaga aktif berdasarkan kode atau singkatan secara case-insensitive.
+     */
+    public static function resolveByKode(?string $kode): ?self
+    {
+        $clean = strtolower(trim((string) $kode));
+        if ($clean === '') {
+            return null;
+        }
+
+        $compact = preg_replace('/[\s_-]+/', '', $clean);
+
+        return static::where('is_active', true)->orderBy('urutan')->get()->first(function (self $l) use ($clean, $compact) {
+            $lKode = strtolower(trim((string) $l->kode));
+            $lSingkat = strtolower(trim((string) $l->singkatan));
+            $lKodeCompact = preg_replace('/[\s_-]+/', '', $lKode);
+            $lSingkatCompact = preg_replace('/[\s_-]+/', '', $lSingkat);
+
+            return $lKode === $clean
+                || $lSingkat === $clean
+                || ($compact !== '' && ($lKodeCompact === $compact || $lSingkatCompact === $compact));
+        });
+    }
+
+    /**
+     * Ambil seluruh alias penulisan jenjang untuk suatu kode room (misal 'sdit' => ['SD IT', 'SDIT', 'sdit', 'sd it']).
+     */
+    public static function jenjangAliasesForRoom(?string $kodeLembaga): array
+    {
+        $clean = trim((string) $kodeLembaga);
+        if ($clean === '' || static::isGlobalRoom($clean)) {
+            return [];
+        }
+
+        $lembaga = static::resolveByKode($clean);
+        $rawList = [$clean, strtoupper($clean), strtolower($clean)];
+
+        if ($lembaga) {
+            foreach ([$lembaga->kode, $lembaga->singkatan, $lembaga->jenjang_key, $lembaga->nama] as $val) {
+                $v = trim((string) $val);
+                if ($v !== '') {
+                    $rawList[] = $v;
+                    $rawList[] = strtoupper($v);
+                    $rawList[] = strtolower($v);
+                    $noSpace = preg_replace('/\s+/', '', $v);
+                    if ($noSpace !== '') {
+                        $rawList[] = $noSpace;
+                        $rawList[] = strtoupper($noSpace);
+                        $rawList[] = strtolower($noSpace);
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($rawList, fn ($v) => trim((string) $v) !== '')));
+    }
+
+    /**
+     * Jenjang baku untuk kode room aktif (misal 'sdit' => 'SD IT', 'ra' => 'RA', 'smp' => 'SMP').
+     */
+    public static function defaultJenjangForRoom(?string $kodeLembaga): string
+    {
+        if (static::isGlobalRoom($kodeLembaga)) {
+            return 'Reguler';
+        }
+
+        $lembaga = static::resolveByKode($kodeLembaga);
+        if ($lembaga) {
+            return $lembaga->jenjang_key;
+        }
+
+        return strtoupper(trim((string) $kodeLembaga)) ?: 'Reguler';
+    }
+
+    /**
+     * Daftar seluruh opsi jenjang aktif di sistem (Reguler + seluruh lembaga formal terdaftar).
+     */
+    public static function allJenjangOptions(bool $includeReguler = true): array
+    {
+        $list = $includeReguler ? ['Reguler'] : [];
+        foreach (static::formalOptions() as $lemb) {
+            $key = $lemb->jenjang_key;
+            if ($key !== '' && !in_array($key, $list, true)) {
+                $list[] = $key;
+            }
+        }
+
+        if (count($list) <= ($includeReguler ? 1 : 0)) {
+            $list = array_values(array_unique(array_merge($list, ['SMP', 'SMA'])));
+        }
+
+        return $list;
+    }
+
+    /**
+     * Dapatkan model Lembaga yang sedang aktif dan divalidasi terhadap hak akses user.
+     * Mengembalikan null jika room aktif adalah global ('yayasan' atau 'pondok').
+     */
+    public static function activeScopedFormal(?User $user = null, ?string $roomKode = null): ?self
+    {
+        $authUser = $user ?? auth()->user();
+        $activeKode = $roomKode ?? session('active_lembaga');
+
+        if ($authUser && !$authUser->isYayasan()) {
+            if (!$activeKode || !$authUser->hasAccessToLembaga($activeKode)) {
+                $current = $authUser->currentLembaga();
+                $activeKode = $current?->kode;
+            }
+        }
+
+        if (static::isGlobalRoom($activeKode)) {
+            return null;
+        }
+
+        return static::resolveByKode($activeKode);
     }
 
     /**

@@ -48,29 +48,39 @@
     @endif
 
     {{-- Kartu Statistik --}}
+    @php
+        $mutasiPalette = [
+            'smp'     => '#2563eb',
+            'sma'     => '#047857',
+            'sdit'    => '#0891b2',
+            'ra'      => '#7c3aed',
+            'reguler' => '#d97706',
+        ];
+        $mutasiFallback = ['#4f46e5', '#0891b2', '#ea580c', '#db2777'];
+    @endphp
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px;">
         <div class="form-section-card" style="padding:16px 18px;">
-            <div style="font-size:12px; font-weight:600; color:var(--text-secondary);">Total Siswa Mutasi</div>
+            <div style="font-size:12px; font-weight:600; color:var(--text-secondary);">
+                Total Siswa Mutasi{{ !empty($scopedFormal) ? ' (' . $scopedFormal->nama_singkat . ')' : '' }}
+            </div>
             <div style="font-size:26px; font-weight:800; color:var(--text-primary); margin-top:4px;">{{ number_format($totalMutasi) }}</div>
         </div>
-        <div class="form-section-card" style="padding:16px 18px;">
-            <div style="font-size:12px; font-weight:600; color:#2563eb;">Mutasi SMP</div>
-            <div style="font-size:26px; font-weight:800; color:#2563eb; margin-top:4px;">{{ number_format($mutasiSmp) }}</div>
-        </div>
-        <div class="form-section-card" style="padding:16px 18px;">
-            <div style="font-size:12px; font-weight:600; color:#047857;">Mutasi SMA</div>
-            <div style="font-size:26px; font-weight:800; color:#047857; margin-top:4px;">{{ number_format($mutasiSma) }}</div>
-        </div>
-        <div class="form-section-card" style="padding:16px 18px;">
-            <div style="font-size:12px; font-weight:600; color:#d97706;">Mutasi Reguler</div>
-            <div style="font-size:26px; font-weight:800; color:#d97706; margin-top:4px;">{{ number_format($mutasiReguler) }}</div>
-        </div>
+        @foreach($mutasiStats ?? [] as $mIdx => $mStat)
+            @php
+                $mColor = $mutasiPalette[$mStat['kode']] ?? $mutasiFallback[$mIdx % count($mutasiFallback)];
+            @endphp
+            <div class="form-section-card" style="padding:16px 18px;">
+                <div style="font-size:12px; font-weight:600; color:{{ $mColor }};">{{ $mStat['label'] }}</div>
+                <div style="font-size:26px; font-weight:800; color:{{ $mColor }}; margin-top:4px;">{{ number_format($mStat['count']) }}</div>
+            </div>
+        @endforeach
     </div>
 
     {{-- Filter & Pencarian --}}
     <div class="form-section-card filter-card">
         <form action="{{ route('data-warga.mutasi') }}" method="GET" class="filter-form">
             <div class="filter-group-left">
+                @if(count($jenjangList ?? []) > 1)
                 <div class="filter-select-wrap">
                     <div class="filter-select-icon-left">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
@@ -84,8 +94,9 @@
                         @endforeach
                     </select>
                 </div>
+                @endif
 
-                @if(request('search') || request('jenjang'))
+                @if(request('search') || (count($jenjangList ?? []) > 1 && request('jenjang')))
                 <a href="{{ route('data-warga.mutasi') }}" class="btn btn-sm btn-secondary filter-btn-reset" title="Reset Filter">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;">
                         <line x1="18" y1="6" x2="6" y2="18"></line>

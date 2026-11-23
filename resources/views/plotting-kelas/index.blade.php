@@ -10,7 +10,7 @@
         @csrf
         <input type="hidden" name="lembaga_id" value="{{ $selectedLembaga->id }}">
         <input type="hidden" name="jenjang" value="{{ $jenjang }}">
-        <button type="button" class="pk-btn-secondary" title="Muat kelas standar SMP (VII A-IX B) atau SMA (X A-XII B)"
+        <button type="button" class="pk-btn-secondary" title="Muat kelas standar {{ $jenjang }}"
                 onclick="openFiConfirm({
                     variant: 'primary',
                     title: 'Muat Kelas Standar {{ $jenjang }}',
@@ -204,15 +204,19 @@
                                     <label for="fltKelasTingkat" class="fi-ta-filter-label">Tingkat Kelas</label>
                                     <select id="fltKelasTingkat" class="fi-ta-filter-select">
                                         <option value="">Semua Tingkat</option>
-                                        @if($jenjang === 'SMP')
-                                            <option value="7">Tingkat 7 (Kelas VII)</option>
-                                            <option value="8">Tingkat 8 (Kelas VIII)</option>
-                                            <option value="9">Tingkat 9 (Kelas IX)</option>
-                                        @else
-                                            <option value="10">Tingkat 10 (Kelas X)</option>
-                                            <option value="11">Tingkat 11 (Kelas XI)</option>
-                                            <option value="12">Tingkat 12 (Kelas XII)</option>
-                                        @endif
+                                        @php
+                                            $pkKode = strtolower((string) ($kodeLembaga ?? $jenjang));
+                                            $pkTingkatOptions = match (true) {
+                                                $pkKode === 'smp' => [7 => 'Tingkat 7 (Kelas VII)', 8 => 'Tingkat 8 (Kelas VIII)', 9 => 'Tingkat 9 (Kelas IX)'],
+                                                $pkKode === 'sma' => [10 => 'Tingkat 10 (Kelas X)', 11 => 'Tingkat 11 (Kelas XI)', 12 => 'Tingkat 12 (Kelas XII)'],
+                                                in_array($pkKode, ['sdit', 'sd'], true) => [1 => 'Tingkat 1 (Kelas 1)', 2 => 'Tingkat 2 (Kelas 2)', 3 => 'Tingkat 3 (Kelas 3)', 4 => 'Tingkat 4 (Kelas 4)', 5 => 'Tingkat 5 (Kelas 5)', 6 => 'Tingkat 6 (Kelas 6)'],
+                                                in_array($pkKode, ['ra', 'tk'], true) => [1 => 'Kelompok A (Tingkat 1)', 2 => 'Kelompok B (Tingkat 2)'],
+                                                default => array_combine(range(1, 12), array_map(fn ($n) => 'Tingkat ' . $n, range(1, 12))),
+                                            };
+                                        @endphp
+                                        @foreach($pkTingkatOptions as $tVal => $tLabel)
+                                            <option value="{{ $tVal }}">{{ $tLabel }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                             </div>
@@ -871,15 +875,9 @@
                     <div class="pk-form-group">
                         <label for="selectTingkat" class="pk-form-label">Tingkat Kelas <span style="color:#EF4444;">*</span></label>
                         <select name="tingkat" id="selectTingkat" class="pk-form-select" required>
-                            @if($jenjang === 'SMP')
-                                <option value="7">Tingkat 7 (Kelas VII)</option>
-                                <option value="8">Tingkat 8 (Kelas VIII)</option>
-                                <option value="9">Tingkat 9 (Kelas IX)</option>
-                            @else
-                                <option value="10">Tingkat 10 (Kelas X)</option>
-                                <option value="11">Tingkat 11 (Kelas XI)</option>
-                                <option value="12">Tingkat 12 (Kelas XII)</option>
-                            @endif
+                            @foreach($pkTingkatOptions as $tVal => $tLabel)
+                                <option value="{{ $tVal }}">{{ $tLabel }}</option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -934,15 +932,9 @@
                     <div class="pk-form-group">
                         <label for="editTingkat" class="pk-form-label">Tingkat Kelas <span style="color:#EF4444;">*</span></label>
                         <select name="tingkat" id="editTingkat" class="pk-form-select" required>
-                            @if($jenjang === 'SMP')
-                                <option value="7">Tingkat 7 (Kelas VII)</option>
-                                <option value="8">Tingkat 8 (Kelas VIII)</option>
-                                <option value="9">Tingkat 9 (Kelas IX)</option>
-                            @else
-                                <option value="10">Tingkat 10 (Kelas X)</option>
-                                <option value="11">Tingkat 11 (Kelas XI)</option>
-                                <option value="12">Tingkat 12 (Kelas XII)</option>
-                            @endif
+                            @foreach($pkTingkatOptions as $tVal => $tLabel)
+                                <option value="{{ $tVal }}">{{ $tLabel }}</option>
+                            @endforeach
                         </select>
                     </div>
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Lembaga;
 use App\Models\Pendaftaran;
 use App\Models\Siswa;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ class ImportSiswaController extends Controller
             ['field' => 'status', 'label' => 'Status', 'type' => 'siswa', 'required' => false, 'desc' => 'aktif / pulang / sakit (default: aktif)', 'example' => 'aktif'],
 
             // --- Identitas Pribadi ---
-            ['field' => 'jenjang', 'label' => 'Jenjang', 'type' => 'jenjang', 'required' => false, 'desc' => 'SMP / SMA / Reguler (default: Reguler)', 'example' => 'SMP'],
+            ['field' => 'jenjang', 'label' => 'Jenjang', 'type' => 'jenjang', 'required' => false, 'desc' => implode(' / ', Lembaga::allJenjangOptions(true)) . ' (default sesuai room aktif)', 'example' => Lembaga::defaultJenjangForRoom(session('active_lembaga'))],
             ['field' => 'nik', 'label' => 'NIK', 'type' => 'text_str', 'required' => false, 'desc' => 'NIK 16 digit', 'example' => '3519011205090001'],
             ['field' => 'nisn', 'label' => 'NISN', 'type' => 'text_str', 'required' => false, 'desc' => 'Nomor Induk Siswa Nasional', 'example' => '0091234567'],
             ['field' => 'nama_panggilan', 'label' => 'Nama Panggilan', 'type' => 'text', 'required' => false, 'desc' => 'Default: kata pertama nama lengkap', 'example' => 'Fajar'],
@@ -155,12 +156,13 @@ class ImportSiswaController extends Controller
      */
     public function index()
     {
-        $activeRoom = session('active_lembaga');
-        $totalSiswa = Siswa::count();
-        $totalPendaftaran = Pendaftaran::count();
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
+        $totalSiswa = Siswa::forLembaga($activeRoom)->count();
+        $totalPendaftaran = Pendaftaran::forLembaga($activeRoom)->count();
         $columns = $this->columnDefinitions();
 
-        return view('master.import-siswa.index', compact('activeRoom', 'totalSiswa', 'totalPendaftaran', 'columns'));
+        return view('master.import-siswa.index', compact('activeRoom', 'totalSiswa', 'totalPendaftaran', 'columns', 'scopedFormal'));
     }
 
     /**
@@ -408,11 +410,23 @@ class ImportSiswaController extends Controller
                     continue;
                 }
 
-                // Cek jenjang eksplisit dari Excel (hanya jika kolom diisi dan tidak kosong)
+                $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+                $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
+
+                // Cek jenjang eksplisit dari Excel (dinamis mendukung seluruh lembaga formal)
                 $explicitJenjang = null;
-                if (isset($data['jenjang']) && $data['jenjang'] !== null && trim((string) $data['jenjang']) !== '') {
-                    $jenjangRaw = strtoupper(trim((string) $data['jenjang']));
-                    $explicitJenjang = in_array($jenjangRaw, ['SMP', 'SMA']) ? $jenjangRaw : 'Reguler';
+                if ($scopedFormal) {
+                    $explicitJenjang = $scopedFormal->jenjang_key;
+                } elseif (isset($data['jenjang']) && $data['jenjang'] !== null && trim((string) $data['jenjang']) !== '') {
+                    $jenjangInput = trim((string) $data['jenjang']);
+                    if (strcasecmp($jenjangInput, 'Reguler') === 0 || strcasecmp($jenjangInput, 'Pondok') === 0) {
+                        $explicitJenjang = 'Reguler';
+                    } else {
+                        $matchedLembaga = Lembaga::resolveByKode($jenjangInput);
+                        $explicitJenjang = ($matchedLembaga && $matchedLembaga->isFormalSchool())
+                            ? $matchedLembaga->jenjang_key
+                            : 'Reguler';
+                    }
                 }
 
                 // Cek status eksplisit dari Excel (hanya jika kolom diisi dan tidak kosong)
@@ -439,7 +453,10 @@ class ImportSiswaController extends Controller
                 // Buang nilai null dan string kosong agar data lama yang tidak diisi di Excel tidak terhapus/tertimpa
                 $pendaftaranData = array_filter($pendaftaranData, fn ($v) => $v !== null && $v !== '');
 
-                $siswa = Siswa::where('nama_lengkap', $nama)->first();
+                $siswa = Siswa::query()
+                    ->forLembaga($activeRoom)
+                    ->where('nama_lengkap', $nama)
+                    ->first();
 
                 if ($siswa && ! $updateExisting) {
                     $skippedCount++;
@@ -502,13 +519,10 @@ class ImportSiswaController extends Controller
                     $updatedCount++;
                 } else {
                     // Data Siswa baru
-                    $activeRoom = session('active_lembaga');
-                    $sessionJenjang = match ($activeRoom) {
-                        'smp' => 'SMP',
-                        'sma' => 'SMA',
-                        default => 'Reguler',
-                    };
-                    $finalJenjang = $explicitJenjang ?? $this->inferJenjang($kelas, $kamar) ?? $sessionJenjang;
+                    $sessionJenjang = Lembaga::defaultJenjangForRoom($activeRoom);
+                    $finalJenjang = $scopedFormal
+                        ? $scopedFormal->jenjang_key
+                        : ($explicitJenjang ?? $this->inferJenjang($kelas, $kamar) ?? $sessionJenjang);
                     $finalStatus = $explicitStatus ?? 'aktif';
 
                     $tahun = date('Y');

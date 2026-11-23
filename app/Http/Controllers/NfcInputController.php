@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Lembaga;
 use App\Models\Siswa;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -14,6 +15,10 @@ class NfcInputController extends Controller
     public function index(Request $request)
     {
         $activeRoom = session('active_lembaga');
+        $scopedLembaga = Lembaga::activeScopedFormal(auth()->user(), $activeRoom);
+        if ($scopedLembaga) {
+            $activeRoom = $scopedLembaga->kode;
+        }
 
         // Daftar santri aktif untuk dropdown / selector
         $siswas = Siswa::forLembaga($activeRoom)
@@ -21,8 +26,12 @@ class NfcInputController extends Controller
             ->orderBy('nama_lengkap', 'asc')
             ->get(['id', 'nama_lengkap', 'jenjang', 'kelas', 'kamar', 'rfid_uid']);
 
-        // Daftar guru & pegawai untuk dropdown / selector
-        $gurus = User::where('is_active', true)
+        // Daftar guru & pegawai untuk dropdown / selector (terkunci ke room aktif bila di lembaga formal)
+        $gurusQuery = User::where('is_active', true);
+        if ($scopedLembaga) {
+            $gurusQuery->forLembagaModel($scopedLembaga);
+        }
+        $gurus = (clone $gurusQuery)
             ->orderBy('name', 'asc')
             ->get(['id', 'name', 'nip', 'role', 'jabatan', 'rfid_uid']);
 
@@ -46,7 +55,7 @@ class NfcInputController extends Controller
                 ];
             });
 
-        $recentGuru = User::where('is_active', true)
+        $recentGuru = (clone $gurusQuery)
             ->whereNotNull('rfid_uid')
             ->orderBy('updated_at', 'desc')
             ->limit(15)
@@ -74,8 +83,8 @@ class NfcInputController extends Controller
         $totalTerdaftar = Siswa::forLembaga($activeRoom)->where('status', 'aktif')->whereNotNull('rfid_uid')->count();
         $totalBelum = max(0, $totalSiswa - $totalTerdaftar);
 
-        $totalGuru = User::where('is_active', true)->count();
-        $totalGuruTerdaftar = User::where('is_active', true)->whereNotNull('rfid_uid')->count();
+        $totalGuru = (clone $gurusQuery)->count();
+        $totalGuruTerdaftar = (clone $gurusQuery)->whereNotNull('rfid_uid')->count();
         $totalGuruBelum = max(0, $totalGuru - $totalGuruTerdaftar);
 
         return view('nfc.index', compact(

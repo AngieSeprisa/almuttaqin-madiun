@@ -825,9 +825,9 @@
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Jenjang *</label>
                         <select name="jenjang" class="mstr-form-control" required>
-                            <option value="Semua">Semua Jenjang</option>
-                            <option value="SMP">SMP Saja</option>
-                            <option value="SMA">SMA Saja</option>
+                            @foreach(($jenjangOptions ?? ['Semua', 'SMP', 'SMA']) as $jOpt)
+                            <option value="{{ $jOpt }}">{{ $jOpt === 'Semua' ? 'Semua Jenjang' : $jOpt . ' Saja' }}</option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -915,9 +915,9 @@
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Jenjang *</label>
                         <select name="jenjang" id="editJenjang" class="mstr-form-control" required>
-                            <option value="Semua">Semua Jenjang</option>
-                            <option value="SMP">SMP</option>
-                            <option value="SMA">SMA</option>
+                            @foreach(($jenjangOptions ?? ['Semua', 'SMP', 'SMA']) as $jOpt)
+                            <option value="{{ $jOpt }}">{{ $jOpt === 'Semua' ? 'Semua Jenjang' : $jOpt }}</option>
+                            @endforeach
                         </select>
                     </div>
                 </div>

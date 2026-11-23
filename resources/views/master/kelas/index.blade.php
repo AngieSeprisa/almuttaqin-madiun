@@ -4,10 +4,10 @@
 
 @section('header-actions')
 <div class="mstr-header-actions">
-    @if($isYayasan)
-    <form action="{{ route('master.kelas.muat-standar') }}" method="POST" class="d-inline" onsubmit="return confirm('Muat kelas standar SMP (7A-9B) dan SMA (10A-12B)?');">
+    @if($isYayasan || auth()->user()?->canDo('master_kelas', 'create'))
+    <form action="{{ route('master.kelas.muat-standar') }}" method="POST" class="d-inline" onsubmit="return confirm('Muat ruang kelas standar untuk lembaga aktif?');">
         @csrf
-        <button type="submit" class="btn btn-secondary mstr-btn-action" title="Muat otomatis kelas standar SMP & SMA">
+        <button type="submit" class="btn btn-secondary mstr-btn-action" title="Muat otomatis kelas standar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
                 <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"></path>
             </svg>
@@ -466,8 +466,9 @@
             </div>
         </div>
 
+        @foreach(($lembagaStats ?? []) as $lsIdx => $ls)
         <div class="mstr-stat-card">
-            <div class="mstr-stat-icon purple">
+            <div class="mstr-stat-icon {{ $lsIdx % 2 === 0 ? 'purple' : 'amber' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="3" width="7" height="7"></rect>
                     <rect x="14" y="3" width="7" height="7"></rect>
@@ -476,38 +477,26 @@
                 </svg>
             </div>
             <div class="mstr-stat-info">
-                <span class="mstr-stat-value">{{ $stats['total_smp'] }}</span>
-                <span class="mstr-stat-label">Kelas SMP</span>
+                <span class="mstr-stat-value">{{ $ls['count'] }}</span>
+                <span class="mstr-stat-label">Kelas {{ $ls['singkatan'] }}</span>
             </div>
         </div>
-
-        <div class="mstr-stat-card">
-            <div class="mstr-stat-icon amber">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                    <polyline points="2 17 12 22 22 17"></polyline>
-                    <polyline points="2 12 12 17 22 12"></polyline>
-                </svg>
-            </div>
-            <div class="mstr-stat-info">
-                <span class="mstr-stat-value">{{ $stats['total_sma'] }}</span>
-                <span class="mstr-stat-label">Kelas SMA</span>
-            </div>
-        </div>
+        @endforeach
     </div>
 
     {{-- Top Bar Kontrol --}}
     <div class="mstr-topbar">
         <div class="mstr-tabs-wrap">
+            @if($isYayasan && $sekolahLembagas->count() > 1)
             <a href="{{ route('master.kelas.index', ['jenjang' => 'all']) }}" class="mstr-tab-btn {{ $selectedJenjang === 'all' ? 'active' : '' }}">
                 Semua Jenjang
             </a>
-            <a href="{{ route('master.kelas.index', ['jenjang' => 'smp']) }}" class="mstr-tab-btn {{ strtolower($selectedJenjang) === 'smp' ? 'active' : '' }}">
-                SMP
+            @endif
+            @foreach($sekolahLembagas as $lem)
+            <a href="{{ route('master.kelas.index', ['jenjang' => $lem->kode]) }}" class="mstr-tab-btn {{ (strcasecmp($selectedJenjang, $lem->kode) === 0 || strcasecmp($selectedJenjang, $lem->jenjang_key) === 0) ? 'active' : '' }}">
+                {{ $lem->nama_singkat }}
             </a>
-            <a href="{{ route('master.kelas.index', ['jenjang' => 'sma']) }}" class="mstr-tab-btn {{ strtolower($selectedJenjang) === 'sma' ? 'active' : '' }}">
-                SMA
-            </a>
+            @endforeach
         </div>
 
         <div class="mstr-search-box">
@@ -707,7 +696,7 @@
                     <label class="mstr-form-label">Lembaga Sekolah *</label>
                     <select name="lembaga_id" id="tambahLembagaId" class="mstr-form-control" required onchange="sesuaikanJenjangOtomatis('tambah')">
                         @foreach($sekolahLembagas as $lem)
-                        <option value="{{ $lem->id }}" data-kode="{{ strtolower($lem->kode) }}">
+                        <option value="{{ $lem->id }}" data-kode="{{ strtolower($lem->kode) }}" data-jenjang="{{ $lem->jenjang_key }}">
                             {{ $lem->nama }} ({{ $lem->singkatan ?: $lem->kode }})
                         </option>
                         @endforeach
@@ -717,26 +706,24 @@
                 <div class="mstr-form-group">
                     <label class="mstr-form-label">Jenjang *</label>
                     <select name="jenjang" id="tambahJenjang" class="mstr-form-control" required>
-                        <option value="SMP">SMP</option>
-                        <option value="SMA">SMA</option>
+                        @foreach($sekolahLembagas as $lem)
+                        <option value="{{ $lem->jenjang_key }}">{{ $lem->jenjang_key }}</option>
+                        @endforeach
                     </select>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Nama Kelas *</label>
-                        <input type="text" name="nama_kelas" class="mstr-form-control" placeholder="Contoh: 7C, 10C" required>
+                        <input type="text" name="nama_kelas" class="mstr-form-control" placeholder="Contoh: 1 A, RA A, VII A, X A" required>
                     </div>
 
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Tingkat / Rombel *</label>
                         <select name="tingkat" id="tambahTingkat" class="mstr-form-control" required>
-                            <option value="7">7 (SMP)</option>
-                            <option value="8">8 (SMP)</option>
-                            <option value="9">9 (SMP)</option>
-                            <option value="10">10 (SMA)</option>
-                            <option value="11">11 (SMA)</option>
-                            <option value="12">12 (SMA)</option>
+                            @for($t = 1; $t <= 12; $t++)
+                            <option value="{{ $t }}">Tingkat {{ $t }}</option>
+                            @endfor
                         </select>
                     </div>
                 </div>
@@ -779,7 +766,7 @@
                     <label class="mstr-form-label">Lembaga Sekolah *</label>
                     <select name="lembaga_id" id="editLembagaId" class="mstr-form-control" required onchange="sesuaikanJenjangOtomatis('edit')">
                         @foreach($sekolahLembagas as $lem)
-                        <option value="{{ $lem->id }}" data-kode="{{ strtolower($lem->kode) }}">
+                        <option value="{{ $lem->id }}" data-kode="{{ strtolower($lem->kode) }}" data-jenjang="{{ $lem->jenjang_key }}">
                             {{ $lem->nama }} ({{ $lem->singkatan ?: $lem->kode }})
                         </option>
                         @endforeach
@@ -789,8 +776,9 @@
                 <div class="mstr-form-group">
                     <label class="mstr-form-label">Jenjang *</label>
                     <select name="jenjang" id="editJenjang" class="mstr-form-control" required>
-                        <option value="SMP">SMP</option>
-                        <option value="SMA">SMA</option>
+                        @foreach($sekolahLembagas as $lem)
+                        <option value="{{ $lem->jenjang_key }}">{{ $lem->jenjang_key }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -803,12 +791,9 @@
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Tingkat / Rombel *</label>
                         <select name="tingkat" id="editTingkat" class="mstr-form-control" required>
-                            <option value="7">7 (SMP)</option>
-                            <option value="8">8 (SMP)</option>
-                            <option value="9">9 (SMP)</option>
-                            <option value="10">10 (SMA)</option>
-                            <option value="11">11 (SMA)</option>
-                            <option value="12">12 (SMA)</option>
+                            @for($t = 1; $t <= 12; $t++)
+                            <option value="{{ $t }}">Tingkat {{ $t }}</option>
+                            @endfor
                         </select>
                     </div>
                 </div>
@@ -871,11 +856,9 @@
 
         var opt = lemSelect.options[lemSelect.selectedIndex];
         if (opt) {
-            var kode = opt.getAttribute('data-kode');
-            if (kode === 'smp') {
-                jenSelect.value = 'SMP';
-            } else if (kode === 'sma') {
-                jenSelect.value = 'SMA';
+            var jen = opt.getAttribute('data-jenjang');
+            if (jen) {
+                jenSelect.value = jen;
             }
         }
     }

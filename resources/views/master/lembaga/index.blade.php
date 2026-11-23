@@ -467,7 +467,7 @@
             </div>
             <div class="mstr-stat-info">
                 <span class="mstr-stat-value">{{ $stats['formal'] }}</span>
-                <span class="mstr-stat-label">Lembaga Formal (SMP/SMA)</span>
+                <span class="mstr-stat-label">Lembaga Formal</span>
             </div>
         </div>
 

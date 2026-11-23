@@ -16,6 +16,10 @@ class BerandaController extends Controller
     public function index()
     {
         $activeRoom = session('active_lembaga') ?? session('active_room');
+        $scopedLembaga = Lembaga::activeScopedFormal(auth()->user(), $activeRoom);
+        if ($scopedLembaga) {
+            $activeRoom = $scopedLembaga->kode;
+        }
 
         $query = Siswa::query()->forLembaga($activeRoom);
 
@@ -27,15 +31,16 @@ class BerandaController extends Controller
         ];
 
         $lembagaSummary = null;
-        if ($activeRoom === 'yayasan' || (auth()->check() && auth()->user()->isYayasan())) {
+        if ($activeRoom === 'yayasan' || (auth()->check() && auth()->user()->isYayasan() && !$scopedLembaga)) {
             $lembagaSummary = [
-                'smp'    => Siswa::forLembaga('smp')->count(),
-                'sma'    => Siswa::forLembaga('sma')->count(),
                 'pondok' => Siswa::count(),
             ];
+            foreach (Lembaga::formalOptions() as $formal) {
+                $lembagaSummary[$formal->kode] = Siswa::forLembaga($formal->kode)->count();
+            }
         }
 
-        $currentLembaga = Lembaga::where('kode', $activeRoom)->first();
+        $currentLembaga = $scopedLembaga ?: Lembaga::resolveByKode($activeRoom);
 
         // Siapkan daftar pengumuman (Jadwal Mengajar & Agenda Hari Ini)
         $authUser = auth()->user();
@@ -58,12 +63,16 @@ class BerandaController extends Controller
         if ($authUser) {
             // 1. Jadwal Mengajar Guru Hari Ini
             try {
-                $teacherSchedules = Schedule::with(['classroom', 'subject', 'timeSlot'])
+                $teacherSchedulesQuery = Schedule::with(['classroom', 'subject', 'timeSlot'])
                     ->activePeriod()
                     ->where('teacher_id', $authUser->id)
                     ->whereHas('timeSlot', function ($q) use ($hariIni) {
                         $q->where('hari', $hariIni);
-                    })
+                    });
+                if ($scopedLembaga) {
+                    $teacherSchedulesQuery->forJenjang($scopedLembaga->kode);
+                }
+                $teacherSchedules = $teacherSchedulesQuery
                     ->get()
                     ->sortBy(fn ($s) => $s->timeSlot?->jam_ke ?? 99);
 
@@ -82,10 +91,13 @@ class BerandaController extends Controller
                     }
                 } else {
                     // Cek apakah user guru ini memiliki jadwal mengajar di semester ini tapi bukan hari ini
-                    $allMySchedules = Schedule::with(['classroom', 'subject', 'timeSlot'])
+                    $allMySchedulesQuery = Schedule::with(['classroom', 'subject', 'timeSlot'])
                         ->activePeriod()
-                        ->where('teacher_id', $authUser->id)
-                        ->get();
+                        ->where('teacher_id', $authUser->id);
+                    if ($scopedLembaga) {
+                        $allMySchedulesQuery->forJenjang($scopedLembaga->kode);
+                    }
+                    $allMySchedules = $allMySchedulesQuery->get();
 
                     if ($allMySchedules->isNotEmpty()) {
                         // Tampilkan info jadwal KBM berikutnya agar guru tahu jadwal mendatang
@@ -123,7 +135,9 @@ class BerandaController extends Controller
                             ->whereHas('timeSlot', function ($q) use ($hariIni) {
                                 $q->where('hari', $hariIni);
                             });
-                        if ($activeRoom && in_array($activeRoom, ['smp', 'sma'])) {
+                        if ($scopedLembaga) {
+                            $schQuery->forJenjang($scopedLembaga->kode);
+                        } elseif ($activeRoom && !Lembaga::isGlobalRoom($activeRoom)) {
                             $schQuery->forJenjang($activeRoom);
                         }
                         $schoolSchedules = $schQuery->orderBy('time_slot_id')->take(5)->get();
@@ -153,7 +167,9 @@ class BerandaController extends Controller
                     ->where('is_break', true)
                     ->orderBy('urutan');
 
-                if ($activeRoom && in_array($activeRoom, ['smp', 'sma'])) {
+                if ($scopedLembaga) {
+                    $agendaQuery->forJenjang($scopedLembaga->kode);
+                } elseif ($activeRoom && !Lembaga::isGlobalRoom($activeRoom)) {
                     $agendaQuery->forJenjang($activeRoom);
                 }
 

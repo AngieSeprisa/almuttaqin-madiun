@@ -25,47 +25,57 @@ class PlottingMapelController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membuka menu Plotting Mata Pelajaran.');
         }
 
-        // Lembaga sekolah yang valid: SMP dan SMA (kategori formal)
-        $sekolahLembagas = $authUser->accessibleLembagas()->filter(function ($l) {
-            return in_array(strtolower($l->kode), ['smp', 'sma']) || $l->kategori === 'formal';
-        })->values();
+        $isYayasan = $authUser->isYayasan();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+
+        // Lembaga sekolah formal yang dapat diakses user
+        if ($isYayasan) {
+            $sekolahLembagas = Lembaga::formalOptions();
+        } elseif ($scopedFormal) {
+            $sekolahLembagas = collect([$scopedFormal]);
+        } else {
+            $sekolahLembagas = $authUser->accessibleLembagas()
+                ->filter(fn (Lembaga $l) => $l->isFormalSchool())
+                ->values();
+        }
 
         // Jika user tidak memiliki akses ke sekolah manapun
         if ($sekolahLembagas->isEmpty()) {
-            abort(403, 'Menu Plotting Mata Pelajaran hanya untuk lembaga sekolah (SMP & SMA).');
+            abort(403, 'Menu Plotting Mata Pelajaran hanya untuk lembaga sekolah formal.');
         }
-
-        $isYayasan = $authUser->isYayasan();
 
         // Tentukan lembaga yang sedang dipilih/difilter
         $selectedLembagaId = null;
         $currentLembaga = null;
 
         if ($isYayasan) {
-            // Yayasan bisa memilih 'all' (semua sekolah) atau memilih sekolah tertentu
+            // Yayasan bisa memilih 'all' (semua sekolah) atau memilih sekolah tertentu; default mengikuti room formal aktif
             $reqLembaga = $request->get('lembaga_id');
             if ($reqLembaga && $reqLembaga !== 'all') {
                 $selectedLembagaId = (int) $reqLembaga;
                 $currentLembaga = $sekolahLembagas->firstWhere('id', $selectedLembagaId);
             } elseif ($request->filled('lembaga')) {
-                // Mendukung filter lewat kode lembaga (?lembaga=smp)
-                $currentLembaga = $sekolahLembagas->firstWhere('kode', $request->lembaga);
+                $resolved = Lembaga::resolveByKode((string) $request->lembaga);
+                $currentLembaga = $resolved ? $sekolahLembagas->firstWhere('id', $resolved->id) : null;
+                if ($currentLembaga) {
+                    $selectedLembagaId = $currentLembaga->id;
+                }
+            } elseif ($reqLembaga !== 'all' && $scopedFormal) {
+                $currentLembaga = $sekolahLembagas->firstWhere('id', $scopedFormal->id);
                 if ($currentLembaga) {
                     $selectedLembagaId = $currentLembaga->id;
                 }
             }
         } else {
-            // Non-Yayasan (SMP/SMA): Terkunci pada lembaga sekolahnya sendiri
-            $activeKode = session('active_lembaga');
-            $currentLembaga = $sekolahLembagas->firstWhere('kode', $activeKode) 
+            // Non-Yayasan: Terkunci ketat pada room lembaga aktifnya
+            $currentLembaga = $scopedFormal
                 ?: ($sekolahLembagas->firstWhere('id', $authUser->primary_lembaga_id) ?: $sekolahLembagas->first());
 
             if (!$currentLembaga) {
                 abort(403, 'Anda tidak memiliki hak akses pada lembaga sekolah ini.');
             }
 
-            // Jika user mencoba kirim lembaga_id lain di URL, pastikan tetap terkunci ke lembaga sekolahnya
-            if ($request->filled('lembaga_id')) {
+            if (!$scopedFormal && $request->filled('lembaga_id')) {
                 $requested = $sekolahLembagas->firstWhere('id', (int) $request->lembaga_id);
                 if ($requested) {
                     $currentLembaga = $requested;
@@ -134,9 +144,10 @@ class PlottingMapelController extends Controller
             abort(403, 'Anda tidak memiliki hak untuk menambah mata pelajaran.');
         }
 
-        $sekolahLembagas = $authUser->accessibleLembagas()->filter(function ($l) {
-            return in_array(strtolower($l->kode), ['smp', 'sma']) || $l->kategori === 'formal';
-        });
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $sekolahLembagas = $authUser->isYayasan()
+            ? Lembaga::formalOptions()
+            : ($scopedFormal ? collect([$scopedFormal]) : $authUser->accessibleLembagas()->filter(fn (Lembaga $l) => $l->isFormalSchool()));
 
         // Dukung input baik mata_pelajaran/nama_pelajaran dan kode/kode_mapel
         $namaMapel = trim((string)($request->input('mata_pelajaran') ?? $request->input('nama_pelajaran') ?? ''));
@@ -146,17 +157,16 @@ class PlottingMapelController extends Controller
             $request->validate(['lembaga_id' => 'required|exists:lembagas,id']);
             $targetLembagaId = (int) $request->input('lembaga_id');
         } else {
-            $activeKode = session('active_lembaga');
-            $currentLembaga = $sekolahLembagas->firstWhere('kode', $activeKode) ?: $sekolahLembagas->first();
+            $currentLembaga = $scopedFormal ?: $sekolahLembagas->first();
             if (!$currentLembaga) {
                 return redirect()->back()->withErrors(['lembaga_id' => 'Lembaga sekolah tidak valid.']);
             }
             $targetLembagaId = $currentLembaga->id;
         }
 
-        // Pastikan target adalah lembaga sekolah (bukan pondok/yayasan)
+        // Pastikan target adalah lembaga sekolah formal (bukan pondok/yayasan)
         if (!$sekolahLembagas->contains('id', $targetLembagaId)) {
-            return redirect()->back()->withErrors(['lembaga_id' => 'Plotting mata pelajaran hanya diperuntukkan bagi lembaga sekolah (SMP/SMA).']);
+            return redirect()->back()->withErrors(['lembaga_id' => 'Plotting mata pelajaran hanya diperuntukkan bagi lembaga sekolah formal.']);
         }
 
         if (empty($namaMapel) || empty($kodeMapel)) {
@@ -202,13 +212,18 @@ class PlottingMapelController extends Controller
             abort(403, 'Anda tidak memiliki hak untuk mengubah mata pelajaran.');
         }
 
-        $sekolahLembagas = $authUser->accessibleLembagas()->filter(function ($l) {
-            return in_array(strtolower($l->kode), ['smp', 'sma']) || $l->kategori === 'formal';
-        });
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $sekolahLembagas = $authUser->isYayasan()
+            ? Lembaga::formalOptions()
+            : ($scopedFormal ? collect([$scopedFormal]) : $authUser->accessibleLembagas()->filter(fn (Lembaga $l) => $l->isFormalSchool()));
 
-        // Pastikan non-yayasan hanya bisa mengedit mapel dari lembaganya
-        if (!$authUser->isYayasan() && !$authUser->hasAccessToLembaga($mapel->lembaga->kode)) {
-            abort(403, 'Anda tidak memiliki akses untuk mengubah mata pelajaran lembaga ini.');
+        // Pastikan non-yayasan hanya bisa mengedit mapel dari room lembaganya
+        if (!$authUser->isYayasan()) {
+            $allowed = $mapel->lembaga && $authUser->hasAccessToLembaga($mapel->lembaga->kode)
+                && (!$scopedFormal || (int) $mapel->lembaga_id === (int) $scopedFormal->id);
+            if (!$allowed) {
+                abort(403, 'Anda tidak memiliki akses untuk mengubah mata pelajaran lembaga ini.');
+            }
         }
 
         // Dukung input baik mata_pelajaran/nama_pelajaran dan kode/kode_mapel
@@ -222,9 +237,9 @@ class PlottingMapelController extends Controller
             $targetLembagaId = $mapel->lembaga_id;
         }
 
-        // Pastikan target adalah sekolah
+        // Pastikan target adalah sekolah formal
         if (!$sekolahLembagas->contains('id', $targetLembagaId)) {
-            return redirect()->back()->withErrors(['lembaga_id' => 'Plotting mata pelajaran hanya diperuntukkan bagi lembaga sekolah (SMP/SMA).']);
+            return redirect()->back()->withErrors(['lembaga_id' => 'Plotting mata pelajaran hanya diperuntukkan bagi lembaga sekolah formal.']);
         }
 
         if (empty($namaMapel) || empty($kodeMapel)) {
@@ -269,9 +284,14 @@ class PlottingMapelController extends Controller
             abort(403, 'Anda tidak memiliki hak untuk menghapus mata pelajaran.');
         }
 
-        // Pastikan non-yayasan hanya bisa menghapus mapel dari lembaganya
-        if (!$authUser->isYayasan() && !$authUser->hasAccessToLembaga($mapel->lembaga->kode)) {
-            abort(403, 'Akses ditolak.');
+        // Pastikan non-yayasan hanya bisa menghapus mapel dari room lembaganya
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if (!$authUser->isYayasan()) {
+            $allowed = $mapel->lembaga && $authUser->hasAccessToLembaga($mapel->lembaga->kode)
+                && (!$scopedFormal || (int) $mapel->lembaga_id === (int) $scopedFormal->id);
+            if (!$allowed) {
+                abort(403, 'Akses ditolak.');
+            }
         }
 
         $nama = $mapel->mata_pelajaran;

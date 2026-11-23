@@ -18,12 +18,18 @@ class PlottingKelasController extends Controller
      */
     public static function daftarKelasStandar(string $kodeLembaga): array
     {
-        $kode = strtolower($kodeLembaga);
+        $kode = strtolower(trim($kodeLembaga));
         if ($kode === 'smp') {
             return ['VII A', 'VII B', 'VIII A', 'VIII B', 'IX A', 'IX B'];
         }
         if ($kode === 'sma') {
             return ['X A', 'X B', 'XI A', 'XI B', 'XII A', 'XII B'];
+        }
+        if (in_array($kode, ['sdit', 'sd'], true)) {
+            return ['1 A', '2 A', '3 A', '4 A', '5 A', '6 A'];
+        }
+        if (in_array($kode, ['ra', 'tk'], true)) {
+            return ['RA A', 'RA B'];
         }
         return [];
     }
@@ -88,14 +94,25 @@ class PlottingKelasController extends Controller
     public static function inferTingkat(string $namaKelas, string $jenjang): int
     {
         $clean = strtoupper(trim(str_ireplace('kelas', '', $namaKelas)));
-        if (preg_match('/^(VII|7)\b/i', $clean)) return 7;
-        if (preg_match('/^(VIII|8)\b/i', $clean)) return 8;
-        if (preg_match('/^(IX|9)\b/i', $clean)) return 9;
-        if (preg_match('/^(X|10)\b/i', $clean)) return 10;
-        if (preg_match('/^(XI|11)\b/i', $clean)) return 11;
         if (preg_match('/^(XII|12)\b/i', $clean)) return 12;
+        if (preg_match('/^(XI|11)\b/i', $clean)) return 11;
+        if (preg_match('/^(X|10)\b/i', $clean)) return 10;
+        if (preg_match('/^(IX|9)\b/i', $clean)) return 9;
+        if (preg_match('/^(VIII|8)\b/i', $clean)) return 8;
+        if (preg_match('/^(VII|7)\b/i', $clean)) return 7;
+        if (preg_match('/^(VI|6)\b/i', $clean)) return 6;
+        if (preg_match('/^(V|5)\b/i', $clean)) return 5;
+        if (preg_match('/^(IV|4)\b/i', $clean)) return 4;
+        if (preg_match('/^(III|3)\b/i', $clean)) return 3;
+        if (preg_match('/^(II|2)\b/i', $clean)) return 2;
+        if (preg_match('/^(I|1)\b/i', $clean)) return 1;
+        if (preg_match('/^(RA|TK)\s*B\b/i', $clean)) return 2;
+        if (preg_match('/^(RA|TK)\s*A\b/i', $clean)) return 1;
 
-        return strtoupper($jenjang) === 'SMA' ? 10 : 7;
+        $jUpper = strtoupper(trim($jenjang));
+        if ($jUpper === 'SMA') return 10;
+        if ($jUpper === 'SMP') return 7;
+        return 1;
     }
 
     /**
@@ -103,7 +120,7 @@ class PlottingKelasController extends Controller
      */
     public static function seedStandar(Lembaga $lembaga): int
     {
-        $kode = strtolower($lembaga->kode);
+        $kode = strtolower(trim((string) $lembaga->kode));
         $added = 0;
 
         if ($kode === 'smp') {
@@ -124,11 +141,25 @@ class PlottingKelasController extends Controller
                 ['nama_kelas' => 'XII A', 'tingkat' => 12, 'urutan' => 5],
                 ['nama_kelas' => 'XII B', 'tingkat' => 12, 'urutan' => 6],
             ];
+        } elseif (in_array($kode, ['sdit', 'sd'], true)) {
+            $classes = [
+                ['nama_kelas' => '1 A', 'tingkat' => 1, 'urutan' => 1],
+                ['nama_kelas' => '2 A', 'tingkat' => 2, 'urutan' => 2],
+                ['nama_kelas' => '3 A', 'tingkat' => 3, 'urutan' => 3],
+                ['nama_kelas' => '4 A', 'tingkat' => 4, 'urutan' => 4],
+                ['nama_kelas' => '5 A', 'tingkat' => 5, 'urutan' => 5],
+                ['nama_kelas' => '6 A', 'tingkat' => 6, 'urutan' => 6],
+            ];
+        } elseif (in_array($kode, ['ra', 'tk'], true)) {
+            $classes = [
+                ['nama_kelas' => 'RA A', 'tingkat' => 1, 'urutan' => 1],
+                ['nama_kelas' => 'RA B', 'tingkat' => 2, 'urutan' => 2],
+            ];
         } else {
             return 0;
         }
 
-        $jenjang = strtoupper($kode);
+        $jenjang = $lembaga->jenjang_key;
 
         foreach ($classes as $item) {
             $existing = Classroom::where('lembaga_id', $lembaga->id)->get()->first(function ($c) use ($item) {
@@ -152,6 +183,30 @@ class PlottingKelasController extends Controller
     }
 
     /**
+     * Pastikan ruang kelas termasuk dalam room yang boleh dikelola user.
+     */
+    protected function ensureClassroomInRoom(User $authUser, Classroom $classroom): void
+    {
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal && !$authUser->isYayasan()) {
+            if ((int) $classroom->lembaga_id !== (int) $scopedFormal->id) {
+                abort(403, 'Anda tidak memiliki akses untuk mengelola ruang kelas lembaga lain.');
+            }
+            return;
+        }
+
+        if (!$authUser->isYayasan()) {
+            $allowedIds = $authUser->accessibleLembagas()
+                ->filter(fn (Lembaga $l) => $l->isFormalSchool())
+                ->pluck('id')
+                ->all();
+            if (!in_array((int) $classroom->lembaga_id, $allowedIds, true)) {
+                abort(403, 'Anda tidak memiliki akses untuk mengelola ruang kelas lembaga lain.');
+            }
+        }
+    }
+
+    /**
      * Tampilkan halaman Plotting Kelas & Manajemen Ruang Kelas Terintegrasi
      */
     public function index(Request $request)
@@ -164,40 +219,52 @@ class PlottingKelasController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membuka menu Plotting Kelas.');
         }
 
-        // Lembaga sekolah formal: SMP & SMA
-        $sekolahLembagas = $authUser->accessibleLembagas()->filter(function ($l) {
-            return in_array(strtolower($l->kode), ['smp', 'sma']) || $l->kategori === 'formal';
-        })->values();
+        $isYayasan = $authUser->isYayasan();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
 
-        if ($sekolahLembagas->isEmpty()) {
-            abort(403, 'Menu Plotting Kelas hanya diperuntukkan bagi lembaga sekolah (SMP & SMA).');
+        // Lembaga sekolah formal dinamis (SMP, SMA, SD IT, RA, dll)
+        if ($isYayasan) {
+            $sekolahLembagas = Lembaga::formalOptions();
+        } elseif ($scopedFormal) {
+            $sekolahLembagas = collect([$scopedFormal]);
+        } else {
+            $sekolahLembagas = $authUser->accessibleLembagas()
+                ->filter(fn (Lembaga $l) => $l->isFormalSchool())
+                ->values();
         }
 
-        $isYayasan = $authUser->isYayasan();
+        if ($sekolahLembagas->isEmpty()) {
+            abort(403, 'Menu Plotting Kelas hanya diperuntukkan bagi lembaga sekolah formal.');
+        }
+
         $selectedLembaga = null;
 
         if ($isYayasan) {
-            // Yayasan bisa memilih lembaga SMP atau SMA
-            $reqKode = strtolower($request->get('lembaga', ''));
-            if ($reqKode && in_array($reqKode, ['smp', 'sma'])) {
-                $selectedLembaga = $sekolahLembagas->firstWhere('kode', $reqKode);
+            $reqKode = trim((string) $request->get('lembaga', ''));
+            if ($reqKode !== '') {
+                $resolved = Lembaga::resolveByKode($reqKode);
+                if ($resolved) {
+                    $selectedLembaga = $sekolahLembagas->firstWhere('id', $resolved->id);
+                }
+            }
+            if (!$selectedLembaga && $scopedFormal) {
+                $selectedLembaga = $sekolahLembagas->firstWhere('id', $scopedFormal->id);
             }
             if (!$selectedLembaga) {
                 $selectedLembaga = $sekolahLembagas->firstWhere('kode', 'smp') ?: $sekolahLembagas->first();
             }
         } else {
-            // Pengguna sekolah terkunci pada lembaganya
-            $activeKode = session('active_lembaga');
-            $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode)
+            // Pengguna non-Yayasan terkunci pada room lembaga aktifnya
+            $selectedLembaga = $scopedFormal
                 ?: ($sekolahLembagas->firstWhere('id', $authUser->primary_lembaga_id) ?: $sekolahLembagas->first());
 
-            if (!$selectedLembaga || !in_array(strtolower($selectedLembaga->kode), ['smp', 'sma'])) {
-                abort(403, 'Menu Plotting Kelas hanya dapat dibuka dari lembaga sekolah (SMP atau SMA).');
+            if (!$selectedLembaga || !$selectedLembaga->isFormalSchool()) {
+                abort(403, 'Menu Plotting Kelas hanya dapat dibuka dari lembaga sekolah formal.');
             }
         }
 
         $kodeLembaga = strtolower($selectedLembaga->kode);
-        $jenjang = strtoupper($kodeLembaga); // 'SMP' atau 'SMA'
+        $jenjang = $selectedLembaga->jenjang_key;
 
         // Ambil daftar ruang kelas dari database Classroom
         $dbClassrooms = Classroom::where('lembaga_id', $selectedLembaga->id)
@@ -220,7 +287,7 @@ class PlottingKelasController extends Controller
                   ->orWhereNull('status');
             })
             ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
-            ->where('jenjang', $jenjang)
+            ->forLembaga($selectedLembaga->kode)
             ->with('pendaftaran');
 
         if ($request->filled('search')) {
@@ -317,7 +384,7 @@ class PlottingKelasController extends Controller
 
         $validated = $request->validate([
             'lembaga_id' => 'required|exists:lembagas,id',
-            'jenjang'    => 'required|in:SMP,SMA',
+            'jenjang'    => 'nullable|string|max:50',
             'nama_kelas' => [
                 'required',
                 'string',
@@ -333,13 +400,26 @@ class PlottingKelasController extends Controller
             'lembaga_id.required' => 'Pilih lembaga yang sesuai.',
         ]);
 
+        $lembaga = Lembaga::findOrFail($validated['lembaga_id']);
+        if (!$lembaga->isFormalSchool()) {
+            return redirect()->back()->withErrors(['lembaga_id' => 'Lembaga yang dipilih harus merupakan lembaga sekolah formal.']);
+        }
+
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if (!$authUser->isYayasan()) {
+            if (!$authUser->hasAccessToLembaga($lembaga->kode) || ($scopedFormal && (int) $scopedFormal->id !== (int) $lembaga->id)) {
+                abort(403, 'Anda hanya dapat menambah ruang kelas untuk lembaga ruang kerja Anda.');
+            }
+        }
+
+        $validated['jenjang'] = $lembaga->jenjang_key;
         $validated['is_active'] = true;
         $validated['urutan'] = $validated['urutan'] ?? ((Classroom::where('lembaga_id', $validated['lembaga_id'])->max('urutan') ?? 0) + 1);
 
         $classroom = Classroom::create($validated);
 
         $redirectUrl = route('plotting-kelas.index', [
-            'lembaga' => strtolower($validated['jenjang']),
+            'lembaga' => strtolower($lembaga->kode),
             'tab'     => 'kelas',
         ]);
 
@@ -356,6 +436,8 @@ class PlottingKelasController extends Controller
         if (!$authUser->isYayasan() && !$authUser->canDo('plotting_kelas', 'edit') && !$authUser->canDo('master_kelas', 'edit')) {
             abort(403, 'Anda tidak memiliki hak akses untuk mengubah ruang kelas.');
         }
+
+        $this->ensureClassroomInRoom($authUser, $classroom);
 
         $validated = $request->validate([
             'nama_kelas' => [
@@ -375,9 +457,10 @@ class PlottingKelasController extends Controller
         $oldName = $classroom->nama_kelas;
         $classroom->update($validated);
 
-        // Jika nama kelas berubah, sinkronkan data siswa yang ada di kelas ini
+        // Jika nama kelas berubah, sinkronkan data siswa di lembaga yang sama saja
         if ($oldName !== $validated['nama_kelas']) {
-            Siswa::where('kelas', $oldName)->update(['kelas' => $validated['nama_kelas']]);
+            $scopeKey = $classroom->lembaga?->kode ?? $classroom->jenjang;
+            Siswa::forLembaga($scopeKey)->where('kelas', $oldName)->update(['kelas' => $validated['nama_kelas']]);
         }
 
         return redirect()->back()->with('success', "Ruang kelas {$classroom->nama_kelas} berhasil diperbarui.");
@@ -394,8 +477,11 @@ class PlottingKelasController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk menghapus ruang kelas.');
         }
 
-        // Cek keterkaitan siswa (termasuk yang sedang sakit atau izin pulang)
-        $siswaList = Siswa::where(function ($q) {
+        $this->ensureClassroomInRoom($authUser, $classroom);
+
+        // Cek keterkaitan siswa pada lembaga terkait
+        $scopeKey = $classroom->lembaga?->kode ?? $classroom->jenjang;
+        $siswaList = Siswa::forLembaga($scopeKey)->where(function ($q) {
             $q->whereIn('status', ['aktif', 'pulang', 'sakit'])
               ->orWhereNull('status');
         })->get();
@@ -460,16 +546,25 @@ class PlottingKelasController extends Controller
             return redirect()->back()->with('error', 'Tidak ada ruang kelas yang dipilih untuk dihapus.');
         }
 
-        $classrooms = Classroom::whereIn('id', $ids)->get();
-        $siswaList = Siswa::where(function ($q) {
-            $q->whereIn('status', ['aktif', 'pulang', 'sakit'])
-              ->orWhereNull('status');
-        })->get();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $classroomsQuery = Classroom::with('lembaga')->whereIn('id', $ids);
+        if ($scopedFormal && !$authUser->isYayasan()) {
+            $classroomsQuery->where('lembaga_id', $scopedFormal->id);
+        } elseif (!$authUser->isYayasan()) {
+            $allowedIds = $authUser->accessibleLembagas()->filter(fn (Lembaga $l) => $l->isFormalSchool())->pluck('id')->all();
+            $classroomsQuery->whereIn('lembaga_id', $allowedIds);
+        }
+        $classrooms = $classroomsQuery->get();
 
         $deletedCount = 0;
         $blockedNames = [];
 
         foreach ($classrooms as $classroom) {
+            $scopeKey = $classroom->lembaga?->kode ?? $classroom->jenjang;
+            $siswaList = Siswa::forLembaga($scopeKey)->where(function ($q) {
+                $q->whereIn('status', ['aktif', 'pulang', 'sakit'])
+                  ->orWhereNull('status');
+            })->get();
             $siswaCount = $siswaList->filter(fn ($s) => self::isSameClass($s->kelas, $classroom->nama_kelas))->count();
             $schedCount = Schedule::where('classroom_id', $classroom->id)->count();
 
@@ -511,14 +606,19 @@ class PlottingKelasController extends Controller
             abort(403, 'Anda tidak memiliki hak akses.');
         }
 
-        $targetLembagaId = $request->get('lembaga_id');
-        $lembaga = null;
-        if ($targetLembagaId) {
-            $lembaga = Lembaga::find($targetLembagaId);
-        }
-        if (!$lembaga) {
-            $reqKode = strtolower($request->get('lembaga', session('active_lembaga', 'smp')));
-            $lembaga = Lembaga::where('kode', $reqKode)->first() ?: Lembaga::where('kode', 'smp')->first();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal && !$authUser->isYayasan()) {
+            $lembaga = $scopedFormal;
+        } else {
+            $targetLembagaId = $request->get('lembaga_id');
+            $lembaga = $targetLembagaId ? Lembaga::find($targetLembagaId) : null;
+            if (!$lembaga) {
+                $reqKode = strtolower((string) $request->get('lembaga', session('active_lembaga', 'smp')));
+                $lembaga = Lembaga::resolveByKode($reqKode) ?: Lembaga::where('kode', 'smp')->first();
+            }
+            if ($lembaga && !$authUser->isYayasan() && !$authUser->hasAccessToLembaga($lembaga->kode)) {
+                abort(403, 'Anda tidak memiliki akses ke lembaga tersebut.');
+            }
         }
 
         if (!$lembaga) {
@@ -546,10 +646,14 @@ class PlottingKelasController extends Controller
             return back()->with('error', 'Tidak ada siswa yang dipilih untuk dimutasi.');
         }
 
-        // Validasi siswa tidak berstatus reguler
-        $updatedCount = Siswa::whereIn('id', $siswaIds)
-            ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
-            ->update(['kelas' => $targetKelas]);
+        // Validasi siswa tidak berstatus reguler dan sesuai room aktif
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $mutasiQuery = Siswa::whereIn('id', $siswaIds)
+            ->whereRaw('LOWER(jenjang) != ?', ['reguler']);
+        if ($scopedFormal) {
+            $mutasiQuery->forLembaga($scopedFormal->kode);
+        }
+        $updatedCount = $mutasiQuery->update(['kelas' => $targetKelas]);
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -576,9 +680,13 @@ class PlottingKelasController extends Controller
             return back()->with('error', 'Tidak ada siswa yang dipilih.');
         }
 
-        $updatedCount = Siswa::whereIn('id', $siswaIds)
-            ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
-            ->update(['kelas' => null]);
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $unassignQuery = Siswa::whereIn('id', $siswaIds)
+            ->whereRaw('LOWER(jenjang) != ?', ['reguler']);
+        if ($scopedFormal) {
+            $unassignQuery->forLembaga($scopedFormal->kode);
+        }
+        $updatedCount = $unassignQuery->update(['kelas' => null]);
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -596,14 +704,15 @@ class PlottingKelasController extends Controller
     public function anggota(Request $request, string $kelas)
     {
         $kelasDecoded = urldecode($kelas);
-        $jenjang = strtoupper($request->get('jenjang', 'SMP'));
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $scopeKey = $scopedFormal ? $scopedFormal->kode : (string) $request->get('jenjang', 'SMP');
 
         $allSiswa = Siswa::where(function ($q) {
                 $q->whereIn('status', ['aktif', 'pulang', 'sakit'])
                   ->orWhereNull('status');
             })
             ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
-            ->where('jenjang', $jenjang)
+            ->forLembaga($scopeKey)
             ->with('pendaftaran')
             ->orderBy('nama_lengkap')
             ->get();

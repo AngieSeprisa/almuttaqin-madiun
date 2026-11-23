@@ -504,35 +504,42 @@
             </div>
         </div>
 
+        @php
+            $jmsColors = [
+                ['bg' => 'rgba(59, 130, 246, 0.12)', 'fg' => '#3B82F6'],
+                ['bg' => 'rgba(139, 92, 246, 0.12)', 'fg' => '#8B5CF6'],
+                ['bg' => 'rgba(245, 158, 11, 0.12)', 'fg' => '#D97706'],
+                ['bg' => 'rgba(236, 72, 153, 0.12)', 'fg' => '#DB2777'],
+            ];
+            $jmsDataList = $lembagaJadwalData ?? [];
+            $jmsKeys = array_keys($jmsDataList);
+            $jmsFirstKey = $jmsKeys[0] ?? 'SMP';
+            $jmsMasterPayload = [];
+            foreach ($jmsDataList as $jKey => $jInfo) {
+                $jmsMasterPayload[$jKey] = [
+                    'classrooms' => $jInfo['classrooms']->map(fn ($c) => ['id' => $c->id, 'nama' => $c->nama_kelas])->values()->all(),
+                    'assignedSubjects' => $jInfo['subjects']->map(fn ($s) => ['id' => $s->id, 'kode' => $s->kode, 'nama' => $s->nama_pelajaran ?? $s->mata_pelajaran, 'is_assigned' => $s->is_guru_assigned ?? false])->values()->all(),
+                    'allSubjects' => $jInfo['all_subjects']->map(fn ($s) => ['id' => $s->id, 'kode' => $s->kode, 'nama' => $s->nama_pelajaran ?? $s->mata_pelajaran, 'is_assigned' => $s->is_guru_assigned ?? false])->values()->all(),
+                ];
+            }
+        @endphp
+        @foreach($jmsDataList as $jKey => $jInfo)
+        @php $jc = $jmsColors[$loop->index % count($jmsColors)]; @endphp
         <div class="form-section-card jms-stat-card">
-            <div class="jms-stat-icon" style="background:rgba(59, 130, 246, 0.12); color:#3B82F6;">
+            <div class="jms-stat-icon" style="background:{{ $jc['bg'] }}; color:{{ $jc['fg'] }};">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
                 </svg>
             </div>
             <div class="jms-stat-body">
-                <div class="jms-stat-label">Mengajar SMP</div>
-                <div class="jms-stat-val" style="color:#3B82F6;">
-                    {{ $totalJamSMP }} <span class="jms-stat-unit">JP</span>
+                <div class="jms-stat-label">Mengajar {{ $jInfo['singkatan'] }}</div>
+                <div class="jms-stat-val" style="color:{{ $jc['fg'] }};">
+                    {{ $jInfo['total_jam'] }} <span class="jms-stat-unit">JP</span>
                 </div>
             </div>
         </div>
-
-        <div class="form-section-card jms-stat-card">
-            <div class="jms-stat-icon" style="background:rgba(139, 92, 246, 0.12); color:#8B5CF6;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
-                    <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
-                </svg>
-            </div>
-            <div class="jms-stat-body">
-                <div class="jms-stat-label">Mengajar SMA</div>
-                <div class="jms-stat-val" style="color:#8B5CF6;">
-                    {{ $totalJamSMA }} <span class="jms-stat-unit">JP</span>
-                </div>
-            </div>
-        </div>
+        @endforeach
 
         <div class="form-section-card jms-stat-card">
             <div class="jms-stat-icon" style="background:{{ $hasLocked ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)' }}; color:{{ $hasLocked ? '#EF4444' : '#10B981' }};">
@@ -611,20 +618,18 @@
             <form action="{{ route('jadwal-pelajaran.saya.store') }}" method="POST" id="formInputJadwal" class="jms-form">
                 @csrf
 
-                {{-- Pilihan Jenjang --}}
+                {{-- Pilihan Jenjang (Dinamis sesuai room / lembaga yang dapat diakses) --}}
                 <div class="form-group">
                     <label class="form-label jms-label">
                         1. Jenjang Sekolah <span style="color:#ef4444;">*</span>
                     </label>
-                    <div class="jms-jenjang-grid">
-                        <label class="jms-jenjang-opt is-selected" id="labelJenjangSMP">
-                            <input type="radio" name="jenjang_select" value="SMP" checked onchange="switchJenjang('SMP')">
-                            <span>SMP Al-Muttaqin</span>
+                    <div class="jms-jenjang-grid" style="{{ count($jmsDataList) === 1 ? 'grid-template-columns:1fr;' : '' }}">
+                        @foreach($jmsDataList as $jKey => $jInfo)
+                        <label class="jms-jenjang-opt {{ $loop->first ? 'is-selected' : '' }}" data-jenjang-opt="{{ $jKey }}">
+                            <input type="radio" name="jenjang_select" value="{{ $jKey }}" {{ $loop->first ? 'checked' : '' }} onchange="switchJenjang(this.value)">
+                            <span>{{ $jInfo['nama'] }}</span>
                         </label>
-                        <label class="jms-jenjang-opt" id="labelJenjangSMA">
-                            <input type="radio" name="jenjang_select" value="SMA" onchange="switchJenjang('SMA')">
-                            <span>SMA Al-Muttaqin</span>
-                        </label>
+                        @endforeach
                     </div>
                 </div>
 
@@ -739,7 +744,7 @@
                 <div>
                     <h3 class="jms-card-title">Kalender Mengajar Mingguan Saya</h3>
                     <p class="jms-card-desc">
-                        Penggabungan jadwal mengajar SMP &amp; SMA Al-Muttaqin
+                        {{ isset($scopedFormal) && $scopedFormal ? 'Jadwal mengajar ' . $scopedFormal->nama : 'Penggabungan jadwal mengajar seluruh lembaga formal' }}
                     </p>
                 </div>
                 <span class="badge" style="background:rgba(16, 185, 129, 0.12); color:#059669; font-weight:700; padding:3px 9px; border-radius:999px; font-size:11px;">
@@ -809,11 +814,7 @@
                                     <div class="jms-slot-info">
                                         <div class="jms-slot-mapel">{{ $sched->subject->nama_pelajaran }}</div>
                                         <div class="jms-slot-badges">
-                                            @if($sched->classroom->jenjang === 'SMP')
-                                                <span class="jms-pill jms-pill-smp">SMP</span>
-                                            @else
-                                                <span class="jms-pill jms-pill-sma">SMA</span>
-                                            @endif
+                                            <span class="jms-pill {{ strtoupper((string) $sched->classroom->jenjang) === 'SMP' ? 'jms-pill-smp' : 'jms-pill-sma' }}">{{ $sched->classroom->jenjang }}</span>
                                             <span class="jms-pill jms-pill-kelas">{{ $namaKelasBersih }}</span>
                                             @if(!empty($sched->subject->kode))
                                                 <span class="jms-pill jms-pill-kode">{{ $sched->subject->kode }}</span>
@@ -864,20 +865,9 @@
 
 {{-- Embedded Master Data for Instant Dynamic Dropdown Switching --}}
 <script>
-    const masterData = {
-        SMP: {
-            classrooms: {!! json_encode($smpClassrooms->map(fn($c) => ['id' => $c->id, 'nama' => $c->nama_kelas])) !!},
-            assignedSubjects: {!! json_encode($smpSubjects->map(fn($s) => ['id' => $s->id, 'kode' => $s->kode, 'nama' => $s->nama_pelajaran ?? $s->mata_pelajaran, 'is_assigned' => $s->is_guru_assigned ?? false])) !!},
-            allSubjects: {!! json_encode($allSmpSubjects->map(fn($s) => ['id' => $s->id, 'kode' => $s->kode, 'nama' => $s->nama_pelajaran ?? $s->mata_pelajaran, 'is_assigned' => $s->is_guru_assigned ?? false])) !!}
-        },
-        SMA: {
-            classrooms: {!! json_encode($smaClassrooms->map(fn($c) => ['id' => $c->id, 'nama' => $c->nama_kelas])) !!},
-            assignedSubjects: {!! json_encode($smaSubjects->map(fn($s) => ['id' => $s->id, 'kode' => $s->kode, 'nama' => $s->nama_pelajaran ?? $s->mata_pelajaran, 'is_assigned' => $s->is_guru_assigned ?? false])) !!},
-            allSubjects: {!! json_encode($allSmaSubjects->map(fn($s) => ['id' => $s->id, 'kode' => $s->kode, 'nama' => $s->nama_pelajaran ?? $s->mata_pelajaran, 'is_assigned' => $s->is_guru_assigned ?? false])) !!}
-        }
-    };
+    const masterData = @json($jmsMasterPayload);
 
-    let currentJenjang = 'SMP';
+    let currentJenjang = @json($jmsFirstKey);
     let showAllMapelMode = false;
 
     function toggleAllMapelMode(showAll) {
@@ -890,8 +880,9 @@
         const alertBox = document.getElementById('noMapelAlert');
         const submitBtn = document.querySelector('#formInputJadwal button[type="submit"]');
 
-        const assignedList = masterData[jenjang].assignedSubjects || [];
-        const allList = masterData[jenjang].allSubjects || [];
+        const bucket = masterData[jenjang] || { assignedSubjects: [], allSubjects: [] };
+        const assignedList = bucket.assignedSubjects || [];
+        const allList = bucket.allSubjects || [];
         const list = showAllMapelMode ? allList : assignedList;
 
         subSelect.innerHTML = '<option value="">-- Pilih Mata Pelajaran --</option>';
@@ -924,20 +915,16 @@
     function switchJenjang(jenjang) {
         currentJenjang = jenjang;
         const clsSelect = document.getElementById('classroom_id');
-        const labelSMP = document.getElementById('labelJenjangSMP');
-        const labelSMA = document.getElementById('labelJenjangSMA');
 
-        if (jenjang === 'SMP') {
-            labelSMP.classList.add('is-selected');
-            labelSMA.classList.remove('is-selected');
-        } else {
-            labelSMA.classList.add('is-selected');
-            labelSMP.classList.remove('is-selected');
-        }
+        document.querySelectorAll('[data-jenjang-opt]').forEach(el => {
+            el.classList.toggle('is-selected', el.getAttribute('data-jenjang-opt') === jenjang);
+        });
+
+        const bucket = masterData[jenjang] || { classrooms: [] };
 
         // Update Classrooms (tampilkan nama kelas saja tanpa Tingkat)
         clsSelect.innerHTML = '<option value="">-- Pilih Kelas --</option>';
-        masterData[jenjang].classrooms.forEach(cls => {
+        (bucket.classrooms || []).forEach(cls => {
             const opt = document.createElement('option');
             opt.value = cls.id;
             const rawNama = String(cls.nama || '').trim();
@@ -977,7 +964,9 @@
 
     // Initial render
     document.addEventListener('DOMContentLoaded', function() {
-        switchJenjang('SMP');
+        if (currentJenjang && masterData[currentJenjang]) {
+            switchJenjang(currentJenjang);
+        }
         updateJamPreview();
     });
 </script>

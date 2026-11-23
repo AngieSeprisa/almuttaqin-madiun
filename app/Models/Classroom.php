@@ -41,11 +41,23 @@ class Classroom extends Model
     }
 
     /**
-     * Scope filter per jenjang (SMP atau SMA).
+     * Scope filter per jenjang / kode lembaga (SMP, SMA, SD IT, RA, dll).
      */
     public function scopeForJenjang($query, string $jenjang)
     {
-        return $query->where('jenjang', strtoupper($jenjang));
+        $lembaga = Lembaga::resolveByKode($jenjang);
+        $aliases = Lembaga::jenjangAliasesForRoom($jenjang);
+        if (empty($aliases)) {
+            $aliases = [strtoupper(trim($jenjang))];
+        }
+        $lowerAliases = array_values(array_unique(array_map('strtolower', $aliases)));
+
+        return $query->where(function ($q) use ($lembaga, $lowerAliases) {
+            $q->whereRaw('LOWER(TRIM(jenjang)) IN (' . implode(',', array_fill(0, count($lowerAliases), '?')) . ')', $lowerAliases);
+            if ($lembaga) {
+                $q->orWhere('lembaga_id', $lembaga->id);
+            }
+        });
     }
 
     /**

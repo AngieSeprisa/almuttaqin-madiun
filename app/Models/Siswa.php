@@ -119,22 +119,26 @@ class Siswa extends Model
     }
 
     /**
-     * Scope filter santri berdasarkan room/lembaga yang aktif.
-     * Karena seluruh santri mukim di pondok, room 'pondok' & 'yayasan' menampilkan semua santri,
-     * sedangkan room 'smp' atau 'sma' hanya menyaring santri dari jenjang tersebut.
+     * Scope filter santri/siswa berdasarkan room/lembaga yang aktif.
+     * Room 'pondok' & 'yayasan' menampilkan semua santri,
+     * sedangkan room lembaga formal (SMP, SMA, SD IT, RA, dll) hanya menyaring siswa lembaga tersebut.
      */
     public function scopeForLembaga(Builder $query, ?string $kodeLembaga): Builder
     {
-        if (!$kodeLembaga || in_array($kodeLembaga, ['pondok', 'yayasan'])) {
+        if (Lembaga::isGlobalRoom($kodeLembaga)) {
             return $query;
         }
 
-        $jenjang = strtoupper($kodeLembaga); // 'SMP' atau 'SMA'
+        $aliases = Lembaga::jenjangAliasesForRoom($kodeLembaga);
+        if (empty($aliases)) {
+            $aliases = [strtoupper(trim((string) $kodeLembaga))];
+        }
+        $lowerAliases = array_values(array_unique(array_map('strtolower', $aliases)));
 
-        return $query->where(function ($q) use ($jenjang) {
-            $q->where('jenjang', $jenjang)
-              ->orWhereHas('pendaftaran', function ($p) use ($jenjang) {
-                  $p->where('jenjang', $jenjang);
+        return $query->where(function ($q) use ($lowerAliases) {
+            $q->whereRaw('LOWER(TRIM(jenjang)) IN (' . implode(',', array_fill(0, count($lowerAliases), '?')) . ')', $lowerAliases)
+              ->orWhereHas('pendaftaran', function ($p) use ($lowerAliases) {
+                  $p->whereRaw('LOWER(TRIM(jenjang)) IN (' . implode(',', array_fill(0, count($lowerAliases), '?')) . ')', $lowerAliases);
               });
         });
     }

@@ -37,13 +37,19 @@ class MataPelajaran extends Model
     }
 
     /**
-     * Scope filter per jenjang sekolah (SMP / SMA).
+     * Scope filter per jenjang / kode sekolah (SMP, SMA, SD IT, RA, dll).
      */
     public function scopeForJenjang($query, string $jenjang)
     {
-        $kode = strtolower($jenjang);
+        $lembaga = Lembaga::resolveByKode($jenjang);
+        if ($lembaga) {
+            return $query->where('lembaga_id', $lembaga->id);
+        }
+
+        $kode = strtolower(trim($jenjang));
         return $query->whereHas('lembaga', function ($q) use ($kode) {
-            $q->where('kode', $kode);
+            $q->whereRaw('LOWER(kode) = ?', [$kode])
+              ->orWhereRaw('LOWER(singkatan) = ?', [$kode]);
         });
     }
 
@@ -56,11 +62,11 @@ class MataPelajaran extends Model
     }
 
     /**
-     * Jenjang uppercase (SMP atau SMA).
+     * Jenjang baku lembaga (SMP, SMA, SD IT, RA, dll).
      */
     public function getJenjangAttribute(): string
     {
-        return strtoupper($this->lembaga?->kode ?? 'SMP');
+        return $this->lembaga?->jenjang_key ?? 'SMP';
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Lembaga;
 use App\Models\PerizinanHaid;
 use App\Models\Siswa;
 use Carbon\Carbon;
@@ -10,12 +11,35 @@ use Illuminate\Support\Facades\Auth;
 
 class PerizinanHaidController extends Controller
 {
+    protected function scopedFormal(): ?Lembaga
+    {
+        return Lembaga::activeScopedFormal(Auth::user());
+    }
+
+    protected function ensureHaidInRoom(PerizinanHaid $haid): void
+    {
+        $scoped = $this->scopedFormal();
+        if (!$scoped) {
+            return;
+        }
+
+        if (!$haid->siswa_id || !Siswa::forLembaga($scoped->kode)->whereKey($haid->siswa_id)->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke data perizinan haid santri lembaga lain.');
+        }
+    }
+
     /**
      * Tampilkan daftar perizinan haid santriwati.
      */
     public function index(Request $request)
     {
-        $query = PerizinanHaid::query()->with(['siswa', 'creator']);
+        $scoped = $this->scopedFormal();
+        $baseQuery = PerizinanHaid::query();
+        if ($scoped) {
+            $baseQuery->whereHas('siswa', fn ($s) => $s->forLembaga($scoped->kode));
+        }
+
+        $query = (clone $baseQuery)->with(['siswa', 'creator']);
         $today = Carbon::today()->toDateString();
 
         if ($request->filled('search')) {
@@ -42,19 +66,19 @@ class PerizinanHaidController extends Controller
 
         $perizinan = $query->latest('id')->paginate($perPage)->withQueryString();
 
-        // Ambil daftar kamar putri unik
-        $kamars = PerizinanHaid::whereNotNull('kamar')
+        // Ambil daftar kamar putri unik sesuai room aktif
+        $kamars = (clone $baseQuery)->whereNotNull('kamar')
             ->where('kamar', '!=', '')
             ->distinct()
             ->orderBy('kamar')
             ->pluck('kamar');
 
-        // Statistik ringkas
-        $totalAktif = PerizinanHaid::where('status', 'sedang_haid')->count();
-        $totalBulanIni = PerizinanHaid::whereMonth('tanggal_mulai', Carbon::today()->month)
+        // Statistik ringkas sesuai room aktif
+        $totalAktif = (clone $baseQuery)->where('status', 'sedang_haid')->count();
+        $totalBulanIni = (clone $baseQuery)->whereMonth('tanggal_mulai', Carbon::today()->month)
             ->whereYear('tanggal_mulai', Carbon::today()->year)
             ->count();
-        $totalSuci = PerizinanHaid::where('status', 'sudah_suci')->count();
+        $totalSuci = (clone $baseQuery)->where('status', 'sudah_suci')->count();
 
         return view('perizinan.haid', compact('perizinan', 'kamars', 'today', 'totalAktif', 'totalBulanIni', 'totalSuci'));
     }
@@ -64,19 +88,29 @@ class PerizinanHaidController extends Controller
      */
     public function create()
     {
-        // Utamakan santriwati (Perempuan / Kamar Putri)
-        $daftarSiswa = Siswa::where(function ($q) {
+        $scoped = $this->scopedFormal();
+
+        // Utamakan santriwati (Perempuan / Kamar Putri) sesuai room aktif
+        $daftarQuery = Siswa::where(function ($q) {
             $q->where('jenis_kelamin', 'Perempuan')
               ->orWhere('jenis_kelamin', 'P')
               ->orWhere('kamar', 'like', '%putri%')
               ->orWhere('kamar', 'like', '%banat%');
-        })
-        ->orderBy('nama_lengkap', 'asc')
-        ->get(['id', 'nama_lengkap', 'kamar', 'status', 'jenis_kelamin']);
+        });
+        if ($scoped) {
+            $daftarQuery->forLembaga($scoped->kode);
+        }
+        $daftarSiswa = $daftarQuery
+            ->orderBy('nama_lengkap', 'asc')
+            ->get(['id', 'nama_lengkap', 'kamar', 'status', 'jenis_kelamin']);
 
-        // Jika data siswa putri kosong (misal belum terisi gender), tampilkan semua santri
+        // Jika data siswa putri kosong (misal belum terisi gender), tampilkan semua santri di room ini
         if ($daftarSiswa->isEmpty()) {
-            $daftarSiswa = Siswa::orderBy('nama_lengkap', 'asc')->get(['id', 'nama_lengkap', 'kamar', 'status', 'jenis_kelamin']);
+            $fallback = Siswa::orderBy('nama_lengkap', 'asc');
+            if ($scoped) {
+                $fallback->forLembaga($scoped->kode);
+            }
+            $daftarSiswa = $fallback->get(['id', 'nama_lengkap', 'kamar', 'status', 'jenis_kelamin']);
         }
 
         $today = Carbon::today()->toDateString();
@@ -101,8 +135,12 @@ class PerizinanHaidController extends Controller
             'keterangan'      => 'nullable|string|max:500',
         ]);
 
+        $scoped = $this->scopedFormal();
         $siswa = null;
         if ($request->filled('siswa_id')) {
+            if ($scoped && !Siswa::forLembaga($scoped->kode)->whereKey((int) $request->siswa_id)->exists()) {
+                abort(403, 'Santri yang dipilih bukan milik lembaga ruang kerja Anda.');
+            }
             $siswa = Siswa::find($request->siswa_id);
         }
 
@@ -131,6 +169,7 @@ class PerizinanHaidController extends Controller
     public function suci($id)
     {
         $haid = PerizinanHaid::findOrFail($id);
+        $this->ensureHaidInRoom($haid);
         $haid->update([
             'status'          => 'sudah_suci',
             'tanggal_selesai' => Carbon::today()->toDateString(),
@@ -146,6 +185,7 @@ class PerizinanHaidController extends Controller
     public function update(Request $request, $id)
     {
         $haid = PerizinanHaid::findOrFail($id);
+        $this->ensureHaidInRoom($haid);
 
         $request->validate([
             'kamar'           => 'nullable|string|max:100',
@@ -173,6 +213,7 @@ class PerizinanHaidController extends Controller
     public function destroy($id)
     {
         $haid = PerizinanHaid::findOrFail($id);
+        $this->ensureHaidInRoom($haid);
         $nama = $haid->nama;
         $haid->delete();
 

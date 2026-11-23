@@ -36,6 +36,23 @@ class PlottingEkskulController extends Controller
     }
 
     /**
+     * Pastikan ekstrakurikuler termasuk dalam room yang dapat diakses user.
+     */
+    protected function ensureEkskulInRoom(User $authUser, Ekstrakurikuler $ekskul): void
+    {
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal && !$authUser->isYayasan()) {
+            $aliasesLower = array_map('strtolower', Lembaga::jenjangAliasesForRoom($scopedFormal->kode));
+            $matches = (int) $ekskul->lembaga_id === (int) $scopedFormal->id
+                || strcasecmp((string) $ekskul->jenjang, 'ALL') === 0
+                || in_array(strtolower(trim((string) $ekskul->jenjang)), $aliasesLower, true);
+            if (!$matches) {
+                abort(403, 'Anda tidak memiliki akses untuk mengelola ekstrakurikuler lembaga lain.');
+            }
+        }
+    }
+
+    /**
      * Tampilkan halaman Plotting Ekstrakurikuler & Manajemen Ekskul (Filament v4 Style)
      */
     public function index(Request $request)
@@ -47,44 +64,60 @@ class PlottingEkskulController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membuka menu Plotting Ekstrakurikuler.');
         }
 
-        // Lembaga sekolah formal: SMP & SMA
-        $sekolahLembagas = $authUser->accessibleLembagas()->filter(function ($l) {
-            return in_array(strtolower($l->kode), ['smp', 'sma']) || $l->kategori === 'formal';
-        })->values();
+        $isYayasan = $authUser->isYayasan();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
 
-        if ($sekolahLembagas->isEmpty()) {
-            abort(403, 'Menu Ekstrakurikuler hanya diperuntukkan bagi lembaga sekolah (SMP & SMA).');
+        // Lembaga sekolah formal dinamis (SMP, SMA, SD IT, RA, dll)
+        if ($isYayasan) {
+            $sekolahLembagas = Lembaga::formalOptions();
+        } elseif ($scopedFormal) {
+            $sekolahLembagas = collect([$scopedFormal]);
+        } else {
+            $sekolahLembagas = $authUser->accessibleLembagas()
+                ->filter(fn (Lembaga $l) => $l->isFormalSchool())
+                ->values();
         }
 
-        $isYayasan = $authUser->isYayasan();
+        if ($sekolahLembagas->isEmpty()) {
+            abort(403, 'Menu Ekstrakurikuler hanya diperuntukkan bagi lembaga sekolah formal.');
+        }
+
         $selectedLembaga = null;
 
         if ($isYayasan) {
-            $reqKode = strtolower($request->get('lembaga', ''));
-            if ($reqKode && in_array($reqKode, ['smp', 'sma'])) {
-                $selectedLembaga = $sekolahLembagas->firstWhere('kode', $reqKode);
+            $reqKode = trim((string) $request->get('lembaga', ''));
+            if ($reqKode !== '') {
+                $resolved = Lembaga::resolveByKode($reqKode);
+                if ($resolved) {
+                    $selectedLembaga = $sekolahLembagas->firstWhere('id', $resolved->id);
+                }
+            }
+            if (!$selectedLembaga && $scopedFormal) {
+                $selectedLembaga = $sekolahLembagas->firstWhere('id', $scopedFormal->id);
             }
             if (!$selectedLembaga) {
                 $selectedLembaga = $sekolahLembagas->firstWhere('kode', 'smp') ?: $sekolahLembagas->first();
             }
         } else {
-            $activeKode = session('active_lembaga');
-            $selectedLembaga = $sekolahLembagas->firstWhere('kode', $activeKode)
+            $selectedLembaga = $scopedFormal
                 ?: ($sekolahLembagas->firstWhere('id', $authUser->primary_lembaga_id) ?: $sekolahLembagas->first());
 
-            if (!$selectedLembaga || !in_array(strtolower($selectedLembaga->kode), ['smp', 'sma'])) {
-                abort(403, 'Menu Ekstrakurikuler hanya dapat dibuka dari lembaga sekolah (SMP atau SMA).');
+            if (!$selectedLembaga || !$selectedLembaga->isFormalSchool()) {
+                abort(403, 'Menu Ekstrakurikuler hanya dapat dibuka dari lembaga sekolah formal.');
             }
         }
 
         $kodeLembaga = strtolower($selectedLembaga->kode);
-        $jenjang = strtoupper($kodeLembaga); // 'SMP' atau 'SMA'
+        $jenjang = $selectedLembaga->jenjang_key;
+        $aliasesLower = array_map('strtolower', Lembaga::jenjangAliasesForRoom($selectedLembaga->kode));
 
         // Ambil daftar ekskul di jenjang/lembaga ini
-        $ekskuls = Ekstrakurikuler::where(function ($q) use ($selectedLembaga, $jenjang) {
+        $ekskuls = Ekstrakurikuler::where(function ($q) use ($selectedLembaga, $aliasesLower) {
                 $q->where('lembaga_id', $selectedLembaga->id)
-                  ->orWhere('jenjang', $jenjang)
                   ->orWhere('jenjang', 'ALL');
+                if (!empty($aliasesLower)) {
+                    $q->orWhereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(jenjang))'), $aliasesLower);
+                }
             })
             ->with(['pembina', 'anggota'])
             ->withCount('anggota')
@@ -97,7 +130,7 @@ class PlottingEkskulController extends Controller
                   ->orWhereNull('status');
             })
             ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
-            ->where('jenjang', $jenjang)
+            ->forLembaga($selectedLembaga->kode)
             ->with(['pendaftaran', 'ekstrakurikulers']);
 
         if ($request->filled('search')) {
@@ -118,7 +151,7 @@ class PlottingEkskulController extends Controller
             return $s->ekstrakurikulers->isEmpty();
         })->values();
 
-        // Daftar guru resmi yang terdaftar di menu Guru Sekolah sesuai lembaga aktif (SMP / SMA)
+        // Daftar guru resmi yang terdaftar di menu Guru Sekolah sesuai lembaga aktif
         $gurus = User::with(['primaryLembaga', 'lembagas'])
             ->where(function ($q) {
                 $q->whereNull('is_active')->orWhere('is_active', true);
@@ -128,23 +161,13 @@ class PlottingEkskulController extends Controller
                   ->orWhere('mapel_status', 'disetujui');
             })
             ->where('mapel_status', '!=', 'ditolak')
-            ->where(function ($q) use ($selectedLembaga) {
-                $q->where('primary_lembaga_id', $selectedLembaga->id)
-                  ->orWhereHas('lembagas', function ($l) use ($selectedLembaga) {
-                      $l->where('lembagas.id', $selectedLembaga->id);
-                  })
-                  ->orWhere('jabatan', 'like', "%{$selectedLembaga->singkatan}%")
-                  ->orWhere('jabatan', 'like', "%{$selectedLembaga->kode}%");
-            })
+            ->forLembagaModel($selectedLembaga)
             ->orderBy('name')
             ->get();
 
         // Fallback jika belum ada approval resmi
         if ($gurus->isEmpty()) {
-            $gurus = User::where(function ($q) use ($selectedLembaga) {
-                    $q->where('primary_lembaga_id', $selectedLembaga->id)
-                      ->orWhereHas('lembagas', fn($l) => $l->where('lembagas.id', $selectedLembaga->id));
-                })
+            $gurus = User::forLembagaModel($selectedLembaga)
                 ->where(function ($q) {
                     $q->where('role', 'guru')->orWhere('is_guru_sekolah', true);
                 })
@@ -204,14 +227,13 @@ class PlottingEkskulController extends Controller
 
         $validated = $request->validate([
             'lembaga_id'   => 'required|exists:lembagas,id',
-            'jenjang'      => 'required|in:SMP,SMA,ALL',
+            'jenjang'      => 'nullable|string|max:50',
             'nama_ekskul'  => [
                 'required',
                 'string',
                 'max:100',
                 Rule::unique('ekstrakurikulers')->where(function ($q) use ($request) {
-                    return $q->where('lembaga_id', $request->lembaga_id)
-                             ->where('jenjang', $request->jenjang);
+                    return $q->where('lembaga_id', $request->lembaga_id);
                 }),
             ],
             'pembina_id'   => 'nullable|exists:users,id',
@@ -219,6 +241,22 @@ class PlottingEkskulController extends Controller
             'nama_ekskul.required' => 'Nama ekstrakurikuler wajib diisi.',
             'nama_ekskul.unique'   => 'Ekstrakurikuler tersebut sudah terdaftar.',
         ]);
+
+        $lembaga = Lembaga::findOrFail($validated['lembaga_id']);
+        if (!$lembaga->isFormalSchool()) {
+            return redirect()->back()->withErrors(['lembaga_id' => 'Lembaga harus merupakan sekolah formal.']);
+        }
+
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if (!$authUser->isYayasan()) {
+            if (!$authUser->hasAccessToLembaga($lembaga->kode) || ($scopedFormal && (int) $scopedFormal->id !== (int) $lembaga->id)) {
+                abort(403, 'Anda hanya dapat menambah ekstrakurikuler pada lembaga ruang kerja Anda.');
+            }
+        }
+
+        $validated['jenjang'] = ($authUser->isYayasan() && strtoupper((string) ($validated['jenjang'] ?? '')) === 'ALL')
+            ? 'ALL'
+            : $lembaga->jenjang_key;
 
         if (!empty($validated['pembina_id'])) {
             $p = User::find($validated['pembina_id']);
@@ -231,7 +269,7 @@ class PlottingEkskulController extends Controller
         $ekskul = Ekstrakurikuler::create($validated);
 
         return redirect()->route('plotting-ekskul.index', [
-            'lembaga' => strtolower($validated['jenjang'] === 'SMA' ? 'sma' : 'smp'),
+            'lembaga' => strtolower($lembaga->kode),
             'tab'     => 'ekskul',
         ])->with('success', "Ekstrakurikuler {$ekskul->nama_ekskul} berhasil ditambahkan.");
     }
@@ -246,6 +284,8 @@ class PlottingEkskulController extends Controller
         if (!$authUser->isYayasan() && !$authUser->canDo('plotting_ekskul', 'edit') && !$authUser->canDo('plotting_kelas', 'edit') && !$authUser->canDo('sekolah', 'edit')) {
             abort(403, 'Anda tidak memiliki hak akses untuk mengubah ekstrakurikuler.');
         }
+
+        $this->ensureEkskulInRoom($authUser, $ekstrakurikuler);
 
         $validated = $request->validate([
             'nama_ekskul'  => [
@@ -286,6 +326,8 @@ class PlottingEkskulController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk menghapus ekstrakurikuler.');
         }
 
+        $this->ensureEkskulInRoom($authUser, $ekstrakurikuler);
+
         $nama = $ekstrakurikuler->nama_ekskul;
         $ekstrakurikuler->delete();
 
@@ -308,7 +350,12 @@ class PlottingEkskulController extends Controller
             return redirect()->back()->with('error', 'Tidak ada ekstrakurikuler yang dipilih.');
         }
 
-        $deletedCount = Ekstrakurikuler::whereIn('id', $ids)->delete();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $deleteQuery = Ekstrakurikuler::whereIn('id', $ids);
+        if ($scopedFormal && !$authUser->isYayasan()) {
+            $deleteQuery->where('lembaga_id', $scopedFormal->id);
+        }
+        $deletedCount = $deleteQuery->delete();
 
         return redirect()->back()->with('success', "{$deletedCount} ekstrakurikuler terpilih berhasil dihapus.");
     }
@@ -318,9 +365,20 @@ class PlottingEkskulController extends Controller
      */
     public function anggota(Request $request, Ekstrakurikuler $ekstrakurikuler)
     {
-        $anggotaList = EkstrakurikulerSiswa::where('ekstrakurikuler_id', $ekstrakurikuler->id)
-            ->with(['siswa.pendaftaran'])
-            ->get()
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        if ($authUser) {
+            $this->ensureEkskulInRoom($authUser, $ekstrakurikuler);
+        }
+
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $anggotaQuery = EkstrakurikulerSiswa::where('ekstrakurikuler_id', $ekstrakurikuler->id)
+            ->with(['siswa.pendaftaran']);
+        if ($scopedFormal) {
+            $anggotaQuery->whereHas('siswa', fn ($q) => $q->forLembaga($scopedFormal->kode));
+        }
+
+        $anggotaList = $anggotaQuery->get()
             ->map(function ($item) {
                 $s = $item->siswa;
                 return [
@@ -356,8 +414,19 @@ class PlottingEkskulController extends Controller
             'peran'              => 'nullable|string|max:50',
         ]);
 
-        $ekskulId = (int) $request->ekstrakurikuler_id;
+        $ekskul = Ekstrakurikuler::findOrFail((int) $request->ekstrakurikuler_id);
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        if ($authUser) {
+            $this->ensureEkskulInRoom($authUser, $ekskul);
+        }
+
+        $ekskulId = $ekskul->id;
         $siswaIds = $this->parseIds($request->siswa_id);
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal) {
+            $siswaIds = Siswa::forLembaga($scopedFormal->kode)->whereIn('id', $siswaIds)->pluck('id')->all();
+        }
         $peran = $request->get('peran', 'anggota') ?: 'anggota';
 
         if (empty($siswaIds)) {
@@ -382,8 +451,7 @@ class PlottingEkskulController extends Controller
             }
         }
 
-        $ekskul = Ekstrakurikuler::find($ekskulId);
-        $msg = "{$addedCount} siswa berhasil dimasukkan ke ekstrakurikuler " . ($ekskul?->nama_ekskul ?? '') . ".";
+        $msg = "{$addedCount} siswa berhasil dimasukkan ke ekstrakurikuler " . ($ekskul->nama_ekskul ?? '') . ".";
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json(['success' => true, 'message' => $msg, 'added' => $addedCount]);
@@ -402,8 +470,19 @@ class PlottingEkskulController extends Controller
             'siswa_id'           => 'required',
         ]);
 
-        $ekskulId = (int) $request->ekstrakurikuler_id;
+        $ekskul = Ekstrakurikuler::findOrFail((int) $request->ekstrakurikuler_id);
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        if ($authUser) {
+            $this->ensureEkskulInRoom($authUser, $ekskul);
+        }
+
+        $ekskulId = $ekskul->id;
         $siswaIds = $this->parseIds($request->siswa_id);
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal) {
+            $siswaIds = Siswa::forLembaga($scopedFormal->kode)->whereIn('id', $siswaIds)->pluck('id')->all();
+        }
 
         if (empty($siswaIds)) {
             return back()->with('error', 'Pilih minimal satu siswa.');

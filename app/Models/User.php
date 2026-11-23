@@ -450,35 +450,84 @@ class User extends Authenticatable
     }
 
     /**
-     * Resolusi Lembaga Sekolah untuk Guru / Pegawai (SMP atau SMA).
+     * Scope pengguna yang terafiliasi dengan lembaga tertentu (primary_lembaga_id atau user_lembagas).
+     */
+    public function scopeForLembagaModel($query, ?Lembaga $lembaga)
+    {
+        if (!$lembaga) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($lembaga) {
+            $q->where('primary_lembaga_id', $lembaga->id)
+              ->orWhereHas('lembagas', function ($l) use ($lembaga) {
+                  $l->where('lembagas.id', $lembaga->id);
+              });
+        });
+    }
+
+    /**
+     * Resolusi Lembaga Sekolah untuk Guru / Pegawai (SMP, SMA, SD IT, RA, atau lembaga formal lainnya).
      * Menentukan lembaga sekolah asal guru berdasarkan Mapel Diampu, Jabatan, Primary Lembaga, Akses Lembagas, atau Device Tap.
      */
     public function resolveSchoolLembaga(?string $deviceId = null): ?Lembaga
     {
+        $formalSchools = Lembaga::formalOptions();
+        $formalIds = $formalSchools->pluck('id')->all();
+
         // 1. Cek dari Mata Pelajaran yang diampu (Guru Sekolah)
         if ($this->is_guru_sekolah || !empty($this->mata_pelajaran) || $this->mapel_status === 'disetujui') {
             $mapelList = $this->daftar_mata_pelajaran;
-            if (!empty($mapelList)) {
-                $mapelRecord = \App\Models\MataPelajaran::with('lembaga')
+            if (!empty($mapelList) && !empty($formalIds)) {
+                $mapelRecords = \App\Models\MataPelajaran::with('lembaga')
                     ->whereIn('mata_pelajaran', $mapelList)
-                    ->whereHas('lembaga', function ($q) {
-                        $q->whereRaw('LOWER(kode) IN (?, ?)', ['smp', 'sma'])
-                          ->orWhereRaw('UPPER(singkatan) IN (?, ?)', ['SMP', 'SMA']);
-                    })
-                    ->first();
-                if ($mapelRecord && $mapelRecord->lembaga) {
-                    return $mapelRecord->lembaga;
+                    ->whereIn('lembaga_id', $formalIds)
+                    ->get();
+
+                $distinctLembagas = $mapelRecords->pluck('lembaga')->filter()->unique('id')->values();
+                if ($distinctLembagas->count() === 1) {
+                    return $distinctLembagas->first();
+                }
+
+                if ($distinctLembagas->count() > 1) {
+                    // Jika mapel sama ada di beberapa sekolah (misal Matematika di SMP & SD IT),
+                    // cocokkan dulu dengan jabatan, lalu primary_lembaga_id, lalu relasi lembagas user
+                    $jabatanCheck = strtolower((string) ($this->jabatan ?? ''));
+                    if ($jabatanCheck !== '') {
+                        foreach ($distinctLembagas as $cand) {
+                            $tokens = array_unique(array_filter([
+                                strtolower(trim((string) $cand->kode)),
+                                strtolower(trim((string) $cand->singkatan)),
+                            ]));
+                            foreach ($tokens as $tok) {
+                                if (preg_match('/(?<![a-z0-9])' . preg_quote($tok, '/') . '(?![a-z0-9])/i', $jabatanCheck)) {
+                                    return $cand;
+                                }
+                            }
+                        }
+                    }
+
+                    $userFormalIds = $this->lembagas()->whereIn('lembagas.id', $formalIds)->pluck('lembagas.id')->all();
+                    if ($this->primary_lembaga_id && in_array($this->primary_lembaga_id, $formalIds, true)) {
+                        $primaryMatch = $distinctLembagas->firstWhere('id', $this->primary_lembaga_id);
+                        if ($primaryMatch) {
+                            return $primaryMatch;
+                        }
+                    }
+                    $relMatch = $distinctLembagas->first(fn ($l) => in_array($l->id, $userFormalIds, true));
+                    if ($relMatch) {
+                        return $relMatch;
+                    }
+
+                    return $distinctLembagas->first();
                 }
             }
 
             // Cek relasi langsung mataPelajaranPengampu jika kolom guru_id tersedia di tabel
-            if (\Illuminate\Support\Facades\Schema::hasColumn('mata_pelajarans', 'guru_id')) {
+            if (!empty($formalIds) && \Illuminate\Support\Facades\Schema::hasColumn('mata_pelajarans', 'guru_id')) {
                 $mapelPengampu = \App\Models\MataPelajaran::with('lembaga')
                     ->where('guru_id', $this->id)
-                    ->whereHas('lembaga', function ($q) {
-                        $q->whereRaw('LOWER(kode) IN (?, ?)', ['smp', 'sma'])
-                          ->orWhereRaw('UPPER(singkatan) IN (?, ?)', ['SMP', 'SMA']);
-                    })
+                    ->whereIn('lembaga_id', $formalIds)
                     ->first();
                 if ($mapelPengampu && $mapelPengampu->lembaga) {
                     return $mapelPengampu->lembaga;
@@ -486,52 +535,45 @@ class User extends Authenticatable
             }
         }
 
-        // 2. Cek dari Jabatan (misal "Operator SMP", "Guru Bahasa SMP", "Kepala Sekolah SMA", dll)
+        // 2. Cek dari Jabatan (misal "Operator SMP", "Guru SD IT", "Kepala RA", dll)
+        // Gunakan batas kata agar kode pendek seperti "ra" tidak cocok dengan kata "operator"
         $jabatan = strtolower((string) ($this->jabatan ?? ''));
-        if (str_contains($jabatan, 'smp')) {
-            $smp = Lembaga::where(function ($q) {
-                $q->whereRaw('LOWER(kode) = ?', ['smp'])
-                  ->orWhereRaw('UPPER(singkatan) = ?', ['SMP']);
-            })->first();
-            if ($smp) return $smp;
-        } elseif (str_contains($jabatan, 'sma')) {
-            $sma = Lembaga::where(function ($q) {
-                $q->whereRaw('LOWER(kode) = ?', ['sma'])
-                  ->orWhereRaw('UPPER(singkatan) = ?', ['SMA']);
-            })->first();
-            if ($sma) return $sma;
-        }
-
-        // 3. Cek primaryLembaga jika merupakan sekolah (SMP/SMA)
-        if ($this->primaryLembaga) {
-            $kode = strtolower($this->primaryLembaga->kode ?? '');
-            $singkat = strtoupper($this->primaryLembaga->singkatan ?? '');
-            if (in_array($kode, ['smp', 'sma']) || in_array($singkat, ['SMP', 'SMA'])) {
-                return $this->primaryLembaga;
+        if ($jabatan !== '') {
+            foreach ($formalSchools as $fs) {
+                $tokens = array_unique(array_filter([
+                    strtolower(trim((string) $fs->kode)),
+                    strtolower(trim((string) $fs->singkatan)),
+                ]));
+                foreach ($tokens as $tok) {
+                    if (preg_match('/(?<![a-z0-9])' . preg_quote($tok, '/') . '(?![a-z0-9])/i', $jabatan)) {
+                        return $fs;
+                    }
+                }
             }
         }
 
-        // 4. Cek relasi lembagas yang tergolong sekolah (SMP/SMA)
-        $sekolahLembagas = $this->lembagas()
-            ->where(function ($q) {
-                $q->whereRaw('LOWER(kode) IN (?, ?)', ['smp', 'sma'])
-                  ->orWhereRaw('UPPER(singkatan) IN (?, ?)', ['SMP', 'SMA']);
-            })
-            ->get();
+        // 3. Cek primaryLembaga jika merupakan lembaga formal
+        if ($this->primaryLembaga && $this->primaryLembaga->isFormalSchool()) {
+            return $this->primaryLembaga;
+        }
+
+        // 4. Cek relasi lembagas yang tergolong lembaga formal
+        $sekolahLembagas = !empty($formalIds)
+            ? $this->lembagas()->whereIn('lembagas.id', $formalIds)->get()
+            : collect();
 
         if ($sekolahLembagas->count() === 1) {
             return $sekolahLembagas->first();
         }
 
-        // 5. Cek dari device_id jika tap fisik dilakukan di alat khusus SMP atau SMA
+        // 5. Cek dari device_id jika tap fisik dilakukan di alat khusus lembaga formal tertentu
         if ($deviceId) {
             $devId = strtolower($deviceId);
-            if (str_contains($devId, 'smp')) {
-                $smp = Lembaga::where(fn($q) => $q->where(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), 'smp')->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), 'SMP'))->first();
-                if ($smp) return $smp;
-            } elseif (str_contains($devId, 'sma')) {
-                $sma = Lembaga::where(fn($q) => $q->where(\Illuminate\Support\Facades\DB::raw('LOWER(kode)'), 'sma')->orWhere(\Illuminate\Support\Facades\DB::raw('UPPER(singkatan)'), 'SMA'))->first();
-                if ($sma) return $sma;
+            foreach ($formalSchools as $fs) {
+                $kode = strtolower(trim((string) $fs->kode));
+                if ($kode !== '' && preg_match('/(?<![a-z0-9])' . preg_quote($kode, '/') . '(?![a-z0-9])/i', $devId)) {
+                    return $fs;
+                }
             }
         }
 

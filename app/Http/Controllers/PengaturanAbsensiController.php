@@ -35,6 +35,10 @@ class PengaturanAbsensiController extends Controller
         ]);
 
         $lembaga = Lembaga::findOrFail($validated['lembaga_id']);
+        $authUser = auth()->user();
+        if ($authUser && !$authUser->isYayasan() && !$authUser->hasAccessToLembaga($lembaga->kode)) {
+            abort(403, 'Anda tidak memiliki akses untuk mengubah pengaturan absensi lembaga lain.');
+        }
         $pengaturan = $lembaga->getOrCreatePengaturanAbsensi();
 
         $pengaturan->update([
@@ -59,6 +63,10 @@ class PengaturanAbsensiController extends Controller
     {
         $request->validate(['lembaga_id' => 'required|exists:lembagas,id']);
         $lembaga = Lembaga::findOrFail($request->lembaga_id);
+        $authUser = auth()->user();
+        if ($authUser && !$authUser->isYayasan() && !$authUser->hasAccessToLembaga($lembaga->kode)) {
+            abort(403, 'Anda tidak memiliki akses untuk memperbarui kunci QR lembaga lain.');
+        }
         $pengaturan = $lembaga->getOrCreatePengaturanAbsensi();
 
         $pengaturan->update([

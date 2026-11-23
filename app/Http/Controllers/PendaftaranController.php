@@ -15,19 +15,27 @@ use RuntimeException;
 class PendaftaranController extends Controller
 {
     /**
+     * Pastikan pendaftaran termasuk dalam room lembaga aktif.
+     */
+    protected function ensurePendaftaranInActiveRoom(Pendaftaran $pendaftaran): void
+    {
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        if ($scopedFormal && !Pendaftaran::forLembaga($scopedFormal->kode)->whereKey($pendaftaran->id)->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke data pendaftaran lembaga lain.');
+        }
+    }
+
+    /**
      * Menampilkan daftar calon santri yang mendaftar.
      */
     public function index(Request $request)
     {
-        $activeRoom = session('active_lembaga');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
         $query = Pendaftaran::query()->with(['penerimaan', 'gelombang'])->latest();
 
-        // Scope berdasarkan ruang kerja
-        if ($activeRoom === 'smp') {
-            $query->where('jenjang', 'SMP');
-        } elseif ($activeRoom === 'sma') {
-            $query->where('jenjang', 'SMA');
-        }
+        // Scope berdasarkan ruang kerja (dinamis mendukung SMP, SMA, SD IT, RA, dll)
+        $query->forLembaga($activeRoom);
 
         // Filter Event Penerimaan
         if ($request->filled('penerimaan_id')) {
@@ -39,9 +47,14 @@ class PendaftaranController extends Controller
             $query->where('status_pendaftaran', $request->status);
         }
 
-        // Filter jenjang manual jika di Yayasan/Pondok
-        if ((!$activeRoom || in_array($activeRoom, ['yayasan', 'pondok'])) && $request->filled('jenjang')) {
-            $query->where('jenjang', $request->jenjang);
+        // Filter jenjang manual hanya jika di room global (Yayasan/Pondok)
+        if (!$scopedFormal && $request->filled('jenjang')) {
+            $jenjang = trim((string) $request->jenjang);
+            if (strcasecmp($jenjang, 'Reguler') === 0) {
+                $query->whereRaw('LOWER(TRIM(jenjang)) = ?', ['reguler']);
+            } else {
+                $query->forLembaga($jenjang);
+            }
         }
 
         // Pencarian Nama / NIK / NISN / Jenjang / Sekolah Asal
@@ -61,12 +74,7 @@ class PendaftaranController extends Controller
 
         $pendaftarans = $query->paginate(10)->withQueryString();
 
-        $baseStats = Pendaftaran::query();
-        if ($activeRoom === 'smp') {
-            $baseStats->where('jenjang', 'SMP');
-        } elseif ($activeRoom === 'sma') {
-            $baseStats->where('jenjang', 'SMA');
-        }
+        $baseStats = Pendaftaran::query()->forLembaga($activeRoom);
         if ($request->filled('penerimaan_id')) {
             $baseStats->where('penerimaan_santri_id', $request->penerimaan_id);
         }
@@ -80,18 +88,27 @@ class PendaftaranController extends Controller
         ];
 
         $penerimaanQuery = PenerimaanSantri::query()->latest();
-        if ($activeRoom === 'smp') {
-            $penerimaanQuery->where(function ($q) {
-                $q->where('jenjang', 'Semua')->orWhere('jenjang', 'like', '%SMP%');
-            });
-        } elseif ($activeRoom === 'sma') {
-            $penerimaanQuery->where(function ($q) {
-                $q->where('jenjang', 'Semua')->orWhere('jenjang', 'like', '%SMA%');
+        if ($scopedFormal) {
+            $aliases = array_map('strtolower', Lembaga::jenjangAliasesForRoom($scopedFormal->kode));
+            $penerimaanQuery->where(function ($q) use ($aliases) {
+                $q->whereRaw('LOWER(TRIM(jenjang)) = ?', ['semua']);
+                foreach ($aliases as $alias) {
+                    $q->orWhereRaw('LOWER(TRIM(jenjang)) = ?', [$alias])
+                      ->orWhereRaw('LOWER(jenjang) LIKE ?', [$alias . ',%'])
+                      ->orWhereRaw('LOWER(jenjang) LIKE ?', ['%, ' . $alias])
+                      ->orWhereRaw('LOWER(jenjang) LIKE ?', ['%,' . $alias])
+                      ->orWhereRaw('LOWER(jenjang) LIKE ?', ['%, ' . $alias . ',%'])
+                      ->orWhereRaw('LOWER(jenjang) LIKE ?', ['%,' . $alias . ',%'])
+                      ->orWhereRaw('LOWER(jenjangs) LIKE ?', ['%"' . $alias . '"%']);
+                }
             });
         }
         $penerimaanList = $penerimaanQuery->get(['id', 'judul', 'tahun_ajaran']);
+        $jenjangList = $scopedFormal
+            ? [$scopedFormal->jenjang_key]
+            : Lembaga::allJenjangOptions(true);
 
-        return view('pendaftaran.index', compact('pendaftarans', 'stats', 'activeRoom', 'penerimaanList'));
+        return view('pendaftaran.index', compact('pendaftarans', 'stats', 'activeRoom', 'penerimaanList', 'jenjangList', 'scopedFormal'));
     }
 
     /**
@@ -99,7 +116,14 @@ class PendaftaranController extends Controller
      */
     public function create()
     {
-        return view('pendaftaran.create');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
+        $jenjangList = $scopedFormal
+            ? [$scopedFormal->jenjang_key]
+            : Lembaga::allJenjangOptions(true);
+        $defaultJenjang = Lembaga::defaultJenjangForRoom($activeRoom);
+
+        return view('pendaftaran.create', compact('scopedFormal', 'activeRoom', 'jenjangList', 'defaultJenjang'));
     }
 
     /**
@@ -136,13 +160,11 @@ class PendaftaranController extends Controller
         if (empty($data['nama_lengkap'])) {
             $data['nama_lengkap'] = 'Santri Baru';
         }
-        if (empty($data['jenjang'])) {
-            $activeRoom = session('active_lembaga');
-            $data['jenjang'] = match ($activeRoom) {
-                'smp' => 'SMP',
-                'sma' => 'SMA',
-                default => 'Reguler',
-            };
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        if ($scopedFormal) {
+            $data['jenjang'] = $scopedFormal->jenjang_key;
+        } elseif (empty($data['jenjang'])) {
+            $data['jenjang'] = Lembaga::defaultJenjangForRoom(session('active_lembaga'));
         }
 
         // Generate No. Induk otomatis jika kosong
@@ -178,6 +200,7 @@ class PendaftaranController extends Controller
     public function show($id)
     {
         $pendaftaran = Pendaftaran::with(['penerimaan', 'gelombang'])->findOrFail($id);
+        $this->ensurePendaftaranInActiveRoom($pendaftaran);
 
         return view('pendaftaran.show', compact('pendaftaran'));
     }
@@ -188,6 +211,7 @@ class PendaftaranController extends Controller
     public function cetak($id)
     {
         $pendaftaran = Pendaftaran::findOrFail($id);
+        $this->ensurePendaftaranInActiveRoom($pendaftaran);
         $kop = Lembaga::kopForJenjang($pendaftaran->jenjang);
 
         return view('pendaftaran.cetak', compact('pendaftaran', 'kop'));
@@ -203,6 +227,7 @@ class PendaftaranController extends Controller
         ]);
 
         $pendaftaran = Pendaftaran::findOrFail($id);
+        $this->ensurePendaftaranInActiveRoom($pendaftaran);
         $newStatus = $request->status_pendaftaran;
 
         $pendaftaran->update([
@@ -244,9 +269,14 @@ class PendaftaranController extends Controller
     public function edit($id)
     {
         $pendaftaran = Pendaftaran::findOrFail($id);
-        $activeRoom = session('active_lembaga');
+        $this->ensurePendaftaranInActiveRoom($pendaftaran);
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
+        $jenjangList = $scopedFormal
+            ? [$scopedFormal->jenjang_key]
+            : Lembaga::allJenjangOptions(true);
 
-        return view('pendaftaran.edit', compact('pendaftaran', 'activeRoom'));
+        return view('pendaftaran.edit', compact('pendaftaran', 'activeRoom', 'scopedFormal', 'jenjangList'));
     }
 
     /**
@@ -255,7 +285,13 @@ class PendaftaranController extends Controller
     public function update(PendaftaranRequest $request, $id, ImageCompressor $compressor)
     {
         $pendaftaran = Pendaftaran::findOrFail($id);
+        $this->ensurePendaftaranInActiveRoom($pendaftaran);
         $data = $request->validated();
+
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        if ($scopedFormal) {
+            $data['jenjang'] = $scopedFormal->jenjang_key;
+        }
 
         $stored = [];
         $oldFilesToDelete = [];
@@ -328,6 +364,7 @@ class PendaftaranController extends Controller
     public function destroy(Request $request, $id, ImageCompressor $compressor)
     {
         $pendaftaran = Pendaftaran::findOrFail($id);
+        $this->ensurePendaftaranInActiveRoom($pendaftaran);
         $nama = $pendaftaran->nama_lengkap;
 
         foreach (array_keys(Pendaftaran::FOTO_BERKAS) as $field) {

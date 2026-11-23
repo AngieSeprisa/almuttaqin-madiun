@@ -91,16 +91,18 @@ class SekolahController extends Controller
      */
     public static function daftarKelas(?string $activeRoom = null): array
     {
-        $room = strtolower($activeRoom ?? session('active_lembaga', ''));
+        $scoped = Lembaga::activeScopedFormal(auth()->user(), $activeRoom);
+        $room = strtolower(trim((string) ($scoped?->kode ?? $activeRoom ?? session('active_lembaga', ''))));
+        $isGlobal = Lembaga::isGlobalRoom($room);
         $classes = [];
 
         // 1. Ambil dari master ruang kelas (Classroom)
         try {
             $query = Classroom::query()->where('is_active', true);
-            if ($room === 'smp') {
-                $query->where('jenjang', 'SMP');
-            } elseif ($room === 'sma') {
-                $query->where('jenjang', 'SMA');
+            if ($scoped) {
+                $query->forJenjang($scoped->kode);
+            } elseif (!$isGlobal) {
+                $query->forJenjang($room);
             }
             $classes = $query->orderBy('urutan')->orderBy('nama_kelas')->pluck('nama_kelas')->toArray();
         } catch (\Throwable $e) {
@@ -115,10 +117,10 @@ class SekolahController extends Controller
                 ->where('kelas', '!=', '-')
                 ->whereRaw('LOWER(jenjang) != ?', ['reguler']);
 
-            if ($room === 'smp') {
-                $siswaQuery->where('jenjang', 'SMP');
-            } elseif ($room === 'sma') {
-                $siswaQuery->where('jenjang', 'SMA');
+            if ($scoped) {
+                $siswaQuery->forLembaga($scoped->kode);
+            } elseif (!$isGlobal) {
+                $siswaQuery->forLembaga($room);
             }
             $siswaClasses = $siswaQuery->distinct()->pluck('kelas')->toArray();
             foreach ($siswaClasses as $sc) {
@@ -136,22 +138,46 @@ class SekolahController extends Controller
         } catch (\Throwable $e) {
         }
 
-        // 3. Fallback jika kosong atau lengkapi kelas standar
+        // 3. Fallback kelas standar sesuai lembaga (TIDAK menyuntikkan kelas SMP/SMA ke SD IT / RA)
         $smpStandar = ['VII A', 'VII B', 'VIII A', 'VIII B', 'IX A', 'IX B'];
         $smaStandar = ['X A', 'X B', 'XI A', 'XI B', 'XII A', 'XII B'];
+        $sditStandar = ['1 A', '2 A', '3 A', '4 A', '5 A', '6 A'];
+        $raStandar = ['RA A', 'RA B'];
+
+        if (!$isGlobal) {
+            $standardPool = match (true) {
+                $room === 'smp' => $smpStandar,
+                $room === 'sma' => $smaStandar,
+                in_array($room, ['sdit', 'sd'], true) => $sditStandar,
+                in_array($room, ['ra', 'tk'], true) => $raStandar,
+                default => [],
+            };
+
+            if (empty($classes)) {
+                return $standardPool;
+            }
+
+            foreach ($standardPool as $std) {
+                $matched = false;
+                foreach ($classes as $c) {
+                    if (PlottingKelasController::isSameClass($c, $std)) {
+                        $matched = true;
+                        break;
+                    }
+                }
+                if (!$matched) {
+                    $classes[] = $std;
+                }
+            }
+
+            return array_values(array_unique($classes));
+        }
 
         if (empty($classes)) {
-            if ($room === 'smp') {
-                return $smpStandar;
-            }
-            if ($room === 'sma') {
-                return $smaStandar;
-            }
             return array_merge($smpStandar, $smaStandar);
         }
 
-        $standardPool = ($room === 'smp') ? $smpStandar : (($room === 'sma') ? $smaStandar : array_merge($smpStandar, $smaStandar));
-        foreach ($standardPool as $std) {
+        foreach (array_merge($smpStandar, $smaStandar) as $std) {
             $matched = false;
             foreach ($classes as $c) {
                 if (PlottingKelasController::isSameClass($c, $std)) {
@@ -209,52 +235,37 @@ class SekolahController extends Controller
      */
     public function jurnal(Request $request)
     {
-        $activeRoom = session('active_lembaga');
-        if ($request->filled('lembaga')) {
-            $activeRoom = $request->get('lembaga');
-        } elseif (!$activeRoom && auth()->check()) {
-            $activeRoom = auth()->user()->currentLembaga()?->kode;
+        $authUser = auth()->user();
+        $requestedRoom = $request->filled('lembaga') ? (string) $request->get('lembaga') : null;
+
+        // Non-Yayasan tidak bisa menerobos room lembaga lain melalui ?lembaga=...
+        if ($authUser && !$authUser->isYayasan()) {
+            $effectiveRoom = ($requestedRoom && $authUser->hasAccessToLembaga($requestedRoom))
+                ? $requestedRoom
+                : session('active_lembaga');
+            $targetLembaga = Lembaga::activeScopedFormal($authUser, $effectiveRoom);
+        } else {
+            $targetLembaga = Lembaga::activeScopedFormal($authUser, $requestedRoom ?? session('active_lembaga'));
         }
 
-        $activeKode = strtolower((string) $activeRoom);
+        $activeRoom = $targetLembaga
+            ? $targetLembaga->kode
+            : (session('active_lembaga') ?: $authUser?->currentLembaga()?->kode);
+
         $periode = self::hitungPeriodeAkademik();
         $kelasList = self::daftarKelas($activeRoom);
 
-        // Ambil data lembaga resmi sekolah (SMP & SMA)
-        $sekolahLembagas = Lembaga::where(function ($q) {
-            $q->whereIn('kode', ['smp', 'sma'])
-              ->orWhere(function ($sub) {
-                  $sub->where('kategori', 'formal')->whereIn('kode', ['smp', 'sma']);
-              })
-              ->orWhere('singkatan', 'SMP')
-              ->orWhere('singkatan', 'SMA');
-        })->where('is_active', true)->orderBy('urutan')->get();
+        // Ambil seluruh lembaga formal aktif secara dinamis (SMP, SMA, SD IT, RA, dll)
+        $sekolahLembagas = Lembaga::formalOptions();
 
-        if ($sekolahLembagas->isEmpty()) {
-            $sekolahLembagas = Lembaga::where('singkatan', 'like', '%SMP%')
-                ->orWhere('singkatan', 'like', '%SMA%')
-                ->get();
-        }
-
-        $smpLembaga = $sekolahLembagas->first(fn($l) => strtolower($l->kode) === 'smp' || strtoupper($l->singkatan) === 'SMP');
-        $smaLembaga = $sekolahLembagas->first(fn($l) => strtolower($l->kode) === 'sma' || strtoupper($l->singkatan) === 'SMA');
-
-        // Tentukan lembaga sekolah target berdasarkan activeRoom atau context user
-        $targetLembaga = null;
-        if (str_contains($activeKode, 'sma')) {
-            $targetLembaga = $smaLembaga;
-        } elseif (str_contains($activeKode, 'smp')) {
-            $targetLembaga = $smpLembaga;
-        } else {
-            $userLembagaId = auth()->user()?->primary_lembaga_id;
-            if ($smaLembaga && $userLembagaId === $smaLembaga->id) {
-                $targetLembaga = $smaLembaga;
-            } elseif ($smpLembaga && $userLembagaId === $smpLembaga->id) {
-                $targetLembaga = $smpLembaga;
+        if (!$targetLembaga && $authUser && $authUser->primary_lembaga_id) {
+            $primaryMatch = $sekolahLembagas->firstWhere('id', $authUser->primary_lembaga_id);
+            if ($primaryMatch) {
+                $targetLembaga = $primaryMatch;
             }
         }
 
-        // Ambil daftar guru resmi yang terdaftar di menu Guru Sekolah masing-masing lembaga
+        // Ambil daftar guru resmi yang terdaftar di menu Guru Sekolah sesuai lembaga aktif
         $guruQuery = User::with(['primaryLembaga', 'lembagas'])
             ->where(function ($q) {
                 $q->whereNull('is_active')->orWhere('is_active', true);
@@ -266,14 +277,9 @@ class SekolahController extends Controller
             ->where('mapel_status', '!=', 'ditolak');
 
         if ($targetLembaga) {
-            $guruQuery->where(function ($q) use ($targetLembaga) {
-                $q->where('primary_lembaga_id', $targetLembaga->id)
-                  ->orWhereHas('lembagas', function ($l) use ($targetLembaga) {
-                      $l->where('lembagas.id', $targetLembaga->id);
-                  });
-            });
-        } elseif ($activeKode === 'yayasan' && ($smpLembaga || $smaLembaga)) {
-            $sekolahIds = array_filter([$smpLembaga?->id, $smaLembaga?->id]);
+            $guruQuery->forLembagaModel($targetLembaga);
+        } elseif ($sekolahLembagas->isNotEmpty()) {
+            $sekolahIds = $sekolahLembagas->pluck('id')->all();
             $guruQuery->where(function ($q) use ($sekolahIds) {
                 $q->whereIn('primary_lembaga_id', $sekolahIds)
                   ->orWhereHas('lembagas', function ($l) use ($sekolahIds) {
@@ -284,8 +290,8 @@ class SekolahController extends Controller
 
         $gurus = $guruQuery->orderBy('name')->get();
 
-        // Ambil seluruh siswa aktif non-reguler yang memiliki kelas dan kelompokkan per kelas
-        $siswas = Siswa::where(function ($q) {
+        // Ambil siswa aktif non-reguler yang memiliki kelas, strictly discope ke room lembaga aktif
+        $siswaQuery = Siswa::where(function ($q) {
                 $q->whereNull('status')
                   ->orWhere('status', 'aktif')
                   ->orWhere('status', 'Aktif');
@@ -296,8 +302,15 @@ class SekolahController extends Controller
             ->where(function ($q) {
                 $q->whereNull('jenjang')
                   ->orWhereRaw('LOWER(jenjang) != ?', ['reguler']);
-            })
-            ->orderBy('nama_lengkap')
+            });
+
+        if ($targetLembaga) {
+            $siswaQuery->forLembaga($targetLembaga->kode);
+        } elseif ($activeRoom) {
+            $siswaQuery->forLembaga($activeRoom);
+        }
+
+        $siswas = $siswaQuery->orderBy('nama_lengkap')
             ->get(['id', 'nama_lengkap', 'kelas', 'jenjang']);
 
         $siswasByKelas = [];
@@ -375,13 +388,16 @@ class SekolahController extends Controller
         ]);
 
         $guru = User::findOrFail($validated['guru_id']);
-        $activeRoom = session('active_lembaga');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
 
-        // Tentukan lembaga untuk jurnal
-        $lembagaId = null;
-        if ($activeRoom && $activeRoom !== 'yayasan') {
-            $lembaga = Lembaga::where('kode', $activeRoom)->first();
-            $lembagaId = $lembaga?->id;
+        // Tentukan lembaga untuk jurnal (prioritas room formal aktif)
+        $lembagaId = $scopedFormal?->id;
+        if (!$lembagaId && $activeRoom && !Lembaga::isGlobalRoom($activeRoom)) {
+            $lembagaId = Lembaga::resolveByKode($activeRoom)?->id;
+        }
+        if (!$lembagaId && !empty($validated['kelas'])) {
+            $lembagaId = Classroom::where('nama_kelas', trim($validated['kelas']))->value('lembaga_id');
         }
         if (!$lembagaId && !empty($validated['kelas'])) {
             $kelasClean = strtoupper(trim($validated['kelas']));
@@ -468,13 +484,16 @@ class SekolahController extends Controller
      */
     public function rekapJurnal(Request $request)
     {
-        $activeRoom = session('active_lembaga');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
         $kelasList = self::daftarKelas($activeRoom);
 
         $query = Jurnal::with(['guru', 'lembaga', 'absensis.siswa']);
 
-        // Filter lembaga
-        if ($activeRoom && !in_array($activeRoom, ['yayasan', 'pondok'])) {
+        // Filter lembaga secara ketat sesuai room aktif
+        if ($scopedFormal) {
+            $query->where('lembaga_id', $scopedFormal->id);
+        } elseif ($activeRoom && !Lembaga::isGlobalRoom($activeRoom)) {
             $query->whereHas('lembaga', function ($q) use ($activeRoom) {
                 $q->where('kode', $activeRoom);
             });
@@ -615,12 +634,9 @@ class SekolahController extends Controller
         if ($waktuDindingLabel === '' && $startJam !== null && $startJam >= 1 && $endJam !== null && $endJam >= $startJam) {
             $slots = $timeSlots ? collect($timeSlots) : collect();
             if ($slots->isNotEmpty()) {
-                $lembagaKode = strtolower((string) ($item->lembaga?->kode ?? ''));
-                if ($lembagaKode === 'sma' || preg_match('/\b(10|11|12|X|XI|XII)\b/i', $cleanKelas)) {
-                    $jenjang = 'SMA';
-                } else {
-                    $jenjang = 'SMP';
-                }
+                $jenjang = $item->lembaga
+                    ? strtoupper(trim((string) $item->lembaga->jenjang_key))
+                    : (preg_match('/\b(10|11|12|X|XI|XII)\b/i', $cleanKelas) ? 'SMA' : 'SMP');
 
                 $jenjangSlots = $slots->filter(function ($s) use ($jenjang) {
                     $sj = strtoupper(trim((string) ($s->jenjang ?? '')));
@@ -682,6 +698,11 @@ class SekolahController extends Controller
      */
     public function destroyJurnal(Jurnal $jurnal)
     {
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        if ($scopedFormal && (int) $jurnal->lembaga_id !== (int) $scopedFormal->id) {
+            abort(403, 'Anda tidak memiliki akses untuk menghapus jurnal lembaga lain.');
+        }
+
         $kelas = $jurnal->kelas;
         $jurnal->delete();
 
@@ -906,7 +927,8 @@ class SekolahController extends Controller
      */
     public function rekapAbsensi(Request $request)
     {
-        $activeRoom = session('active_lembaga');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
         $kelasList = self::daftarKelas($activeRoom);
 
         // Pilih kelas default jika belum ada filter
@@ -919,8 +941,13 @@ class SekolahController extends Controller
 
         $tahun = $request->filled('tahun') ? (int) $request->tahun : (int) date('Y');
 
-        // Query Jurnal untuk kelas terpilih (fleksibel mendukung varian Romawi, Angka, dll)
+        // Query Jurnal untuk kelas terpilih, strictly discope ke room lembaga aktif
         $jurnalQuery = Jurnal::with(['guru', 'lembaga']);
+        if ($scopedFormal) {
+            $jurnalQuery->where('lembaga_id', $scopedFormal->id);
+        } elseif ($activeRoom && !Lembaga::isGlobalRoom($activeRoom)) {
+            $jurnalQuery->whereHas('lembaga', fn ($q) => $q->where('kode', $activeRoom));
+        }
         if ($selectedKelas) {
             $matchingKelas = self::getEquivalentClassNames($selectedKelas);
             $jurnalQuery->whereIn('kelas', $matchingKelas);
@@ -962,9 +989,10 @@ class SekolahController extends Controller
             $tanggalGroups[$tgl]['jurnals'][] = $jurnal;
         }
 
-        // Ambil data siswa di kelas terpilih (hanya siswa aktif non-reguler)
+        // Ambil data siswa di kelas terpilih (hanya siswa aktif non-reguler sesuai room lembaga aktif)
         $siswaQuery = Siswa::with('pendaftaran')->where('status', 'aktif')
-            ->whereRaw('LOWER(jenjang) != ?', ['reguler']);
+            ->whereRaw('LOWER(jenjang) != ?', ['reguler'])
+            ->forLembaga($activeRoom);
         if ($selectedKelas) {
             $matchingKelas = self::getEquivalentClassNames($selectedKelas);
             $siswaQuery->whereIn('kelas', $matchingKelas);
@@ -1081,6 +1109,8 @@ class SekolahController extends Controller
      */
     public function getAnggotaKelas(Request $request, string $kelas)
     {
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
         $kelasDecoded = urldecode($kelas);
         $cleanKelas = trim(str_ireplace('kelas', '', $kelasDecoded));
 
@@ -1096,6 +1126,7 @@ class SekolahController extends Controller
                 $q->whereNull('jenjang')
                   ->orWhereRaw('LOWER(jenjang) != ?', ['reguler']);
             })
+            ->forLembaga($activeRoom)
             ->with('pendaftaran')
             ->orderBy('nama_lengkap')
             ->get();

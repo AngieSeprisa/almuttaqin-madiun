@@ -3,18 +3,32 @@
 namespace App\Http\Controllers;
 
 use App\Models\Kamar;
+use App\Models\Lembaga;
 use App\Models\Pendaftaran;
 use App\Models\Siswa;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SiswaController extends Controller
 {
+    /**
+     * Pastikan siswa berada di dalam room lembaga aktif (mencegah akses lintas lembaga).
+     */
+    protected function ensureSiswaInActiveRoom(Siswa $siswa): void
+    {
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        if ($scopedFormal && !Siswa::forLembaga($scopedFormal->kode)->whereKey($siswa->id)->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke data siswa lembaga lain.');
+        }
+    }
+
     /**
      * Menampilkan daftar siswa.
      */
     public function index(Request $request)
     {
-        $activeRoom = session('active_lembaga');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
         $query = Siswa::query()
             ->with('pendaftaran')
             ->where(function ($q) {
@@ -25,15 +39,26 @@ class SiswaController extends Controller
         // Filter berdasarkan ruang kerja/lembaga aktif
         $query->forLembaga($activeRoom);
 
-        // Filter berdasarkan jenjang
-        if ($request->filled('jenjang')) {
-            $jenjang = $request->jenjang;
-            $query->where(function ($q) use ($jenjang) {
-                $q->where('jenjang', $jenjang)
-                  ->orWhereHas('pendaftaran', function ($p) use ($jenjang) {
-                      $p->where('jenjang', $jenjang);
-                  });
-            });
+        // Filter berdasarkan jenjang (hanya berlaku di room global Yayasan/Pondok)
+        if (!$scopedFormal && $request->filled('jenjang')) {
+            $jenjang = trim((string) $request->jenjang);
+            if (strcasecmp($jenjang, 'Reguler') === 0) {
+                $query->where(function ($q) {
+                    $q->whereRaw('LOWER(TRIM(jenjang)) = ?', ['reguler'])
+                      ->orWhereHas('pendaftaran', fn ($p) => $p->whereRaw('LOWER(TRIM(jenjang)) = ?', ['reguler']));
+                });
+            } else {
+                $aliases = array_map('strtolower', Lembaga::jenjangAliasesForRoom($jenjang));
+                if (empty($aliases)) {
+                    $aliases = [strtolower($jenjang)];
+                }
+                $query->where(function ($q) use ($aliases) {
+                    $q->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(jenjang))'), $aliases)
+                      ->orWhereHas('pendaftaran', function ($p) use ($aliases) {
+                          $p->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(jenjang))'), $aliases);
+                      });
+                });
+            }
         }
 
         // Filter berdasarkan kamar
@@ -59,9 +84,11 @@ class SiswaController extends Controller
         // Ambil daftar unik kamar dari master kamars + data siswa
         $kamars = Kamar::daftarNamaKamarAktif();
 
-        $jenjangList = ['Reguler', 'SMP', 'SMA'];
+        $jenjangList = $scopedFormal
+            ? [$scopedFormal->jenjang_key]
+            : Lembaga::allJenjangOptions(true);
 
-        return view('siswa', compact('siswa', 'activeRoom', 'kamars', 'jenjangList'));
+        return view('siswa', compact('siswa', 'activeRoom', 'kamars', 'jenjangList', 'scopedFormal'));
     }
 
     /**
@@ -69,16 +96,14 @@ class SiswaController extends Controller
      */
     public function store(Request $request)
     {
-        $activeRoom = session('active_lembaga');
-        $defaultJenjang = match ($activeRoom) {
-            'smp' => 'SMP',
-            'sma' => 'SMA',
-            default => 'Reguler',
-        };
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
+        $defaultJenjang = Lembaga::defaultJenjangForRoom($activeRoom);
+        $allowedJenjangs = Lembaga::allJenjangOptions(true);
 
         $validated = $request->validate([
             'nama_lengkap' => 'required|string|max:255',
-            'jenjang'      => 'nullable|in:SMP,SMA,Reguler',
+            'jenjang'      => ['nullable', 'string', 'max:50', Rule::in($allowedJenjangs)],
             'kamar'        => 'required|string|max:100',
             'status'       => 'required|in:aktif,pulang,sakit',
         ], [
@@ -88,7 +113,8 @@ class SiswaController extends Controller
             'status.in'             => 'Status santri tidak valid.',
         ]);
 
-        $jenjang = $validated['jenjang'] ?? $defaultJenjang;
+        // Kunci jenjang sesuai room formal aktif agar tidak bisa menyuntikkan siswa ke lembaga lain
+        $jenjang = $scopedFormal ? $scopedFormal->jenjang_key : ($validated['jenjang'] ?? $defaultJenjang);
 
         $tahun = date('Y');
         $count = Pendaftaran::whereYear('created_at', $tahun)->count() + 1;
@@ -245,6 +271,7 @@ class SiswaController extends Controller
     public function show($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->ensureSiswaInActiveRoom($siswa);
 
         if (request()->wantsJson()) {
             return response()->json($siswa);
@@ -261,6 +288,7 @@ class SiswaController extends Controller
     public function cetak($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->ensureSiswaInActiveRoom($siswa);
 
         if (request()->wantsJson()) {
             return response()->json($siswa);
@@ -277,6 +305,7 @@ class SiswaController extends Controller
     public function edit($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->ensureSiswaInActiveRoom($siswa);
 
         if (request()->wantsJson()) {
             return response()->json($siswa);
@@ -293,6 +322,7 @@ class SiswaController extends Controller
     public function update(Request $request, $id)
     {
         $item = Siswa::findOrFail($id);
+        $this->ensureSiswaInActiveRoom($item);
 
         $validated = $request->validate([
             'nama_lengkap' => 'required|string|max:255',
@@ -322,6 +352,7 @@ class SiswaController extends Controller
     public function updateRfid(Request $request, $id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->ensureSiswaInActiveRoom($siswa);
 
         $validated = $request->validate([
             'rfid_uid' => 'nullable|string|max:32|unique:siswas,rfid_uid,' . $siswa->id,
@@ -376,6 +407,7 @@ class SiswaController extends Controller
     public function destroy($id)
     {
         $item = Siswa::findOrFail($id);
+        $this->ensureSiswaInActiveRoom($item);
         $nama = $item->nama_lengkap;
         $item->delete();
 

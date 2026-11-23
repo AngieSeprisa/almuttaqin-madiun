@@ -278,7 +278,7 @@
                                     </div>
                                     <div class="pk-kelas-sub">
                                         <span class="pk-badge-jenjang {{ strtolower($item->jenjang ?? $jenjang) }}">
-                                            {{ $item->jenjang === 'ALL' ? 'SMP & SMA' : ($item->jenjang ?? $jenjang) }}
+                                            {{ $item->jenjang === 'ALL' ? 'Semua Sekolah' : ($item->jenjang ?? $jenjang) }}
                                         </span>
                                     </div>
                                 </div>

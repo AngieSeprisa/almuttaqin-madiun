@@ -23,6 +23,46 @@ class JadwalPelajaranController extends Controller
     public const DEFAULT_SEMESTER = 'Gasal';
 
     /**
+     * Tentukan daftar lembaga formal yang dapat diakses dan lembaga terpilih sesuai room aktif.
+     */
+    protected function resolveFormalScope(?User $authUser, ?string $requestedJenjang = null): array
+    {
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+
+        if ($authUser && $authUser->isYayasan()) {
+            $formalLembagas = Lembaga::formalOptions();
+        } elseif ($scopedFormal) {
+            $formalLembagas = collect([$scopedFormal]);
+        } else {
+            $formalLembagas = Lembaga::formalOptions();
+        }
+
+        $selectedLembaga = null;
+        if ($scopedFormal && $authUser && !$authUser->isYayasan()) {
+            // Non-Yayasan di room formal selalu terkunci pada room lembaganya sendiri
+            $selectedLembaga = $scopedFormal;
+        } else {
+            if ($requestedJenjang !== null && trim($requestedJenjang) !== '') {
+                $resolved = Lembaga::resolveByKode($requestedJenjang);
+                if ($resolved) {
+                    $selectedLembaga = $formalLembagas->firstWhere('id', $resolved->id);
+                }
+            }
+            if (!$selectedLembaga && $scopedFormal) {
+                $selectedLembaga = $formalLembagas->firstWhere('id', $scopedFormal->id) ?? $scopedFormal;
+            }
+            if (!$selectedLembaga) {
+                $selectedLembaga = $formalLembagas->first();
+            }
+        }
+
+        $jenjang = $selectedLembaga ? $selectedLembaga->jenjang_key : 'SMP';
+        $lookupKey = $selectedLembaga ? $selectedLembaga->kode : $jenjang;
+
+        return [$formalLembagas, $selectedLembaga, $jenjang, $lookupKey, $scopedFormal];
+    }
+
+    /**
      * Tampilkan Halaman Master Jadwal Grid (Admin Lembaga & Yayasan)
      */
     public function index(Request $request)
@@ -30,17 +70,10 @@ class JadwalPelajaranController extends Controller
         /** @var User $authUser */
         $authUser = Auth::user();
 
-        // Tentukan jenjang aktif: SMP atau SMA
-        $activeRoom = session('active_lembaga');
-        $defaultJenjang = match ($activeRoom) {
-            'sma'   => 'SMA',
-            default => 'SMP',
-        };
-
-        $jenjang = strtoupper($request->get('jenjang', $defaultJenjang));
-        if (!in_array($jenjang, ['SMP', 'SMA'])) {
-            $jenjang = 'SMP';
-        }
+        [$formalLembagas, $selectedLembaga, $jenjang, $lookupKey, $scopedFormal] = $this->resolveFormalScope(
+            $authUser,
+            $request->filled('jenjang') ? (string) $request->get('jenjang') : null
+        );
 
         $hariFilter = $request->get('hari', 'Semua');
         $validDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
@@ -48,14 +81,14 @@ class JadwalPelajaranController extends Controller
         $tahunAjaran = self::DEFAULT_TAHUN_AJARAN;
         $semester = self::DEFAULT_SEMESTER;
 
-        // Ambil data ruang kelas untuk jenjang yang dipilih
-        $classrooms = Classroom::forJenjang($jenjang)
+        // Ambil data ruang kelas untuk jenjang/lembaga yang dipilih
+        $classrooms = Classroom::forJenjang($lookupKey)
             ->active()
             ->orderBy('urutan')
             ->get();
 
-        // Ambil data time slots
-        $timeSlotsQuery = TimeSlot::active()->orderBy('urutan');
+        // Ambil data time slots (termasuk slot umum 'Semua' dan slot khusus jenjang ini)
+        $timeSlotsQuery = TimeSlot::active()->forJenjang($lookupKey)->orderBy('urutan');
         if ($hariFilter !== 'Semua' && in_array($hariFilter, $validDays)) {
             $timeSlotsQuery->where('hari', $hariFilter);
         }
@@ -67,7 +100,7 @@ class JadwalPelajaranController extends Controller
         // Ambil seluruh jadwal yang telah terisi pada periode ini
         $schedules = Schedule::with(['classroom', 'subject', 'teacher', 'timeSlot'])
             ->activePeriod($tahunAjaran, $semester)
-            ->forJenjang($jenjang)
+            ->forJenjang($lookupKey)
             ->get();
 
         // Index matrix: [hari][jam_ke][classroom_id] => Schedule
@@ -77,7 +110,7 @@ class JadwalPelajaranController extends Controller
         }
 
         // Cek status kunci jadwal untuk jenjang ini
-        $isLocked = Schedule::forJenjang($jenjang)
+        $isLocked = Schedule::forJenjang($lookupKey)
             ->activePeriod($tahunAjaran, $semester)
             ->where('is_locked', true)
             ->exists();
@@ -111,6 +144,9 @@ class JadwalPelajaranController extends Controller
 
         return view('jadwal-pelajaran.index', compact(
             'jenjang',
+            'formalLembagas',
+            'selectedLembaga',
+            'scopedFormal',
             'hariFilter',
             'validDays',
             'tahunAjaran',
@@ -139,14 +175,33 @@ class JadwalPelajaranController extends Controller
         $tahunAjaran = self::DEFAULT_TAHUN_AJARAN;
         $semester = self::DEFAULT_SEMESTER;
 
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal) {
+            $formalLembagas = collect([$scopedFormal]);
+        } elseif ($authUser->isYayasan()) {
+            $formalLembagas = Lembaga::formalOptions();
+        } else {
+            $formalLembagas = $authUser->accessibleLembagas()
+                ->filter(fn (Lembaga $l) => $l->isFormalSchool())
+                ->values();
+        }
+
         // Guru yang login
         $teacherId = $authUser->id;
 
-        // Ambil seluruh jadwal guru ini (menggabungkan jadwal SMP & SMA secara rapi)
-        $mySchedules = Schedule::with(['classroom', 'subject', 'timeSlot'])
+        // Ambil jadwal guru ini, discope ke room aktif bila berada di room formal
+        $mySchedulesQuery = Schedule::with(['classroom', 'subject', 'timeSlot'])
             ->activePeriod($tahunAjaran, $semester)
-            ->where('teacher_id', $teacherId)
-            ->get();
+            ->where('teacher_id', $teacherId);
+
+        if ($scopedFormal) {
+            $mySchedulesQuery->forJenjang($scopedFormal->kode);
+        } elseif (!$authUser->isYayasan() && $formalLembagas->isNotEmpty()) {
+            $allowedLembagaIds = $formalLembagas->pluck('id')->all();
+            $mySchedulesQuery->whereHas('classroom', fn ($q) => $q->whereIn('lembaga_id', $allowedLembagaIds));
+        }
+
+        $mySchedules = $mySchedulesQuery->get();
 
         // Urutkan berdasarkan hari & jam_ke
         $dayWeights = ['Senin' => 1, 'Selasa' => 2, 'Rabu' => 3, 'Kamis' => 4, 'Jumat' => 5];
@@ -157,22 +212,14 @@ class JadwalPelajaranController extends Controller
 
         // Hitung statistik guru
         $totalJam = $mySchedules->count();
-        $totalJamSMP = $mySchedules->filter(fn ($s) => $s->classroom->jenjang === 'SMP')->count();
-        $totalJamSMA = $mySchedules->filter(fn ($s) => $s->classroom->jenjang === 'SMA')->count();
+        $totalJamSMP = $mySchedules->filter(fn ($s) => strcasecmp((string) $s->classroom?->jenjang, 'SMP') === 0)->count();
+        $totalJamSMA = $mySchedules->filter(fn ($s) => strcasecmp((string) $s->classroom?->jenjang, 'SMA') === 0)->count();
 
         // Status kunci untuk guru ini
         $hasLocked = $mySchedules->contains('is_locked', true);
 
-        // Data master untuk form input: Kelas & Mapel
-        $smpClassrooms = Classroom::forJenjang('SMP')->active()->orderBy('urutan')->get();
-        $smaClassrooms = Classroom::forJenjang('SMA')->active()->orderBy('urutan')->get();
-
-        // SINKRONISASI 1: Master Mata Pelajaran dari tabel mata_pelajarans (Plotting Mata Pelajaran)
-        $allSmpSubjects = MataPelajaran::forJenjang('SMP')->orderBy('mata_pelajaran')->get();
-        $allSmaSubjects = MataPelajaran::forJenjang('SMA')->orderBy('mata_pelajaran')->get();
-
         // SINKRONISASI 2: Mata Pelajaran yang Diampu Guru di Menu Guru Sekolah (users.mata_pelajaran)
-        $teacherMapelRaw = trim((string)($authUser->mata_pelajaran ?? ''));
+        $teacherMapelRaw = trim((string) ($authUser->mata_pelajaran ?? ''));
         $teacherMapels = array_values(array_filter(array_map('trim', preg_split('/[,|;]/', $teacherMapelRaw))));
         $hasAssignedMapel = !empty($teacherMapels);
         $mapelStatus = $authUser->mapel_status; // 'disetujui', 'menunggu', dll.
@@ -180,10 +227,12 @@ class JadwalPelajaranController extends Controller
 
         // Helper untuk mencocokkan nama mapel plotting dengan penugasan guru di Guru Sekolah
         $matchMapel = function ($plottedName, $assignedList) {
-            if (empty($assignedList)) return false;
-            $cleanPlotted = strtolower(trim((string)$plottedName));
+            if (empty($assignedList)) {
+                return false;
+            }
+            $cleanPlotted = strtolower(trim((string) $plottedName));
             foreach ($assignedList as $assigned) {
-                $cleanAssigned = strtolower(trim((string)$assigned));
+                $cleanAssigned = strtolower(trim((string) $assigned));
                 if ($cleanPlotted === $cleanAssigned || str_contains($cleanPlotted, $cleanAssigned) || str_contains($cleanAssigned, $cleanPlotted)) {
                     return true;
                 }
@@ -191,7 +240,6 @@ class JadwalPelajaranController extends Controller
             return false;
         };
 
-        // Tandai setiap subject apakah diampu oleh guru yang login
         $markAssigned = function ($collection) use ($matchMapel, $teacherMapels) {
             return $collection->map(function ($item) use ($matchMapel, $teacherMapels) {
                 $item->is_guru_assigned = !empty($teacherMapels) && $matchMapel($item->mata_pelajaran, $teacherMapels);
@@ -199,24 +247,53 @@ class JadwalPelajaranController extends Controller
             });
         };
 
-        $allSmpSubjects = $markAssigned($allSmpSubjects);
-        $allSmaSubjects = $markAssigned($allSmaSubjects);
+        // Bangun data dinamis per lembaga formal yang dapat diakses user
+        $lembagaJadwalData = [];
+        foreach ($formalLembagas as $lemb) {
+            $cls = Classroom::forJenjang($lemb->kode)->active()->orderBy('urutan')->get();
+            $allSubs = $markAssigned(MataPelajaran::forJenjang($lemb->kode)->orderBy('mata_pelajaran')->get());
+            $filteredSubs = (!$isPrivileged && $hasAssignedMapel)
+                ? $allSubs->where('is_guru_assigned', true)->values()
+                : $allSubs;
 
-        // Jika user adalah role 'guru' murni dan memiliki penugasan mapel:
-        // Filter dropdown HANYA mata pelajaran yang diampu di menu Guru Sekolah
-        if (!$isPrivileged && $hasAssignedMapel) {
-            $smpSubjects = $allSmpSubjects->where('is_guru_assigned', true)->values();
-            $smaSubjects = $allSmaSubjects->where('is_guru_assigned', true)->values();
-        } else {
-            // Untuk Yayasan / Admin Lembaga (atau guru tanpa filter ketat):
-            $smpSubjects = $allSmpSubjects;
-            $smaSubjects = $allSmaSubjects;
+            $aliasesLower = array_map('strtolower', Lembaga::jenjangAliasesForRoom($lemb->kode));
+            $jamCount = $mySchedules->filter(function ($s) use ($lemb, $aliasesLower) {
+                if ($s->classroom && (int) $s->classroom->lembaga_id === (int) $lemb->id) {
+                    return true;
+                }
+                return in_array(strtolower(trim((string) $s->classroom?->jenjang)), $aliasesLower, true);
+            })->count();
+
+            $lembagaJadwalData[$lemb->jenjang_key] = [
+                'lembaga'      => $lemb,
+                'kode'         => $lemb->kode,
+                'jenjang'      => $lemb->jenjang_key,
+                'nama'         => $lemb->nama,
+                'singkatan'    => $lemb->nama_singkat,
+                'classrooms'   => $cls,
+                'subjects'     => $filteredSubs,
+                'all_subjects' => $allSubs,
+                'total_jam'    => $jamCount,
+            ];
         }
+
+        // Kompatibilitas variabel lama (hanya terisi bila lembaga terkait masuk ruang lingkup user)
+        $smpData = $lembagaJadwalData['SMP'] ?? null;
+        $smaData = $lembagaJadwalData['SMA'] ?? null;
+        $smpClassrooms = $smpData ? $smpData['classrooms'] : collect();
+        $smaClassrooms = $smaData ? $smaData['classrooms'] : collect();
+        $smpSubjects = $smpData ? $smpData['subjects'] : collect();
+        $smaSubjects = $smaData ? $smaData['subjects'] : collect();
+        $allSmpSubjects = $smpData ? $smpData['all_subjects'] : collect();
+        $allSmaSubjects = $smaData ? $smaData['all_subjects'] : collect();
 
         $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
         return view('jadwal-pelajaran.saya', compact(
             'authUser',
+            'formalLembagas',
+            'scopedFormal',
+            'lembagaJadwalData',
             'tahunAjaran',
             'semester',
             'mySchedules',
@@ -274,15 +351,34 @@ class JadwalPelajaranController extends Controller
             $teacherId = (int) $validated['teacher_id'];
         }
 
-        $classroom = Classroom::findOrFail($validated['classroom_id']);
+        $classroom = Classroom::with('lembaga')->findOrFail($validated['classroom_id']);
         $subject = MataPelajaran::with('lembaga')->findOrFail($validated['subject_id']);
         $teacher = User::findOrFail($teacherId);
 
-        // A. Validasi Sinkronisasi Jenjang Kelas vs Plotting Mata Pelajaran
-        $expectedJenjang = strtoupper($classroom->jenjang);
-        $subjectJenjang = strtoupper($subject->lembaga?->kode ?? '');
-        if (!empty($subjectJenjang) && $subjectJenjang !== $expectedJenjang) {
-            $msg = "Mata pelajaran {$subject->mata_pelajaran} ({$subject->kode}) terdaftar untuk jenjang {$subjectJenjang}, tidak dapat dijadwalkan pada kelas {$classroom->nama_kelas} ({$expectedJenjang}).";
+        // Proteksi akses lintas room lembaga
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal) {
+            $classInRoom = Classroom::forJenjang($scopedFormal->kode)->whereKey($classroom->id)->exists();
+            $subjectInRoom = $subject->lembaga_id && (int) $subject->lembaga_id === (int) $scopedFormal->id;
+            if (!$classInRoom || !$subjectInRoom) {
+                abort(403, 'Anda hanya dapat menginput jadwal untuk ruang kerja lembaga aktif Anda.');
+            }
+        }
+
+        // A. Validasi Sinkronisasi Jenjang/Lembaga Kelas vs Plotting Mata Pelajaran
+        $classroomLembaga = $classroom->lembaga ?? Lembaga::resolveByKode($classroom->jenjang);
+        $subjectLembaga = $subject->lembaga;
+        $mismatch = false;
+        if ($classroomLembaga && $subjectLembaga) {
+            $mismatch = (int) $classroomLembaga->id !== (int) $subjectLembaga->id;
+        } elseif ($subjectLembaga) {
+            $aliases = array_map('strtolower', Lembaga::jenjangAliasesForRoom($subjectLembaga->kode));
+            $mismatch = !in_array(strtolower(trim((string) $classroom->jenjang)), $aliases, true);
+        }
+        if ($mismatch) {
+            $expectedLabel = $classroomLembaga?->nama_singkat ?? $classroom->jenjang;
+            $subjectLabel = $subjectLembaga?->nama_singkat ?? strtoupper((string) $subjectLembaga?->kode);
+            $msg = "Mata pelajaran {$subject->mata_pelajaran} ({$subject->kode}) terdaftar untuk jenjang {$subjectLabel}, tidak dapat dijadwalkan pada kelas {$classroom->nama_kelas} ({$expectedLabel}).";
             throw ValidationException::withMessages([
                 'subject_id' => $msg,
                 'jadwal'     => $msg,
@@ -329,9 +425,11 @@ class JadwalPelajaranController extends Controller
         $jamSelesai = (int) $validated['jam_selesai'];
         $hari = $validated['hari'];
 
+        $slotLookup = $classroom->lembaga?->kode ?? $classroom->jenjang;
         $targetSlots = TimeSlot::where('hari', $hari)
             ->whereBetween('jam_ke', [$jamMulai, $jamSelesai])
             ->active()
+            ->forJenjang($slotLookup)
             ->orderBy('urutan')
             ->get();
 
@@ -439,6 +537,11 @@ class JadwalPelajaranController extends Controller
 
         $schedule = Schedule::with(['classroom', 'subject', 'timeSlot'])->findOrFail($id);
 
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal && !Schedule::forJenjang($scopedFormal->kode)->whereKey($schedule->id)->exists()) {
+            abort(403, 'Anda tidak memiliki akses untuk menghapus jadwal lembaga lain.');
+        }
+
         // Cek status kunci
         if ($schedule->is_locked) {
             return redirect()->back()->with('error', 'Jadwal tidak dapat dihapus karena telah dikunci/difinalisasi oleh pihak kurikulum.');
@@ -477,23 +580,43 @@ class JadwalPelajaranController extends Controller
         }
 
         $validated = $request->validate([
-            'jenjang' => 'required|in:SMP,SMA,ALL',
+            'jenjang' => 'required|string|max:50',
             'action'  => 'required|in:lock,unlock',
         ]);
+
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $targetJenjang = trim((string) $validated['jenjang']);
+
+        if (strcasecmp($targetJenjang, 'ALL') === 0) {
+            if (!$authUser->isYayasan()) {
+                abort(403, 'Hanya Yayasan yang dapat mengunci seluruh jenjang sekaligus.');
+            }
+            $lookupKey = 'ALL';
+            $jenjangText = 'seluruh jenjang formal';
+        } else {
+            $resolvedLembaga = Lembaga::resolveByKode($targetJenjang);
+            if ($scopedFormal && !$authUser->isYayasan() && (!$resolvedLembaga || (int) $resolvedLembaga->id !== (int) $scopedFormal->id)) {
+                abort(403, 'Anda hanya dapat mengunci/membuka jadwal untuk lembaga Anda sendiri.');
+            }
+            if (!$authUser->isYayasan() && (!$resolvedLembaga || !$authUser->hasAccessToLembaga($resolvedLembaga->kode))) {
+                abort(403, 'Anda tidak memiliki akses ke lembaga tersebut.');
+            }
+            $lookupKey = $resolvedLembaga ? $resolvedLembaga->kode : $targetJenjang;
+            $jenjangText = 'jenjang ' . ($resolvedLembaga?->nama_singkat ?? $targetJenjang);
+        }
 
         $tahunAjaran = self::DEFAULT_TAHUN_AJARAN;
         $semester = self::DEFAULT_SEMESTER;
         $shouldLock = $validated['action'] === 'lock';
 
         $query = Schedule::activePeriod($tahunAjaran, $semester);
-        if ($validated['jenjang'] !== 'ALL') {
-            $query->forJenjang($validated['jenjang']);
+        if ($lookupKey !== 'ALL') {
+            $query->forJenjang($lookupKey);
         }
 
         $updatedCount = $query->update(['is_locked' => $shouldLock]);
 
         $statusText = $shouldLock ? 'dikunci (final)' : 'dibuka kembali untuk penginputan';
-        $jenjangText = $validated['jenjang'] === 'ALL' ? 'seluruh jenjang (SMP & SMA)' : "jenjang {$validated['jenjang']}";
 
         return redirect()->back()->with('success', "Jadwal pelajaran {$jenjangText} berhasil {$statusText}. Total {$updatedCount} slot jadwal terpengaruh.");
     }
@@ -503,27 +626,27 @@ class JadwalPelajaranController extends Controller
      */
     public function cetak(Request $request)
     {
-        $jenjang = strtoupper($request->get('jenjang', 'SMP'));
-        if (!in_array($jenjang, ['SMP', 'SMA'])) {
-            $jenjang = 'SMP';
-        }
+        /** @var User|null $authUser */
+        $authUser = Auth::user();
+        [$formalLembagas, $lembaga, $jenjang, $lookupKey] = $this->resolveFormalScope(
+            $authUser,
+            $request->filled('jenjang') ? (string) $request->get('jenjang') : null
+        );
 
         $tahunAjaran = self::DEFAULT_TAHUN_AJARAN;
         $semester = self::DEFAULT_SEMESTER;
 
-        $lembaga = Lembaga::where('kode', strtolower($jenjang))->first();
-
-        $classrooms = Classroom::forJenjang($jenjang)
+        $classrooms = Classroom::forJenjang($lookupKey)
             ->active()
             ->orderBy('urutan')
             ->get();
 
-        $timeSlots = TimeSlot::active()->orderBy('urutan')->get();
+        $timeSlots = TimeSlot::active()->forJenjang($lookupKey)->orderBy('urutan')->get();
         $timeSlotsByDay = $timeSlots->groupBy('hari');
 
         $schedules = Schedule::with(['classroom', 'subject', 'teacher', 'timeSlot'])
             ->activePeriod($tahunAjaran, $semester)
-            ->forJenjang($jenjang)
+            ->forJenjang($lookupKey)
             ->get();
 
         $matrix = [];
@@ -557,16 +680,16 @@ class JadwalPelajaranController extends Controller
      */
     public function ajaxClassesAndSubjects(Request $request)
     {
-        /** @var User $authUser */
+        /** @var User|null $authUser */
         $authUser = Auth::user();
 
-        $jenjang = strtoupper($request->get('jenjang', 'SMP'));
-        if (!in_array($jenjang, ['SMP', 'SMA'])) {
-            $jenjang = 'SMP';
-        }
+        [$formalLembagas, $selectedLembaga, $jenjang, $lookupKey] = $this->resolveFormalScope(
+            $authUser,
+            $request->filled('jenjang') ? (string) $request->get('jenjang') : null
+        );
 
-        $classrooms = Classroom::forJenjang($jenjang)->active()->orderBy('urutan')->get(['id', 'nama_kelas', 'tingkat']);
-        $allSubjects = MataPelajaran::forJenjang($jenjang)->orderBy('mata_pelajaran')->get();
+        $classrooms = Classroom::forJenjang($lookupKey)->active()->orderBy('urutan')->get(['id', 'nama_kelas', 'tingkat']);
+        $allSubjects = MataPelajaran::forJenjang($lookupKey)->orderBy('mata_pelajaran')->get();
 
         $teacherMapelRaw = trim((string)($authUser?->mata_pelajaran ?? ''));
         $teacherMapels = array_values(array_filter(array_map('trim', preg_split('/[,|;]/', $teacherMapelRaw))));

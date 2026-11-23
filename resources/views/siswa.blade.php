@@ -798,7 +798,8 @@
     <div class="form-section-card filter-card">
         <form action="{{ route('siswa') }}" method="GET" class="filter-form">
             <div class="filter-group-left">
-                {{-- Filter Jenjang --}}
+                {{-- Filter Jenjang (Hanya tampil di ruang kerja global Yayasan/Pondok) --}}
+                @if(empty($scopedFormal))
                 <div class="filter-select-wrap">
                     <div class="filter-select-icon-left">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
@@ -819,6 +820,7 @@
                         </svg>
                     </div>
                 </div>
+                @endif
 
                 {{-- Filter Kamar --}}
                 <div class="filter-select-wrap">

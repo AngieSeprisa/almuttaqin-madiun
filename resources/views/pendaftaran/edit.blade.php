@@ -140,11 +140,20 @@
                             <label class="wizard-label" for="jenjang">
                                 Daftar Sebagai 
                             </label>
+                            @php
+                                $editJenjangOptions = $jenjangList ?? \App\Models\Lembaga::allJenjangOptions(true);
+                                $currentEditJenjang = old('jenjang', $pendaftaran->jenjang);
+                                if ($currentEditJenjang && !in_array($currentEditJenjang, $editJenjangOptions, true)) {
+                                    $editJenjangOptions[] = $currentEditJenjang;
+                                }
+                            @endphp
                             <select name="jenjang" id="jenjang" class="wizard-select @error('jenjang') is-invalid @enderror">
+                                @if(empty($scopedFormal))
                                 <option value="">Pilih salah satu opsi</option>
-                                <option value="SMP" {{ old('jenjang', $pendaftaran->jenjang) == 'SMP' ? 'selected' : '' }}>SMP</option>
-                                <option value="SMA" {{ old('jenjang', $pendaftaran->jenjang) == 'SMA' ? 'selected' : '' }}>SMA</option>
-                                <option value="Reguler" {{ old('jenjang', $pendaftaran->jenjang) == 'Reguler' ? 'selected' : '' }}>Reguler</option>
+                                @endif
+                                @foreach($editJenjangOptions as $jOpt)
+                                <option value="{{ $jOpt }}" {{ $currentEditJenjang == $jOpt ? 'selected' : '' }}>{{ $jOpt }}</option>
+                                @endforeach
                             </select>
                             @error('jenjang')
                                 <div class="invalid-feedback" style="display:block;">{{ $message }}</div>

@@ -4,8 +4,9 @@
 
 @section('header-actions')
 @php
+    $isFormalLocked       = auth()->check() && !auth()->user()->isYayasan() && !empty($scopedFormal);
     $canManageGuruSekolah = auth()->check() && (auth()->user()->isYayasan() || auth()->user()->canDo('guru_sekolah', 'view'));
-    $canManageGuruPondok  = auth()->check() && (auth()->user()->isYayasan() || auth()->user()->canDo('guru_pondok', 'view'));
+    $canManageGuruPondok  = !$isFormalLocked && auth()->check() && (auth()->user()->isYayasan() || auth()->user()->canDo('guru_pondok', 'view'));
 @endphp
 @if($canManageGuruSekolah || $canManageGuruPondok)
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -47,29 +48,38 @@
     @endif
 
     {{-- Kartu Statistik --}}
+    @php
+        $statPalette = [
+            'pondok' => '#059669',
+            'smp'    => '#2563eb',
+            'sma'    => '#047857',
+            'sdit'   => '#0891b2',
+            'ra'     => '#d97706',
+        ];
+        $fallbackPalette = ['#4f46e5', '#0891b2', '#7c3aed', '#db2777', '#ea580c'];
+    @endphp
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px;">
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:var(--text-secondary);">Total Guru Terdaftar</div>
             <div style="font-size:26px; font-weight:800; color:var(--text-primary); margin-top:4px;">{{ number_format($totalGuru) }}</div>
         </div>
-        <div class="form-section-card" style="padding:16px 18px;">
-            <div style="font-size:12px; font-weight:600; color:#059669;">Guru Pondok</div>
-            <div style="font-size:26px; font-weight:800; color:#059669; margin-top:4px;">{{ number_format($totalPondok ?? 0) }}</div>
-        </div>
-        <div class="form-section-card" style="padding:16px 18px;">
-            <div style="font-size:12px; font-weight:600; color:#2563eb;">Guru SMP</div>
-            <div style="font-size:26px; font-weight:800; color:#2563eb; margin-top:4px;">{{ number_format($totalSmp) }}</div>
-        </div>
-        <div class="form-section-card" style="padding:16px 18px;">
-            <div style="font-size:12px; font-weight:600; color:#047857;">Guru SMA</div>
-            <div style="font-size:26px; font-weight:800; color:#047857; margin-top:4px;">{{ number_format($totalSma) }}</div>
-        </div>
+        @foreach($lembagaGuruStats ?? [] as $statIdx => $stat)
+            @php
+                $kodeKey = strtolower((string) ($stat['kode'] ?? ''));
+                $statColor = $statPalette[$kodeKey] ?? $fallbackPalette[$statIdx % count($fallbackPalette)];
+            @endphp
+            <div class="form-section-card" style="padding:16px 18px;">
+                <div style="font-size:12px; font-weight:600; color:{{ $statColor }};">{{ $stat['label'] }}</div>
+                <div style="font-size:26px; font-weight:800; color:{{ $statColor }}; margin-top:4px;">{{ number_format($stat['count'] ?? 0) }}</div>
+            </div>
+        @endforeach
     </div>
 
     {{-- Filter & Pencarian --}}
     <div class="form-section-card filter-card">
         <form action="{{ route('data-warga.guru') }}" method="GET" class="filter-form">
             <div class="filter-group-left">
+                @if($sekolahLembagas->count() > 1)
                 <div class="filter-select-wrap">
                     <div class="filter-select-icon-left">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
@@ -85,9 +95,10 @@
                         @endforeach
                     </select>
                 </div>
+                @endif
 
-                @if(request('search') || (request('lembaga_id') && request('lembaga_id') !== 'semua'))
-                <a href="{{ route('data-warga.guru', ['lembaga_id' => 'semua']) }}" class="btn btn-sm btn-secondary filter-btn-reset" title="Reset Filter">
+                @if(request('search') || ($sekolahLembagas->count() > 1 && request('lembaga_id') && request('lembaga_id') !== 'semua'))
+                <a href="{{ route('data-warga.guru', $sekolahLembagas->count() > 1 ? ['lembaga_id' => 'semua'] : []) }}" class="btn btn-sm btn-secondary filter-btn-reset" title="Reset Filter">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
                         <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -140,7 +151,7 @@
                             }
                             foreach ($guru->lembagas as $l) {
                                 $lbl = $l->singkatan ?: $l->nama;
-                                if (in_array(strtoupper($lbl), ['SMP', 'SMA']) && !$lembagaLabels->contains($lbl)) {
+                                if ($l->isFormalSchool() && !$lembagaLabels->contains($lbl)) {
                                     $lembagaLabels->push($lbl);
                                 }
                             }

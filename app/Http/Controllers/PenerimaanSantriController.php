@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Lembaga;
 use App\Models\PenerimaanGelombang;
 use App\Models\PenerimaanSantri;
 use Illuminate\Http\Request;
@@ -11,17 +12,34 @@ use Illuminate\Validation\Rule;
 
 class PenerimaanSantriController extends Controller
 {
+    protected function ensureEventInActiveRoom(PenerimaanSantri $event): void
+    {
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        if (!$scopedFormal) {
+            return;
+        }
+
+        $q = PenerimaanSantri::whereKey($event->id);
+        $this->applyRoomScope($q, $scopedFormal->kode);
+        if (!$q->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke link penerimaan lembaga lain.');
+        }
+    }
+
     public function index(Request $request)
     {
-        $activeRoom = session('active_lembaga');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
+
+        $pendaftarScope = fn ($q) => $q->forLembaga($activeRoom);
 
         $query = PenerimaanSantri::query()
             ->with(['gelombangs'])
             ->withCount([
-                'pendaftarans',
-                'pendaftarans as pending_count' => fn ($q) => $q->where('status_pendaftaran', 'Pending'),
-                'pendaftarans as lulus_count' => fn ($q) => $q->where('status_pendaftaran', 'Lulus Seleksi'),
-                'pendaftarans as diterima_count' => fn ($q) => $q->where('status_pendaftaran', 'Diterima'),
+                'pendaftarans' => $pendaftarScope,
+                'pendaftarans as pending_count' => fn ($q) => $q->forLembaga($activeRoom)->where('status_pendaftaran', 'Pending'),
+                'pendaftarans as lulus_count' => fn ($q) => $q->forLembaga($activeRoom)->where('status_pendaftaran', 'Lulus Seleksi'),
+                'pendaftarans as diterima_count' => fn ($q) => $q->forLembaga($activeRoom)->where('status_pendaftaran', 'Diterima'),
             ])
             ->latest();
 
@@ -45,7 +63,7 @@ class PenerimaanSantriController extends Controller
             'total_event' => (clone $allEvents)->count(),
             'aktif'       => (clone $allEvents)->where('is_active', true)->count(),
             'tutup'       => (clone $allEvents)->where('is_active', false)->count(),
-            'pendaftar'   => (clone $allEvents)->withCount('pendaftarans')->get()->sum('pendaftarans_count'),
+            'pendaftar'   => (clone $allEvents)->withCount(['pendaftarans' => $pendaftarScope])->get()->sum('pendaftarans_count'),
         ];
 
         return view('penerimaan.index', compact('penerimaans', 'stats', 'activeRoom'));
@@ -53,15 +71,23 @@ class PenerimaanSantriController extends Controller
 
     public function create()
     {
+        $authUser = auth()->user();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
         $formalOptions = PenerimaanSantri::formalJenjangOptions();
+
+        if ($scopedFormal && $authUser && !$authUser->isYayasan()) {
+            $formalOptions = [$scopedFormal->jenjang_key => $scopedFormal->nama];
+        }
+
         $formalKeys = array_keys($formalOptions);
-        $activeRoom = session('active_lembaga');
+        $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');
 
         $defaultJenjangs = $formalKeys;
-        if ($activeRoom && !in_array($activeRoom, ['yayasan', 'pondok'], true)) {
+        if ($scopedFormal) {
+            $aliasesLower = array_map('strtolower', Lembaga::jenjangAliasesForRoom($scopedFormal->kode));
             $matched = array_values(array_filter(
                 $formalKeys,
-                fn ($k) => strcasecmp($k, $activeRoom) === 0
+                fn ($k) => in_array(strtolower(trim((string) $k)), $aliasesLower, true)
             ));
             if (!empty($matched)) {
                 $defaultJenjangs = $matched;
@@ -89,7 +115,13 @@ class PenerimaanSantriController extends Controller
 
     public function store(Request $request)
     {
+        $authUser = auth()->user();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
         $formalOptions = PenerimaanSantri::formalJenjangOptions();
+        if ($scopedFormal && $authUser && !$authUser->isYayasan()) {
+            $formalOptions = [$scopedFormal->jenjang_key => $scopedFormal->nama];
+        }
+
         $validated = $this->validateEvent($request, null, array_keys($formalOptions));
         [$jenjangs, $jenjangSummary, $waPerJenjang, $fallbackWa, $lokasiPerJenjang, $fallbackLokasi] = $this->extractPerLembagaData($validated, array_keys($formalOptions));
 
@@ -123,12 +155,19 @@ class PenerimaanSantriController extends Controller
     public function edit($id)
     {
         $penerimaan = PenerimaanSantri::with('gelombangs')->findOrFail($id);
-        $formalOptions = PenerimaanSantri::formalJenjangOptions();
+        $this->ensureEventInActiveRoom($penerimaan);
 
-        // Pertahankan jenjang lama pada opsi bila sebelumnya sudah tersimpan di event
-        foreach ($penerimaan->allowedJenjangs() as $existingKey) {
-            if (!array_key_exists($existingKey, $formalOptions)) {
-                $formalOptions[$existingKey] = $existingKey;
+        $authUser = auth()->user();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $formalOptions = PenerimaanSantri::formalJenjangOptions();
+        if ($scopedFormal && $authUser && !$authUser->isYayasan()) {
+            $formalOptions = [$scopedFormal->jenjang_key => $scopedFormal->nama];
+        } else {
+            // Pertahankan jenjang lama pada opsi bila sebelumnya sudah tersimpan di event
+            foreach ($penerimaan->allowedJenjangs() as $existingKey) {
+                if (!array_key_exists($existingKey, $formalOptions)) {
+                    $formalOptions[$existingKey] = $existingKey;
+                }
             }
         }
 
@@ -144,8 +183,16 @@ class PenerimaanSantriController extends Controller
     public function update(Request $request, $id)
     {
         $penerimaan = PenerimaanSantri::with('gelombangs')->findOrFail($id);
-        $formalKeys = array_keys(PenerimaanSantri::formalJenjangOptions());
-        $allowedKeys = array_values(array_unique(array_merge($formalKeys, $penerimaan->allowedJenjangs())));
+        $this->ensureEventInActiveRoom($penerimaan);
+
+        $authUser = auth()->user();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal && $authUser && !$authUser->isYayasan()) {
+            $allowedKeys = [$scopedFormal->jenjang_key];
+        } else {
+            $formalKeys = array_keys(PenerimaanSantri::formalJenjangOptions());
+            $allowedKeys = array_values(array_unique(array_merge($formalKeys, $penerimaan->allowedJenjangs())));
+        }
 
         $validated = $this->validateEvent($request, $penerimaan->id, $allowedKeys);
         [$jenjangs, $jenjangSummary, $waPerJenjang, $fallbackWa, $lokasiPerJenjang, $fallbackLokasi] = $this->extractPerLembagaData($validated, $allowedKeys);
@@ -177,6 +224,7 @@ class PenerimaanSantriController extends Controller
     public function toggleStatus($id)
     {
         $penerimaan = PenerimaanSantri::findOrFail($id);
+        $this->ensureEventInActiveRoom($penerimaan);
         $penerimaan->update([
             'is_active' => !$penerimaan->is_active,
         ]);
@@ -190,6 +238,7 @@ class PenerimaanSantriController extends Controller
     public function destroy($id)
     {
         $penerimaan = PenerimaanSantri::findOrFail($id);
+        $this->ensureEventInActiveRoom($penerimaan);
         $judul = $penerimaan->judul;
         $penerimaan->delete();
 
@@ -199,13 +248,27 @@ class PenerimaanSantriController extends Controller
 
     protected function applyRoomScope($query, ?string $activeRoom): void
     {
-        if ($activeRoom && !in_array($activeRoom, ['yayasan', 'pondok'], true)) {
-            $roomUpper = strtoupper($activeRoom);
-            $query->where(function ($q) use ($roomUpper) {
-                $q->where('jenjang', 'Semua')
-                    ->orWhere('jenjang', 'like', "%{$roomUpper}%");
-            });
+        if (Lembaga::isGlobalRoom($activeRoom)) {
+            return;
         }
+
+        $aliases = array_map('strtolower', Lembaga::jenjangAliasesForRoom($activeRoom));
+        if (empty($aliases)) {
+            return;
+        }
+
+        $query->where(function ($q) use ($aliases) {
+            $q->whereRaw('LOWER(TRIM(jenjang)) = ?', ['semua']);
+            foreach ($aliases as $alias) {
+                $q->orWhereRaw('LOWER(TRIM(jenjang)) = ?', [$alias])
+                    ->orWhereRaw('LOWER(jenjang) LIKE ?', [$alias . ',%'])
+                    ->orWhereRaw('LOWER(jenjang) LIKE ?', ['%, ' . $alias])
+                    ->orWhereRaw('LOWER(jenjang) LIKE ?', ['%,' . $alias])
+                    ->orWhereRaw('LOWER(jenjang) LIKE ?', ['%, ' . $alias . ',%'])
+                    ->orWhereRaw('LOWER(jenjang) LIKE ?', ['%,' . $alias . ',%'])
+                    ->orWhereRaw('LOWER(jenjangs) LIKE ?', ['%"' . $alias . '"%']);
+            }
+        });
     }
 
     protected function validateEvent(Request $request, ?int $ignoreId, array $allowedJenjangKeys): array

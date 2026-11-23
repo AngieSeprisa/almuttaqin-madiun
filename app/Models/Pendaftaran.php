@@ -128,6 +128,23 @@ class Pendaftaran extends Model
     ];
 
     /**
+     * Scope filter pendaftaran berdasarkan ruang kerja/lembaga aktif.
+     */
+    public function scopeForLembaga($query, ?string $kodeLembaga)
+    {
+        if (Lembaga::isGlobalRoom($kodeLembaga)) {
+            return $query;
+        }
+
+        $aliases = array_map('strtolower', Lembaga::jenjangAliasesForRoom($kodeLembaga));
+        if (empty($aliases)) {
+            return $query;
+        }
+
+        return $query->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(jenjang))'), $aliases);
+    }
+
+    /**
      * Relasi ke data siswa
      */
     public function siswa()

@@ -144,8 +144,8 @@
                     </div>
                 </div>
 
-                {{-- Filter Jenjang (Khusus ruang kerja yayasan/pondok) --}}
-                @if(!$activeRoom || in_array($activeRoom, ['yayasan', 'pondok']))
+                {{-- Filter Jenjang (Khusus ruang kerja global yayasan/pondok) --}}
+                @if(empty($scopedFormal))
                 <div class="filter-select-wrap">
                     <div class="filter-select-icon-left">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
@@ -154,9 +154,9 @@
                     </div>
                     <select name="jenjang" id="filter_jenjang_pendaftaran" class="form-select filter-select" onchange="this.form.submit()">
                         <option value="">Semua Jenjang</option>
-                        <option value="Reguler" {{ request('jenjang') === 'Reguler' ? 'selected' : '' }}>Reguler</option>
-                        <option value="SMP" {{ request('jenjang') === 'SMP' ? 'selected' : '' }}>SMP</option>
-                        <option value="SMA" {{ request('jenjang') === 'SMA' ? 'selected' : '' }}>SMA</option>
+                        @foreach(($jenjangList ?? \App\Models\Lembaga::allJenjangOptions(true)) as $jOpt)
+                        <option value="{{ $jOpt }}" {{ request('jenjang') === $jOpt ? 'selected' : '' }}>{{ $jOpt }}</option>
+                        @endforeach
                     </select>
                     <div class="filter-select-icon-right">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">

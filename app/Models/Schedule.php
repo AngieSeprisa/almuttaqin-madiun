@@ -66,12 +66,12 @@ class Schedule extends Model
     }
 
     /**
-     * Scope filter per jenjang melalui relasi kelas.
+     * Scope filter per jenjang / kode lembaga melalui relasi kelas.
      */
     public function scopeForJenjang($query, string $jenjang)
     {
         return $query->whereHas('classroom', function ($q) use ($jenjang) {
-            $q->where('jenjang', strtoupper($jenjang));
+            $q->forJenjang($jenjang);
         });
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Lembaga;
 use App\Models\PerizinanSakit;
 use App\Models\PerizinanSambang;
 use App\Models\Siswa;
@@ -10,12 +11,33 @@ use Illuminate\Http\Request;
 
 class PerizinanController extends Controller
 {
+    protected function scopedFormal(): ?Lembaga
+    {
+        return Lembaga::activeScopedFormal(auth()->user());
+    }
+
+    protected function ensureSiswaInRoom(?int $siswaId): void
+    {
+        $scoped = $this->scopedFormal();
+        if (!$scoped) {
+            return;
+        }
+
+        if (!$siswaId || !Siswa::forLembaga($scoped->kode)->whereKey($siswaId)->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke data perizinan siswa lembaga lain.');
+        }
+    }
+
     /**
      * Tampilkan halaman perizinan sambang siswa.
      */
     public function sambang(Request $request)
     {
+        $scoped = $this->scopedFormal();
         $query = PerizinanSambang::query()->with('siswa');
+        if ($scoped) {
+            $query->whereHas('siswa', fn ($s) => $s->forLembaga($scoped->kode));
+        }
         $today = Carbon::today()->toDateString();
 
         if ($request->filled('search')) {
@@ -46,11 +68,19 @@ class PerizinanController extends Controller
 
         $perizinan = $query->latest('id')->get();
 
-        // Ambil daftar kamar unik
-        $kamars = PerizinanSambang::whereNotNull('kamar')->where('kamar', '!=', '')->distinct()->orderBy('kamar')->pluck('kamar');
+        // Ambil daftar kamar unik (discope ke room aktif)
+        $kamarsQuery = PerizinanSambang::whereNotNull('kamar')->where('kamar', '!=', '');
+        if ($scoped) {
+            $kamarsQuery->whereHas('siswa', fn ($s) => $s->forLembaga($scoped->kode));
+        }
+        $kamars = $kamarsQuery->distinct()->orderBy('kamar')->pluck('kamar');
 
-        // Ambil daftar seluruh siswa untuk prediksi pencarian nama & auto kamar
-        $daftarSiswa = Siswa::orderBy('nama_lengkap', 'asc')->get(['id', 'nama_lengkap', 'kamar', 'status']);
+        // Ambil daftar siswa sesuai room aktif
+        $daftarSiswaQuery = Siswa::orderBy('nama_lengkap', 'asc');
+        if ($scoped) {
+            $daftarSiswaQuery->forLembaga($scoped->kode);
+        }
+        $daftarSiswa = $daftarSiswaQuery->get(['id', 'nama_lengkap', 'kamar', 'status']);
 
         return view('perizinan.sambang', compact('perizinan', 'daftarSiswa', 'today', 'kamars'));
     }
@@ -60,7 +90,12 @@ class PerizinanController extends Controller
      */
     public function createSambang()
     {
-        $daftarSiswa = Siswa::orderBy('nama_lengkap', 'asc')->get(['id', 'nama_lengkap', 'kamar', 'status']);
+        $scoped = $this->scopedFormal();
+        $daftarSiswaQuery = Siswa::orderBy('nama_lengkap', 'asc');
+        if ($scoped) {
+            $daftarSiswaQuery->forLembaga($scoped->kode);
+        }
+        $daftarSiswa = $daftarSiswaQuery->get(['id', 'nama_lengkap', 'kamar', 'status']);
         $today = Carbon::today()->toDateString();
 
         return view('perizinan.sambang_create', compact('daftarSiswa', 'today'));
@@ -85,6 +120,7 @@ class PerizinanController extends Controller
             'tanggal_kembali.after_or_equal' => 'Tanggal estimasi kembali tidak boleh sebelum tanggal mulai sambang.',
         ]);
 
+        $this->ensureSiswaInRoom((int) $validated['siswa_id']);
         $siswa = Siswa::findOrFail($validated['siswa_id']);
 
         PerizinanSambang::create([
@@ -111,6 +147,7 @@ class PerizinanController extends Controller
     public function kembaliSambang($id)
     {
         $sambang = PerizinanSambang::findOrFail($id);
+        $this->ensureSiswaInRoom($sambang->siswa_id);
         $sambang->update(['status' => 'sudah_kembali']);
 
         if ($sambang->siswa_id) {
@@ -127,6 +164,7 @@ class PerizinanController extends Controller
     public function updateSambang(Request $request, $id)
     {
         $sambang = PerizinanSambang::findOrFail($id);
+        $this->ensureSiswaInRoom($sambang->siswa_id);
 
         $validated = $request->validate([
             'tanggal_mulai'   => 'required|date',
@@ -161,6 +199,7 @@ class PerizinanController extends Controller
     public function destroySambang($id)
     {
         $sambang = PerizinanSambang::findOrFail($id);
+        $this->ensureSiswaInRoom($sambang->siswa_id);
         $nama = $sambang->nama;
         $sambang->delete();
 
@@ -173,7 +212,11 @@ class PerizinanController extends Controller
      */
     public function sakit(Request $request)
     {
+        $scoped = $this->scopedFormal();
         $query = PerizinanSakit::query()->with('siswa');
+        if ($scoped) {
+            $query->whereHas('siswa', fn ($s) => $s->forLembaga($scoped->kode));
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -195,11 +238,19 @@ class PerizinanController extends Controller
 
         $perizinan = $query->latest('id')->get();
 
-        // Ambil daftar kamar unik
-        $kamars = PerizinanSakit::whereNotNull('kamar')->where('kamar', '!=', '')->distinct()->orderBy('kamar')->pluck('kamar');
+        // Ambil daftar kamar unik (discope ke room aktif)
+        $kamarsQuery = PerizinanSakit::whereNotNull('kamar')->where('kamar', '!=', '');
+        if ($scoped) {
+            $kamarsQuery->whereHas('siswa', fn ($s) => $s->forLembaga($scoped->kode));
+        }
+        $kamars = $kamarsQuery->distinct()->orderBy('kamar')->pluck('kamar');
 
-        // Ambil daftar seluruh siswa untuk prediksi pencarian nama & auto kamar
-        $daftarSiswa = Siswa::orderBy('nama_lengkap', 'asc')->get(['id', 'nama_lengkap', 'kamar', 'status']);
+        // Ambil daftar siswa sesuai room aktif
+        $daftarSiswaQuery = Siswa::orderBy('nama_lengkap', 'asc');
+        if ($scoped) {
+            $daftarSiswaQuery->forLembaga($scoped->kode);
+        }
+        $daftarSiswa = $daftarSiswaQuery->get(['id', 'nama_lengkap', 'kamar', 'status']);
         $today = Carbon::today()->toDateString();
 
         return view('perizinan.sakit', compact('perizinan', 'daftarSiswa', 'today', 'kamars'));
@@ -210,7 +261,12 @@ class PerizinanController extends Controller
      */
     public function createSakit()
     {
-        $daftarSiswa = Siswa::orderBy('nama_lengkap', 'asc')->get(['id', 'nama_lengkap', 'kamar', 'status']);
+        $scoped = $this->scopedFormal();
+        $daftarSiswaQuery = Siswa::orderBy('nama_lengkap', 'asc');
+        if ($scoped) {
+            $daftarSiswaQuery->forLembaga($scoped->kode);
+        }
+        $daftarSiswa = $daftarSiswaQuery->get(['id', 'nama_lengkap', 'kamar', 'status']);
         $today = Carbon::today()->toDateString();
 
         return view('perizinan.sakit_create', compact('daftarSiswa', 'today'));
@@ -234,6 +290,7 @@ class PerizinanController extends Controller
             'sakit.required'         => 'Keluhan / jenis penyakit wajib diisi.',
         ]);
 
+        $this->ensureSiswaInRoom((int) $validated['siswa_id']);
         $siswa = Siswa::findOrFail($validated['siswa_id']);
 
         PerizinanSakit::create([
@@ -260,6 +317,7 @@ class PerizinanController extends Controller
     public function sembuhSakit($id)
     {
         $sakit = PerizinanSakit::findOrFail($id);
+        $this->ensureSiswaInRoom($sakit->siswa_id);
         $sakit->update(['status' => 'sembuh']);
 
         if ($sakit->siswa_id) {
@@ -276,6 +334,7 @@ class PerizinanController extends Controller
     public function updateSakit(Request $request, $id)
     {
         $sakit = PerizinanSakit::findOrFail($id);
+        $this->ensureSiswaInRoom($sakit->siswa_id);
 
         $validated = $request->validate([
             'tanggal_sakit' => 'required|date',
@@ -310,6 +369,7 @@ class PerizinanController extends Controller
     public function destroySakit($id)
     {
         $sakit = PerizinanSakit::findOrFail($id);
+        $this->ensureSiswaInRoom($sakit->siswa_id);
         $nama = $sakit->nama;
         $sakit->delete();
 

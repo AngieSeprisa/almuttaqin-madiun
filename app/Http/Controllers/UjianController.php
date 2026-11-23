@@ -7,6 +7,7 @@ use App\Models\UjianKunci;
 use App\Models\UjianHasil;
 use App\Models\UjianSoal;
 use App\Models\Classroom;
+use App\Models\Lembaga;
 use App\Models\MataPelajaran;
 use App\Models\Siswa;
 use App\Models\TimeSlot;
@@ -28,6 +29,61 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 class UjianController extends Controller
 {
     /**
+     * Dapatkan room lembaga formal aktif (null bila room global Yayasan/Pondok).
+     */
+    protected function scopedFormal(): ?Lembaga
+    {
+        return Lembaga::activeScopedFormal(Auth::user());
+    }
+
+    /**
+     * Pastikan ujian yang diakses berada di dalam room lembaga aktif.
+     */
+    protected function ensureUjianInRoom(Ujian $ujian): void
+    {
+        $scoped = $this->scopedFormal();
+        if ($scoped && !Ujian::forLembaga($scoped)->whereKey($ujian->id)->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke data ujian lembaga lain.');
+        }
+    }
+
+    protected function scopedKelases()
+    {
+        $scoped = $this->scopedFormal();
+        $q = Classroom::active();
+        if ($scoped) {
+            $q->forJenjang($scoped->kode);
+        }
+
+        return $q->orderBy('tingkat')->orderBy('nama_kelas')->get();
+    }
+
+    protected function scopedMapels(bool $withLembaga = false)
+    {
+        $scoped = $this->scopedFormal();
+        $q = $withLembaga ? MataPelajaran::with('lembaga') : MataPelajaran::query();
+        if ($scoped) {
+            $q->forJenjang($scoped->kode);
+        }
+
+        return $q->orderBy('mata_pelajaran')->get();
+    }
+
+    protected function scopedGurus()
+    {
+        $scoped = $this->scopedFormal();
+        $q = User::where(function ($sub) {
+            $sub->where('role', 'guru')->orWhere('is_guru_sekolah', true);
+        })->where('is_active', true);
+
+        if ($scoped) {
+            $q->forLembagaModel($scoped);
+        }
+
+        return $q->orderBy('name')->get();
+    }
+
+    /**
      * Redirect default /ujian ke sub menu Soal Ujian
      */
     public function index(Request $request)
@@ -44,8 +100,10 @@ class UjianController extends Controller
      */
     public function soalIndex(Request $request)
     {
+        $scoped = $this->scopedFormal();
         $query = Ujian::with(['mapel', 'kelas', 'guru'])
-            ->withCount(['soals', 'kuncis']);
+            ->withCount(['soals', 'kuncis'])
+            ->forLembaga($scoped);
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -64,8 +122,8 @@ class UjianController extends Controller
         }
 
         $ujians = $query->latest('tanggal_ujian')->paginate(12)->withQueryString();
-        $kelases = Classroom::active()->orderBy('tingkat')->orderBy('nama_kelas')->get();
-        $mapels = MataPelajaran::orderBy('mata_pelajaran')->get();
+        $kelases = $this->scopedKelases();
+        $mapels = $this->scopedMapels();
 
         return view('ujian.soal-index', compact('ujians', 'kelases', 'mapels'));
     }
@@ -75,11 +133,9 @@ class UjianController extends Controller
      */
     public function create()
     {
-        $kelases = Classroom::active()->orderBy('tingkat')->orderBy('nama_kelas')->get();
-        $mapels = MataPelajaran::orderBy('mata_pelajaran')->get();
-        $gurus = User::where(function ($q) {
-            $q->where('role', 'guru')->orWhere('is_guru_sekolah', true);
-        })->where('is_active', true)->orderBy('name')->get();
+        $kelases = $this->scopedKelases();
+        $mapels = $this->scopedMapels();
+        $gurus = $this->scopedGurus();
 
         $prefix = 'UJN-' . date('Ym') . '-';
         $last = Ujian::where('kode_ujian', 'like', "$prefix%")->orderBy('id', 'desc')->first();
@@ -123,10 +179,25 @@ class UjianController extends Controller
             'file_word'     => 'nullable|file|mimes:docx|max:10240',
         ]);
 
+        $scoped = $this->scopedFormal();
+        if ($scoped) {
+            if (!empty($validated['kelas_id']) && !Classroom::forJenjang($scoped->kode)->whereKey($validated['kelas_id'])->exists()) {
+                abort(403, 'Kelas yang dipilih bukan milik lembaga ruang kerja Anda.');
+            }
+            if (!empty($validated['mapel_id']) && !MataPelajaran::forJenjang($scoped->kode)->whereKey($validated['mapel_id'])->exists()) {
+                abort(403, 'Mata pelajaran yang dipilih bukan milik lembaga ruang kerja Anda.');
+            }
+            $lembagaId = $scoped->id;
+        } else {
+            $lembagaId = (!empty($validated['kelas_id']) ? Classroom::whereKey($validated['kelas_id'])->value('lembaga_id') : null)
+                ?? (!empty($validated['mapel_id']) ? MataPelajaran::whereKey($validated['mapel_id'])->value('lembaga_id') : null);
+        }
+
         $timerDefault = $validated['timer_default'] ?? 90;
 
-        $ujian = DB::transaction(function () use ($validated, $timerDefault, $request) {
+        $ujian = DB::transaction(function () use ($validated, $timerDefault, $request, $lembagaId) {
             $ujian = Ujian::create([
+                'lembaga_id'    => $lembagaId,
                 'kode_ujian'    => $validated['kode_ujian'],
                 'nama_ujian'    => $validated['nama_ujian'],
                 'mapel_id'      => $validated['mapel_id'] ?? null,
@@ -171,11 +242,10 @@ class UjianController extends Controller
      */
     public function edit(Ujian $ujian)
     {
-        $kelases = Classroom::active()->orderBy('tingkat')->orderBy('nama_kelas')->get();
-        $mapels = MataPelajaran::orderBy('mata_pelajaran')->get();
-        $gurus = User::where(function ($q) {
-            $q->where('role', 'guru')->orWhere('is_guru_sekolah', true);
-        })->where('is_active', true)->orderBy('name')->get();
+        $this->ensureUjianInRoom($ujian);
+        $kelases = $this->scopedKelases();
+        $mapels = $this->scopedMapels();
+        $gurus = $this->scopedGurus();
 
         return view('ujian.form', [
             'ujian'   => $ujian,
@@ -191,6 +261,8 @@ class UjianController extends Controller
      */
     public function update(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
+
         $validated = $request->validate([
             'kode_ujian'    => 'required|string|max:50|unique:ujian,kode_ujian,' . $ujian->id,
             'nama_ujian'    => 'required|string|max:200',
@@ -204,6 +276,17 @@ class UjianController extends Controller
             'tanggal_ujian' => 'required|date',
             'status'        => 'required|in:draft,aktif,selesai',
         ]);
+
+        $scoped = $this->scopedFormal();
+        if ($scoped) {
+            if (!empty($validated['kelas_id']) && !Classroom::forJenjang($scoped->kode)->whereKey($validated['kelas_id'])->exists()) {
+                abort(403, 'Kelas yang dipilih bukan milik lembaga ruang kerja Anda.');
+            }
+            if (!empty($validated['mapel_id']) && !MataPelajaran::forJenjang($scoped->kode)->whereKey($validated['mapel_id'])->exists()) {
+                abort(403, 'Mata pelajaran yang dipilih bukan milik lembaga ruang kerja Anda.');
+            }
+            $validated['lembaga_id'] = $scoped->id;
+        }
 
         $prevJumlahSoal = $ujian->jumlah_soal;
 
@@ -239,6 +322,7 @@ class UjianController extends Controller
      */
     public function destroy(Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         $nama = $ujian->nama_ujian;
         $ujian->delete();
 
@@ -251,6 +335,7 @@ class UjianController extends Controller
      */
     public function uploadWordSoal(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         $request->validate([
             'file_word'     => 'required|file|mimes:docx|max:15360', // max 15MB
             'timer_per_soal'=> 'nullable|integer|min:10|max:1800',
@@ -353,6 +438,7 @@ class UjianController extends Controller
      */
     public function kunci(Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         $ujian->load('kuncis');
         $kuncis = $ujian->kuncis->keyBy('nomor_soal');
 
@@ -364,6 +450,7 @@ class UjianController extends Controller
      */
     public function updateKunci(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         $keys = $request->input('kunci', []);
         $bobots = $request->input('bobot', []);
 
@@ -399,6 +486,7 @@ class UjianController extends Controller
      */
     public function updateTimer(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         $validated = $request->validate([
             'timer_default'  => 'required|integer|min:10|max:1800',
             'soal_timer'     => 'nullable|array',
@@ -432,20 +520,26 @@ class UjianController extends Controller
      */
     public function ljkIndex(Request $request)
     {
+        $scoped = $this->scopedFormal();
         $ujians = Ujian::with(['mapel', 'kelas', 'guru'])
+            ->forLembaga($scoped)
             ->latest('tanggal_ujian')
             ->get();
 
         $selectedUjianId = $request->input('ujian_id') ?: ($ujians->first()?->id ?? null);
-        $ujian = $selectedUjianId ? Ujian::with(['mapel', 'kelas', 'guru'])->find($selectedUjianId) : null;
+        $ujian = $selectedUjianId ? $ujians->firstWhere('id', (int) $selectedUjianId) : null;
 
         $siswas = collect();
         if ($ujian && $ujian->kelas) {
             $namaKelas = $ujian->kelas->nama_kelas;
-            $siswas = Siswa::where(function ($q) use ($namaKelas) {
+            $siswaQuery = Siswa::where(function ($q) use ($namaKelas) {
                 $q->where('kelas', $namaKelas)
                   ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
-            })->where('status', 'aktif')->orderBy('nama_lengkap')->get();
+            })->where('status', 'aktif');
+            if ($scoped) {
+                $siswaQuery->forLembaga($scoped->kode);
+            }
+            $siswas = $siswaQuery->orderBy('nama_lengkap')->get();
         }
 
         return view('ujian.ljk-index', compact('ujians', 'ujian', 'siswas'));
@@ -456,6 +550,7 @@ class UjianController extends Controller
      */
     public function updatePeraturan(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         $validated = $request->validate([
             'peraturan_ujian' => 'nullable|string|max:2000',
         ]);
@@ -472,9 +567,14 @@ class UjianController extends Controller
      */
     public function cetakLjk(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
+        $scoped = $this->scopedFormal();
         $ujian->load(['mapel', 'kelas', 'guru']);
 
         $query = Siswa::query();
+        if ($scoped) {
+            $query->forLembaga($scoped->kode);
+        }
         if ($ujian->kelas_id && $ujian->kelas) {
             $namaKelas = $ujian->kelas->nama_kelas;
             $query->where(function ($q) use ($namaKelas) {
@@ -525,18 +625,22 @@ class UjianController extends Controller
      */
     public function sesiIndex(Request $request)
     {
-        $kelases = Classroom::active()->orderBy('tingkat')->orderBy('nama_kelas')->get();
-        $mapels = MataPelajaran::with('lembaga')->orderBy('mata_pelajaran')->get();
-        $gurus = User::where(function ($q) {
-            $q->where('role', 'guru')->orWhere('is_guru_sekolah', true);
-        })->where('is_active', true)->orderBy('name')->get();
+        $scoped = $this->scopedFormal();
+        $kelases = $this->scopedKelases();
+        $mapels = $this->scopedMapels(true);
+        $gurus = $this->scopedGurus();
 
         $ujians = Ujian::with(['mapel', 'kelas', 'guru'])
             ->withCount('soals')
+            ->forLembaga($scoped)
             ->latest('tanggal_ujian')
             ->get();
 
-        $timeSlots = TimeSlot::active()->orderBy('jam_ke')->get();
+        $timeSlotsQuery = TimeSlot::active();
+        if ($scoped) {
+            $timeSlotsQuery->forJenjang($scoped->kode);
+        }
+        $timeSlots = $timeSlotsQuery->orderBy('jam_ke')->get();
 
         return view('ujian.sesi-index', compact('kelases', 'mapels', 'gurus', 'ujians', 'timeSlots'));
     }
@@ -546,6 +650,7 @@ class UjianController extends Controller
      */
     public function proyektor(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         $ujian->load(['mapel', 'kelas', 'guru', 'soals']);
 
         $soals = $ujian->soals;
@@ -583,24 +688,34 @@ class UjianController extends Controller
      */
     public function koreksiIndex(Request $request)
     {
+        $scoped = $this->scopedFormal();
         $ujians = Ujian::with(['mapel', 'kelas', 'guru'])
             ->withCount('hasils')
+            ->forLembaga($scoped)
             ->latest('tanggal_ujian')
             ->get();
 
         $selectedUjianId = $request->input('ujian_id') ?: ($ujians->first()?->id ?? null);
-        $ujian = $selectedUjianId ? Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->find($selectedUjianId) : null;
+        $ujian = $selectedUjianId ? $ujians->firstWhere('id', (int) $selectedUjianId) : null;
 
         $siswasKelas = collect();
         if ($ujian && $ujian->kelas_id && $ujian->kelas) {
             $namaKelas = $ujian->kelas->nama_kelas;
-            $siswasKelas = Siswa::where(function ($q) use ($namaKelas) {
-                $q->where('kelas', $namaKelas)
-                  ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
-            })->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
+            $q = Siswa::where(function ($sub) use ($namaKelas) {
+                $sub->where('kelas', $namaKelas)
+                    ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
+            });
+            if ($scoped) {
+                $q->forLembaga($scoped->kode);
+            }
+            $siswasKelas = $q->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
         }
         if ($siswasKelas->isEmpty()) {
-            $siswasKelas = Siswa::orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
+            $fallback = Siswa::query();
+            if ($scoped) {
+                $fallback->forLembaga($scoped->kode);
+            }
+            $siswasKelas = $fallback->orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
         }
 
         return view('ujian.upload-scan', compact('ujians', 'ujian', 'siswasKelas'));
@@ -611,18 +726,28 @@ class UjianController extends Controller
      */
     public function uploadScan(Ujian $ujian)
     {
-        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->latest('tanggal_ujian')->get();
+        $this->ensureUjianInRoom($ujian);
+        $scoped = $this->scopedFormal();
+        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->forLembaga($scoped)->latest('tanggal_ujian')->get();
 
         $siswasKelas = collect();
         if ($ujian && $ujian->kelas_id && $ujian->kelas) {
             $namaKelas = $ujian->kelas->nama_kelas;
-            $siswasKelas = Siswa::where(function ($q) use ($namaKelas) {
-                $q->where('kelas', $namaKelas)
-                  ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
-            })->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
+            $q = Siswa::where(function ($sub) use ($namaKelas) {
+                $sub->where('kelas', $namaKelas)
+                    ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
+            });
+            if ($scoped) {
+                $q->forLembaga($scoped->kode);
+            }
+            $siswasKelas = $q->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
         }
         if ($siswasKelas->isEmpty()) {
-            $siswasKelas = Siswa::orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
+            $fallback = Siswa::query();
+            if ($scoped) {
+                $fallback->forLembaga($scoped->kode);
+            }
+            $siswasKelas = $fallback->orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
         }
 
         return view('ujian.upload-scan', compact('ujians', 'ujian', 'siswasKelas'));
@@ -633,6 +758,7 @@ class UjianController extends Controller
      */
     public function processScan(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         if (function_exists('set_time_limit')) {
             @set_time_limit(120);
         }
@@ -690,13 +816,15 @@ class UjianController extends Controller
      */
     public function nilaiIndex(Request $request)
     {
+        $scoped = $this->scopedFormal();
         $ujians = Ujian::with(['mapel', 'kelas', 'guru'])
             ->withCount('hasils')
+            ->forLembaga($scoped)
             ->latest('tanggal_ujian')
             ->get();
 
         $selectedUjianId = $request->input('ujian_id') ?: ($ujians->first()?->id ?? null);
-        $ujian = $selectedUjianId ? Ujian::with(['mapel', 'kelas', 'guru', 'kuncis', 'hasils'])->find($selectedUjianId) : null;
+        $ujian = $selectedUjianId ? $ujians->firstWhere('id', (int) $selectedUjianId) : null;
 
         if (!$ujian && $ujians->isNotEmpty()) {
             $ujian = $ujians->first();
@@ -714,8 +842,10 @@ class UjianController extends Controller
      */
     public function hasil(Ujian $ujian)
     {
-        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->latest('tanggal_ujian')->get();
-        $ujian->load(['mapel', 'kelas', 'guru']);
+        $this->ensureUjianInRoom($ujian);
+        $scoped = $this->scopedFormal();
+        $ujians = Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->forLembaga($scoped)->latest('tanggal_ujian')->get();
+        $ujian->load(['mapel', 'kelas', 'guru', 'kuncis']);
 
         $hasils = UjianHasil::with('siswa')
             ->where('ujian_id', $ujian->id)
@@ -731,13 +861,21 @@ class UjianController extends Controller
         $siswaList = collect();
         if ($ujian->kelas_id && $ujian->kelas) {
             $namaKelas = $ujian->kelas->nama_kelas;
-            $siswaList = Siswa::where(function ($q) use ($namaKelas) {
-                $q->where('kelas', $namaKelas)
-                  ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
-            })->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
+            $q = Siswa::where(function ($sub) use ($namaKelas) {
+                $sub->where('kelas', $namaKelas)
+                    ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
+            });
+            if ($scoped) {
+                $q->forLembaga($scoped->kode);
+            }
+            $siswaList = $q->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
         }
         if ($siswaList->isEmpty()) {
-            $siswaList = Siswa::orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
+            $fallback = Siswa::query();
+            if ($scoped) {
+                $fallback->forLembaga($scoped->kode);
+            }
+            $siswaList = $fallback->orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
         }
 
         return view('ujian.hasil', compact('ujians', 'ujian', 'hasils', 'kuncis', 'statistik', 'analisis', 'siswaList'));
@@ -748,6 +886,7 @@ class UjianController extends Controller
      */
     public function updateHasilManual(Request $request, Ujian $ujian, UjianHasil $hasil)
     {
+        $this->ensureUjianInRoom($ujian);
         if ($request->filled('siswa_id')) {
             $newSiswaId = (int) $request->input('siswa_id');
             if ($newSiswaId > 0 && $newSiswaId !== (int) $hasil->siswa_id) {
@@ -838,6 +977,7 @@ class UjianController extends Controller
      */
     public function assignHasilSiswa(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         $validated = $request->validate([
             'hasil_id'      => 'nullable|integer',
             'siswa_id'      => 'required|exists:siswas,id',
@@ -845,6 +985,10 @@ class UjianController extends Controller
         ]);
 
         $siswa = Siswa::findOrFail($validated['siswa_id']);
+        $scoped = $this->scopedFormal();
+        if ($scoped && !Siswa::forLembaga($scoped->kode)->whereKey($siswa->id)->exists()) {
+            abort(403, 'Siswa tersebut bukan milik lembaga ruang kerja Anda.');
+        }
         $hasil = null;
 
         if (!empty($validated['hasil_id'])) {
@@ -919,6 +1063,7 @@ class UjianController extends Controller
      */
     public function destroyHasil(Ujian $ujian, UjianHasil $hasil)
     {
+        $this->ensureUjianInRoom($ujian);
         if ($hasil->ujian_id !== $ujian->id) {
             abort(404);
         }
@@ -933,6 +1078,7 @@ class UjianController extends Controller
      */
     public function exportExcel(Request $request, Ujian $ujian)
     {
+        $this->ensureUjianInRoom($ujian);
         $ujian->load(['mapel', 'kelas', 'guru']);
         $hasils = UjianHasil::with('siswa')
             ->where('ujian_id', $ujian->id)

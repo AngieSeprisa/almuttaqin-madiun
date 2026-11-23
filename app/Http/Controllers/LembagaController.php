@@ -25,10 +25,20 @@ class LembagaController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membuka Master Lembaga.');
         }
 
-        $lembagas = Lembaga::withCount('users')
+        $lembagasQuery = Lembaga::withCount('users')
                            ->orderBy('urutan')
-                           ->orderBy('id')
-                           ->get();
+                           ->orderBy('id');
+
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if (!$authUser->isYayasan()) {
+            if ($scopedFormal) {
+                $lembagasQuery->whereKey($scopedFormal->id);
+            } else {
+                $lembagasQuery->whereIn('id', $authUser->accessibleLembagas()->pluck('id'));
+            }
+        }
+
+        $lembagas = $lembagasQuery->get();
 
         // Tambah penghitungan ruang kelas & mapel per lembaga
         foreach ($lembagas as $l) {
@@ -103,6 +113,9 @@ class LembagaController extends Controller
         $authUser = Auth::user();
         if (!$authUser->isYayasan() && !$authUser->canDo('master_lembaga', 'edit')) {
             abort(403, 'Anda tidak memiliki hak akses untuk mengubah lembaga.');
+        }
+        if (!$authUser->isYayasan() && !$authUser->hasAccessToLembaga($lembaga->kode)) {
+            abort(403, 'Anda hanya dapat mengubah data lembaga yang berada dalam akses Anda.');
         }
 
         $validated = $request->validate([

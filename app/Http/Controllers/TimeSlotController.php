@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Lembaga;
 use App\Models\Schedule;
 use App\Models\TimeSlot;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class TimeSlotController extends Controller
 {
@@ -14,6 +16,32 @@ class TimeSlotController extends Controller
      * Daftar hari sekolah
      */
     public const DAFTAR_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+
+    /**
+     * Opsi jenjang yang diizinkan untuk user sesuai room aktif.
+     */
+    protected function allowedJenjangOptions(User $authUser): array
+    {
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal && !$authUser->isYayasan()) {
+            return ['Semua', $scopedFormal->jenjang_key];
+        }
+
+        return array_values(array_unique(array_merge(['Semua'], Lembaga::allJenjangOptions(false))));
+    }
+
+    /**
+     * Pastikan slot jam pelajaran dapat diakses dari room aktif.
+     */
+    protected function ensureSlotInRoom(User $authUser, TimeSlot $slot): void
+    {
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        if ($scopedFormal && !$authUser->isYayasan()) {
+            if (!TimeSlot::forJenjang($scopedFormal->kode)->whereKey($slot->id)->exists()) {
+                abort(403, 'Anda tidak memiliki akses untuk mengubah jam pelajaran lembaga lain.');
+            }
+        }
+    }
 
     /**
      * Tampilkan daftar master jam pelajaran / time slot
@@ -27,20 +55,24 @@ class TimeSlotController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk membuka Master Jam Pelajaran.');
         }
 
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $jenjangOptions = $this->allowedJenjangOptions($authUser);
+
         $activeHari = $request->get('hari', 'Senin');
-        $selectedJenjang = $request->get('jenjang', 'all');
+        $selectedJenjang = ($scopedFormal && !$authUser->isYayasan())
+            ? $scopedFormal->jenjang_key
+            : $request->get('jenjang', $scopedFormal ? $scopedFormal->jenjang_key : 'all');
 
-        $query = TimeSlot::query();
-
-        if ($activeHari && $activeHari !== 'all') {
-            $query->where('hari', ucfirst(strtolower($activeHari)));
+        $baseQuery = TimeSlot::query();
+        if ($scopedFormal && !$authUser->isYayasan()) {
+            $baseQuery->forJenjang($scopedFormal->kode);
+        } elseif ($selectedJenjang && $selectedJenjang !== 'all') {
+            $baseQuery->forJenjang($selectedJenjang);
         }
 
-        if ($selectedJenjang && $selectedJenjang !== 'all') {
-            $query->where(function ($q) use ($selectedJenjang) {
-                $q->where('jenjang', $selectedJenjang)
-                  ->orWhere('jenjang', 'Semua');
-            });
+        $query = clone $baseQuery;
+        if ($activeHari && $activeHari !== 'all') {
+            $query->where('hari', ucfirst(strtolower($activeHari)));
         }
 
         $timeSlots = $query->orderBy('hari')
@@ -51,20 +83,20 @@ class TimeSlotController extends Controller
         // Hitung slot per hari untuk badge di tab
         $slotCountPerHari = [];
         foreach (self::DAFTAR_HARI as $h) {
-            $slotCountPerHari[$h] = TimeSlot::where('hari', $h)->count();
+            $slotCountPerHari[$h] = (clone $baseQuery)->where('hari', $h)->count();
         }
 
         // Statistik umum
         $stats = [
-            'total'     => TimeSlot::count(),
-            'kbm'       => TimeSlot::where('is_break', false)->count(),
-            'non_kbm'   => TimeSlot::where('is_break', true)->count(),
-            'aktif'     => TimeSlot::where('is_active', true)->count(),
+            'total'     => (clone $baseQuery)->count(),
+            'kbm'       => (clone $baseQuery)->where('is_break', false)->count(),
+            'non_kbm'   => (clone $baseQuery)->where('is_break', true)->count(),
+            'aktif'     => (clone $baseQuery)->where('is_active', true)->count(),
         ];
 
         $daftarHari = self::DAFTAR_HARI;
 
-        return view('master.jam-pelajaran.index', compact('timeSlots', 'activeHari', 'selectedJenjang', 'slotCountPerHari', 'stats', 'daftarHari'));
+        return view('master.jam-pelajaran.index', compact('timeSlots', 'activeHari', 'selectedJenjang', 'slotCountPerHari', 'stats', 'daftarHari', 'jenjangOptions', 'scopedFormal'));
     }
 
     /**
@@ -78,10 +110,12 @@ class TimeSlotController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk menambah jam pelajaran.');
         }
 
+        $allowedJenjangs = $this->allowedJenjangOptions($authUser);
+
         $validated = $request->validate([
             'hari_list'     => 'required|array|min:1',
             'hari_list.*'   => 'in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu',
-            'jenjang'       => 'required|in:Semua,SMP,SMA',
+            'jenjang'       => ['required', 'string', 'max:50', Rule::in($allowedJenjangs)],
             'jam_ke'        => 'required|integer|min:0|max:20',
             'waktu_mulai'   => 'required|date_format:H:i',
             'waktu_selesai' => 'required|date_format:H:i|after:waktu_mulai',
@@ -136,9 +170,12 @@ class TimeSlotController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk mengubah jam pelajaran.');
         }
 
+        $this->ensureSlotInRoom($authUser, $jamPelajaran);
+        $allowedJenjangs = $this->allowedJenjangOptions($authUser);
+
         $validated = $request->validate([
             'hari'          => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu',
-            'jenjang'       => 'required|in:Semua,SMP,SMA',
+            'jenjang'       => ['required', 'string', 'max:50', Rule::in($allowedJenjangs)],
             'jam_ke'        => 'required|integer|min:0|max:20',
             'waktu_mulai'   => 'required|date_format:H:i',
             'waktu_selesai' => 'required|date_format:H:i|after:waktu_mulai',
@@ -183,6 +220,8 @@ class TimeSlotController extends Controller
             abort(403, 'Anda tidak memiliki hak akses mengubah status jam pelajaran.');
         }
 
+        $this->ensureSlotInRoom($authUser, $jamPelajaran);
+
         $jamPelajaran->update(['is_active' => !$jamPelajaran->is_active]);
 
         $statusText = $jamPelajaran->is_active ? 'diaktifkan' : 'dinonaktifkan';
@@ -199,6 +238,8 @@ class TimeSlotController extends Controller
         if (!$authUser->isYayasan() && !$authUser->canDo('master_jam', 'delete')) {
             abort(403, 'Anda tidak memiliki hak akses menghapus jam pelajaran.');
         }
+
+        $this->ensureSlotInRoom($authUser, $jamPelajaran);
 
         $scheduleCount = Schedule::where('time_slot_id', $jamPelajaran->id)->count();
         if ($scheduleCount > 0) {

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Lembaga;
 use App\Models\PerpustakaanBuku;
 use App\Models\PerpustakaanPeminjaman;
 use App\Models\Siswa;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -207,11 +209,51 @@ class PerpustakaanController extends Controller
     }
 
     /**
+     * Terapkan scope room aktif pada query peminjaman perpustakaan.
+     */
+    protected function applyPinjamRoomScope($query, ?Lembaga $scopedFormal): void
+    {
+        if (!$scopedFormal) {
+            return;
+        }
+
+        $roomUserIds = User::forLembagaModel($scopedFormal)->pluck('id')->all();
+        $query->where(function ($outer) use ($scopedFormal, $roomUserIds) {
+            $outer->whereHas('siswa', fn ($s) => $s->forLembaga($scopedFormal->kode))
+                  ->orWhere(function ($manual) use ($roomUserIds) {
+                      $manual->whereNull('siswa_id')
+                             ->whereIn('created_by', empty($roomUserIds) ? [0] : $roomUserIds);
+                  });
+        });
+    }
+
+    /**
+     * Pastikan transaksi peminjaman berada di dalam room aktif.
+     */
+    protected function ensurePinjamInRoom(PerpustakaanPeminjaman $pinjam): void
+    {
+        $scopedFormal = Lembaga::activeScopedFormal(Auth::user());
+        if (!$scopedFormal) {
+            return;
+        }
+
+        $q = PerpustakaanPeminjaman::whereKey($pinjam->id);
+        $this->applyPinjamRoomScope($q, $scopedFormal);
+        if (!$q->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke transaksi peminjaman lembaga lain.');
+        }
+    }
+
+    /**
      * 2. SUBMENU PINJAM BUKU (INDEX)
      */
     public function pinjamIndex(Request $request): View
     {
-        $query = PerpustakaanPeminjaman::with(['buku', 'siswa']);
+        $scopedFormal = Lembaga::activeScopedFormal(Auth::user());
+        $baseQuery = PerpustakaanPeminjaman::query();
+        $this->applyPinjamRoomScope($baseQuery, $scopedFormal);
+
+        $query = (clone $baseQuery)->with(['buku', 'siswa']);
 
         if ($request->filled('search')) {
             $s = trim((string) $request->input('search'));
@@ -247,10 +289,10 @@ class PerpustakaanController extends Controller
 
         $peminjamans = $query->orderByDesc('id')->paginate($perPage)->withQueryString();
 
-        $totalTransaksi = PerpustakaanPeminjaman::count();
-        $sedangDipinjam = PerpustakaanPeminjaman::where('status', 'dipinjam')->count();
-        $sudahKembali = PerpustakaanPeminjaman::where('status', 'dikembalikan')->count();
-        $terlambatCount = PerpustakaanPeminjaman::where('status', 'dipinjam')
+        $totalTransaksi = (clone $baseQuery)->count();
+        $sedangDipinjam = (clone $baseQuery)->where('status', 'dipinjam')->count();
+        $sudahKembali = (clone $baseQuery)->where('status', 'dikembalikan')->count();
+        $terlambatCount = (clone $baseQuery)->where('status', 'dipinjam')
             ->whereNotNull('tanggal_jatuh_tempo')
             ->whereDate('tanggal_jatuh_tempo', '<', Carbon::today())
             ->count();
@@ -270,8 +312,13 @@ class PerpustakaanController extends Controller
      */
     public function createPinjam(Request $request): View
     {
+        $scopedFormal = Lembaga::activeScopedFormal(Auth::user());
         $bukuList = PerpustakaanBuku::orderBy('judul_buku')->get();
-        $daftarSiswa = Siswa::orderBy('nama_lengkap')->get(['id', 'nama_lengkap', 'kelas', 'kamar']);
+        $siswaQuery = Siswa::orderBy('nama_lengkap');
+        if ($scopedFormal) {
+            $siswaQuery->forLembaga($scopedFormal->kode);
+        }
+        $daftarSiswa = $siswaQuery->get(['id', 'nama_lengkap', 'kelas', 'kamar']);
         $today = Carbon::today()->toDateString();
         $defaultJatuhTempo = Carbon::today()->addDays(7)->toDateString();
         $selectedBukuId = $request->input('buku_id');
@@ -305,6 +352,11 @@ class PerpustakaanController extends Controller
             'tanggal_pinjam.required'             => 'Tanggal pinjam wajib diisi.',
             'tanggal_jatuh_tempo.after_or_equal'  => 'Tanggal estimasi kembali tidak boleh sebelum tanggal pinjam.',
         ]);
+
+        $scopedFormal = Lembaga::activeScopedFormal(Auth::user());
+        if ($scopedFormal && !empty($validated['siswa_id']) && !Siswa::forLembaga($scopedFormal->kode)->whereKey((int) $validated['siswa_id'])->exists()) {
+            abort(403, 'Siswa yang dipilih bukan milik lembaga ruang kerja Anda.');
+        }
 
         $buku = PerpustakaanBuku::findOrFail($validated['perpustakaan_buku_id']);
         $jumlah = max(1, (int) ($validated['jumlah'] ?? 1));
@@ -361,6 +413,7 @@ class PerpustakaanController extends Controller
      */
     public function kembalikanPinjam(PerpustakaanPeminjaman $pinjam): RedirectResponse
     {
+        $this->ensurePinjamInRoom($pinjam);
         if ($pinjam->status !== 'dikembalikan') {
             $pinjam->update([
                 'status'          => 'dikembalikan',
@@ -382,6 +435,7 @@ class PerpustakaanController extends Controller
      */
     public function updatePinjam(Request $request, PerpustakaanPeminjaman $pinjam): RedirectResponse
     {
+        $this->ensurePinjamInRoom($pinjam);
         $validated = $request->validate([
             'nama_peminjam'       => ['required', 'string', 'max:255'],
             'kelas_kamar'         => ['nullable', 'string', 'max:120'],
@@ -422,6 +476,7 @@ class PerpustakaanController extends Controller
      */
     public function destroyPinjam(PerpustakaanPeminjaman $pinjam): RedirectResponse
     {
+        $this->ensurePinjamInRoom($pinjam);
         $buku = $pinjam->buku;
         $nama = $pinjam->nama_peminjam;
         $pinjam->delete();

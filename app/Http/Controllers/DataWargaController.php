@@ -16,14 +16,31 @@ class DataWargaController extends Controller
      */
     public function guru(Request $request)
     {
-        $activeRoom = strtolower((string) session('active_lembaga', ''));
+        $authUser = auth()->user();
+        $isYayasan = $authUser && $authUser->isYayasan();
+        $scopedFormal = Lembaga::activeScopedFormal($authUser);
+        $activeRoom = strtolower((string) ($scopedFormal?->kode ?? session('active_lembaga', '')));
 
-        $sekolahLembagas = Lembaga::where(function ($q) {
-            $q->whereIn('kode', ['pondok', 'smp', 'sma'])
-              ->orWhere('singkatan', 'Pondok')
-              ->orWhere('singkatan', 'SMP')
-              ->orWhere('singkatan', 'SMA');
-        })->where('is_active', true)->orderBy('urutan')->get();
+        $allGuruLembagas = Lembaga::where('is_active', true)
+            ->where(function ($q) {
+                $q->where('kode', 'pondok')
+                  ->orWhere('kategori', 'formal')
+                  ->orWhereIn('kode', ['smp', 'sma', 'smk', 'sdit', 'sd', 'ra', 'tk', 'mi', 'mts', 'ma']);
+            })
+            ->orderBy('urutan')
+            ->orderBy('id')
+            ->get();
+
+        // Untuk non-Yayasan, batasi opsi lembaga ke lembaga yang dapat diaksesnya (terkunci ke room aktif)
+        if ($isYayasan) {
+            $sekolahLembagas = $allGuruLembagas;
+        } else {
+            $accessibleIds = $authUser ? $authUser->accessibleLembagas()->pluck('id')->all() : [];
+            $sekolahLembagas = $allGuruLembagas->whereIn('id', $accessibleIds)->values();
+            if ($scopedFormal) {
+                $sekolahLembagas = collect([$scopedFormal]);
+            }
+        }
 
         $pondokLembaga = $sekolahLembagas->first(fn ($l) => strtolower((string) $l->kode) === 'pondok' || strtoupper((string) $l->singkatan) === 'PONDOK');
         $smpLembaga = $sekolahLembagas->first(fn ($l) => strtolower((string) $l->kode) === 'smp' || strtoupper((string) $l->singkatan) === 'SMP');
@@ -45,18 +62,25 @@ class DataWargaController extends Controller
 
         $query = $baseRegisteredQuery();
 
-        // Filter lembaga dari request atau dari session active_lembaga jika Pondok/SMP/SMA
+        // Tentukan filter lembaga: terkunci ke room aktif untuk non-Yayasan di room formal/pondok
         $selectedLembagaId = $request->input('lembaga_id');
-        if ($selectedLembagaId === null && in_array($activeRoom, ['pondok', 'smp', 'sma'], true)) {
-            $activeLembagaModel = match ($activeRoom) {
-                'pondok' => $pondokLembaga,
-                'smp'    => $smpLembaga,
-                'sma'    => $smaLembaga,
-                default  => null,
-            };
-            if ($activeLembagaModel) {
-                $selectedLembagaId = (string) $activeLembagaModel->id;
+        if (!$isYayasan && $scopedFormal) {
+            $selectedLembagaId = (string) $scopedFormal->id;
+        } elseif (!$isYayasan && $activeRoom === 'pondok' && $pondokLembaga) {
+            $selectedLembagaId = (string) $pondokLembaga->id;
+        } elseif ($selectedLembagaId === null && $scopedFormal) {
+            $selectedLembagaId = (string) $scopedFormal->id;
+        } elseif ($selectedLembagaId === null && $activeRoom === 'pondok' && $pondokLembaga) {
+            $selectedLembagaId = (string) $pondokLembaga->id;
+        }
+
+        // Validasi non-Yayasan tidak bisa menyuntikkan lembaga_id luar aksesnya
+        if (!$isYayasan && !empty($selectedLembagaId) && $selectedLembagaId !== 'semua') {
+            if (!$sekolahLembagas->contains('id', (int) $selectedLembagaId)) {
+                $selectedLembagaId = (string) ($sekolahLembagas->first()?->id ?? '');
             }
+        } elseif (!$isYayasan && ($selectedLembagaId === 'semua' || empty($selectedLembagaId)) && $sekolahLembagas->count() === 1) {
+            $selectedLembagaId = (string) $sekolahLembagas->first()->id;
         }
 
         if (!empty($selectedLembagaId) && $selectedLembagaId !== 'semua') {
@@ -71,6 +95,15 @@ class DataWargaController extends Controller
                           });
                     });
             }
+        } elseif (!$isYayasan && $sekolahLembagas->isNotEmpty()) {
+            $allowedIds = $sekolahLembagas->pluck('id')->all();
+            $query->where(function ($q) use ($allowedIds, $pondokLembaga) {
+                $q->whereIn('primary_lembaga_id', $allowedIds)
+                  ->orWhereHas('lembagas', fn ($l) => $l->whereIn('lembagas.id', $allowedIds));
+                if ($pondokLembaga) {
+                    $q->orWhere('is_guru_pondok', true);
+                }
+            });
         }
 
         if ($request->filled('search')) {
@@ -87,24 +120,40 @@ class DataWargaController extends Controller
         $gurus = $query->orderBy('name')->paginate(20)->withQueryString();
         $kelasPengajianMap = MasterKelasPengajian::pluck('nama_kelas', 'id')->all();
 
-        $totalGuru   = $baseRegisteredQuery()->count();
-        $totalPondok = User::where(function ($q) {
+        $scopedStatQuery = fn () => $baseRegisteredQuery()->when(
+            !$isYayasan && $scopedFormal,
+            fn ($q) => $q->where('is_guru_sekolah', true)->forLembagaModel($scopedFormal)
+        );
+
+        $totalGuru   = $scopedStatQuery()->count();
+        $totalPondok = (!$isYayasan && $scopedFormal) ? 0 : User::where(function ($q) {
             $q->whereNull('is_active')->orWhere('is_active', true);
         })->where('is_guru_pondok', true)->count();
-        $totalSmp    = $smpLembaga ? $baseRegisteredQuery()->where('is_guru_sekolah', true)->where(function ($q) use ($smpLembaga) {
-            $q->where('primary_lembaga_id', $smpLembaga->id)
-              ->orWhereHas('lembagas', fn ($l) => $l->where('lembagas.id', $smpLembaga->id));
-        })->count() : 0;
-        $totalSma    = $smaLembaga ? $baseRegisteredQuery()->where('is_guru_sekolah', true)->where(function ($q) use ($smaLembaga) {
-            $q->where('primary_lembaga_id', $smaLembaga->id)
-              ->orWhereHas('lembagas', fn ($l) => $l->where('lembagas.id', $smaLembaga->id));
-        })->count() : 0;
+        $totalSmp    = $smpLembaga ? $baseRegisteredQuery()->where('is_guru_sekolah', true)->forLembagaModel($smpLembaga)->count() : 0;
+        $totalSma    = $smaLembaga ? $baseRegisteredQuery()->where('is_guru_sekolah', true)->forLembagaModel($smaLembaga)->count() : 0;
+
+        // Statistik dinamis per lembaga formal yang dapat diakses
+        $lembagaGuruStats = [];
+        foreach ($sekolahLembagas as $lemb) {
+            $isPondokItem = strtolower((string) $lemb->kode) === 'pondok';
+            $cnt = $isPondokItem
+                ? $totalPondok
+                : $baseRegisteredQuery()->where('is_guru_sekolah', true)->forLembagaModel($lemb)->count();
+            $lembagaGuruStats[] = [
+                'id'    => $lemb->id,
+                'kode'  => $lemb->kode,
+                'label' => 'Guru ' . ($lemb->nama_singkat ?: $lemb->singkatan ?: $lemb->nama),
+                'count' => $cnt,
+            ];
+        }
 
         return view('data-warga.guru', compact(
             'gurus',
             'sekolahLembagas',
             'selectedLembagaId',
             'kelasPengajianMap',
+            'scopedFormal',
+            'lembagaGuruStats',
             'totalGuru',
             'totalPondok',
             'totalSmp',
@@ -112,12 +161,33 @@ class DataWargaController extends Controller
         ));
     }
 
+    private function resolveActiveRoomKode(): ?string
+    {
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        return $scopedFormal?->kode ?? session('active_lembaga');
+    }
+
+    private function ensureSiswaInActiveRoom(Siswa $siswa): void
+    {
+        $activeRoom = $this->resolveActiveRoomKode();
+        if (Lembaga::isGlobalRoom($activeRoom)) {
+            return;
+        }
+
+        if (!Siswa::whereKey($siswa->id)->forLembaga($activeRoom)->exists()) {
+            abort(403, 'Anda tidak memiliki akses ke data siswa lembaga lain.');
+        }
+    }
+
     /**
      * Menampilkan daftar siswa yang lulus dari Pondok maupun Sekolah.
      */
     public function lulus(Request $request)
     {
-        $activeRoom = session('active_lembaga');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal?->kode ?? session('active_lembaga');
+        $isGlobalRoom = Lembaga::isGlobalRoom($activeRoom);
+
         $query = Siswa::query()
             ->with('pendaftaran')
             ->where('status', 'lulus');
@@ -128,7 +198,7 @@ class DataWargaController extends Controller
             $query->where('kategori_lulus', $request->kategori_lulus);
         }
 
-        if ($request->filled('jenjang')) {
+        if ($isGlobalRoom && $request->filled('jenjang')) {
             $jenjang = $request->jenjang;
             $query->where(function ($q) use ($jenjang) {
                 $q->where('jenjang', $jenjang)
@@ -158,7 +228,8 @@ class DataWargaController extends Controller
         $lulusSekolah = Siswa::forLembaga($activeRoom)->where('status', 'lulus')
             ->whereIn('kategori_lulus', ['Sekolah', 'Pondok & Sekolah'])->count();
 
-        $tahunList = Siswa::where('status', 'lulus')
+        $tahunList = Siswa::forLembaga($activeRoom)
+            ->where('status', 'lulus')
             ->whereNotNull('tahun_lulus')
             ->where('tahun_lulus', '!=', '')
             ->distinct()
@@ -173,7 +244,9 @@ class DataWargaController extends Controller
             ->orderBy('nama_lengkap')
             ->get(['id', 'nama_lengkap', 'jenjang', 'kelas', 'kamar']);
 
-        $jenjangList = ['Reguler', 'SMP', 'SMA'];
+        $jenjangList = $isGlobalRoom
+            ? Lembaga::allJenjangOptions(true)
+            : [Lembaga::defaultJenjangForRoom($activeRoom)];
         $kategoriLulusList = ['Pondok', 'Sekolah', 'Pondok & Sekolah'];
 
         return view('data-warga.lulus', compact(
@@ -184,7 +257,8 @@ class DataWargaController extends Controller
             'tahunList',
             'siswaAktifList',
             'jenjangList',
-            'kategoriLulusList'
+            'kategoriLulusList',
+            'scopedFormal'
         ));
     }
 
@@ -206,6 +280,8 @@ class DataWargaController extends Controller
         ]);
 
         $siswa = Siswa::findOrFail($validated['siswa_id']);
+        $this->ensureSiswaInActiveRoom($siswa);
+
         $siswa->update([
             'status'            => 'lulus',
             'kategori_lulus'    => $validated['kategori_lulus'],
@@ -223,6 +299,8 @@ class DataWargaController extends Controller
      */
     public function updateLulus(Request $request, Siswa $siswa)
     {
+        $this->ensureSiswaInActiveRoom($siswa);
+
         $validated = $request->validate([
             'kategori_lulus'    => 'required|in:Pondok,Sekolah,Pondok & Sekolah',
             'tahun_lulus'       => 'required|string|max:20',
@@ -247,14 +325,17 @@ class DataWargaController extends Controller
      */
     public function mutasi(Request $request)
     {
-        $activeRoom = session('active_lembaga');
+        $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
+        $activeRoom = $scopedFormal?->kode ?? session('active_lembaga');
+        $isGlobalRoom = Lembaga::isGlobalRoom($activeRoom);
+
         $query = Siswa::query()
             ->with('pendaftaran')
             ->where('status', 'mutasi');
 
         $query->forLembaga($activeRoom);
 
-        if ($request->filled('jenjang')) {
+        if ($isGlobalRoom && $request->filled('jenjang')) {
             $jenjang = $request->jenjang;
             $query->where(function ($q) use ($jenjang) {
                 $q->where('jenjang', $jenjang)
@@ -280,6 +361,25 @@ class DataWargaController extends Controller
         $mutasiSma     = Siswa::forLembaga($activeRoom)->where('status', 'mutasi')->where('jenjang', 'SMA')->count();
         $mutasiReguler = Siswa::forLembaga($activeRoom)->where('status', 'mutasi')->where('jenjang', 'Reguler')->count();
 
+        $jenjangList = $isGlobalRoom
+            ? Lembaga::allJenjangOptions(true)
+            : [Lembaga::defaultJenjangForRoom($activeRoom)];
+
+        $mutasiStats = [];
+        if ($isGlobalRoom) {
+            foreach ($jenjangList as $jLabel) {
+                $lembMatch = Lembaga::resolveByKode($jLabel);
+                $cnt = $lembMatch && $lembMatch->isFormalSchool()
+                    ? Siswa::forLembaga($lembMatch->kode)->where('status', 'mutasi')->count()
+                    : Siswa::where('status', 'mutasi')->whereRaw('LOWER(TRIM(COALESCE(jenjang, ""))) = ?', [strtolower(trim($jLabel))])->count();
+                $mutasiStats[] = [
+                    'kode'  => strtolower($lembMatch?->kode ?? $jLabel),
+                    'label' => 'Mutasi ' . $jLabel,
+                    'count' => $cnt,
+                ];
+            }
+        }
+
         $siswaAktifList = Siswa::forLembaga($activeRoom)
             ->where(function ($q) {
                 $q->whereNotIn('status', ['lulus', 'mutasi'])
@@ -288,16 +388,16 @@ class DataWargaController extends Controller
             ->orderBy('nama_lengkap')
             ->get(['id', 'nama_lengkap', 'jenjang', 'kelas', 'kamar']);
 
-        $jenjangList = ['Reguler', 'SMP', 'SMA'];
-
         return view('data-warga.mutasi', compact(
             'siswaMutasi',
             'totalMutasi',
             'mutasiSmp',
             'mutasiSma',
             'mutasiReguler',
+            'mutasiStats',
             'siswaAktifList',
-            'jenjangList'
+            'jenjangList',
+            'scopedFormal'
         ));
     }
 
@@ -317,6 +417,8 @@ class DataWargaController extends Controller
         ]);
 
         $siswa = Siswa::findOrFail($validated['siswa_id']);
+        $this->ensureSiswaInActiveRoom($siswa);
+
         $siswa->update([
             'status'            => 'mutasi',
             'tanggal_mutasi'    => $validated['tanggal_mutasi'],
@@ -333,6 +435,8 @@ class DataWargaController extends Controller
      */
     public function updateMutasi(Request $request, Siswa $siswa)
     {
+        $this->ensureSiswaInActiveRoom($siswa);
+
         $validated = $request->validate([
             'tanggal_mutasi'    => 'required|date',
             'tujuan_mutasi'     => 'nullable|string|max:255',
@@ -355,6 +459,8 @@ class DataWargaController extends Controller
      */
     public function kembalikanAktif(Request $request, Siswa $siswa)
     {
+        $this->ensureSiswaInActiveRoom($siswa);
+
         $asalStatus = $siswa->status;
         $siswa->update([
             'status'            => 'aktif',
