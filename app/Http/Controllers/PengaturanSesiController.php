@@ -266,6 +266,8 @@ class PengaturanSesiController extends Controller
             ]);
         }
 
+        $this->notifyRfidDaemonSesiChanged();
+
         return redirect()->route('pengaturan.sesi')->with('success', 'Sesi presensi baru berhasil ditambahkan.');
     }
 
@@ -389,6 +391,8 @@ class PengaturanSesiController extends Controller
             ]);
         }
 
+        $this->notifyRfidDaemonSesiChanged();
+
         return redirect()->route('pengaturan.sesi')->with('success', 'Pengaturan sesi berhasil diperbarui.');
     }
 
@@ -398,6 +402,7 @@ class PengaturanSesiController extends Controller
     public function destroy($id)
     {
         DB::table('master_sesis')->where('id', $id)->delete();
+        $this->notifyRfidDaemonSesiChanged();
 
         return redirect()->route('pengaturan.sesi')->with('success', 'Sesi berhasil dihapus.');
     }
@@ -421,6 +426,7 @@ class PengaturanSesiController extends Controller
         }
 
         $deleted = DB::table('master_sesis')->whereIn('id', $ids)->delete();
+        $this->notifyRfidDaemonSesiChanged();
 
         return redirect()->route('pengaturan.sesi')->with('success', "{$deleted} sesi terpilih berhasil dihapus.");
     }
@@ -445,8 +451,12 @@ class PengaturanSesiController extends Controller
             'nama_lokasi.required' => 'Nama lokasi pemasangan wajib diisi.',
         ]);
 
-        // Gunakan updateOrInsert agar jika serial sudah auto-register oleh daemon, tinggal memperbarui lokasinya
-        $existing = DB::table('master_devices')->where('device_id', $validated['device_id'])->first();
+        // Gunakan updateOrInsert agar jika serial sudah auto-register oleh daemon (termasuk beda spasi/underscore), tinggal memperbarui lokasinya
+        $normalizedInput = strtolower(preg_replace('/[\s\-]+/', '_', trim($validated['device_id'])));
+        $existing = DB::table('master_devices')
+            ->where('device_id', $validated['device_id'])
+            ->orWhereRaw("LOWER(REPLACE(REPLACE(TRIM(device_id), ' ', '_'), '-', '_')) = ?", [$normalizedInput])
+            ->first();
 
         if ($existing) {
             DB::table('master_devices')->where('id', $existing->id)->update([
@@ -455,7 +465,7 @@ class PengaturanSesiController extends Controller
                 'status_aktif' => 1,
                 'updated_at' => now(),
             ]);
-            $msg = 'Lokasi perangkat ' . $validated['device_id'] . ' berhasil diperbarui.';
+            $msg = 'Lokasi perangkat ' . $existing->device_id . ' berhasil diperbarui.';
         } else {
             DB::table('master_devices')->insert([
                 'device_id' => $validated['device_id'],
@@ -467,6 +477,8 @@ class PengaturanSesiController extends Controller
             ]);
             $msg = 'Perangkat ESP32 (' . $validated['device_id'] . ') berhasil didaftarkan.';
         }
+
+        $this->notifyRfidDaemonSesiChanged();
 
         return redirect()->route('pengaturan.sesi', ['tab' => 'devices'])
             ->with('success', $msg);
@@ -494,6 +506,8 @@ class PengaturanSesiController extends Controller
             'updated_at' => now(),
         ]);
 
+        $this->notifyRfidDaemonSesiChanged();
+
         return redirect()->route('pengaturan.sesi', ['tab' => 'devices'])
             ->with('success', 'Nama lokasi perangkat ' . $device->device_id . ' berhasil disimpan.');
     }
@@ -509,6 +523,7 @@ class PengaturanSesiController extends Controller
                 'status_aktif' => $device->status_aktif ? 0 : 1,
                 'updated_at' => now(),
             ]);
+            $this->notifyRfidDaemonSesiChanged();
         }
 
         return redirect()->route('pengaturan.sesi', ['tab' => 'devices'])
@@ -526,11 +541,33 @@ class PengaturanSesiController extends Controller
                 ->where('device_id_target', $device->device_id)
                 ->update(['device_id_target' => null]);
 
+            if (\Illuminate\Support\Facades\Schema::hasTable('sesi_device_allocations')) {
+                DB::table('sesi_device_allocations')
+                    ->where('device_id', $device->device_id)
+                    ->update(['device_id' => null]);
+            }
+
             DB::table('master_devices')->where('id', $id)->delete();
+            $this->notifyRfidDaemonSesiChanged();
         }
 
         return redirect()->route('pengaturan.sesi', ['tab' => 'devices'])
             ->with('success', 'Perangkat berhasil dihapus dan sesi terkait dikembalikan ke Global.');
+    }
+
+    /**
+     * Beri sinyal instan ke daemon RFID (presensi_daemon.py) agar segera mem-broadcast ulang sesi aktif ke semua ESP32.
+     */
+    private function notifyRfidDaemonSesiChanged(): void
+    {
+        try {
+            $signalPath = DIRECTORY_SEPARATOR === '/'
+                ? '/tmp/rfid_sesi_dirty'
+                : sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'rfid_sesi_dirty';
+            @file_put_contents($signalPath, (string) microtime(true));
+        } catch (\Throwable $e) {
+            // Abaikan bila sistem berkas sementara tidak dapat ditulis
+        }
     }
 
     /**

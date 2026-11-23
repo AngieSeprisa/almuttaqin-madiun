@@ -1,27 +1,32 @@
 /*
  * =====================================================================
- * FIRMWARE ESP32 PRESENSI RFID MULTI-LOKASI & AUTO-SESI LCD 16X2 (v2.0)
+ * FIRMWARE ESP32 PRESENSI RFID MULTI-LOKASI & FAST CONTINUOUS TAP (v3.0)
  * Yayasan Pondok Pesantren Al Muttaqin Kota Madiun
  * =====================================================================
- * Perbaikan & Peningkatan Stabilitas (v2.0):
- * 1. Anti-Bentrok MQTT Broker (MQTT Client ID Collision Protection):
- *    - Client ID MQTT otomatis diberi suffix unik berbasis Chip MAC ESP32.
- *    - Jika ada 2 atau lebih alat dinyalakan bersamaan dengan DEVICE_ID yang sama,
- *      keduanya TIDAK AKAN PERNAH saling tendang / putus koneksi di broker Mosquitto.
- * 2. Anti-Freeze Pergantian Sesi (I2C Decoupled Processing):
- *    - Callback MQTT tidak lagi memanggil perintah LCD secara sinkron.
- *    - Perubahan sesi diproses di main loop() secara aman, mencegah I2C deadlock/freeze
- *      saat server mem-broadcast status sesi baru bertubi-tubi.
- * 3. Proteksi I2C Timeout & Recovery:
- *    - Wire.setTimeOut(1000) mencegah CPU ESP32 hang permanen jika bus LCD terganggu.
- * 4. Pemulihan Otomatis Modul RFID RC522 (Brownout & SPI Auto-Recovery):
- *    - Secara periodik memeriksa register status RC522. Jika sensor mengalami drop tegangan
- *      dan macet di jalur SPI, firmware otomatis me-reset dan menginisialisasi ulang RC522.
- * 5. Hardware Task Watchdog Timer (WDT 15 detik):
- *    - Jika terjadi hang tak terduga pada WiFi/I2C/SPI, ESP32 otomatis reboot mandiri
- *      tanpa perlu cabut colok adaptor daya.
- * 6. Langganan Topik MQTT Bersih & Hemat Buffer:
- *    - Menghilangkan langganan redundan yang membanjiri buffer RAM ESP32.
+ * Peningkatan Utama (v3.0):
+ * 1. TAP CEPAT BERUNTUN TANPA TUNGGU MODE STANDBY (Zero-Wait Continuous Tap):
+ *    - Saat nama siswa sebelumnya masih tampil di LCD, siswa berikutnya BISA
+ *      LANGSUNG MEN-TAP KARTU tanpa menunggu layar kembali ke mode standby!
+ *    - Proteksi anti-double-tap hanya menahan kartu dengan UID YANG SAMA selama
+ *      2,5 detik; kartu siswa lain langsung diproses seketika.
+ * 2. LOADING SUPER CEPAT & TANPA KEDIP (Ultra-Low Latency):
+ *    - Mengaktifkan TCP_NODELAY (espClient.setNoDelay(true)) agar paket MQTT
+ *      terkirim seketika tanpa jeda Nagle 40-200ms.
+ *    - Paket tap dipublikasikan ke MQTT TERLEBIH DAHULU sebelum bunyi buzzer
+ *      atau pembaruan LCD.
+ *    - Buzzer non-blocking berbasis millis() (NOL delay() di dalam loop).
+ *    - Menunda tampilan "MEMPROSES..." 450ms sehingga respon cepat (<450ms)
+ *      langsung menampilkan nama siswa tanpa jeda/kedip layar loading.
+ *    - Deduplikasi respon via tap_seq dan 1 topik respon bersih (mencegah
+ *      buzzer bunyi 2x dan LCD redraw 2x).
+ * 3. SINKRONISASI SESI ANTI "TIDAK ADA SESI":
+ *    - Pencocokan Device ID toleran spasi/underscore/huruf besar-kecil
+ *      ("kantor smp" otomatis cocok dengan "kantor_smp").
+ *    - Berlangganan topik sesi raw & normalized sekaligus + sinkronisasi ulang
+ *      tiap 15 detik bila belum menerima sesi aktif.
+ * 4. Stabilitas Hardware Penuh:
+ *    - Client ID MQTT unik berbasis Chip MAC, I2C timeout 1000ms, auto-recovery
+ *      RC522, dan Hardware Watchdog Timer (15 detik) aman saat reconnect.
  *
  * Pin Hardware:
  * - RC522 SDA(SS): GPIO 5  | SCK: GPIO 18 | MOSI: GPIO 23 | MISO: GPIO 19 | RST: GPIO 4
@@ -40,8 +45,7 @@
 
 // ================= KONFIGURASI PERANGKAT =======================
 // Masukkan Device ID yang didaftarkan di Menu Pengaturan Sesi Web.
-// Contoh: "tap_masjid_1" untuk alat 1, "tap_masjid_2" untuk alat 2.
-// JIKA DIKOSONGKAN (""), otomatis memakai Serial Chip MAC unik ESP32 (misal: "ESP32-B8D2E14A").
+// JIKA DIKOSONGKAN (""), otomatis memakai Serial Chip MAC unik ESP32.
 const char* DEVICE_ID = "kantor smp";
 
 // ================= KONFIGURASI WIFI & VPS MQTT =================
@@ -54,137 +58,239 @@ const int   MQTT_PORT     = 1883;
 const char* TOPIC_TAP       = "presensi/santri/tap";
 const char* TOPIC_HEARTBEAT = "presensi/santri/heartbeat";
 
-// ================= KONFIGURASI PIN HARDWARE ====================
+// ================= KONFIGURASI PIN & TIMING ====================
 #define SS_PIN      5
 #define RST_PIN     4
 #define BUZZER_PIN  25
 
-#define WDT_TIMEOUT_SECONDS 15
+#define WDT_TIMEOUT_SECONDS       15
+#define RESULT_DISPLAY_MS         2500   // Durasi nama tampil di LCD bila tidak ada siswa berikutnya
+#define SAME_CARD_COOLDOWN_MS     2500   // Cooldown hanya untuk KARTU YANG SAMA (kartu lain langsung bisa tap!)
+#define PREEMPT_INFLIGHT_MS       200    // Kartu berbeda boleh mendahului tap in-flight setelah 200ms
+#define PROCESSING_HINT_DELAY_MS  450    // Tampilkan "MEMPROSES..." hanya jika server > 450ms
+#define RESPONSE_TIMEOUT_MS       2500   // Batas tunggu respon server
+#define SESSION_SYNC_GRACE_MS     2000   // Masa tunggu sinkron sesi awal saat baru konek MQTT
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 
-// Variabel Identitas Perangkat
-String activeDeviceId  = "";
+// Identitas Perangkat
+String activeDeviceId     = "";
+String normalizedDeviceId = "";
 String mqttBrokerClientId = "";
 
 // Status Sesi Presensi
-bool hasActiveSesi = false;
-String currentKategori = "";
-String currentSesiName = "";
+bool hasActiveSesi        = false;
+bool receivedSessionMsg   = false;
+unsigned long sessionSyncDeadlineMs = 0;
+String currentKategori    = "";
+String currentSesiName    = "";
 volatile bool pendingLcdRefresh = false;
 
-// Status Respon Tap Kartu (Decoupled dari MQTT Callback)
-bool waitingResponse = false;
-unsigned long tapSentAtMs = 0;
+// Cache LCD untuk update bebas flicker & cepat
+String lastRenderedLine0 = "";
+String lastRenderedLine1 = "";
 
-bool showingResult = false;
+// Status Tap Kartu & Continuous Tap
+bool waitingResponse       = false;
+bool processingHintShown   = false;
+unsigned long tapSentAtMs  = 0;
+uint32_t currentTapSeq     = 0;
+uint32_t lastDisplayedSeq  = 0;
+
+String lastTappedUid       = "";
+unsigned long lastTapAtMs  = 0;
+
+bool showingResult         = false;
 unsigned long lcdResetAtMs = 0;
 volatile bool pendingDisplayResult = false;
-String respNama = "";
+String respNama   = "";
 String respStatus = "";
+uint32_t pendingRespSeq = 0;
 
 // Timer periodik
 unsigned long lastHeartbeatMs = 0;
 unsigned long lastRfidCheckMs = 0;
+bool wdtInitialized = false;
+
+// ================= NON-BLOCKING BUZZER STATE MACHINE ===========
+struct BeepStep {
+    bool high;
+    uint16_t durationMs;
+};
+
+BeepStep buzzerQueue[6];
+uint8_t buzzerCount = 0;
+uint8_t buzzerIdx = 0;
+unsigned long buzzerStepEndMs = 0;
+bool buzzerActive = false;
+
+void startBuzzerPattern(const BeepStep* steps, uint8_t count) {
+    if (count == 0 || count > 6) return;
+    for (uint8_t i = 0; i < count; i++) {
+        buzzerQueue[i] = steps[i];
+    }
+    buzzerCount = count;
+    buzzerIdx = 0;
+    buzzerActive = true;
+    digitalWrite(BUZZER_PIN, buzzerQueue[0].high ? HIGH : LOW);
+    buzzerStepEndMs = millis() + buzzerQueue[0].durationMs;
+}
+
+void updateBuzzer() {
+    if (!buzzerActive) return;
+    if ((long)(millis() - buzzerStepEndMs) < 0) return;
+
+    buzzerIdx++;
+    if (buzzerIdx >= buzzerCount) {
+        digitalWrite(BUZZER_PIN, LOW);
+        buzzerActive = false;
+        return;
+    }
+    digitalWrite(BUZZER_PIN, buzzerQueue[buzzerIdx].high ? HIGH : LOW);
+    buzzerStepEndMs = millis() + buzzerQueue[buzzerIdx].durationMs;
+}
+
+void beepTapAsync() {
+    static const BeepStep seq[] = { {true, 45}, {false, 10} };
+    startBuzzerPattern(seq, 2);
+}
+
+void beepSuccessAsync() {
+    static const BeepStep seq[] = { {true, 55}, {false, 45}, {true, 55}, {false, 10} };
+    startBuzzerPattern(seq, 4);
+}
+
+void beepDuplicateAsync() {
+    static const BeepStep seq[] = { {true, 90}, {false, 60}, {true, 90}, {false, 10} };
+    startBuzzerPattern(seq, 4);
+}
+
+void beepWarningAsync() {
+    static const BeepStep seq[] = { {true, 220}, {false, 10} };
+    startBuzzerPattern(seq, 2);
+}
+
+void safeWdtReset() {
+    if (wdtInitialized) {
+        esp_task_wdt_reset();
+    }
+}
+
+// ================= HELPER NORMALISASI DEVICE ID ================
+String normalizeDeviceId(String s) {
+    s.trim();
+    s.toLowerCase();
+    String out = "";
+    bool prevUnderscore = false;
+    for (unsigned int i = 0; i < s.length(); i++) {
+        char c = s.charAt(i);
+        if (c == ' ' || c == '-' || c == '_') {
+            if (!prevUnderscore) {
+                out += '_';
+                prevUnderscore = true;
+            }
+        } else {
+            out += c;
+            prevUnderscore = false;
+        }
+    }
+    return out;
+}
+
+bool isForThisDevice(const String& targetDevice) {
+    if (targetDevice.length() == 0) return true;
+    return normalizeDeviceId(targetDevice) == normalizedDeviceId;
+}
 
 // ================= FUNGSI BACA SERIAL HARDWARE ESP32 ===========
 String readHardwareSerial() {
-    uint64_t chipid = ESP.getEfuseMac(); // 48-bit Factory MAC unik
+    uint64_t chipid = ESP.getEfuseMac();
     char serialBuf[24];
     snprintf(serialBuf, sizeof(serialBuf), "ESP32-%04X%08X",
              (uint16_t)(chipid >> 32), (uint32_t)chipid);
     return String(serialBuf);
 }
 
-// ================= POLA BUNYI BUZZER GPIO 25 ===================
-void beepTap() {
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(70);
-    digitalWrite(BUZZER_PIN, LOW);
-}
-
-void beepSuccess() {
-    for (int i = 0; i < 2; i++) {
-        digitalWrite(BUZZER_PIN, HIGH);
-        delay(60);
-        digitalWrite(BUZZER_PIN, LOW);
-        delay(50);
-    }
-}
-
-void beepDuplicate() {
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(100);
-    digitalWrite(BUZZER_PIN, LOW);
-    delay(70);
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(100);
-    digitalWrite(BUZZER_PIN, LOW);
-}
-
-void beepWarning() {
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(300);
-    digitalWrite(BUZZER_PIN, LOW);
-}
-
-// ================= HELPER RATA TENGAH LCD 16X2 =================
-void printCenter(String teks, int baris) {
+// ================= HELPER LCD 16X2 CEPAT & BEBAS FLICKER =======
+void printCenter(String teks, int baris, bool forceWrite = false) {
     teks.trim();
     if (teks.length() > 16) {
         teks = teks.substring(0, 16);
     }
-    int offset = (16 - teks.length()) / 2;
+
+    char lineBuf[17];
+    memset(lineBuf, ' ', 16);
+    lineBuf[16] = '\0';
+
+    int len = teks.length();
+    int offset = (16 - len) / 2;
     if (offset < 0) offset = 0;
+    for (int i = 0; i < len && (offset + i) < 16; i++) {
+        lineBuf[offset + i] = teks.charAt(i);
+    }
+
+    String formatted = String(lineBuf);
+    if (!forceWrite) {
+        if (baris == 0 && formatted == lastRenderedLine0) return;
+        if (baris == 1 && formatted == lastRenderedLine1) return;
+    }
+
     lcd.setCursor(0, baris);
-    lcd.print("                ");
-    lcd.setCursor(offset, baris);
-    lcd.print(teks);
+    lcd.print(lineBuf);
+
+    if (baris == 0) {
+        lastRenderedLine0 = formatted;
+    } else {
+        lastRenderedLine1 = formatted;
+    }
 }
 
 // ================= TAMPILAN STANDBY / SESI AKTIF ===============
-void showStandbyScreen() {
-    lcd.clear();
+void showStandbyScreen(bool forceWrite = false) {
     if (!hasActiveSesi) {
-        printCenter("TIDAK ADA SESI", 0);
-        printCenter("", 1);
+        if (!receivedSessionMsg && (long)(millis() - sessionSyncDeadlineMs) < 0) {
+            printCenter("SINKRON SESI...", 0, forceWrite);
+            printCenter(activeDeviceId, 1, forceWrite);
+        } else {
+            printCenter("TIDAK ADA SESI", 0, forceWrite);
+            printCenter("", 1, forceWrite);
+        }
     } else {
         String kat = currentKategori;
         String ses = currentSesiName;
         kat.trim();
         ses.trim();
 
-        printCenter(kat, 0);
-
+        printCenter(kat, 0, forceWrite);
         if (kat.equalsIgnoreCase(ses) || ses.length() == 0) {
-            printCenter("", 1);
+            printCenter("", 1, forceWrite);
         } else {
-            printCenter(ses, 1);
+            printCenter(ses, 1, forceWrite);
         }
     }
     showingResult = false;
     waitingResponse = false;
+    processingHintShown = false;
 }
 
 // ================= PEMULIHAN / RE-INIT MODUL RFID RC522 ========
 void checkAndRecoverRC522() {
     byte ver = rfid.PCD_ReadRegister(MFRC522::VersionReg);
-    // Nilai normal VersionReg adalah 0x91 atau 0x92. Jika 0x00 atau 0xFF berarti modul tidak merespon (freeze / lepas)
     if (ver == 0x00 || ver == 0xFF) {
-        Serial.println("[RC522] Terdeteksi tidak merespon (ver=0x" + String(ver, HEX) + "). Memulihkan koneksi SPI...");
+        Serial.println("[RC522] Tidak merespon (ver=0x" + String(ver, HEX) + "). Memulihkan SPI...");
         digitalWrite(RST_PIN, LOW);
-        delay(20);
+        delay(10);
         digitalWrite(RST_PIN, HIGH);
-        delay(20);
+        delay(10);
         rfid.PCD_Init();
-        Serial.println("[RC522] Inisialisasi ulang selesai.");
+        Serial.println("[RC522] Pemulihan selesai.");
     }
 }
 
-// ================= KIRIM HEARTBEAT KE SERVER ===================
+// ================= KIRIM HEARTBEAT / REQUEST SESI ==============
 void publishHeartbeat(const char* eventName) {
     if (!mqttClient.connected()) return;
 
@@ -200,8 +306,10 @@ void publishHeartbeat(const char* eventName) {
 }
 
 // ================= CALLBACK MQTT DARI DAEMON VPS ================
-// CATATAN PENTING: Callback ini berjalan cepat tanpa perintah lambat I2C (Wire)
+// Ringan & cepat: TIDAK ada perintah I2C LCD di sini
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    if (length == 0) return;
+
     StaticJsonDocument<512> doc;
     DeserializationError err = deserializeJson(doc, payload, length);
     if (err) return;
@@ -214,8 +322,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         if (targetDevice.length() == 0) {
             targetDevice = doc["serial"] | "";
         }
-        // Abaikan jika pesan spesifik ditujukan untuk perangkat lain
-        if (targetDevice.length() > 0 && !targetDevice.equalsIgnoreCase(activeDeviceId)) {
+        // Cocokkan secara toleran (spasi/underscore/huruf besar-kecil)
+        if (targetDevice.length() > 0 && !isForThisDevice(targetDevice)) {
             return;
         }
 
@@ -237,7 +345,11 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             }
         }
 
-        bool changed = (hasActiveSesi != adaSesi) ||
+        bool firstSync = !receivedSessionMsg;
+        receivedSessionMsg = true;
+
+        bool changed = firstSync ||
+                       (hasActiveSesi != adaSesi) ||
                        (currentKategori != nextKategori) ||
                        (currentSesiName != nextSesiName);
 
@@ -245,7 +357,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             hasActiveSesi   = adaSesi;
             currentKategori = nextKategori;
             currentSesiName = nextSesiName;
-            // Tandai butuh update layar (dieksekusi aman di loop(), bukan di interrupt callback)
             pendingLcdRefresh = true;
         }
         return;
@@ -254,30 +365,44 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     // 2. RESPON HASIL TAP KARTU
     if (topStr.indexOf("response") >= 0) {
         String targetDevice = doc["device_id"] | "";
-        if (targetDevice.length() > 0 && !targetDevice.equalsIgnoreCase(activeDeviceId)) {
-            return; // Respon untuk alat lain
+        if (targetDevice.length() > 0 && !isForThisDevice(targetDevice)) {
+            return;
+        }
+
+        uint32_t respSeq = doc["tap_seq"] | 0;
+        // Abaikan respon lama jika siswa berikutnya sudah men-tap kartu baru
+        if (respSeq > 0 && respSeq != currentTapSeq) {
+            return;
+        }
+        // Abaikan duplikat respon untuk tap yang sama (langsung di callback)
+        if (respSeq > 0 && (respSeq == lastDisplayedSeq || respSeq == pendingRespSeq)) {
+            return;
         }
 
         waitingResponse = false;
+        processingHintShown = false;
+        pendingRespSeq = respSeq;
+        lastDisplayedSeq = respSeq;
         respNama = doc["nama"] | "Santri";
         respStatus = doc["status"] | "BERHASIL ABSEN";
-        pendingDisplayResult = true; // Tandai agar loop() yang menampilkan ke LCD
+        pendingDisplayResult = true;
         return;
     }
 }
 
 // ================= KONEKSI WIFI & MQTT =========================
 void connectWiFi() {
-    lcd.clear();
     printCenter("MENGHUBUNGKAN", 0);
     printCenter("WIFI...", 1);
 
     WiFi.mode(WIFI_STA);
+    WiFi.setSleep(false); // Matikan power-saving WiFi agar latensi MQTT minimal
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     int retry = 0;
     while (WiFi.status() != WL_CONNECTED) {
-        delay(400);
+        safeWdtReset();
+        delay(250);
         Serial.print(".");
         retry++;
         if (retry > 40) {
@@ -287,37 +412,51 @@ void connectWiFi() {
             retry = 0;
         }
     }
+    espClient.setNoDelay(true);
     Serial.println("\nWiFi Terhubung! IP: " + WiFi.localIP().toString());
 }
 
 void reconnectMQTT() {
     while (!mqttClient.connected()) {
-        Serial.print("Menghubungkan MQTT ke " + String(MQTT_SERVER) + " sebagai [" + mqttBrokerClientId + "] (Device: " + activeDeviceId + ")... ");
-        
-        // Connect ke broker dengan Client ID yang dijamin unik di seluruh dunia
+        safeWdtReset();
+        if (WiFi.status() != WL_CONNECTED) {
+            connectWiFi();
+        }
+        espClient.setNoDelay(true);
+
+        Serial.print("Menghubungkan MQTT ke " + String(MQTT_SERVER) + " [" + mqttBrokerClientId + "] (Device: " + activeDeviceId + ")... ");
         if (mqttClient.connect(mqttBrokerClientId.c_str())) {
             Serial.println("Terhubung!");
+            espClient.setNoDelay(true);
 
-            // 1. Dengarkan respon tap kartu khusus untuk alat ini
-            String topicResp1 = "presensi/santri/response/" + activeDeviceId;
-            String topicResp2 = "presensi/devices/" + activeDeviceId + "/response";
-            mqttClient.subscribe(topicResp1.c_str(), 1);
-            mqttClient.subscribe(topicResp2.c_str(), 1);
+            // 1. Topik respon tap kartu (1 topik bersih sesuai activeDeviceId agar tidak duplikat)
+            String topicResp = "presensi/devices/" + activeDeviceId + "/response";
+            mqttClient.subscribe(topicResp.c_str(), 0);
 
-            // 2. Dengarkan broadcast sesi aktif spesifik untuk alat ini
-            String topicSesiDevice = "presensi/devices/" + activeDeviceId + "/sesi";
-            mqttClient.subscribe(topicSesiDevice.c_str(), 1);
+            // 2. Topik sesi aktif perangkat (raw & normalized agar kebal beda spasi/underscore)
+            String topicSesi = "presensi/devices/" + activeDeviceId + "/sesi";
+            mqttClient.subscribe(topicSesi.c_str(), 0);
+            if (!activeDeviceId.equalsIgnoreCase(normalizedDeviceId)) {
+                String topicSesiNorm = "presensi/devices/" + normalizedDeviceId + "/sesi";
+                mqttClient.subscribe(topicSesiNorm.c_str(), 0);
+            }
 
-            // 3. Fallback broadcast sesi global
-            mqttClient.subscribe("presensi/sesi_aktif", 1);
+            // 3. Fallback topik status sesi bersama
+            mqttClient.subscribe("presensi/santri/status_sesi", 0);
+            mqttClient.subscribe("presensi/sesi_aktif", 0);
 
-            // Kirim sinyal boot ke backend agar status online terdata & sesi langsung dikirim balik
+            sessionSyncDeadlineMs = millis() + SESSION_SYNC_GRACE_MS;
+            lastHeartbeatMs = millis();
+
             publishHeartbeat("boot");
             showStandbyScreen();
         } else {
             Serial.print("Gagal, rc=");
             Serial.println(mqttClient.state());
-            delay(3000);
+            for (int i = 0; i < 10; i++) {
+                safeWdtReset();
+                delay(200);
+            }
         }
     }
 }
@@ -328,53 +467,46 @@ void setup() {
     pinMode(BUZZER_PIN, OUTPUT);
     digitalWrite(BUZZER_PIN, LOW);
 
-    // Ambil Serial Unik Chip MAC ESP32
     String hwSerial = readHardwareSerial();
-
-    // Inisialisasi ID perangkat untuk display & registrasi ke sistem web
     if (String(DEVICE_ID).length() > 0) {
         activeDeviceId = String(DEVICE_ID);
     } else {
         activeDeviceId = hwSerial;
     }
+    activeDeviceId.trim();
+    normalizedDeviceId = normalizeDeviceId(activeDeviceId);
 
-    // Client ID MQTT ke Broker WAJIB UNIK di broker Mosquitto:
-    // Menggabungkan activeDeviceId dengan 6 digit unik MAC chip agar tidak ada bentrok
-    mqttBrokerClientId = activeDeviceId + "-" + hwSerial.substring(hwSerial.length() - 6);
+    mqttBrokerClientId = normalizedDeviceId + "-" + hwSerial.substring(hwSerial.length() - 6);
 
     Serial.println("=========================================");
+    Serial.println("FIRMWARE         : ESP32 PRESENSI v3.0");
     Serial.println("DEVICE ID SISTEM : " + activeDeviceId);
+    Serial.println("DEVICE ID NORM   : " + normalizedDeviceId);
     Serial.println("MQTT CLIENT ID   : " + mqttBrokerClientId);
     Serial.println("=========================================");
 
-    // Inisialisasi I2C dengan proteksi timeout (1000ms) agar tidak bisa hang permanen
+    // Inisialisasi I2C standar 100kHz (stabil di semua modul LCD PCF8574) dengan proteksi timeout
     Wire.begin(21, 22);
     Wire.setTimeOut(1000);
 
     lcd.init();
     lcd.backlight();
-
-    // Tampilkan Device ID saat pertama kali dinyalakan
     lcd.clear();
-    printCenter("ALAT AKTIF:", 0);
-    printCenter(activeDeviceId, 1);
-    beepTap();
-    delay(1500);
 
-    // Inisialisasi SPI dan Modul RFID RC522
+    printCenter("ALAT AKTIF:", 0, true);
+    printCenter(activeDeviceId, 1, true);
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(55);
+    digitalWrite(BUZZER_PIN, LOW);
+    delay(800);
+
+    // Inisialisasi SPI & Modul RFID RC522
     SPI.begin();
     rfid.PCD_Init();
-    delay(50);
+    delay(30);
     checkAndRecoverRC522();
 
-    // Inisialisasi WiFi & MQTT
-    connectWiFi();
-    mqttClient.setBufferSize(512);
-    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
-    mqttClient.setCallback(mqttCallback);
-    reconnectMQTT();
-
-    // Inisialisasi Hardware Task Watchdog Timer (Anti-Hang Auto Reboot)
+    // Inisialisasi Watchdog Timer sebelum koneksi jaringan
     #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
         esp_task_wdt_config_t wdt_config = {
             .timeout_ms = WDT_TIMEOUT_SECONDS * 1000,
@@ -387,16 +519,26 @@ void setup() {
         esp_task_wdt_init(WDT_TIMEOUT_SECONDS, true);
         esp_task_wdt_add(NULL);
     #endif
+    wdtInitialized = true;
 
-    Serial.println("Sistem Siap! Watchdog Aktif (15 detik).");
+    // Inisialisasi WiFi & MQTT
+    connectWiFi();
+    mqttClient.setBufferSize(512);
+    mqttClient.setSocketTimeout(2);
+    mqttClient.setKeepAlive(30);
+    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    mqttClient.setCallback(mqttCallback);
+    reconnectMQTT();
+
+    Serial.println("Sistem Siap! Mode Fast Continuous Tap & Watchdog Aktif.");
 }
 
 // ================= LOOP UTAMA ==================================
 void loop() {
-    // Reset Hardware Watchdog Timer setiap iterasi loop normal
-    esp_task_wdt_reset();
+    safeWdtReset();
+    updateBuzzer();
 
-    // Pastikan koneksi WiFi & MQTT tetap terjaga
+    // Jaga koneksi WiFi & MQTT tetap prima
     if (WiFi.status() != WL_CONNECTED) {
         connectWiFi();
     }
@@ -405,96 +547,122 @@ void loop() {
     }
     mqttClient.loop();
 
-    // 1. Eksekusi Tampilan Hasil Tap Kartu (Aman dari Interrupt)
+    unsigned long nowMs = millis();
+
+    // 1. Tampilkan Hasil Tap Kartu (segera tanpa memblokir siswa berikutnya!)
     if (pendingDisplayResult) {
         pendingDisplayResult = false;
-        lcd.clear();
         printCenter(respNama, 0);
         printCenter(respStatus, 1);
 
-        if (respStatus.equalsIgnoreCase("BERHASIL ABSEN") || 
-            respStatus.equalsIgnoreCase("HADIR MASUK") || 
+        if (respStatus.equalsIgnoreCase("BERHASIL ABSEN") ||
+            respStatus.equalsIgnoreCase("HADIR MASUK") ||
             respStatus.equalsIgnoreCase("HADIR PULANG")) {
-            beepSuccess();
+            beepSuccessAsync();
         } else if (respStatus.equalsIgnoreCase("SUDAH ABSEN")) {
-            beepDuplicate();
+            beepDuplicateAsync();
         } else {
-            beepWarning();
+            beepWarningAsync();
         }
 
         showingResult = true;
-        lcdResetAtMs = millis() + 3000;
+        lcdResetAtMs = nowMs + RESULT_DISPLAY_MS;
     }
 
-    // 2. Eksekusi Refresh Layar Standby jika Sesi Berubah
-    if (pendingLcdRefresh && !showingResult && !waitingResponse) {
-        pendingLcdRefresh = false;
-        showStandbyScreen();
+    // 2. Tampilkan layar "MEMPROSES..." HANYA jika server belum membalas > 450ms
+    if (waitingResponse && !processingHintShown && (nowMs - tapSentAtMs >= PROCESSING_HINT_DELAY_MS)) {
+        processingHintShown = true;
+        printCenter("MEMPROSES...", 0);
+        printCenter("MOHON TUNGGU", 1);
     }
 
-    // 3. Timeout Proteksi Tap: Jika 3 detik tidak ada respon dari server, tampilkan timeout
-    if (waitingResponse && (millis() - tapSentAtMs >= 3000)) {
+    // 3. Refresh Layar Standby jika Sesi Berubah atau masa grace sinkron awal selesai
+    if (!showingResult && !waitingResponse) {
+        if (pendingLcdRefresh) {
+            pendingLcdRefresh = false;
+            showStandbyScreen();
+        } else if (!receivedSessionMsg && !hasActiveSesi && (long)(nowMs - sessionSyncDeadlineMs) >= 0) {
+            receivedSessionMsg = true; // Tampilkan status akhir jika belum ada balasan
+            showStandbyScreen();
+        }
+    }
+
+    // 4. Timeout Proteksi Tap (2,5 detik)
+    if (waitingResponse && (nowMs - tapSentAtMs >= RESPONSE_TIMEOUT_MS)) {
         waitingResponse = false;
-        beepWarning();
-        lcd.clear();
+        processingHintShown = false;
+        beepWarningAsync();
         printCenter("SERVER TIMEOUT", 0);
         printCenter("COBA LAGI", 1);
         showingResult = true;
-        lcdResetAtMs = millis() + 2000;
+        lcdResetAtMs = nowMs + 1500;
     }
 
-    // 4. Kembalikan layar LCD ke standby setelah durasi tampilan hasil tap selesai
-    if (showingResult && millis() >= lcdResetAtMs) {
+    // 5. Kembalikan LCD ke standby bila durasi tampilan hasil sudah habis & tidak ada tap baru
+    if (showingResult && !waitingResponse && (long)(nowMs - lcdResetAtMs) >= 0) {
         showStandbyScreen();
     }
 
-    // 5. Kirim heartbeat tiap 60 detik agar status Online di Web selalu terpantau
-    if (millis() - lastHeartbeatMs > 60000) {
-        lastHeartbeatMs = millis();
-        publishHeartbeat("ping");
+    // 6. Heartbeat & Auto-Sync Sesi:
+    //    - Setiap 15 detik bila belum ada sesi aktif (agar cepat pulih otomatis)
+    //    - Setiap 60 detik bila sesi sudah aktif
+    unsigned long hbInterval = hasActiveSesi ? 60000UL : 15000UL;
+    if (nowMs - lastHeartbeatMs > hbInterval) {
+        lastHeartbeatMs = nowMs;
+        publishHeartbeat(hasActiveSesi ? "ping" : "sync_sesi");
     }
 
-    // 6. Pemeriksaan Kesehatan Modul RFID RC522 setiap 15 detik (Auto-Recovery jika drop tegangan)
-    if (!waitingResponse && (millis() - lastRfidCheckMs > 15000)) {
-        lastRfidCheckMs = millis();
+    // 7. Pemeriksaan Kesehatan Modul RFID RC522 setiap 15 detik (saat idle)
+    if (!waitingResponse && !showingResult && (nowMs - lastRfidCheckMs > 15000UL)) {
+        lastRfidCheckMs = nowMs;
         checkAndRecoverRC522();
     }
 
-    // 7. Jangan baca kartu baru jika sedang menunggu balasan server atau sedang menampilkan hasil
-    if (waitingResponse || showingResult) {
-        return;
-    }
-
-    // 8. Deteksi Tap Kartu RFID Baru
+    // 8. DETEKSI TAP KARTU RFID SECARA KONTINU (TIDAK PERLU TUNGGU STANDBY!)
+    //    Catatan: `showingResult` sengaja TIDAK memblokir pembacaan kartu!
     if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
         return;
     }
 
     // Baca UID format HEX 8-digit
     String uidHex = "";
+    uidHex.reserve(16);
     for (byte i = 0; i < rfid.uid.size; i++) {
         if (rfid.uid.uidByte[i] < 0x10) uidHex += "0";
         uidHex += String(rfid.uid.uidByte[i], HEX);
     }
     uidHex.toUpperCase();
 
-    // Hitung Format Desimal 32-bit dari 4-byte kartu Mifare (normal & byte-reversed)
+    // Hentikan komunikasi kartu segera agar pembaca siap untuk kartu berikutnya
+    rfid.PICC_HaltA();
+    rfid.PCD_StopCrypto1();
+
+    // Proteksi Anti-Double-Tap KHUSUS UNTUK KARTU YANG SAMA (kartu siswa lain tetap langsung masuk!)
+    if (uidHex == lastTappedUid && (nowMs - lastTapAtMs) < SAME_CARD_COOLDOWN_MS) {
+        return;
+    }
+
+    // Jika tap kartu lain masih in-flight < 200ms, tunggu sekejap agar tidak tabrakan
+    if (waitingResponse && (nowMs - tapSentAtMs) < PREEMPT_INFLIGHT_MS) {
+        return;
+    }
+
+    // Hitung Format Desimal 32-bit (normal & byte-reversed)
     uint32_t uidDec32 = 0;
     uint32_t uidDec32Rev = 0;
     String uidHexRev = "";
     if (rfid.uid.size >= 4) {
-        // Format Normal RC522
         uidDec32 = ((uint32_t)rfid.uid.uidByte[0] << 24) |
                    ((uint32_t)rfid.uid.uidByte[1] << 16) |
                    ((uint32_t)rfid.uid.uidByte[2] << 8)  |
                    ((uint32_t)rfid.uid.uidByte[3]);
 
-        // Format Byte-Reversed (Big-Endian sesuai USB Desktop Reader)
         uidDec32Rev = ((uint32_t)rfid.uid.uidByte[3] << 24) |
                       ((uint32_t)rfid.uid.uidByte[2] << 16) |
                       ((uint32_t)rfid.uid.uidByte[1] << 8)  |
                       ((uint32_t)rfid.uid.uidByte[0]);
 
+        uidHexRev.reserve(16);
         for (int i = (int)rfid.uid.size - 1; i >= 0; i--) {
             if (rfid.uid.uidByte[i] < 0x10) uidHexRev += "0";
             uidHexRev += String(rfid.uid.uidByte[i], HEX);
@@ -502,27 +670,24 @@ void loop() {
         uidHexRev.toUpperCase();
     }
 
-    beepTap();
-    Serial.println("Tap HEX: " + uidHex + " (Rev: " + uidHexRev + ") | DEC: " + String(uidDec32) + " (Rev: " + String(uidDec32Rev) + ") | Device: " + activeDeviceId);
-
-    // Tampilkan pesan proses di LCD
-    lcd.clear();
-    printCenter("MEMPROSES KARTU", 0);
-    printCenter("MOHON TUNGGU...", 1);
-
-    waitingResponse = true;
-    tapSentAtMs = millis();
-
-    // Format 10 digit zero-padded sesuai format USB Desktop Reader (misal 0086028247)
     char dec32Padded[16];
     snprintf(dec32Padded, sizeof(dec32Padded), "%010lu", (unsigned long)uidDec32);
     char dec32RevPadded[16];
     snprintf(dec32RevPadded, sizeof(dec32RevPadded), "%010lu", (unsigned long)uidDec32Rev);
 
-    // Kirim payload ke MQTT
+    currentTapSeq++;
+    lastTappedUid       = uidHex;
+    lastTapAtMs         = nowMs;
+    waitingResponse     = true;
+    processingHintShown = false;
+    showingResult       = false;
+    tapSentAtMs         = nowMs;
+
+    // KIRIM PAYLOAD MQTT TERLEBIH DAHULU (latensi minimum!)
     StaticJsonDocument<384> doc;
     doc["device_id"]        = activeDeviceId;
     doc["serial"]           = activeDeviceId;
+    doc["tap_seq"]          = currentTapSeq;
     doc["uid"]              = uidHex;
     doc["rfid_uid"]         = String(uidDec32);
     doc["rfid_uid_pad"]     = String(dec32Padded);
@@ -531,10 +696,12 @@ void loop() {
     doc["rfid_uid_rev_pad"] = String(dec32RevPadded);
     doc["ip"]               = WiFi.localIP().toString();
 
-    char payload[256];
+    char payload[320];
     serializeJson(doc, payload);
     mqttClient.publish(TOPIC_TAP, payload);
 
-    rfid.PICC_HaltA();
-    rfid.PCD_StopCrypto1();
+    // Buzzer tap non-blocking (0ms delay!)
+    beepTapAsync();
+
+    Serial.println("[TAP #" + String(currentTapSeq) + "] HEX:" + uidHex + " | DEC:" + String(uidDec32) + " | Dev:" + activeDeviceId);
 }

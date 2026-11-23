@@ -6,10 +6,11 @@ After=network.target mysql.service mosquitto.service
 Type=simple
 User=root
 WorkingDirectory=/opt/rfid-backend
+Environment="TZ=Asia/Jakarta"
 EnvironmentFile=-/opt/rfid-backend/.env
 ExecStart=/usr/bin/python3 /opt/rfid-backend/presensi_daemon.py
 Restart=always
-RestartSec=5
+RestartSec=3
 StandardOutput=journal
 StandardError=journal
 
