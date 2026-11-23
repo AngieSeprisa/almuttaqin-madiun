@@ -1022,7 +1022,12 @@
 
                     <div class="form-group">
                         <label class="form-label">Pengajar</label>
-                        <input type="text" name="nama_pengajar" value="{{ old('nama_pengajar', auth()->user()?->name) }}" class="form-control" placeholder="Nama pengajar...">
+                        <input type="text" name="nama_pengajar" list="daftarGuruPondokJurnal" value="{{ old('nama_pengajar', auth()->user()?->name) }}" class="form-control" placeholder="Nama pengajar...">
+                        <datalist id="daftarGuruPondokJurnal">
+                            @foreach($pengajarList ?? [] as $pg)
+                                <option value="{{ $pg->name }}"></option>
+                            @endforeach
+                        </datalist>
                     </div>
                 </div>
 
@@ -1278,7 +1283,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Pengajar</label>
-                        <input type="text" name="nama_pengajar" value="{{ $item->nama_pengajar }}" class="form-control">
+                        <input type="text" name="nama_pengajar" list="daftarGuruPondokJurnal" value="{{ $item->nama_pengajar }}" class="form-control">
                     </div>
                 </div>
 

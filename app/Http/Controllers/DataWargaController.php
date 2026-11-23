@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lembaga;
+use App\Models\MasterKelasPengajian;
 use App\Models\Siswa;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -18,11 +19,13 @@ class DataWargaController extends Controller
         $activeRoom = strtolower((string) session('active_lembaga', ''));
 
         $sekolahLembagas = Lembaga::where(function ($q) {
-            $q->whereIn('kode', ['smp', 'sma'])
+            $q->whereIn('kode', ['pondok', 'smp', 'sma'])
+              ->orWhere('singkatan', 'Pondok')
               ->orWhere('singkatan', 'SMP')
               ->orWhere('singkatan', 'SMA');
         })->where('is_active', true)->orderBy('urutan')->get();
 
+        $pondokLembaga = $sekolahLembagas->first(fn ($l) => strtolower((string) $l->kode) === 'pondok' || strtoupper((string) $l->singkatan) === 'PONDOK');
         $smpLembaga = $sekolahLembagas->first(fn ($l) => strtolower((string) $l->kode) === 'smp' || strtoupper((string) $l->singkatan) === 'SMP');
         $smaLembaga = $sekolahLembagas->first(fn ($l) => strtolower((string) $l->kode) === 'sma' || strtoupper((string) $l->singkatan) === 'SMA');
 
@@ -30,30 +33,44 @@ class DataWargaController extends Controller
             ->where(function ($q) {
                 $q->whereNull('is_active')->orWhere('is_active', true);
             })
-            ->where('is_guru_sekolah', true)
             ->where(function ($q) {
-                $q->whereNull('mapel_status')
-                  ->orWhereNotIn('mapel_status', ['ditolak', 'menunggu']);
+                $q->where(function ($sub) {
+                    $sub->where('is_guru_sekolah', true)
+                        ->where(function ($s) {
+                            $s->whereNull('mapel_status')
+                              ->orWhereNotIn('mapel_status', ['ditolak', 'menunggu']);
+                        });
+                })->orWhere('is_guru_pondok', true);
             });
 
         $query = $baseRegisteredQuery();
 
-        // Filter lembaga dari request atau dari session active_lembaga jika SMP/SMA
+        // Filter lembaga dari request atau dari session active_lembaga jika Pondok/SMP/SMA
         $selectedLembagaId = $request->input('lembaga_id');
-        if ($selectedLembagaId === null && in_array($activeRoom, ['smp', 'sma'], true)) {
-            $activeLembagaModel = $activeRoom === 'smp' ? $smpLembaga : $smaLembaga;
+        if ($selectedLembagaId === null && in_array($activeRoom, ['pondok', 'smp', 'sma'], true)) {
+            $activeLembagaModel = match ($activeRoom) {
+                'pondok' => $pondokLembaga,
+                'smp'    => $smpLembaga,
+                'sma'    => $smaLembaga,
+                default  => null,
+            };
             if ($activeLembagaModel) {
                 $selectedLembagaId = (string) $activeLembagaModel->id;
             }
         }
 
         if (!empty($selectedLembagaId) && $selectedLembagaId !== 'semua') {
-            $query->where(function ($q) use ($selectedLembagaId) {
-                $q->where('primary_lembaga_id', $selectedLembagaId)
-                  ->orWhereHas('lembagas', function ($l) use ($selectedLembagaId) {
-                      $l->where('lembagas.id', $selectedLembagaId);
-                  });
-            });
+            if ($pondokLembaga && (string) $selectedLembagaId === (string) $pondokLembaga->id) {
+                $query->where('is_guru_pondok', true);
+            } else {
+                $query->where('is_guru_sekolah', true)
+                    ->where(function ($q) use ($selectedLembagaId) {
+                        $q->where('primary_lembaga_id', $selectedLembagaId)
+                          ->orWhereHas('lembagas', function ($l) use ($selectedLembagaId) {
+                              $l->where('lembagas.id', $selectedLembagaId);
+                          });
+                    });
+            }
         }
 
         if ($request->filled('search')) {
@@ -62,18 +79,23 @@ class DataWargaController extends Controller
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('nip', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('mata_pelajaran', 'like', "%{$search}%");
+                  ->orWhere('mata_pelajaran', 'like', "%{$search}%")
+                  ->orWhere('pondok_materi', 'like', "%{$search}%");
             });
         }
 
         $gurus = $query->orderBy('name')->paginate(20)->withQueryString();
+        $kelasPengajianMap = MasterKelasPengajian::pluck('nama_kelas', 'id')->all();
 
-        $totalGuru = $baseRegisteredQuery()->count();
-        $totalSmp  = $smpLembaga ? $baseRegisteredQuery()->where(function ($q) use ($smpLembaga) {
+        $totalGuru   = $baseRegisteredQuery()->count();
+        $totalPondok = User::where(function ($q) {
+            $q->whereNull('is_active')->orWhere('is_active', true);
+        })->where('is_guru_pondok', true)->count();
+        $totalSmp    = $smpLembaga ? $baseRegisteredQuery()->where('is_guru_sekolah', true)->where(function ($q) use ($smpLembaga) {
             $q->where('primary_lembaga_id', $smpLembaga->id)
               ->orWhereHas('lembagas', fn ($l) => $l->where('lembagas.id', $smpLembaga->id));
         })->count() : 0;
-        $totalSma  = $smaLembaga ? $baseRegisteredQuery()->where(function ($q) use ($smaLembaga) {
+        $totalSma    = $smaLembaga ? $baseRegisteredQuery()->where('is_guru_sekolah', true)->where(function ($q) use ($smaLembaga) {
             $q->where('primary_lembaga_id', $smaLembaga->id)
               ->orWhereHas('lembagas', fn ($l) => $l->where('lembagas.id', $smaLembaga->id));
         })->count() : 0;
@@ -82,7 +104,9 @@ class DataWargaController extends Controller
             'gurus',
             'sekolahLembagas',
             'selectedLembagaId',
+            'kelasPengajianMap',
             'totalGuru',
+            'totalPondok',
             'totalSmp',
             'totalSma'
         ));

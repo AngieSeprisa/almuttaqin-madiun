@@ -547,7 +547,19 @@ class PondokPengajianController extends Controller
             ->orderByDesc('tanggal')
             ->orderBy('kelas_pengajian_id')
             ->get();
-        $pengajarList = User::where('is_active', true)->orderBy('name')->get();
+        $guruPondokList = User::where('is_active', true)
+            ->where('is_guru_pondok', true)
+            ->orderBy('name')
+            ->get();
+
+        if ($guruPondokList->isNotEmpty()) {
+            $pengajarList = $guruPondokList;
+            if (Auth::check() && !$pengajarList->contains('id', Auth::id())) {
+                $pengajarList = $pengajarList->push(Auth::user())->sortBy('name')->values();
+            }
+        } else {
+            $pengajarList = User::where('is_active', true)->orderBy('name')->get();
+        }
         $daftarSurat  = MushafMadinah::daftarSurat();
         $sesiList     = MushafMadinah::daftarSesiPengajian();
 

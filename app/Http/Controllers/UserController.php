@@ -82,6 +82,7 @@ class UserController extends Controller
             'Pengaturan Pondok' => [
                 'plotting_kamar'     => 'Plotting Kamar',
                 'plotting_pengajian' => 'Plotting Pengajian',
+                'guru_pondok'        => 'Plotting Guru Pondok',
             ],
             'Pengguna & Akses' => [
                 'pengguna' => 'Pengguna & Akses',

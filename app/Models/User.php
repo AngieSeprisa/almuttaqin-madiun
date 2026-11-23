@@ -40,6 +40,10 @@ class User extends Authenticatable
         'alamat',
         'primary_lembaga_id',
         'is_guru_sekolah',
+        'is_guru_pondok',
+        'pondok_kelas_ids',
+        'pondok_materi',
+        'pondok_catatan',
         'is_active',
         'must_change_password',
     ];
@@ -66,6 +70,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'is_guru_sekolah' => 'boolean',
+            'is_guru_pondok' => 'boolean',
+            'pondok_kelas_ids' => 'array',
             'must_change_password' => 'boolean',
             'mapel_diajukan_at' => 'datetime',
             'mapel_diverifikasi_at' => 'datetime',
@@ -203,7 +209,7 @@ class User extends Authenticatable
             'data_master'        => ['master_jam', 'master_lembaga', 'master_import_siswa'],
             'pengaturan_absensi' => ['pengaturan_sesi', 'monitor_rfid'],
             'pengaturan_sekolah' => ['pengaturan_sesi', 'monitor_rfid', 'guru_sekolah', 'plotting_mapel', 'plotting_kelas', 'plotting_ekskul'],
-            'pengaturan_pondok'  => ['plotting_kamar', 'plotting_pengajian'],
+            'pengaturan_pondok'  => ['plotting_kamar', 'plotting_pengajian', 'guru_pondok'],
             'master_kelas'       => ['plotting_kelas'],
         ];
     }
@@ -313,7 +319,7 @@ class User extends Authenticatable
             'daftar_buku', 'pinjam_buku',
             'guru_warga', 'lulus_warga', 'mutasi_warga', 'nfc',
             'rekap_sholat', 'rekap_pengajian', 'rekap_sekolah', 'rekap_guru',
-            'pengaturan_sesi', 'monitor_rfid', 'plotting_pengajian',
+            'pengaturan_sesi', 'monitor_rfid', 'plotting_pengajian', 'guru_pondok',
             'guru_sekolah', 'plotting_mapel', 'plotting_kelas', 'plotting_ekskul',
             'master_jam', 'master_lembaga', 'master_import_siswa', 'perizinan_haid',
         ];
@@ -332,7 +338,7 @@ class User extends Authenticatable
 
         if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, [
             'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
-            'pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian',
+            'pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian', 'guru_pondok',
             'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'rekap_guru',
             'perizinan', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'
         ], true)) {
@@ -417,6 +423,30 @@ class User extends Authenticatable
         $raw = trim((string)($this->mapel_diajukan ?? ''));
         if (empty($raw)) return [];
         return array_values(array_filter(array_map('trim', preg_split('/[,|;]/', $raw))));
+    }
+
+    /**
+     * Daftar array materi pondok yang diampu guru pondok.
+     */
+    public function getDaftarMateriPondokAttribute(): array
+    {
+        $raw = trim((string) ($this->pondok_materi ?? ''));
+        if ($raw === '') {
+            return [];
+        }
+        return array_values(array_filter(array_map('trim', preg_split('/[,|;]/', $raw))));
+    }
+
+    /**
+     * Daftar array ID kelas pengajian yang diampu guru pondok (integer).
+     */
+    public function getDaftarKelasPengajianIdsAttribute(): array
+    {
+        $ids = $this->pondok_kelas_ids;
+        if (!is_array($ids)) {
+            return [];
+        }
+        return array_values(array_unique(array_filter(array_map('intval', $ids), fn ($id) => $id > 0)));
     }
 
     /**

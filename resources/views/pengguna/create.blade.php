@@ -328,7 +328,8 @@
                 plotting_kelas: ['view', 'create', 'edit', 'delete'],
                 plotting_ekskul: ['view', 'create', 'edit', 'delete'],
                 plotting_kamar: ['view', 'create', 'edit', 'delete'],
-                plotting_pengajian: ['view', 'create', 'edit', 'delete']
+                plotting_pengajian: ['view', 'create', 'edit', 'delete'],
+                guru_pondok: ['view', 'create', 'edit', 'delete']
             }
         };
 

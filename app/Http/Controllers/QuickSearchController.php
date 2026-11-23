@@ -219,6 +219,14 @@ class QuickSearchController extends Controller
                 'permission' => 'plotting_kamar',
             ],
             [
+                'title' => 'Plotting Guru Pondok',
+                'description' => 'Daftar & plotting guru pengajar kelas pengajian pondok',
+                'url' => route('guru-pondok.index'),
+                'icon' => 'award',
+                'keywords' => 'plotting guru pondok ustadz pengajar kelas pengajian materi kitab',
+                'permission' => 'guru_pondok',
+            ],
+            [
                 'title' => 'Pengaturan Sesi & Perangkat RFID',
                 'description' => 'Kelola jadwal sesi otomatis, mesin ESP32 & target partisipan',
                 'url' => route('pengaturan.sesi'),
@@ -385,7 +393,7 @@ class QuickSearchController extends Controller
         }
 
         // 3. Guru & Pegawai
-        $canSearchGuru = !$authUser || $authUser->canDo('guru_sekolah', 'view') || $authUser->canDo('pengguna', 'view') || $authUser->isYayasan() || in_array($authUser->role, ['admin_lembaga', 'guru']);
+        $canSearchGuru = !$authUser || $authUser->canDo('guru_sekolah', 'view') || $authUser->canDo('guru_pondok', 'view') || $authUser->canDo('pengguna', 'view') || $authUser->isYayasan() || in_array($authUser->role, ['admin_lembaga', 'guru']);
         if ($canSearchGuru) {
             try {
                 $users = User::query()
@@ -394,6 +402,7 @@ class QuickSearchController extends Controller
                             ->orWhere('name', 'like', "%{$q}%")
                             ->orWhere('nip', 'like', "%{$q}%")
                             ->orWhere('mata_pelajaran', 'like', "%{$q}%")
+                            ->orWhere('pondok_materi', 'like', "%{$q}%")
                             ->orWhere('email', 'like', "%{$q}%");
                     })
                     ->limit(4)
@@ -404,13 +413,14 @@ class QuickSearchController extends Controller
                     foreach ($users as $u) {
                         $sub = [];
                         if ($u->mata_pelajaran) $sub[] = 'Mapel: ' . $u->mata_pelajaran;
+                        if ($u->pondok_materi) $sub[] = 'Pondok: ' . $u->pondok_materi;
                         if ($u->nip) $sub[] = 'NIP: ' . $u->nip;
                         if (empty($sub)) $sub[] = $u->email;
 
                         $userItems[] = [
                             'title' => $u->name,
                             'subtitle' => implode(' • ', $sub),
-                            'url' => route('guru-sekolah.index'),
+                            'url' => ($u->is_guru_pondok && !$u->is_guru_sekolah) ? route('guru-pondok.index') : route('guru-sekolah.index'),
                             'badge' => str_replace('_', ' ', $u->role),
                             'icon' => 'award',
                         ];

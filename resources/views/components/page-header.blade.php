@@ -132,6 +132,18 @@
                 $bcParent = 'Pengaturan Sekolah';
                 $bcParentRoute = route('plotting-kelas.index');
                 $bcChild = 'Plotting Kelas';
+            } elseif (request()->routeIs('plotting-kamar*')) {
+                $bcParent = 'Pengaturan Pondok';
+                $bcParentRoute = route('plotting-kamar.index');
+                $bcChild = 'Plotting Kamar';
+            } elseif (request()->routeIs('plotting-pengajian*')) {
+                $bcParent = 'Pengaturan Pondok';
+                $bcParentRoute = route('plotting-pengajian.index');
+                $bcChild = 'Plotting Pengajian';
+            } elseif (request()->routeIs('guru-pondok*')) {
+                $bcParent = 'Pengaturan Pondok';
+                $bcParentRoute = route('guru-pondok.index');
+                $bcChild = 'Plotting Guru Pondok';
             } elseif (request()->routeIs('pengguna*')) {
                 $bcParent = 'Pengguna';
                 $bcParentRoute = route('pengguna.index');

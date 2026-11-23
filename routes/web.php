@@ -7,6 +7,7 @@ use App\Http\Controllers\BerandaController;
 use App\Http\Controllers\ClassroomController;
 use App\Http\Controllers\DataWargaController;
 use App\Http\Controllers\EkskulJurnalController;
+use App\Http\Controllers\GuruPondokController;
 use App\Http\Controllers\GuruSekolahController;
 use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\JadwalPelajaranController;
@@ -783,6 +784,22 @@ Route::middleware('auth')->group(function () {
         Route::get('/anggota/{kelas}', [PlottingKelasPengajianController::class, 'anggota'])
             ->middleware('permission:plotting_pengajian,view')
             ->name('anggota');
+    });
+
+    // Menu Pengaturan Pondok: Plotting Guru Pondok
+    Route::prefix('guru-pondok')->name('guru-pondok.')->group(function () {
+        Route::get('/', [GuruPondokController::class, 'index'])
+            ->middleware('permission:guru_pondok,view')
+            ->name('index');
+        Route::post('/store', [GuruPondokController::class, 'store'])
+            ->middleware('permission:guru_pondok,create')
+            ->name('store');
+        Route::put('/{user}', [GuruPondokController::class, 'update'])
+            ->middleware('permission:guru_pondok,edit')
+            ->name('update');
+        Route::delete('/{user}', [GuruPondokController::class, 'destroy'])
+            ->middleware('permission:guru_pondok,delete')
+            ->name('destroy');
     });
 
     // Menu Manajemen Pengguna & Hak Akses

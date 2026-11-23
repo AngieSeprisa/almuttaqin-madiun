@@ -3,8 +3,22 @@
 @section('title', 'Guru')
 
 @section('header-actions')
-@if(auth()->check() && (auth()->user()->isYayasan() || auth()->user()->canDo('guru_sekolah', 'view')))
+@php
+    $canManageGuruSekolah = auth()->check() && (auth()->user()->isYayasan() || auth()->user()->canDo('guru_sekolah', 'view'));
+    $canManageGuruPondok  = auth()->check() && (auth()->user()->isYayasan() || auth()->user()->canDo('guru_pondok', 'view'));
+@endphp
+@if($canManageGuruSekolah || $canManageGuruPondok)
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    @if($canManageGuruPondok)
+    <a href="{{ route('guru-pondok.index') }}" class="btn btn-secondary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <span>Plotting Guru Pondok</span>
+    </a>
+    @endif
+    @if($canManageGuruSekolah)
     <a href="{{ route('guru-sekolah.index') }}" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
             <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -12,8 +26,9 @@
             <line x1="20" y1="8" x2="20" y2="14"></line>
             <line x1="23" y1="11" x2="17" y2="11"></line>
         </svg>
-        <span>Kelola Guru Lembaga</span>
+        <span>Kelola Guru Sekolah</span>
     </a>
+    @endif
 </div>
 @endif
 @endsection
@@ -32,10 +47,14 @@
     @endif
 
     {{-- Kartu Statistik --}}
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px;">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px;">
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:var(--text-secondary);">Total Guru Terdaftar</div>
             <div style="font-size:26px; font-weight:800; color:var(--text-primary); margin-top:4px;">{{ number_format($totalGuru) }}</div>
+        </div>
+        <div class="form-section-card" style="padding:16px 18px;">
+            <div style="font-size:12px; font-weight:600; color:#059669;">Guru Pondok</div>
+            <div style="font-size:26px; font-weight:800; color:#059669; margin-top:4px;">{{ number_format($totalPondok ?? 0) }}</div>
         </div>
         <div class="form-section-card" style="padding:16px 18px;">
             <div style="font-size:12px; font-weight:600; color:#2563eb;">Guru SMP</div>
@@ -101,7 +120,7 @@
                         <th>Nama Guru</th>
                         <th>NIP</th>
                         <th>Lembaga</th>
-                        <th>Mata Pelajaran</th>
+                        <th>Mapel / Pengajian Diampu</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -109,16 +128,33 @@
                     @forelse($gurus as $idx => $guru)
                     @php
                         $lembagaLabels = collect();
-                        if ($guru->primaryLembaga) {
-                            $lembagaLabels->push($guru->primaryLembaga->singkatan ?: $guru->primaryLembaga->nama);
+                        if ($guru->is_guru_pondok) {
+                            $lembagaLabels->push('Pondok');
                         }
-                        foreach ($guru->lembagas as $l) {
-                            $lbl = $l->singkatan ?: $l->nama;
-                            if (in_array(strtoupper($lbl), ['SMP', 'SMA']) && !$lembagaLabels->contains($lbl)) {
-                                $lembagaLabels->push($lbl);
+                        if ($guru->is_guru_sekolah) {
+                            if ($guru->primaryLembaga) {
+                                $lbl = $guru->primaryLembaga->singkatan ?: $guru->primaryLembaga->nama;
+                                if (!$lembagaLabels->contains($lbl)) {
+                                    $lembagaLabels->push($lbl);
+                                }
+                            }
+                            foreach ($guru->lembagas as $l) {
+                                $lbl = $l->singkatan ?: $l->nama;
+                                if (in_array(strtoupper($lbl), ['SMP', 'SMA']) && !$lembagaLabels->contains($lbl)) {
+                                    $lembagaLabels->push($lbl);
+                                }
                             }
                         }
-                        $mapelList = array_values(array_filter(array_map('trim', explode(',', (string) $guru->mata_pelajaran))));
+                        $mapelList = $guru->is_guru_sekolah ? array_values(array_filter(array_map('trim', explode(',', (string) $guru->mata_pelajaran)))) : [];
+                        $pondokKelasLabels = [];
+                        if ($guru->is_guru_pondok) {
+                            foreach ($guru->daftar_kelas_pengajian_ids as $kId) {
+                                if (!empty($kelasPengajianMap[$kId])) {
+                                    $pondokKelasLabels[] = $kelasPengajianMap[$kId];
+                                }
+                            }
+                        }
+                        $pondokMateriList = $guru->is_guru_pondok ? $guru->daftar_materi_pondok : [];
                     @endphp
                     <tr>
                         <td>{{ $gurus->firstItem() + $idx }}</td>
@@ -144,11 +180,21 @@
                             @endif
                         </td>
                         <td>
-                            @if(!empty($mapelList))
+                            @if(!empty($mapelList) || !empty($pondokKelasLabels) || !empty($pondokMateriList))
                                 <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                     @foreach($mapelList as $m)
                                         <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:12px; font-weight:600;">
                                             {{ $m }}
+                                        </span>
+                                    @endforeach
+                                    @foreach($pondokKelasLabels as $kLbl)
+                                        <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:12px; font-weight:600;">
+                                            {{ $kLbl }}
+                                        </span>
+                                    @endforeach
+                                    @foreach($pondokMateriList as $pm)
+                                        <span style="display:inline-flex; align-items:center; padding:3px 9px; border-radius:6px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-size:12px; font-weight:600;">
+                                            {{ $pm }}
                                         </span>
                                     @endforeach
                                 </div>

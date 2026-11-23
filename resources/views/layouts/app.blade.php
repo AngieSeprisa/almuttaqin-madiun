@@ -686,11 +686,13 @@
                 @php
                     $canPlottingKamar     = !$authUser || $authUser->canDo('plotting_kamar', 'view');
                     $canPlottingPengajian = !$authUser || $authUser->canDo('plotting_pengajian', 'view');
-                    $showPengaturanPondokGroup = $canPlottingKamar || $canPlottingPengajian;
+                    $canGuruPondok        = !$authUser || $authUser->canDo('guru_pondok', 'view');
+                    $showPengaturanPondokGroup = $canPlottingKamar || $canPlottingPengajian || $canGuruPondok;
+                    $isPengaturanPondokActive = request()->routeIs('plotting-kamar.*') || request()->routeIs('plotting-pengajian.*') || request()->routeIs('guru-pondok.*');
                 @endphp
                 @if($showPengaturanPondokGroup)
-                <div class="nav-group {{ (request()->routeIs('plotting-kamar.*') || request()->routeIs('plotting-pengajian.*')) ? 'open' : '' }}" id="navGroupPengaturanPondok">
-                    <button type="button" class="nav-item nav-item-has-sub {{ (request()->routeIs('plotting-kamar.*') || request()->routeIs('plotting-pengajian.*')) ? 'active' : '' }}" id="togglePengaturanPondok" title="Pengaturan Pondok">
+                <div class="nav-group {{ $isPengaturanPondokActive ? 'open' : '' }}" id="navGroupPengaturanPondok">
+                    <button type="button" class="nav-item nav-item-has-sub {{ $isPengaturanPondokActive ? 'active' : '' }}" id="togglePengaturanPondok" title="Pengaturan Pondok">
                         <span class="nav-item-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
@@ -716,6 +718,13 @@
                         <a href="{{ route('plotting-pengajian.index') }}" class="subnav-item {{ request()->routeIs('plotting-pengajian*') ? 'active' : '' }}" title="Plotting Pengajian">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Plotting Pengajian</span>
+                        </a>
+                        @endif
+
+                        @if($canGuruPondok)
+                        <a href="{{ route('guru-pondok.index') }}" class="subnav-item {{ request()->routeIs('guru-pondok*') ? 'active' : '' }}" title="Plotting Guru Pondok">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Plotting Guru Pondok</span>
                         </a>
                         @endif
                     </div>
