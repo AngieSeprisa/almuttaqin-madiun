@@ -15,16 +15,8 @@
     <div class="judul">FORMULIR PENDAFTARAN SANTRI BARU</div>
 
     <div class="no-induk-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2mm;">
-        <div style="display:flex; align-items:center; gap:2.5mm;">
-            <span style="font-weight:700;">Jenjang :</span>
-            <span><span class="box">{!! $ck(($p->jenjang ?? '') === 'SMP') !!}</span>SMP</span>
-            <span><span class="box">{!! $ck(($p->jenjang ?? '') === 'SMA') !!}</span>SMA</span>
-            <span><span class="box">{!! $ck(($p->jenjang ?? 'Reguler') === 'Reguler') !!}</span>Reguler</span>
-            @if($p->jenjang && !in_array($p->jenjang, ['SMP', 'SMA', 'Reguler'], true))
-                <span><span class="box">✓</span>{{ $p->jenjang }}</span>
-            @endif
+        <div style="display:flex; align-items:center; gap:2mm;">
             @if($p->nisn)
-                <span class="gap"></span>
                 <span style="font-weight:700;">NISN :</span>
                 <span style="font-family:monospace; font-weight:700;">{{ $p->nisn }}</span>
             @endif

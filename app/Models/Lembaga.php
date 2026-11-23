@@ -226,15 +226,19 @@ class Lembaga extends Model
     }
 
     /**
-     * Teks judul lembaga untuk sidebar.
+     * Teks judul lembaga untuk sidebar & switch lembaga.
      */
     public function getBrandTitleAttribute(): string
     {
-        return match ($this->kode) {
+        if (filled($this->nama)) {
+            return strtoupper(trim((string) $this->nama));
+        }
+
+        return match (strtolower((string) $this->kode)) {
             'smp'     => 'SMP AL MUTTAQIN',
             'sma'     => 'SMA AL MUTTAQIN',
             'yayasan' => 'YAYASAN PONDOK PESANTREN MUTTAQIN',
-            default   => 'PONDOK PESANTREN AL MUTTAQIN',
+            default   => strtoupper(trim((string) ($this->singkatan ?: $this->kode ?: 'PONDOK PESANTREN AL MUTTAQIN'))),
         };
     }
 
