@@ -15,14 +15,19 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* ===== Topbar ===== */
+        /* ===== Topbar (Sticky iOS Liquid Glass) ===== */
         .spmb-topbar {
-            background: #FFFFFF;
-            border-bottom: 1px solid #E2E8F0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(248, 250, 252, 0.56) 100%);
+            backdrop-filter: blur(24px) saturate(210%) brightness(1.04);
+            -webkit-backdrop-filter: blur(24px) saturate(210%) brightness(1.04);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.75);
             position: sticky;
             top: 0;
             z-index: 40;
-            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+            box-shadow:
+                0 6px 24px rgba(15, 23, 42, 0.06),
+                0 1px 0 rgba(15, 23, 42, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
         }
         .spmb-topbar-inner {
             width: 100%;

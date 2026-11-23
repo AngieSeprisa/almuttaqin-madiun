@@ -116,6 +116,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
+  // Sticky Topbar Liquid Glass Scroll State
+  const appHeader = document.querySelector('.app-header');
+  if (appHeader) {
+    const syncHeaderGlass = function () {
+      appHeader.classList.toggle('is-scrolled', window.scrollY > 8);
+    };
+    syncHeaderGlass();
+    window.addEventListener('scroll', syncHeaderGlass, { passive: true });
+  }
+
   // Handle window resize
   window.addEventListener('resize', function () {
     if (window.innerWidth > 768) {
