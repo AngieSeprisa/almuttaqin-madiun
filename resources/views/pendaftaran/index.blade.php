@@ -295,6 +295,27 @@
                                         <rect x="6" y="14" width="12" height="8"></rect>
                                     </svg>
                                 </a>
+
+                                {{-- Tombol Hapus Pendaftar --}}
+                                @if(!auth()->check() || auth()->user()->canDo('pendaftaran', 'delete'))
+                                <form action="{{ route('pendaftaran.destroy', $pendaftar->id) }}" method="POST" style="display:inline;">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="button" class="action-btn action-btn-delete js-swal-confirm"
+                                            data-title="Hapus Data Pendaftar?"
+                                            data-html="Hapus data pendaftaran <strong>{{ e($pendaftar->nama_lengkap) }}</strong> ({{ e($pendaftar->no_induk ?? '-') }})?"
+                                            data-icon="warning"
+                                            data-confirm-text="Ya, Hapus"
+                                            data-confirm-color="#DC2626"
+                                            data-cancel-text="Batal"
+                                            title="Hapus Pendaftar" aria-label="Hapus {{ $pendaftar->nama_lengkap }}">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

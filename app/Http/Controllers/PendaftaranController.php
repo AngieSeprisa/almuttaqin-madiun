@@ -321,4 +321,28 @@ class PendaftaranController extends Controller
         return redirect()->route('pendaftaran.show', $pendaftaran->id)
             ->with('success', 'Formulir pendaftaran santri atas nama ' . $pendaftaran->nama_lengkap . ' berhasil diperbarui.');
     }
+
+    /**
+     * Menghapus data pendaftaran beserta foto berkasnya.
+     */
+    public function destroy(Request $request, $id, ImageCompressor $compressor)
+    {
+        $pendaftaran = Pendaftaran::findOrFail($id);
+        $nama = $pendaftaran->nama_lengkap;
+
+        foreach (array_keys(Pendaftaran::FOTO_BERKAS) as $field) {
+            if (!empty($pendaftaran->{$field})) {
+                $compressor->delete($pendaftaran->{$field});
+            }
+        }
+
+        $pendaftaran->delete();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['ok' => true, 'message' => 'Data pendaftaran ' . $nama . ' berhasil dihapus.']);
+        }
+
+        return redirect()->route('pendaftaran.index')
+            ->with('success', 'Data pendaftaran ' . $nama . ' berhasil dihapus.');
+    }
 }

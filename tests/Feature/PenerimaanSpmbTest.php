@@ -455,4 +455,28 @@ class PenerimaanSpmbTest extends TestCase
             ->assertHeader('Access-Control-Allow-Origin', '*')
             ->assertJsonPath('found', false);
     }
+
+    public function test_admin_dapat_menghapus_data_pendaftar_dan_berkasnya(): void
+    {
+        Storage::fake('public');
+        $path = UploadedFile::fake()->image('akta.jpg', 400, 300)->store('berkas', 'public');
+
+        $p = Pendaftaran::create([
+            'jenjang'            => 'SMP',
+            'no_induk'           => 'SMP-01-202728',
+            'nama_lengkap'       => 'Data Tes Hapus',
+            'foto_akta'          => $path,
+            'status_pendaftaran' => 'Pending',
+        ]);
+
+        Storage::disk('public')->assertExists($path);
+
+        $this->actingAs($this->admin)
+            ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->delete(route('pendaftaran.destroy', $p->id))
+            ->assertRedirect(route('pendaftaran.index'));
+
+        $this->assertDatabaseMissing('pendaftarans', ['id' => $p->id]);
+        Storage::disk('public')->assertMissing($path);
+    }
 }

@@ -33,6 +33,21 @@
         </svg>
         Cetak Formulir
     </a>
+    @if(!auth()->check() || auth()->user()->canDo('pendaftaran', 'delete'))
+    <form action="{{ route('pendaftaran.destroy', $pendaftaran->id) }}" method="POST" style="display:inline;">
+        @csrf
+        @method('DELETE')
+        <button type="button" class="btn btn-danger js-swal-confirm"
+                data-title="Hapus Data Pendaftar?"
+                data-html="Hapus data pendaftaran <strong>{{ e($pendaftaran->nama_lengkap) }}</strong>?"
+                data-icon="warning"
+                data-confirm-text="Ya, Hapus"
+                data-confirm-color="#DC2626"
+                data-cancel-text="Batal">
+            Hapus
+        </button>
+    </form>
+    @endif
 </div>
 @endsection
 

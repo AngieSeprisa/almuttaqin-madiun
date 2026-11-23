@@ -197,6 +197,11 @@ Route::middleware('auth')->group(function () {
         Route::put('/{id}', [PendaftaranController::class, 'update'])->whereNumber('id')->name('update');
     });
 
+    Route::delete('/pendaftaran/{id}', [PendaftaranController::class, 'destroy'])
+        ->whereNumber('id')
+        ->middleware('permission:pendaftaran,delete')
+        ->name('pendaftaran.destroy');
+
     // Menu Perizinan: Sambang
     Route::middleware('permission:perizinan_sambang,view')->prefix('perizinan')->name('perizinan.')->group(function () {
         Route::get('/sambang', [PerizinanController::class, 'sambang'])->name('sambang');
