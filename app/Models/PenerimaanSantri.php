@@ -381,6 +381,10 @@ class PenerimaanSantri extends Model
      */
     public function dokumenConfig(): array
     {
+        if (!is_array($this->syarat_dokumen) && $this->hasCustomFormSchema()) {
+            return \App\Support\SpmbFormSchema::extractDokumenConfig($this->form_schema);
+        }
+
         $saved = is_array($this->syarat_dokumen) ? $this->syarat_dokumen : [];
         $config = [];
 
@@ -420,7 +424,13 @@ class PenerimaanSantri extends Model
      */
     public function resolvedFormSchema(): array
     {
-        return \App\Support\SpmbFormSchema::resolve($this->form_schema, $this->dokumenConfig());
+        $hasSavedDokumen = is_array($this->syarat_dokumen) && !empty($this->syarat_dokumen);
+
+        return \App\Support\SpmbFormSchema::resolve(
+            $this->form_schema,
+            $this->dokumenConfig(),
+            $hasSavedDokumen
+        );
     }
 
     /**

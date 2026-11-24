@@ -405,54 +405,39 @@
         </div>
 
         {{-- Checklist Berkas --}}
+        @php
+            $showDokConfig = $pendaftaran->activeDokumenConfig();
+            $showBerkasList = collect([
+                ['flag' => 'berkas_akta', 'foto' => 'foto_akta', 'label' => 'Akta Kelahiran'],
+                ['flag' => 'berkas_kk', 'foto' => 'foto_kk', 'label' => 'Kartu Keluarga (KK)'],
+                ['flag' => 'berkas_ktp_ortu', 'foto' => 'foto_ktp_ortu', 'label' => 'KTP Orang Tua'],
+                ['flag' => 'berkas_surat_pernyataan', 'foto' => 'foto_surat_pernyataan', 'label' => 'Surat Pernyataan'],
+            ])->filter(fn ($b) => (($showDokConfig[$b['flag']] ?? 'opsional') !== 'tidak') || $pendaftaran->{$b['flag']} || $pendaftaran->{$b['foto']})->values();
+
+            $showFotoBerkas = collect(\App\Models\Pendaftaran::FOTO_BERKAS)
+                ->filter(fn ($meta, $field) => (($showDokConfig[$meta[0]] ?? 'opsional') !== 'tidak') || $pendaftaran->{$field});
+        @endphp
+        @if($showBerkasList->isNotEmpty())
         <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-light);">
             <div class="detail-label" style="margin-bottom: 12px;">Kelengkapan Dokumen / Berkas Fisik:</div>
             <div class="form-grid form-grid-4">
+                @foreach($showBerkasList as $bItem)
                 <div style="display:flex; align-items:center; gap:8px;">
-                    @if($pendaftaran->berkas_akta)
+                    @if($pendaftaran->{$bItem['flag']})
                         <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" style="width:20px;height:20px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        <span style="font-size:13px; font-weight:600; color:#059669;">Akta Kelahiran</span>
+                        <span style="font-size:13px; font-weight:600; color:#059669;">{{ $bItem['label'] }}</span>
                     @else
                         <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" style="width:20px;height:20px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        <span style="font-size:13px; color:var(--text-muted);">Akta Kelahiran (Belum)</span>
+                        <span style="font-size:13px; color:var(--text-muted);">{{ $bItem['label'] }} (Belum)</span>
                     @endif
                 </div>
-
-                <div style="display:flex; align-items:center; gap:8px;">
-                    @if($pendaftaran->berkas_kk)
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" style="width:20px;height:20px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        <span style="font-size:13px; font-weight:600; color:#059669;">Kartu Keluarga (KK)</span>
-                    @else
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" style="width:20px;height:20px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        <span style="font-size:13px; color:var(--text-muted);">Kartu Keluarga (Belum)</span>
-                    @endif
-                </div>
-
-                <div style="display:flex; align-items:center; gap:8px;">
-                    @if($pendaftaran->berkas_ktp_ortu)
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" style="width:20px;height:20px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        <span style="font-size:13px; font-weight:600; color:#059669;">KTP Orang Tua</span>
-                    @else
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" style="width:20px;height:20px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        <span style="font-size:13px; color:var(--text-muted);">KTP Orang Tua (Belum)</span>
-                    @endif
-                </div>
-
-                <div style="display:flex; align-items:center; gap:8px;">
-                    @if($pendaftaran->berkas_surat_pernyataan)
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" style="width:20px;height:20px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        <span style="font-size:13px; font-weight:600; color:#059669;">Surat Pernyataan</span>
-                    @else
-                        <svg viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2" style="width:20px;height:20px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        <span style="font-size:13px; color:var(--text-muted);">Surat Pernyataan (Belum)</span>
-                    @endif
-                </div>
+                @endforeach
             </div>
 
-            @if (collect(array_keys(\App\Models\Pendaftaran::FOTO_BERKAS))->contains(fn ($f) => $pendaftaran->{$f}))
+            @if ($showFotoBerkas->keys()->contains(fn ($f) => $pendaftaran->{$f}))
             <div class="detail-label" style="margin: 20px 0 12px;">Foto Berkas:</div>
             <div class="berkas-photo-grid">
-                @foreach (\App\Models\Pendaftaran::FOTO_BERKAS as $field => [$flag, $label])
+                @foreach ($showFotoBerkas as $field => [$flag, $label])
                     <div class="berkas-photo-item">
                         @if ($pendaftaran->{$field})
                             <a href="{{ $pendaftaran->fotoUrl($field) }}" target="_blank" rel="noopener" class="berkas-photo-thumb" title="Buka ukuran penuh">
@@ -467,6 +452,7 @@
             </div>
             @endif
         </div>
+        @endif
 
     </div>
 

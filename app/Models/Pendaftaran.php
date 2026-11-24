@@ -147,6 +147,100 @@ class Pendaftaran extends Model
     }
 
     /**
+     * Konfigurasi syarat dokumen yang aktif untuk pendaftaran ini.
+     * Jika berasal dari Link Penerimaan (SPMB), mengikuti pengaturan event tersebut;
+     * jika input manual admin tanpa event, seluruh berkas standar aktif (opsional).
+     */
+    public function activeDokumenConfig(): array
+    {
+        $penerimaan = $this->relationLoaded('penerimaan')
+            ? $this->getRelation('penerimaan')
+            : ($this->penerimaan_santri_id ? $this->penerimaan()->first() : null);
+
+        if ($penerimaan) {
+            return $penerimaan->dokumenConfig();
+        }
+
+        return PenerimaanSantri::DOKUMEN_DEFAULTS;
+    }
+
+    /**
+     * Daftar item persyaratan yang perlu ditampilkan pada formulir cetak A4,
+     * hanya menyertakan dokumen yang diaktifkan (Wajib / Opsional) dan mengecualikan yang Tidak Diminta.
+     */
+    public function activePersyaratanForPrint(): array
+    {
+        $dokConfig = $this->activeDokumenConfig();
+        $penerimaan = $this->relationLoaded('penerimaan')
+            ? $this->getRelation('penerimaan')
+            : ($this->penerimaan_santri_id ? $this->penerimaan()->first() : null);
+
+        // Cek apakah admin memberi label kustom pada field dokumen bawaan di Form Builder
+        $customLabels = [];
+        if ($penerimaan && $penerimaan->hasCustomFormSchema()) {
+            $catalog = \App\Support\SpmbFormSchema::builtinCatalog();
+            foreach (($penerimaan->form_schema['sections'] ?? []) as $sec) {
+                foreach (($sec['fields'] ?? []) as $fld) {
+                    $fKey = $fld['key'] ?? '';
+                    if (($fld['source'] ?? '') === 'builtin' && isset(\App\Support\SpmbFormSchema::DOKUMEN_FIELD_TO_FLAG[$fKey])) {
+                        $flagKey = \App\Support\SpmbFormSchema::DOKUMEN_FIELD_TO_FLAG[$fKey];
+                        $submittedLabel = trim((string) ($fld['label'] ?? ''));
+                        $defaultLabel = $catalog[$fKey]['label'] ?? '';
+                        if ($submittedLabel !== '' && $submittedLabel !== $defaultLabel) {
+                            $customLabels[$flagKey] = $submittedLabel;
+                        }
+                    }
+                }
+            }
+        }
+
+        $printDefs = [
+            'berkas_akta' => [
+                'foto'       => 'foto_akta',
+                'label'      => 'Foto Copy Akta Kelahiran',
+                'html_label' => 'Foto Copy Akta Kelahiran',
+            ],
+            'berkas_kk' => [
+                'foto'       => 'foto_kk',
+                'label'      => 'Foto Copy Kartu Keluarga',
+                'html_label' => 'Foto Copy Kartu Keluarga',
+            ],
+            'berkas_ktp_ortu' => [
+                'foto'       => 'foto_ktp_ortu',
+                'label'      => 'Foto Copy KTP Ayah & Ibu',
+                'html_label' => 'Foto Copy KTP Ayah &amp; Ibu',
+            ],
+            'berkas_surat_pernyataan' => [
+                'foto'       => 'foto_surat_pernyataan',
+                'label'      => 'Surat Sanggup Mentaati Peraturan Pondok',
+                'html_label' => 'Surat Sanggup Mentaati<br>Peraturan Pondok',
+            ],
+        ];
+
+        $items = [];
+        foreach ($printDefs as $flagKey => $meta) {
+            $mode = $dokConfig[$flagKey] ?? 'opsional';
+            if ($mode === 'tidak') {
+                continue;
+            }
+
+            $label = $customLabels[$flagKey] ?? $meta['label'];
+            $htmlLabel = isset($customLabels[$flagKey]) ? e($customLabels[$flagKey]) : $meta['html_label'];
+
+            $items[] = [
+                'flag'       => $flagKey,
+                'foto'       => $meta['foto'],
+                'label'      => $label,
+                'html_label' => $htmlLabel,
+                'mode'       => $mode,
+                'checked'    => (bool) $this->{$flagKey},
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
      * Relasi ke data siswa
      */
     public function siswa()

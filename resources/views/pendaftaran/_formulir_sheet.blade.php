@@ -192,30 +192,40 @@
         @endforeach
     </div>
 
+    @php
+        $persyaratanItems = $p->activePersyaratanForPrint();
+        $nextSecNum = 3;
+    @endphp
+    @if(!empty($persyaratanItems))
     {{-- ===== 3. PERSYARATAN ===== --}}
-    <div class="sec">3.&nbsp; PERSYARATAN <span style="font-weight:700">(yang harus dipenuhi)</span></div>
+    @php
+        $splitAt = (int) ceil(count($persyaratanItems) / 2);
+        $leftSyarat = array_slice($persyaratanItems, 0, $splitAt, true);
+        $rightSyarat = array_slice($persyaratanItems, $splitAt, null, true);
+    @endphp
+    <div class="sec">{{ $nextSecNum }}.&nbsp; PERSYARATAN <span style="font-weight:700">(yang harus dipenuhi)</span></div>
     <div class="syarat ind" style="padding-left:6mm">
         <div>
+            @foreach($leftSyarat as $sIdx => $sItem)
             <div class="r">
-                <span class="n" style="width:4.5mm">1.</span><span class="lbl">Foto Copy Akta Kelahiran</span>
-                <span class="opts"><span class="box">{!! $ck($p->berkas_akta) !!}</span>Sudah&nbsp;&nbsp;<span class="box">{!! $ck(! $p->berkas_akta) !!}</span>Belum</span>
+                <span class="n" style="width:4.5mm">{{ $sIdx + 1 }}.</span><span class="lbl">{!! $sItem['html_label'] !!}</span>
+                <span class="opts"><span class="box">{!! $ck($sItem['checked']) !!}</span>Sudah&nbsp;&nbsp;<span class="box">{!! $ck(! $sItem['checked']) !!}</span>Belum</span>
             </div>
-            <div class="r">
-                <span class="n" style="width:4.5mm">2.</span><span class="lbl">Foto Copy Kartu Keluarga</span>
-                <span class="opts"><span class="box">{!! $ck($p->berkas_kk) !!}</span>Sudah&nbsp;&nbsp;<span class="box">{!! $ck(! $p->berkas_kk) !!}</span>Belum</span>
-            </div>
+            @endforeach
         </div>
+        @if(!empty($rightSyarat))
         <div>
+            @foreach($rightSyarat as $sIdx => $sItem)
             <div class="r">
-                <span class="n" style="width:4.5mm">3.</span><span class="lbl">Foto Copy KTP Ayah &amp; Ibu</span>
-                <span class="opts"><span class="box">{!! $ck($p->berkas_ktp_ortu) !!}</span>Sudah&nbsp;&nbsp;<span class="box">{!! $ck(! $p->berkas_ktp_ortu) !!}</span>Belum</span>
+                <span class="n" style="width:4.5mm">{{ $sIdx + 1 }}.</span><span class="lbl">{!! $sItem['html_label'] !!}</span>
+                <span class="opts"><span class="box">{!! $ck($sItem['checked']) !!}</span>Sudah&nbsp;&nbsp;<span class="box">{!! $ck(! $sItem['checked']) !!}</span>Belum</span>
             </div>
-            <div class="r">
-                <span class="n" style="width:4.5mm">4.</span><span class="lbl">Surat Sanggup Mentaati<br>Peraturan Pondok</span>
-                <span class="opts"><span class="box">{!! $ck($p->berkas_surat_pernyataan) !!}</span>Sudah&nbsp;&nbsp;<span class="box">{!! $ck(! $p->berkas_surat_pernyataan) !!}</span>Belum</span>
-            </div>
+            @endforeach
         </div>
+        @endif
     </div>
+    @php $nextSecNum++; @endphp
+    @endif
 
     @php
         $printCustomResponses = collect(is_array($p->custom_responses) ? $p->custom_responses : [])
@@ -223,8 +233,8 @@
             ->values();
     @endphp
     @if($printCustomResponses->isNotEmpty())
-    {{-- ===== 4. INFORMASI TAMBAHAN (PERTANYAAN KUSTOM) ===== --}}
-    <div class="sec">4.&nbsp; INFORMASI TAMBAHAN</div>
+    {{-- ===== INFORMASI TAMBAHAN (PERTANYAAN KUSTOM) ===== --}}
+    <div class="sec">{{ $nextSecNum }}.&nbsp; INFORMASI TAMBAHAN</div>
     <div class="ind">
         @foreach($printCustomResponses as $ci => $cItem)
             @php

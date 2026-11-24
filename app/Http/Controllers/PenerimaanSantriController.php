@@ -203,7 +203,8 @@ class PenerimaanSantriController extends Controller
         [$jenjangs, $jenjangSummary, $waPerJenjang, $fallbackWa, $lokasiPerJenjang, $fallbackLokasi] = $this->extractPerLembagaData($validated, $allowedKeys);
 
         DB::transaction(function () use ($penerimaan, $validated, $request, $jenjangs, $jenjangSummary, $waPerJenjang, $fallbackWa, $lokasiPerJenjang, $fallbackLokasi) {
-            $penerimaan->update([
+            $normalizedDokumen = $this->normalizeDokumen($validated['syarat_dokumen'] ?? []);
+            $updatePayload = [
                 'judul'                      => $validated['judul'],
                 'slug'                       => $validated['slug'],
                 'tahun_ajaran'               => $validated['tahun_ajaran'],
@@ -214,10 +215,19 @@ class PenerimaanSantriController extends Controller
                 'jadwal_seleksi'             => $validated['jadwal_seleksi'] ?? null,
                 'lokasi_seleksi'             => $fallbackLokasi,
                 'lokasi_seleksi_per_jenjang' => $lokasiPerJenjang,
-                'syarat_dokumen'             => $this->normalizeDokumen($validated['syarat_dokumen'] ?? []),
+                'syarat_dokumen'             => $normalizedDokumen,
                 'catatan_syarat'             => $validated['catatan_syarat'] ?? null,
                 'is_active'                  => $request->boolean('is_active'),
-            ]);
+            ];
+
+            if ($penerimaan->hasCustomFormSchema()) {
+                $updatePayload['form_schema'] = SpmbFormSchema::applyDokumenConfig(
+                    $penerimaan->form_schema,
+                    $normalizedDokumen
+                );
+            }
+
+            $penerimaan->update($updatePayload);
 
             $this->syncGelombangs($penerimaan, $validated['gelombangs'] ?? [], $jenjangs);
         });

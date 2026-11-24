@@ -210,7 +210,7 @@ class PendaftaranController extends Controller
      */
     public function cetak($id)
     {
-        $pendaftaran = Pendaftaran::findOrFail($id);
+        $pendaftaran = Pendaftaran::with('penerimaan')->findOrFail($id);
         $this->ensurePendaftaranInActiveRoom($pendaftaran);
         $kop = Lembaga::kopForJenjang($pendaftaran->jenjang);
 
@@ -268,7 +268,7 @@ class PendaftaranController extends Controller
      */
     public function edit($id)
     {
-        $pendaftaran = Pendaftaran::findOrFail($id);
+        $pendaftaran = Pendaftaran::with('penerimaan')->findOrFail($id);
         $this->ensurePendaftaranInActiveRoom($pendaftaran);
         $scopedFormal = Lembaga::activeScopedFormal(auth()->user());
         $activeRoom = $scopedFormal ? $scopedFormal->kode : session('active_lembaga');

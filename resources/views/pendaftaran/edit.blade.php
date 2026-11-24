@@ -893,19 +893,20 @@
                     </div>
 
                     {{-- KELENGKAPAN DOKUMEN / BERKAS --}}
+                    @php
+                        $editDokConfig = $pendaftaran->activeDokumenConfig();
+                        $berkasItems = array_values(array_filter([
+                            ['flag' => 'berkas_akta', 'foto' => 'foto_akta', 'name' => 'Akta Kelahiran'],
+                            ['flag' => 'berkas_kk', 'foto' => 'foto_kk', 'name' => 'Kartu Keluarga (KK)'],
+                            ['flag' => 'berkas_ktp_ortu', 'foto' => 'foto_ktp_ortu', 'name' => 'KTP Orang Tua / Wali'],
+                            ['flag' => 'berkas_surat_pernyataan', 'foto' => 'foto_surat_pernyataan', 'name' => 'Surat Pernyataan / Rekomendasi'],
+                        ], fn ($item) => (($editDokConfig[$item['flag']] ?? 'opsional') !== 'tidak') || $pendaftaran->{$item['flag']} || $pendaftaran->{$item['foto']}));
+                    @endphp
+                    @if(!empty($berkasItems))
                     <div class="wizard-subcard">
                         <div class="wizard-subcard-title">
                             Kelengkapan Dokumen / Berkas
                         </div>
-
-                        @php
-                            $berkasItems = [
-                                ['flag' => 'berkas_akta', 'foto' => 'foto_akta', 'name' => 'Akta Kelahiran'],
-                                ['flag' => 'berkas_kk', 'foto' => 'foto_kk', 'name' => 'Kartu Keluarga (KK)'],
-                                ['flag' => 'berkas_ktp_ortu', 'foto' => 'foto_ktp_ortu', 'name' => 'KTP Orang Tua / Wali'],
-                                ['flag' => 'berkas_surat_pernyataan', 'foto' => 'foto_surat_pernyataan', 'name' => 'Surat Pernyataan / Rekomendasi'],
-                            ];
-                        @endphp
 
                         <div class="gform-grid">
                             @foreach ($berkasItems as $item)
@@ -965,6 +966,7 @@
                             @endforeach
                         </div>
                     </div>
+                    @endif
 
                     {{-- Actions Step 4 --}}
                     <div class="wizard-footer">

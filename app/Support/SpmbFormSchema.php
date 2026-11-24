@@ -377,12 +377,20 @@ class SpmbFormSchema
 
         $requiredKeys = ['jenjang', 'nama_lengkap', 'jenis_kelamin', 'tanggal_lahir', 'pj_biaya_hp', 'ayah_nama', 'ibu_nama'];
 
+        $dok = array_merge(PenerimaanSantri::DOKUMEN_DEFAULTS, $dokumenConfig);
+
         foreach ($schema['sections'] as &$sec) {
             foreach ($sec['fields'] as &$field) {
                 $key = $field['key'];
                 if (in_array($key, self::LOCKED_BUILTIN_KEYS, true)) {
                     $field['enabled'] = true;
                     $field['required'] = true;
+                } elseif (isset(self::DOKUMEN_FIELD_TO_FLAG[$key])) {
+                    $flagKey = self::DOKUMEN_FIELD_TO_FLAG[$key];
+                    $mode = $dok[$flagKey] ?? 'opsional';
+                    $inPreset = in_array($key, $keepKeys, true);
+                    $field['enabled'] = $mode !== 'tidak' && ($inPreset || $mode === 'wajib');
+                    $field['required'] = $field['enabled'] && $mode === 'wajib';
                 } else {
                     $field['enabled'] = in_array($key, $keepKeys, true);
                     $field['required'] = $field['enabled'] && in_array($key, $requiredKeys, true);
@@ -396,15 +404,100 @@ class SpmbFormSchema
     }
 
     /**
+     * Terapkan konfigurasi syarat_dokumen (wajib/opsional/tidak) ke skema formulir kustom
+     * agar perubahan dari halaman Edit Penerimaan selalu sinkron dengan Desain Formulir.
+     */
+    public static function applyDokumenConfig(array $schema, array $dokumenConfig): array
+    {
+        $clean = self::sanitizeSubmittedSchema($schema);
+        $catalog = self::builtinCatalog();
+        $found = [];
+
+        foreach ($clean['sections'] as &$sec) {
+            foreach ($sec['fields'] as &$fld) {
+                if (($fld['source'] ?? '') !== 'builtin') {
+                    continue;
+                }
+                $key = $fld['key'] ?? '';
+                if (!isset(self::DOKUMEN_FIELD_TO_FLAG[$key])) {
+                    continue;
+                }
+                $flagKey = self::DOKUMEN_FIELD_TO_FLAG[$key];
+                $mode = $dokumenConfig[$flagKey] ?? 'opsional';
+                $fld['enabled'] = $mode !== 'tidak';
+                $fld['required'] = $mode === 'wajib';
+                if ($fld['enabled'] && empty($sec['enabled'])) {
+                    $sec['enabled'] = true;
+                }
+                $found[$key] = true;
+            }
+            unset($fld);
+        }
+        unset($sec);
+
+        // Jika ada dokumen yang diaktifkan namun belum ada di skema, tambahkan ke bagian Alamat & Berkas / bagian aktif terakhir
+        $targetSecIdx = null;
+        foreach ($clean['sections'] as $idx => $sec) {
+            if (($sec['id'] ?? '') === 'sec_alamat_berkas') {
+                $targetSecIdx = $idx;
+                break;
+            }
+        }
+        if ($targetSecIdx === null) {
+            foreach ($clean['sections'] as $idx => $sec) {
+                if (!empty($sec['enabled'])) {
+                    $targetSecIdx = $idx;
+                }
+            }
+        }
+        if ($targetSecIdx === null) {
+            $targetSecIdx = count($clean['sections']) - 1;
+        }
+
+        foreach (self::DOKUMEN_FIELD_TO_FLAG as $fotoKey => $flagKey) {
+            if (isset($found[$fotoKey])) {
+                continue;
+            }
+            $mode = $dokumenConfig[$flagKey] ?? 'tidak';
+            if ($mode === 'tidak' || !isset($catalog[$fotoKey])) {
+                continue;
+            }
+            $meta = $catalog[$fotoKey];
+            $clean['sections'][$targetSecIdx]['enabled'] = true;
+            $clean['sections'][$targetSecIdx]['fields'][] = [
+                'id'          => $fotoKey,
+                'source'      => 'builtin',
+                'key'         => $fotoKey,
+                'label'       => $meta['label'],
+                'type'        => $meta['type'],
+                'placeholder' => $meta['placeholder'] ?? '',
+                'help'        => '',
+                'required'    => $mode === 'wajib',
+                'enabled'     => true,
+                'locked'      => false,
+                'wide'        => (bool) ($meta['wide'] ?? false),
+                'options'     => $meta['options'] ?? [],
+            ];
+        }
+
+        return $clean;
+    }
+
+    /**
      * Resolve skema final untuk suatu event (fallback otomatis ke defaultSchema bila belum dikustomisasi).
      */
-    public static function resolve(?array $storedSchema, array $dokumenConfig = []): array
+    public static function resolve(?array $storedSchema, array $dokumenConfig = [], bool $syncDokumenConfig = false): array
     {
         if (empty($storedSchema) || !is_array($storedSchema) || empty($storedSchema['sections'])) {
             return self::defaultSchema($dokumenConfig);
         }
 
-        return self::sanitizeSubmittedSchema($storedSchema);
+        $resolved = self::sanitizeSubmittedSchema($storedSchema);
+        if ($syncDokumenConfig && !empty($dokumenConfig)) {
+            return self::applyDokumenConfig($resolved, $dokumenConfig);
+        }
+
+        return $resolved;
     }
 
     /**

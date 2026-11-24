@@ -427,6 +427,7 @@ class SpmbPublicController extends Controller
             ->where('penerimaan_santri_id', $penerimaan->id)
             ->where('public_token', $token)
             ->firstOrFail();
+        $pendaftaran->setRelation('penerimaan', $penerimaan);
 
         $waMessage = "Assalamu'alaikum Panitia {$penerimaan->judul} ({$pendaftaran->jenjang}),\n"
             . "Saya telah mendaftar secara online:\n"
@@ -446,6 +447,7 @@ class SpmbPublicController extends Controller
             ->where('penerimaan_santri_id', $penerimaan->id)
             ->where('public_token', $token)
             ->firstOrFail();
+        $pendaftaran->setRelation('penerimaan', $penerimaan);
 
         $kop = Lembaga::kopForJenjang($pendaftaran->jenjang);
         $lokasiSeleksi = $penerimaan->lokasiForJenjang($pendaftaran->jenjang);

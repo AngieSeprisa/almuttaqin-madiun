@@ -428,4 +428,139 @@ class SpmbFormBuilderTest extends TestCase
             'no_induk'     => 'RAGM-01-202627',
         ]);
     }
+
+    public function test_formulir_cetak_dan_detail_hanya_menyertakan_persyaratan_yang_diaktifkan(): void
+    {
+        // 1. Event dengan Surat Pernyataan = Tidak Diminta, 3 lainnya Opsional
+        $event = PenerimaanSantri::create([
+            'judul'          => 'SPMB RA Syarat Dinamis',
+            'slug'           => 'spmb-ra-syarat-dinamis',
+            'tahun_ajaran'   => '2026/2027',
+            'jenjang'        => 'SD IT',
+            'jenjangs'       => ['SD IT'],
+            'syarat_dokumen' => [
+                'berkas_akta'             => 'opsional',
+                'berkas_kk'               => 'opsional',
+                'berkas_ktp_ortu'         => 'opsional',
+                'berkas_surat_pernyataan' => 'tidak',
+            ],
+            'is_active'      => true,
+            'created_by'     => $this->yayasanUser->id,
+        ]);
+
+        $this->post(route('spmb.store', $event->slug), [
+            'jenjang'       => 'SD IT',
+            'nama_lengkap'  => 'Aisyah Syarat',
+            'jenis_kelamin' => 'Perempuan',
+            'pj_biaya_hp'   => '08123456700',
+        ])->assertRedirect();
+
+        $p = Pendaftaran::where('nama_lengkap', 'Aisyah Syarat')->firstOrFail();
+
+        // Formulir cetak publik (2 halaman) & cetak admin: 3 syarat tampil, Surat Sanggup Mentaati tidak ikut
+        $this->get(route('spmb.cetak', [$event->slug, $p->public_token]))
+            ->assertOk()
+            ->assertSee('PERSYARATAN')
+            ->assertSee('Foto Copy Akta Kelahiran')
+            ->assertSee('Foto Copy Kartu Keluarga')
+            ->assertSee('Foto Copy KTP Ayah &amp; Ibu', false)
+            ->assertDontSee('Surat Sanggup Mentaati')
+            ->assertDontSee('Peraturan Pondok');
+
+        $this->actingAs($this->yayasanUser)
+            ->get(route('pendaftaran.cetak', $p->id))
+            ->assertOk()
+            ->assertSee('Foto Copy Akta Kelahiran')
+            ->assertSee('Foto Copy Kartu Keluarga')
+            ->assertSee('Foto Copy KTP Ayah &amp; Ibu', false)
+            ->assertDontSee('Surat Sanggup Mentaati');
+
+        // Halaman detail & edit admin juga tidak menyertakan Surat Pernyataan yang tidak diminta
+        $this->actingAs($this->yayasanUser)
+            ->get(route('pendaftaran.show', $p->id))
+            ->assertOk()
+            ->assertSee('Akta Kelahiran')
+            ->assertDontSee('Surat Pernyataan');
+
+        $this->actingAs($this->yayasanUser)
+            ->get(route('pendaftaran.edit', $p->id))
+            ->assertOk()
+            ->assertSee('Akta Kelahiran')
+            ->assertDontSee('Surat Pernyataan / Rekomendasi');
+
+        // 2. Jika seluruh 4 dokumen diset Tidak Diminta, seksi PERSYARATAN tidak muncul sama sekali
+        // dan seksi INFORMASI TAMBAHAN otomatis bernomor 3.
+        $event->update([
+            'syarat_dokumen' => [
+                'berkas_akta'             => 'tidak',
+                'berkas_kk'               => 'tidak',
+                'berkas_ktp_ortu'         => 'tidak',
+                'berkas_surat_pernyataan' => 'tidak',
+            ],
+        ]);
+        $p->update([
+            'custom_responses' => [
+                ['id' => 'cf_catatan', 'section' => 'Tambahan', 'label' => 'Hobi Anak', 'type' => 'text', 'value' => 'Membaca'],
+            ],
+        ]);
+
+        $this->get(route('spmb.cetak', [$event->slug, $p->public_token]))
+            ->assertOk()
+            ->assertDontSee('PERSYARATAN')
+            ->assertDontSee('Foto Copy Akta Kelahiran')
+            ->assertDontSee('Surat Sanggup Mentaati')
+            ->assertSee('3.&nbsp; INFORMASI TAMBAHAN', false)
+            ->assertSee('Hobi Anak');
+
+        // 3. Pendaftaran manual admin (tanpa link penerimaan) tetap menampilkan 4 syarat standar
+        $manual = Pendaftaran::create([
+            'jenjang'            => 'SMP',
+            'no_induk'           => 'PSB-2026-0001',
+            'nama_lengkap'       => 'Santri Manual',
+            'status_pendaftaran' => 'Pending',
+        ]);
+
+        $this->actingAs($this->yayasanUser)
+            ->get(route('pendaftaran.cetak', $manual->id))
+            ->assertOk()
+            ->assertSee('PERSYARATAN')
+            ->assertSee('Foto Copy Akta Kelahiran')
+            ->assertSee('Surat Sanggup Mentaati');
+    }
+
+    public function test_ubah_dokumen_di_edit_penerimaan_otomatis_sinkron_ke_form_kustom_dan_form_publik(): void
+    {
+        // Simpan form builder kustom terlebih dahulu (foto_akta aktif, foto_kk/ktp/surat_pernyataan nonaktif)
+        $this->actingAs($this->yayasanUser)
+            ->put(route('penerimaan.formulir.update', $this->eventSdit->id), [
+                'form_schema_json' => json_encode($this->sampleCustomSchema()),
+            ])
+            ->assertRedirect();
+
+        // Kemudian ubah pengaturan Dokumen & Syarat di halaman Edit Penerimaan:
+        // Matikan Akta & Surat Pernyataan, aktifkan KK (wajib) & KTP Ortu (opsional)
+        $this->actingAs($this->yayasanUser)
+            ->put(route('penerimaan.update', $this->eventSdit->id), [
+                'judul'          => $this->eventSdit->judul,
+                'slug'           => $this->eventSdit->slug,
+                'tahun_ajaran'   => $this->eventSdit->tahun_ajaran,
+                'jenjangs'       => ['SD IT'],
+                'is_active'      => '1',
+                'syarat_dokumen' => [
+                    'berkas_akta'             => 'tidak',
+                    'berkas_kk'               => 'wajib',
+                    'berkas_ktp_ortu'         => 'opsional',
+                    'berkas_surat_pernyataan' => 'tidak',
+                ],
+            ])
+            ->assertRedirect(route('penerimaan.index'));
+
+        // Form online publik langsung mengikuti perubahan Dokumen & Syarat
+        $this->get(route('spmb.show', $this->eventSdit->slug))
+            ->assertOk()
+            ->assertDontSee('name="foto_akta"', false)
+            ->assertDontSee('name="foto_surat_pernyataan"', false)
+            ->assertSee('name="foto_kk"', false)
+            ->assertSee('name="foto_ktp_ortu"', false);
+    }
 }
