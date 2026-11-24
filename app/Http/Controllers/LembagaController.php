@@ -8,11 +8,48 @@ use App\Models\MataPelajaran;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class LembagaController extends Controller
 {
+    /**
+     * Normalisasi input lembaga sebelum validasi agar spasi, huruf kapital pada kode,
+     * atau tanda '-' pada email tidak menyebabkan kegagalan validasi yang membingungkan.
+     */
+    protected function normalizeLembagaInput(Request $request, bool $includeKode = true): void
+    {
+        $merged = [];
+
+        if ($includeKode && $request->has('kode')) {
+            $rawKode = strtolower(trim((string) $request->input('kode')));
+            $cleanKode = preg_replace('/[^a-z0-9_-]+/', '-', $rawKode);
+            $cleanKode = preg_replace('/-+/', '-', (string) $cleanKode);
+            $merged['kode'] = trim((string) $cleanKode, '-_');
+        }
+
+        foreach (['nama', 'singkatan', 'alamat', 'telepon'] as $field) {
+            if ($request->has($field)) {
+                $val = trim((string) $request->input($field));
+                $merged[$field] = $val === '' ? null : $val;
+            }
+        }
+
+        if ($request->has('email')) {
+            $email = trim((string) $request->input('email'));
+            $merged['email'] = ($email === '' || $email === '-') ? null : $email;
+        }
+
+        if ($request->has('urutan') && trim((string) $request->input('urutan')) === '') {
+            $merged['urutan'] = null;
+        }
+
+        if (!empty($merged)) {
+            $request->merge($merged);
+        }
+    }
+
     /**
      * Tampilkan daftar master lembaga pendidikan
      */
@@ -31,7 +68,7 @@ class LembagaController extends Controller
 
         $scopedFormal = Lembaga::activeScopedFormal($authUser);
         if (!$authUser->isYayasan()) {
-            if ($scopedFormal) {
+            if ($scopedFormal && !$authUser->canDo('master_lembaga', 'create')) {
                 $lembagasQuery->whereKey($scopedFormal->id);
             } else {
                 $lembagasQuery->whereIn('id', $authUser->accessibleLembagas()->pluck('id'));
@@ -69,36 +106,74 @@ class LembagaController extends Controller
             abort(403, 'Anda tidak memiliki hak akses untuk menambah lembaga.');
         }
 
+        $this->normalizeLembagaInput($request, true);
+
         $validated = $request->validate([
-            'kode'      => 'required|string|max:30|alpha_dash|unique:lembagas,kode',
+            'kode'      => ['required', 'string', 'max:30', 'alpha_dash', Rule::unique('lembagas', 'kode')],
             'nama'      => 'required|string|max:100',
             'singkatan' => 'required|string|max:30',
             'kategori'  => 'required|in:formal,pesantren,yayasan',
             'alamat'    => 'nullable|string|max:1000',
             'telepon'   => 'nullable|string|max:40',
             'email'     => 'nullable|email|max:120',
-            'logo'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'urutan'    => 'nullable|integer',
+            'logo'      => 'nullable|image|mimes:jpg,jpeg,png,webp,gif|max:5120',
+            'urutan'    => 'nullable|integer|min:1',
             'is_active' => 'nullable|boolean',
         ], [
-            'kode.unique' => 'Kode lembaga tersebut sudah digunakan. Gunakan kode unik lain.',
-            'kode.alpha_dash' => 'Kode lembaga hanya boleh berupa huruf kecil, angka, atau tanda minus (-).',
+            'kode.required'      => 'Kode unik lembaga wajib diisi.',
+            'kode.max'           => 'Kode lembaga maksimal 30 karakter.',
+            'kode.unique'        => 'Kode lembaga tersebut sudah digunakan. Gunakan kode unik lain.',
+            'kode.alpha_dash'    => 'Kode lembaga hanya boleh berupa huruf, angka, tanda minus (-), atau garis bawah (_).',
+            'nama.required'      => 'Nama lembaga wajib diisi.',
+            'nama.max'           => 'Nama lembaga maksimal 100 karakter.',
+            'singkatan.required' => 'Singkatan lembaga wajib diisi.',
+            'singkatan.max'      => 'Singkatan lembaga maksimal 30 karakter.',
+            'kategori.required'  => 'Kategori lembaga wajib dipilih.',
+            'kategori.in'        => 'Kategori lembaga tidak valid.',
+            'email.email'        => 'Format email lembaga tidak valid. Kosongkan jika tidak ada email.',
+            'logo.image'         => 'File logo harus berupa gambar.',
+            'logo.mimes'         => 'Format logo harus JPG, PNG, WEBP, atau GIF.',
+            'logo.max'           => 'Ukuran logo maksimal 5 MB.',
+            'urutan.integer'     => 'Urutan harus berupa angka bulat.',
+            'urutan.min'         => 'Urutan minimal bernilai 1.',
         ]);
+
+        // Pastikan unik secara case-insensitive di seluruh driver database (MySQL & SQLite)
+        if (Lembaga::whereRaw('LOWER(kode) = ?', [$validated['kode']])->exists()) {
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['kode' => 'Kode lembaga tersebut sudah digunakan. Gunakan kode unik lain.']);
+        }
 
         unset($validated['logo']);
         if ($request->hasFile('logo')) {
-            $validated['logo'] = $request->file('logo')->store('lembaga', 'public');
+            try {
+                $validated['logo'] = $request->file('logo')->store('lembaga', 'public');
+            } catch (\Throwable $e) {
+                Log::error('Gagal mengunggah logo lembaga baru: ' . $e->getMessage());
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Gagal menyimpan file logo lembaga. Silakan coba lagi atau simpan tanpa logo terlebih dahulu.');
+            }
         }
 
-        $validated['kode'] = strtolower(trim($validated['kode']));
         $validated['is_active'] = $request->has('is_active');
         $validated['urutan'] = $validated['urutan'] ?? ((Lembaga::max('urutan') ?? 0) + 1);
 
         $lembaga = Lembaga::create($validated);
 
+        // Jika dibuat oleh akun non-Yayasan yang memiliki hak create, langsung berikan akses ke lembaga baru tersebut
+        if (!$authUser->isYayasan()) {
+            $authUser->lembagas()->syncWithoutDetaching([$lembaga->id]);
+        }
+
         // Buat pengaturan absensi default jika formal/pesantren
         if ($lembaga->kategori !== 'yayasan') {
-            $lembaga->getOrCreatePengaturanAbsensi();
+            try {
+                $lembaga->getOrCreatePengaturanAbsensi();
+            } catch (\Throwable $e) {
+                Log::warning("Gagal membuat pengaturan absensi default untuk lembaga {$lembaga->kode}: " . $e->getMessage());
+            }
         }
 
         return redirect()->route('master.lembaga.index')->with('success', "Lembaga '{$lembaga->nama}' ({$lembaga->singkatan}) berhasil ditambahkan.");
@@ -118,6 +193,9 @@ class LembagaController extends Controller
             abort(403, 'Anda hanya dapat mengubah data lembaga yang berada dalam akses Anda.');
         }
 
+        $isCore = in_array(strtolower($lembaga->kode), ['yayasan', 'pondok', 'smp', 'sma']);
+        $this->normalizeLembagaInput($request, !$isCore);
+
         $validated = $request->validate([
             'nama'      => 'required|string|max:100',
             'singkatan' => 'required|string|max:30',
@@ -125,18 +203,32 @@ class LembagaController extends Controller
             'alamat'    => 'nullable|string|max:1000',
             'telepon'   => 'nullable|string|max:40',
             'email'     => 'nullable|email|max:120',
-            'logo'      => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'urutan'    => 'nullable|integer',
+            'logo'      => 'nullable|image|mimes:jpg,jpeg,png,webp,gif|max:5120',
+            'urutan'    => 'nullable|integer|min:1',
             'is_active' => 'nullable|boolean',
+        ], [
+            'nama.required'      => 'Nama lembaga wajib diisi.',
+            'singkatan.required' => 'Singkatan lembaga wajib diisi.',
+            'email.email'        => 'Format email lembaga tidak valid. Kosongkan jika tidak ada email.',
+            'logo.image'         => 'File logo harus berupa gambar.',
+            'logo.mimes'         => 'Format logo harus JPG, PNG, WEBP, atau GIF.',
+            'logo.max'           => 'Ukuran logo maksimal 5 MB.',
         ]);
 
         unset($validated['logo']);
         if ($request->hasFile('logo')) {
-            $newLogo = $request->file('logo')->store('lembaga', 'public');
-            if ($lembaga->logo && Storage::disk('public')->exists($lembaga->logo)) {
-                Storage::disk('public')->delete($lembaga->logo);
+            try {
+                $newLogo = $request->file('logo')->store('lembaga', 'public');
+                if ($lembaga->logo && Storage::disk('public')->exists($lembaga->logo)) {
+                    Storage::disk('public')->delete($lembaga->logo);
+                }
+                $validated['logo'] = $newLogo;
+            } catch (\Throwable $e) {
+                Log::error('Gagal mengunggah logo lembaga: ' . $e->getMessage());
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Gagal menyimpan file logo lembaga. Silakan coba lagi.');
             }
-            $validated['logo'] = $newLogo;
         } elseif ($request->boolean('hapus_logo')) {
             if ($lembaga->logo && Storage::disk('public')->exists($lembaga->logo)) {
                 Storage::disk('public')->delete($lembaga->logo);
@@ -145,12 +237,19 @@ class LembagaController extends Controller
         }
 
         // Jangan izinkan ubah kode core jika core lembaga
-        $isCore = in_array(strtolower($lembaga->kode), ['yayasan', 'pondok', 'smp', 'sma']);
         if (!$isCore && $request->filled('kode')) {
-            $reqKode = strtolower(trim($request->kode));
+            $reqKode = strtolower(trim((string) $request->kode));
             $request->validate([
                 'kode' => ['required', 'string', 'max:30', 'alpha_dash', Rule::unique('lembagas', 'kode')->ignore($lembaga->id)],
+            ], [
+                'kode.unique'     => 'Kode lembaga tersebut sudah digunakan. Gunakan kode unik lain.',
+                'kode.alpha_dash' => 'Kode lembaga hanya boleh berupa huruf, angka, tanda minus (-), atau garis bawah (_).',
             ]);
+            if (Lembaga::where('id', '!=', $lembaga->id)->whereRaw('LOWER(kode) = ?', [$reqKode])->exists()) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['kode' => 'Kode lembaga tersebut sudah digunakan. Gunakan kode unik lain.']);
+            }
             $validated['kode'] = $reqKode;
         }
 
@@ -169,6 +268,9 @@ class LembagaController extends Controller
         $authUser = Auth::user();
         if (!$authUser->isYayasan() && !$authUser->canDo('master_lembaga', 'edit')) {
             abort(403, 'Anda tidak memiliki hak akses mengubah status lembaga.');
+        }
+        if (!$authUser->isYayasan() && !$authUser->hasAccessToLembaga($lembaga->kode)) {
+            abort(403, 'Anda hanya dapat mengubah status lembaga yang berada dalam akses Anda.');
         }
 
         if (strtolower($lembaga->kode) === 'yayasan') {
@@ -190,6 +292,9 @@ class LembagaController extends Controller
         $authUser = Auth::user();
         if (!$authUser->isYayasan() && !$authUser->canDo('master_lembaga', 'delete')) {
             abort(403, 'Anda tidak memiliki hak akses untuk menghapus lembaga.');
+        }
+        if (!$authUser->isYayasan() && !$authUser->hasAccessToLembaga($lembaga->kode)) {
+            abort(403, 'Anda hanya dapat menghapus lembaga yang berada dalam akses Anda.');
         }
 
         // Proteksi lembaga inti sistem

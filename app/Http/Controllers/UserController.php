@@ -255,9 +255,18 @@ class UserController extends Controller
             $jab = strtolower($validated['jabatan']);
             foreach ($validated['lembagas'] as $lemId) {
                 $lem = Lembaga::find($lemId);
-                if ($lem && (str_contains($jab, strtolower($lem->kode ?? '')) || str_contains($jab, strtolower($lem->singkatan ?? '')))) {
-                    $primaryLembagaId = $lem->id;
-                    break;
+                if (!$lem) {
+                    continue;
+                }
+                $tokens = array_unique(array_filter([
+                    strtolower(trim((string) ($lem->kode ?? ''))),
+                    strtolower(trim((string) ($lem->singkatan ?? ''))),
+                ]));
+                foreach ($tokens as $tok) {
+                    if (preg_match('/(?<![a-z0-9])' . preg_quote($tok, '/') . '(?![a-z0-9])/i', $jab)) {
+                        $primaryLembagaId = $lem->id;
+                        break 2;
+                    }
                 }
             }
         }
@@ -385,9 +394,18 @@ class UserController extends Controller
             $jab = strtolower($validated['jabatan']);
             foreach ($validated['lembagas'] as $lemId) {
                 $lem = Lembaga::find($lemId);
-                if ($lem && (str_contains($jab, strtolower($lem->kode ?? '')) || str_contains($jab, strtolower($lem->singkatan ?? '')))) {
-                    $primaryLembagaId = $lem->id;
-                    break;
+                if (!$lem) {
+                    continue;
+                }
+                $tokens = array_unique(array_filter([
+                    strtolower(trim((string) ($lem->kode ?? ''))),
+                    strtolower(trim((string) ($lem->singkatan ?? ''))),
+                ]));
+                foreach ($tokens as $tok) {
+                    if (preg_match('/(?<![a-z0-9])' . preg_quote($tok, '/') . '(?![a-z0-9])/i', $jab)) {
+                        $primaryLembagaId = $lem->id;
+                        break 2;
+                    }
                 }
             }
         }

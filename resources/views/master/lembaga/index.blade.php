@@ -316,6 +316,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        flex-shrink: 0;
     }
 
     .mstr-modal-title {
@@ -349,6 +350,9 @@
         display: flex;
         flex-direction: column;
         gap: 16px;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
     }
 
     .mstr-form-group {
@@ -388,6 +392,7 @@
         justify-content: flex-end;
         gap: 10px;
         background: var(--table-th-bg);
+        flex-shrink: 0;
     }
 
     @media (max-width: 900px) {
@@ -426,6 +431,24 @@
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
         <span>{{ session('error') }}</span>
+    </div>
+    @endif
+
+    @if($errors->any())
+    <div style="background:rgba(239, 68, 68, 0.1); border:1px solid rgba(239, 68, 68, 0.3); color:#DC2626; padding:12px 18px; border-radius:12px; display:flex; align-items:flex-start; gap:10px; font-size:13.5px; font-weight:500;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex-shrink:0;margin-top:2px;">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <div>
+            <div style="font-weight:700; margin-bottom:4px;">Gagal menyimpan data lembaga:</div>
+            <ul style="margin:0; padding-left:18px; display:flex; flex-direction:column; gap:2px;">
+                @foreach($errors->all() as $err)
+                    <li>{{ $err }}</li>
+                @endforeach
+            </ul>
+        </div>
     </div>
     @endif
 
@@ -574,8 +597,11 @@
                             'is_active'       => (bool) $item->is_active,
                         ];
                     @endphp
+                    @php
+                        $editPayloadJson = json_encode($editPayload, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP);
+                    @endphp
                     <button type="button" class="mstr-btn-icon" title="Edit Lembaga"
-                            data-lembaga='@json($editPayload)'
+                            data-lembaga="{{ $editPayloadJson }}"
                             onclick="bukaModalEditLembaga(JSON.parse(this.getAttribute('data-lembaga')))">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -604,69 +630,82 @@
 </div>
 
 {{-- MODAL TAMBAH LEMBAGA --}}
-<div class="mstr-modal-overlay" id="modalTambahLembaga" onclick="if(event.target === this) tutupModalTambahLembaga()">
-    <div class="mstr-modal-box" style="max-width:540px; max-height:92vh; display:flex; flex-direction:column;">
-        <form action="{{ route('master.lembaga.store') }}" method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; max-height:92vh;">
+<div class="mstr-modal-overlay {{ ($errors->any() && old('_form_mode') === 'tambah') ? 'show' : '' }}" id="modalTambahLembaga" onclick="if(event.target === this) tutupModalTambahLembaga()">
+    <div class="mstr-modal-box" style="max-width:540px; max-height:90vh; display:flex; flex-direction:column;">
+        <form action="{{ route('master.lembaga.store') }}" method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; max-height:90vh; min-height:0; overflow:hidden;">
             @csrf
+            <input type="hidden" name="_form_mode" value="tambah">
             <div class="mstr-modal-header">
                 <h3 class="mstr-modal-title">Tambah Lembaga</h3>
                 <button type="button" class="mstr-modal-close" onclick="tutupModalTambahLembaga()">&times;</button>
             </div>
-            <div class="mstr-modal-body" style="overflow-y:auto;">
+            <div class="mstr-modal-body">
+                @if($errors->any() && old('_form_mode') === 'tambah')
+                <div style="background:rgba(239, 68, 68, 0.1); border:1px solid rgba(239, 68, 68, 0.3); color:#DC2626; padding:10px 14px; border-radius:10px; font-size:12.5px;">
+                    <ul style="margin:0; padding-left:16px;">
+                        @foreach($errors->all() as $err)
+                            <li>{{ $err }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+                @endif
+
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Kode Unik *</label>
-                        <input type="text" name="kode" class="mstr-form-control" placeholder="smk / madin / sd" required pattern="[a-zA-Z0-9_-]+">
+                        <input type="text" name="kode" id="tambahKode" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('kode') : '' }}" placeholder="smk / sdit / ra" required maxlength="30" autocomplete="off">
                     </div>
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Singkatan *</label>
-                        <input type="text" name="singkatan" class="mstr-form-control" placeholder="SMK" required>
+                        <input type="text" name="singkatan" id="tambahSingkatan" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('singkatan') : '' }}" placeholder="SMK" required maxlength="30">
                     </div>
                 </div>
 
                 <div class="mstr-form-group">
                     <label class="mstr-form-label">Nama Lembaga *</label>
-                    <input type="text" name="nama" class="mstr-form-control" placeholder="SMK AL MUTTAQIN" required>
+                    <input type="text" name="nama" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('nama') : '' }}" placeholder="SMK AL MUTTAQIN" required maxlength="100">
                 </div>
 
                 <div class="mstr-form-group">
                     <label class="mstr-form-label">Alamat Lengkap</label>
-                    <textarea name="alamat" rows="2" class="mstr-form-control" placeholder="Jln. Nogososro No. 26 Josenan Taman Kota Madiun..."></textarea>
+                    <textarea name="alamat" rows="2" class="mstr-form-control" placeholder="Jln. Nogososro No. 26 Josenan Taman Kota Madiun...">{{ old('_form_mode') === 'tambah' ? old('alamat') : '' }}</textarea>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">No. Telepon</label>
-                        <input type="text" name="telepon" class="mstr-form-control" placeholder="+62857...">
+                        <input type="text" name="telepon" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('telepon') : '' }}" placeholder="+62857..." maxlength="40">
                     </div>
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Email</label>
-                        <input type="email" name="email" class="mstr-form-control" placeholder="info@almuttaqin.id">
+                        <input type="text" inputmode="email" name="email" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('email') : '' }}" placeholder="info@almuttaqin.id" maxlength="120">
                     </div>
                 </div>
 
                 <div class="mstr-form-group">
                     <label class="mstr-form-label">Logo Lembaga</label>
-                    <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" class="mstr-form-control">
+                    <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif" class="mstr-form-control">
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Kategori *</label>
+                        @php $oldKat = old('_form_mode') === 'tambah' ? old('kategori', 'formal') : 'formal'; @endphp
                         <select name="kategori" class="mstr-form-control" required>
-                            <option value="formal">Formal</option>
-                            <option value="pesantren">Pesantren</option>
-                            <option value="yayasan">Yayasan</option>
+                            <option value="formal" {{ $oldKat === 'formal' ? 'selected' : '' }}>Formal</option>
+                            <option value="pesantren" {{ $oldKat === 'pesantren' ? 'selected' : '' }}>Pesantren</option>
+                            <option value="yayasan" {{ $oldKat === 'yayasan' ? 'selected' : '' }}>Yayasan</option>
                         </select>
                     </div>
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Urutan</label>
-                        <input type="number" name="urutan" class="mstr-form-control" placeholder="Otomatis" min="1">
+                        <input type="number" name="urutan" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('urutan') : '' }}" placeholder="Otomatis" min="1">
                     </div>
                     <div class="mstr-form-group" style="justify-content:center;">
                         <label class="mstr-form-label">&nbsp;</label>
+                        @php $oldAktif = old('_form_mode') === 'tambah' ? (bool) old('is_active') : true; @endphp
                         <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; font-weight:600;">
-                            <input type="checkbox" name="is_active" value="1" checked style="width:16px;height:16px;">
+                            <input type="checkbox" name="is_active" value="1" {{ $oldAktif ? 'checked' : '' }} style="width:16px;height:16px;">
                             <span>Aktif</span>
                         </label>
                     </div>
@@ -682,15 +721,16 @@
 
 {{-- MODAL EDIT LEMBAGA --}}
 <div class="mstr-modal-overlay" id="modalEditLembaga" onclick="if(event.target === this) tutupModalEditLembaga()">
-    <div class="mstr-modal-box" style="max-width:540px; max-height:92vh; display:flex; flex-direction:column;">
-        <form id="formEditLembaga" method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; max-height:92vh;">
+    <div class="mstr-modal-box" style="max-width:540px; max-height:90vh; display:flex; flex-direction:column;">
+        <form id="formEditLembaga" method="POST" enctype="multipart/form-data" style="display:flex; flex-direction:column; max-height:90vh; min-height:0; overflow:hidden;">
             @csrf
             @method('PUT')
+            <input type="hidden" name="_form_mode" value="edit">
             <div class="mstr-modal-header">
                 <h3 class="mstr-modal-title">Edit Lembaga</h3>
                 <button type="button" class="mstr-modal-close" onclick="tutupModalEditLembaga()">&times;</button>
             </div>
-            <div class="mstr-modal-body" style="overflow-y:auto;">
+            <div class="mstr-modal-body">
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Kode Unik</label>
@@ -719,7 +759,7 @@
                     </div>
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Email</label>
-                        <input type="email" name="email" id="editEmail" class="mstr-form-control" placeholder="info@almuttaqin.id">
+                        <input type="text" inputmode="email" name="email" id="editEmail" class="mstr-form-control" placeholder="info@almuttaqin.id" maxlength="120">
                     </div>
                 </div>
 
@@ -730,7 +770,7 @@
                             <img id="editLogoPreview" src="" alt="Logo" class="lembaga-logo-img" style="width:36px; height:36px;">
                         </div>
                         <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
-                            <input type="file" name="logo" id="editLogoInput" accept="image/png,image/jpeg,image/webp" class="mstr-form-control">
+                            <input type="file" name="logo" id="editLogoInput" accept="image/png,image/jpeg,image/webp,image/gif" class="mstr-form-control">
                             <label id="editHapusLogoWrap" style="display:none; align-items:center; gap:6px; font-size:12px; color:#DC2626; cursor:pointer;">
                                 <input type="checkbox" name="hapus_logo" id="editHapusLogo" value="1">
                                 <span>Hapus logo unggahan</span>
@@ -808,6 +848,32 @@
 
     function tutupModalEditLembaga() {
         document.getElementById('modalEditLembaga').classList.remove('show');
+    }
+
+    function sanitizeKodeLembaga(val) {
+        return String(val || '')
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9_-]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^[-_]+|[-_]+$/g, '');
+    }
+
+    var tambahKodeInput = document.getElementById('tambahKode');
+    var tambahSingkatanInput = document.getElementById('tambahSingkatan');
+    if (tambahKodeInput) {
+        tambahKodeInput.addEventListener('blur', function () {
+            if (this.value.trim() !== '') {
+                this.value = sanitizeKodeLembaga(this.value);
+            }
+        });
+    }
+    if (tambahSingkatanInput && tambahKodeInput) {
+        tambahSingkatanInput.addEventListener('blur', function () {
+            if (tambahKodeInput.value.trim() === '' && this.value.trim() !== '') {
+                tambahKodeInput.value = sanitizeKodeLembaga(this.value);
+            }
+        });
     }
 
     document.getElementById('editLogoInput')?.addEventListener('change', function (e) {

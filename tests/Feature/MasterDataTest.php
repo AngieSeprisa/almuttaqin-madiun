@@ -112,4 +112,86 @@ class MasterDataTest extends TestCase
         $response->assertSessionHas('error');
         $this->assertDatabaseHas('lembagas', ['kode' => 'smp']);
     }
+
+    public function test_yayasan_can_create_new_lembaga_with_normalized_kode_and_blank_email_dash(): void
+    {
+        $yayasan = User::where('role', 'yayasan')->first();
+
+        $response = $this->actingAs($yayasan)->post(route('master.lembaga.store'), [
+            '_form_mode' => 'tambah',
+            'kode'       => '  KB TK  ',
+            'singkatan'  => 'KB TK',
+            'nama'       => 'KB TK AL MUTTAQIN',
+            'kategori'   => 'formal',
+            'alamat'     => 'Jl. Nogososro No. 26',
+            'telepon'    => '081234567890',
+            'email'      => '-',
+            'is_active'  => '1',
+        ]);
+
+        $response->assertRedirect(route('master.lembaga.index'));
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('lembagas', [
+            'kode'      => 'kb-tk',
+            'singkatan' => 'KB TK',
+            'nama'      => 'KB TK AL MUTTAQIN',
+            'kategori'  => 'formal',
+            'email'     => null,
+            'is_active' => true,
+        ]);
+
+        // Cek lembaga baru tampil di halaman Master Lembaga
+        $index = $this->actingAs($yayasan)->get(route('master.lembaga.index'));
+        $index->assertStatus(200);
+        $index->assertSee('KB TK AL MUTTAQIN');
+        $index->assertSee('kode: kb-tk');
+    }
+
+    public function test_create_lembaga_duplicate_kode_displays_validation_error(): void
+    {
+        $yayasan = User::where('role', 'yayasan')->first();
+
+        $response = $this->actingAs($yayasan)
+            ->from(route('master.lembaga.index'))
+            ->post(route('master.lembaga.store'), [
+                '_form_mode' => 'tambah',
+                'kode'       => 'SMP',
+                'singkatan'  => 'SMP 2',
+                'nama'       => 'SMP Duplikat',
+                'kategori'   => 'formal',
+                'is_active'  => '1',
+            ]);
+
+        $response->assertRedirect(route('master.lembaga.index'));
+        $response->assertSessionHasErrors('kode');
+
+        $follow = $this->actingAs($yayasan)->get(route('master.lembaga.index'));
+        $follow->assertStatus(200);
+        $follow->assertSee('Gagal menyimpan data lembaga:');
+    }
+
+    public function test_non_yayasan_with_master_lembaga_create_permission_can_add_and_see_new_lembaga(): void
+    {
+        $adminSmp = User::where('email', 'admin.smp@almuttaqin.id')->firstOrFail();
+        \App\Models\UserPermission::updateOrCreate(
+            ['user_id' => $adminSmp->id, 'menu_code' => 'master_lembaga'],
+            ['can_view' => true, 'can_create' => true, 'can_edit' => true, 'can_delete' => false]
+        );
+
+        $response = $this->actingAs($adminSmp)->post(route('master.lembaga.store'), [
+            '_form_mode' => 'tambah',
+            'kode'       => 'tpq',
+            'singkatan'  => 'TPQ',
+            'nama'       => 'TPQ AL MUTTAQIN',
+            'kategori'   => 'pesantren',
+            'is_active'  => '1',
+        ]);
+
+        $response->assertRedirect(route('master.lembaga.index'));
+        $this->assertDatabaseHas('lembagas', ['kode' => 'tpq', 'nama' => 'TPQ AL MUTTAQIN']);
+
+        $index = $this->actingAs($adminSmp)->get(route('master.lembaga.index'));
+        $index->assertStatus(200);
+        $index->assertSee('TPQ AL MUTTAQIN');
+    }
 }
