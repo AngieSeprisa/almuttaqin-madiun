@@ -653,17 +653,17 @@
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Kode Unik *</label>
-                        <input type="text" name="kode" id="tambahKode" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('kode') : '' }}" placeholder="smk / sdit / ra" required maxlength="30" autocomplete="off">
+                        <input type="text" name="kode" id="tambahKode" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('kode') : '' }}" placeholder="smk / sdit / ra" required maxlength="60" autocomplete="off">
                     </div>
                     <div class="mstr-form-group">
                         <label class="mstr-form-label">Singkatan *</label>
-                        <input type="text" name="singkatan" id="tambahSingkatan" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('singkatan') : '' }}" placeholder="SMK" required maxlength="30">
+                        <input type="text" name="singkatan" id="tambahSingkatan" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('singkatan') : '' }}" placeholder="SMK" required maxlength="60">
                     </div>
                 </div>
 
                 <div class="mstr-form-group">
                     <label class="mstr-form-label">Nama Lembaga *</label>
-                    <input type="text" name="nama" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('nama') : '' }}" placeholder="SMK AL MUTTAQIN" required maxlength="100">
+                    <input type="text" name="nama" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('nama') : '' }}" placeholder="SMK AL MUTTAQIN" required maxlength="120">
                 </div>
 
                 <div class="mstr-form-group">

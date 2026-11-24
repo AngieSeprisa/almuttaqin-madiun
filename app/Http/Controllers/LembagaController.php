@@ -109,9 +109,9 @@ class LembagaController extends Controller
         $this->normalizeLembagaInput($request, true);
 
         $validated = $request->validate([
-            'kode'      => ['required', 'string', 'max:30', 'alpha_dash', Rule::unique('lembagas', 'kode')],
-            'nama'      => 'required|string|max:100',
-            'singkatan' => 'required|string|max:30',
+            'kode'      => ['required', 'string', 'max:60', 'alpha_dash', Rule::unique('lembagas', 'kode')],
+            'nama'      => 'required|string|max:120',
+            'singkatan' => 'required|string|max:60',
             'kategori'  => 'required|in:formal,pesantren,yayasan',
             'alamat'    => 'nullable|string|max:1000',
             'telepon'   => 'nullable|string|max:40',
@@ -121,13 +121,13 @@ class LembagaController extends Controller
             'is_active' => 'nullable|boolean',
         ], [
             'kode.required'      => 'Kode unik lembaga wajib diisi.',
-            'kode.max'           => 'Kode lembaga maksimal 30 karakter.',
+            'kode.max'           => 'Kode lembaga maksimal 60 karakter.',
             'kode.unique'        => 'Kode lembaga tersebut sudah digunakan. Gunakan kode unik lain.',
             'kode.alpha_dash'    => 'Kode lembaga hanya boleh berupa huruf, angka, tanda minus (-), atau garis bawah (_).',
             'nama.required'      => 'Nama lembaga wajib diisi.',
-            'nama.max'           => 'Nama lembaga maksimal 100 karakter.',
+            'nama.max'           => 'Nama lembaga maksimal 120 karakter.',
             'singkatan.required' => 'Singkatan lembaga wajib diisi.',
-            'singkatan.max'      => 'Singkatan lembaga maksimal 30 karakter.',
+            'singkatan.max'      => 'Singkatan lembaga maksimal 60 karakter.',
             'kategori.required'  => 'Kategori lembaga wajib dipilih.',
             'kategori.in'        => 'Kategori lembaga tidak valid.',
             'email.email'        => 'Format email lembaga tidak valid. Kosongkan jika tidak ada email.',
@@ -197,8 +197,8 @@ class LembagaController extends Controller
         $this->normalizeLembagaInput($request, !$isCore);
 
         $validated = $request->validate([
-            'nama'      => 'required|string|max:100',
-            'singkatan' => 'required|string|max:30',
+            'nama'      => 'required|string|max:120',
+            'singkatan' => 'required|string|max:60',
             'kategori'  => 'required|in:formal,pesantren,yayasan',
             'alamat'    => 'nullable|string|max:1000',
             'telepon'   => 'nullable|string|max:40',
@@ -240,7 +240,7 @@ class LembagaController extends Controller
         if (!$isCore && $request->filled('kode')) {
             $reqKode = strtolower(trim((string) $request->kode));
             $request->validate([
-                'kode' => ['required', 'string', 'max:30', 'alpha_dash', Rule::unique('lembagas', 'kode')->ignore($lembaga->id)],
+                'kode' => ['required', 'string', 'max:60', 'alpha_dash', Rule::unique('lembagas', 'kode')->ignore($lembaga->id)],
             ], [
                 'kode.unique'     => 'Kode lembaga tersebut sudah digunakan. Gunakan kode unik lain.',
                 'kode.alpha_dash' => 'Kode lembaga hanya boleh berupa huruf, angka, tanda minus (-), atau garis bawah (_).',
@@ -253,8 +253,27 @@ class LembagaController extends Controller
             $validated['kode'] = $reqKode;
         }
 
+        $oldKode = $lembaga->kode;
+        $oldSingkatan = $lembaga->singkatan;
+        $oldJenjangKey = $lembaga->jenjang_key;
+        $oldAliases = array_values(array_unique(array_filter(array_merge(
+            Lembaga::jenjangAliasesForRoom($oldKode),
+            [$oldKode, $oldSingkatan, $oldJenjangKey]
+        ))));
+
         $validated['is_active'] = $request->has('is_active');
         $lembaga->update($validated);
+        $lembaga->refresh();
+
+        $newJenjangKey = $lembaga->jenjang_key;
+        if (strcasecmp($oldJenjangKey, $newJenjangKey) !== 0 || strcasecmp((string) $oldKode, (string) $lembaga->kode) !== 0 || strcasecmp((string) $oldSingkatan, (string) $lembaga->singkatan) !== 0) {
+            Lembaga::propagateRename($lembaga, $oldAliases, $newJenjangKey);
+        }
+
+        // Jika sesi active_lembaga sedang berada pada kode lama, perbarui ke kode baru
+        if (session('active_lembaga') && strcasecmp((string) session('active_lembaga'), (string) $oldKode) === 0 && $oldKode !== $lembaga->kode) {
+            session(['active_lembaga' => $lembaga->kode]);
+        }
 
         return redirect()->route('master.lembaga.index')->with('success', "Data lembaga '{$lembaga->nama}' berhasil diperbarui.");
     }

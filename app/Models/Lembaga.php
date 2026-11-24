@@ -388,6 +388,111 @@ class Lembaga extends Model
     }
 
     /**
+     * Propagasi perubahan singkatan / kode lembaga ke seluruh modul yang menyimpan label jenjang
+     * (Link Penerimaan SPMB, Gelombang, Pendaftaran, Siswa, Kelas, Ekskul, Jam Pelajaran).
+     */
+    public static function propagateRename(self $lembaga, array $oldAliases, string $newJenjangKey): void
+    {
+        $newKey = trim($newJenjangKey);
+        if ($newKey === '') {
+            return;
+        }
+
+        $oldLower = array_values(array_unique(array_filter(array_map(
+            fn ($v) => strtolower(trim((string) $v)),
+            $oldAliases
+        ))));
+        if (empty($oldLower)) {
+            return;
+        }
+
+        $matchesOld = function ($value) use ($oldLower): bool {
+            return in_array(strtolower(trim((string) $value)), $oldLower, true);
+        };
+
+        $replaceAssocKeys = function (?array $map) use ($matchesOld, $newKey): ?array {
+            if (!is_array($map)) {
+                return $map;
+            }
+            $updated = [];
+            foreach ($map as $k => $v) {
+                $targetKey = $matchesOld($k) ? $newKey : $k;
+                if (!array_key_exists($targetKey, $updated) || filled($v)) {
+                    $updated[$targetKey] = $v;
+                }
+            }
+            return $updated;
+        };
+
+        // 1. Update PenerimaanSantri & PenerimaanGelombang
+        if (\Illuminate\Support\Facades\Schema::hasTable('penerimaan_santris')) {
+            $events = PenerimaanSantri::with('gelombangs')->get();
+            foreach ($events as $event) {
+                $dirty = false;
+
+                $rawList = is_array($event->jenjangs) && !empty($event->jenjangs)
+                    ? $event->jenjangs
+                    : array_values(array_filter(array_map('trim', explode(',', (string) $event->jenjang))));
+
+                $newList = [];
+                foreach ($rawList as $item) {
+                    if ($matchesOld($item)) {
+                        $newList[] = $newKey;
+                        if ($item !== $newKey) {
+                            $dirty = true;
+                        }
+                    } else {
+                        $newList[] = $item;
+                    }
+                }
+                $newList = array_values(array_unique($newList));
+
+                $newWa = $replaceAssocKeys($event->kontak_wa_per_jenjang);
+                $newLok = $replaceAssocKeys($event->lokasi_seleksi_per_jenjang);
+
+                if ($newWa !== $event->kontak_wa_per_jenjang || $newLok !== $event->lokasi_seleksi_per_jenjang) {
+                    $dirty = true;
+                }
+
+                if ($dirty) {
+                    $event->update([
+                        'jenjangs'                   => $newList,
+                        'jenjang'                    => strcasecmp(trim((string) $event->jenjang), 'Semua') === 0 ? 'Semua' : implode(', ', $newList),
+                        'kontak_wa_per_jenjang'      => $newWa,
+                        'lokasi_seleksi_per_jenjang' => $newLok,
+                    ]);
+                }
+
+                foreach ($event->gelombangs as $gel) {
+                    $newKuota = $replaceAssocKeys($gel->kuota_per_jenjang);
+                    if ($newKuota !== $gel->kuota_per_jenjang) {
+                        $gel->update(['kuota_per_jenjang' => $newKuota]);
+                    }
+                }
+            }
+        }
+
+        // 2. Update tabel pendaftarans, siswas, time_slots (berdasarkan alias lama)
+        foreach (['pendaftarans', 'siswas', 'time_slots'] as $tableName) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($tableName) && \Illuminate\Support\Facades\Schema::hasColumn($tableName, 'jenjang')) {
+                \Illuminate\Support\Facades\DB::table($tableName)
+                    ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(jenjang))'), $oldLower)
+                    ->update(['jenjang' => $newKey]);
+            }
+        }
+
+        // 3. Update classrooms & ekstrakurikulers berdasarkan lembaga_id
+        if (\Illuminate\Support\Facades\Schema::hasTable('classrooms')) {
+            Classroom::where('lembaga_id', $lembaga->id)->update(['jenjang' => $newKey]);
+        }
+        if (\Illuminate\Support\Facades\Schema::hasTable('ekstrakurikulers')) {
+            Ekstrakurikuler::where('lembaga_id', $lembaga->id)
+                ->whereRaw("UPPER(COALESCE(jenjang, '')) != 'ALL'")
+                ->update(['jenjang' => $newKey]);
+        }
+    }
+
+    /**
      * Nama singkat lembaga untuk tampilan filter & ringkas (Yayasan, Pondok, SMA, SMP).
      */
     public function getNamaSingkatAttribute(): string

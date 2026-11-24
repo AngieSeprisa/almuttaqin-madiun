@@ -284,18 +284,22 @@
 
                             {{-- FIELD KHUSUS: JENJANG --}}
                             @if(!$isCustom && $key === 'jenjang')
+                                @php $jDisplayMap = $jenjangDisplayLabels ?? []; @endphp
                                 @if(count($allowedJenjangs) === 1)
                                     <input type="hidden" name="jenjang" id="jenjang" value="{{ $allowedJenjangs[0] }}">
-                                    <input type="text" class="wizard-input" value="{{ $allowedJenjangs[0] }}" readonly style="background:#F8FAFC;">
+                                    <input type="text" class="wizard-input" value="{{ $jDisplayMap[$allowedJenjangs[0]] ?? $allowedJenjangs[0] }}" readonly style="background:#F8FAFC;">
                                 @else
                                     <select name="jenjang" id="jenjang" class="wizard-select @error('jenjang') is-invalid @enderror" required>
-                                        <option value="">Pilih Jenjang</option>
+                                        <option value="">Pilih {{ $fld['label'] ?: 'Jenjang' }}</option>
                                         @foreach($allowedJenjangs as $j)
-                                            @php $isAvail = in_array($j, $availableJenjangs, true); @endphp
+                                            @php
+                                                $isAvail = in_array($j, $availableJenjangs, true);
+                                                $jText = $jDisplayMap[$j] ?? $j;
+                                            @endphp
                                             <option value="{{ $j }}"
                                                     {{ old('jenjang') === $j && $isAvail ? 'selected' : '' }}
                                                     {{ $isAvail ? '' : 'disabled' }}>
-                                                {{ $j }}{{ $isAvail ? '' : ' (Kuota Penuh)' }}
+                                                {{ $jText }}{{ $isAvail ? '' : ' (Kuota Penuh)' }}
                                             </option>
                                         @endforeach
                                     </select>

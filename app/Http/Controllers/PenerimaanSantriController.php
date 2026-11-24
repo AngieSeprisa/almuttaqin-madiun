@@ -158,6 +158,10 @@ class PenerimaanSantriController extends Controller
         $penerimaan = PenerimaanSantri::with('gelombangs')->findOrFail($id);
         $this->ensureEventInActiveRoom($penerimaan);
 
+        if ($penerimaan->syncStaleJenjangKeys()) {
+            $penerimaan->refresh()->load('gelombangs');
+        }
+
         $authUser = auth()->user();
         $scopedFormal = Lembaga::activeScopedFormal($authUser);
         $formalOptions = PenerimaanSantri::formalJenjangOptions();

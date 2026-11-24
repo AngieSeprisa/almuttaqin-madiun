@@ -284,4 +284,89 @@ class SpmbFormBuilderTest extends TestCase
             ])
             ->assertRedirect(route('penerimaan.formulir.edit', $this->eventSdit->id));
     }
+
+    public function test_ubah_nama_dan_singkatan_lembaga_otomatis_sinkron_ke_dropdown_spmb(): void
+    {
+        $raKota = Lembaga::create([
+            'kode' => 'ra', 'nama' => 'RA AL MUTTAQIN', 'singkatan' => 'RA',
+            'kategori' => 'formal', 'is_active' => true, 'urutan' => 4,
+        ]);
+        $raGemarang = Lembaga::create([
+            'kode' => 'ra-gemarang', 'nama' => 'ra gemarang', 'singkatan' => 'ra gemarang',
+            'kategori' => 'formal', 'is_active' => true, 'urutan' => 5,
+        ]);
+
+        $eventRa = PenerimaanSantri::create([
+            'judul'        => 'SPMB RA AL MUTTAQIN',
+            'slug'         => 'spmb-ra-al-muttaqin',
+            'tahun_ajaran' => '2026/2027',
+            'jenjang'      => 'RA, ra gemarang',
+            'jenjangs'     => ['RA', 'ra gemarang'],
+            'kontak_wa_per_jenjang'      => ['RA' => '08111111111', 'ra gemarang' => '08222222222'],
+            'lokasi_seleksi_per_jenjang' => ['RA' => 'Madiun Kota', 'ra gemarang' => 'Gemarang'],
+            'is_active'    => true,
+            'created_by'   => $this->yayasanUser->id,
+        ]);
+
+        // Admin mengganti nama, kode, dan singkatan kedua lembaga lewat Master Lembaga
+        $this->actingAs($this->yayasanUser)->put(route('master.lembaga.update', $raKota->id), [
+            'kode'      => 'ra-al-muttaqin-kota-madiun',
+            'nama'      => 'RA AL MUTTAQIN KOTA',
+            'singkatan' => 'RA AL MUTTAQIN KOTA MADIUN',
+            'kategori'  => 'formal',
+            'is_active' => '1',
+        ])->assertRedirect(route('master.lembaga.index'));
+
+        $this->actingAs($this->yayasanUser)->put(route('master.lembaga.update', $raGemarang->id), [
+            'kode'      => 'ra-al-muttaqin-gemarang',
+            'nama'      => 'RA AL MUTTAQIN GEMARANG',
+            'singkatan' => 'RA AL MUTTAQIN GEMARANG',
+            'kategori'  => 'formal',
+            'is_active' => '1',
+        ])->assertRedirect(route('master.lembaga.index'));
+
+        $eventRa->refresh();
+        $this->assertEquals(['RA AL MUTTAQIN KOTA MADIUN', 'RA AL MUTTAQIN GEMARANG'], $eventRa->jenjangs);
+        $this->assertEquals('08111111111', $eventRa->kontak_wa_per_jenjang['RA AL MUTTAQIN KOTA MADIUN']);
+        $this->assertEquals('Gemarang', $eventRa->lokasi_seleksi_per_jenjang['RA AL MUTTAQIN GEMARANG']);
+
+        $resp = $this->get(route('spmb.show', $eventRa->slug));
+        $resp->assertStatus(200);
+        $resp->assertSee('RA AL MUTTAQIN KOTA MADIUN');
+        $resp->assertSee('RA AL MUTTAQIN GEMARANG');
+        $resp->assertDontSee('ra gemarang');
+    }
+
+    public function test_sync_otomatis_key_jenjang_usang_pada_event_spmb_yang_sudah_terlanjur_diubah(): void
+    {
+        // Simulasi kondisi VPS: Master Lembaga sudah terlanjur diubah duluan,
+        // sedangkan event SPMB masih menyimpan ["RA", "ra gemarang"]
+        Lembaga::create([
+            'kode' => 'ra-al-muttaqin-kota-madiun', 'nama' => 'RA AL MUTTAQIN KOTA',
+            'singkatan' => 'RA AL MUTTAQIN KOTA MADIUN', 'kategori' => 'formal', 'is_active' => true, 'urutan' => 4,
+        ]);
+        Lembaga::create([
+            'kode' => 'ra-al-muttaqin-gemarang', 'nama' => 'RA AL MUTTAQIN GEMARANG',
+            'singkatan' => 'RA AL MUTTAQIN GEMARANG', 'kategori' => 'formal', 'is_active' => true, 'urutan' => 5,
+        ]);
+
+        $staleEvent = PenerimaanSantri::create([
+            'judul'        => 'SPMB RA EXISTING',
+            'slug'         => 'spmb-ra-existing',
+            'tahun_ajaran' => '2026/2027',
+            'jenjang'      => 'RA, ra gemarang',
+            'jenjangs'     => ['RA', 'ra gemarang'],
+            'is_active'    => true,
+            'created_by'   => $this->yayasanUser->id,
+        ]);
+
+        $resp = $this->get(route('spmb.show', $staleEvent->slug));
+        $resp->assertStatus(200);
+        $resp->assertSee('RA AL MUTTAQIN KOTA MADIUN');
+        $resp->assertSee('RA AL MUTTAQIN GEMARANG');
+        $resp->assertDontSee('ra gemarang');
+
+        $staleEvent->refresh();
+        $this->assertEquals(['RA AL MUTTAQIN KOTA MADIUN', 'RA AL MUTTAQIN GEMARANG'], $staleEvent->jenjangs);
+    }
 }

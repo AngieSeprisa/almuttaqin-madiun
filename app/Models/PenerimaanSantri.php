@@ -424,6 +424,193 @@ class PenerimaanSantri extends Model
     }
 
     /**
+     * Cocokkan dan perbarui key jenjang lama pada event ini yang lembaganya sudah berganti nama/singkatan
+     * di Master Lembaga (misal "RA", "ra gemarang" -> "RA AL MUTTAQIN KOTA MADIUN", "RA AL MUTTAQIN GEMARANG").
+     */
+    public function syncStaleJenjangKeys(): bool
+    {
+        $formalLembagas = Lembaga::formalOptions();
+        if ($formalLembagas->isEmpty()) {
+            return false;
+        }
+
+        $formalByKeyLower = [];
+        foreach ($formalLembagas as $lem) {
+            $formalByKeyLower[strtolower(trim($lem->jenjang_key))] = $lem;
+        }
+
+        $rawList = $this->allowedJenjangs();
+        if (empty($rawList)) {
+            return false;
+        }
+
+        $usedLembagaIds = [];
+        $staleItems = [];
+        $resolvedMap = []; // rawKey => newJenjangKey
+
+        // Tahap 1: Identifikasi key yang sudah cocok langsung dengan lembaga aktif
+        foreach ($rawList as $rawKey) {
+            $exact = Lembaga::resolveByKode($rawKey);
+            if ($exact && $exact->isFormalSchool()) {
+                $usedLembagaIds[$exact->id] = true;
+                $resolvedMap[$rawKey] = $exact->jenjang_key;
+            } else {
+                $staleItems[] = $rawKey;
+            }
+        }
+
+        if (empty($staleItems)) {
+            // Cek apakah ada perbedaan kapitalisasi/singkatan (misal "ra" -> "RA")
+            $hasDiff = false;
+            foreach ($resolvedMap as $old => $new) {
+                if ($old !== $new) {
+                    $hasDiff = true;
+                    break;
+                }
+            }
+            if (!$hasDiff) {
+                return false;
+            }
+        } else {
+            // Tahap 2: Urutkan stale item dari paling spesifik (banyak kata / panjang) agar "ra gemarang"
+            // dicocokkan terlebih dahulu ke "RA AL MUTTAQIN GEMARANG" sebelum "RA" ke "RA AL MUTTAQIN KOTA".
+            $tokenize = function (string $text): array {
+                $parts = preg_split('/[^a-z0-9]+/i', strtolower(trim($text)));
+                return array_values(array_unique(array_filter($parts, fn ($t) => $t !== '')));
+            };
+
+            usort($staleItems, function ($a, $b) use ($tokenize) {
+                $ta = count($tokenize($a));
+                $tb = count($tokenize($b));
+                if ($ta !== $tb) {
+                    return $tb <=> $ta;
+                }
+                return strlen($b) <=> strlen($a);
+            });
+
+            foreach ($staleItems as $staleKey) {
+                $tokens = $tokenize($staleKey);
+                if (empty($tokens)) {
+                    $resolvedMap[$staleKey] = $staleKey;
+                    continue;
+                }
+
+                $bestMatch = null;
+                $bestScore = -1;
+
+                foreach ($formalLembagas as $cand) {
+                    if (isset($usedLembagaIds[$cand->id])) {
+                        continue;
+                    }
+
+                    $candHaystack = $tokenize(implode(' ', [
+                        (string) $cand->kode,
+                        (string) $cand->singkatan,
+                        (string) $cand->nama,
+                    ]));
+
+                    $allMatch = true;
+                    foreach ($tokens as $tok) {
+                        if (!in_array($tok, $candHaystack, true)) {
+                            $allMatch = false;
+                            break;
+                        }
+                    }
+
+                    if ($allMatch) {
+                        // Skor: prioritas lembaga yang memiliki kecocokan token lebih padat & urutan lebih awal
+                        $score = (count($tokens) * 100) - count($candHaystack);
+                        if ($score > $bestScore) {
+                            $bestScore = $score;
+                            $bestMatch = $cand;
+                        }
+                    }
+                }
+
+                if ($bestMatch) {
+                    $usedLembagaIds[$bestMatch->id] = true;
+                    $resolvedMap[$staleKey] = $bestMatch->jenjang_key;
+                } else {
+                    $resolvedMap[$staleKey] = $staleKey;
+                }
+            }
+        }
+
+        $changed = false;
+        $newList = [];
+        foreach ($rawList as $rawKey) {
+            $mapped = $resolvedMap[$rawKey] ?? $rawKey;
+            if ($mapped !== $rawKey) {
+                $changed = true;
+            }
+            $newList[] = $mapped;
+        }
+        $newList = array_values(array_unique($newList));
+
+        if (!$changed) {
+            return false;
+        }
+
+        $remapAssoc = function (?array $map) use ($resolvedMap): ?array {
+            if (!is_array($map)) {
+                return $map;
+            }
+            $out = [];
+            foreach ($map as $k => $v) {
+                $nk = $resolvedMap[$k] ?? $k;
+                if (!array_key_exists($nk, $out) || filled($v)) {
+                    $out[$nk] = $v;
+                }
+            }
+            return $out;
+        };
+
+        $this->update([
+            'jenjangs'                   => $newList,
+            'jenjang'                    => strcasecmp(trim((string) $this->jenjang), 'Semua') === 0 ? 'Semua' : implode(', ', $newList),
+            'kontak_wa_per_jenjang'      => $remapAssoc($this->kontak_wa_per_jenjang),
+            'lokasi_seleksi_per_jenjang' => $remapAssoc($this->lokasi_seleksi_per_jenjang),
+        ]);
+
+        $gelombangs = $this->relationLoaded('gelombangs') ? $this->gelombangs : $this->gelombangs()->get();
+        foreach ($gelombangs as $gel) {
+            $newKuota = $remapAssoc($gel->kuota_per_jenjang);
+            if ($newKuota !== $gel->kuota_per_jenjang) {
+                $gel->update(['kuota_per_jenjang' => $newKuota]);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Sinkronkan seluruh event SPMB yang memiliki key jenjang usang.
+     */
+    public static function syncAllStaleJenjangKeys(): int
+    {
+        $updated = 0;
+        foreach (static::with('gelombangs')->get() as $event) {
+            if ($event->syncStaleJenjangKeys()) {
+                $updated++;
+            }
+        }
+        return $updated;
+    }
+
+    /**
+     * Label tampilan terbaru untuk tiap opsi jenjang pada dropdown form publik.
+     */
+    public function jenjangDisplayLabels(): array
+    {
+        $labels = [];
+        foreach ($this->allowedJenjangs() as $jKey) {
+            $lem = Lembaga::resolveByKode($jKey);
+            $labels[$jKey] = $lem ? ($lem->singkatan ?: $lem->nama) : $jKey;
+        }
+        return $labels;
+    }
+
+    /**
      * Format tahun ajaran ringkas untuk nomor registrasi: "2027/2028" -> "202728".
      */
     public function tahunAjaranCode(): string

@@ -135,11 +135,16 @@ class SpmbPublicController extends Controller
             ->where('slug', $slug)
             ->firstOrFail();
 
+        if ($penerimaan->syncStaleJenjangKeys()) {
+            $penerimaan->refresh()->load('gelombangs');
+        }
+
         $isOpen = $penerimaan->isOpen();
         $activeGelombang = $penerimaan->activeGelombang();
         $statusState = $penerimaan->statusState();
         $allowedJenjangs = $penerimaan->allowedJenjangs();
         $availableJenjangs = $penerimaan->availableJenjangs();
+        $jenjangDisplayLabels = $penerimaan->jenjangDisplayLabels();
         $dokumenConfig = $penerimaan->dokumenConfig();
         $lokasiMap = $penerimaan->lokasiMap();
         $formSchema = $penerimaan->resolvedFormSchema();
@@ -152,6 +157,7 @@ class SpmbPublicController extends Controller
             'statusState',
             'allowedJenjangs',
             'availableJenjangs',
+            'jenjangDisplayLabels',
             'dokumenConfig',
             'lokasiMap',
             'formSchema',
@@ -560,7 +566,7 @@ class SpmbPublicController extends Controller
     {
         $lembagaCode = match (strtoupper(trim($jenjang))) {
             'REGULER' => 'PONDOK',
-            default   => strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $jenjang)),
+            default   => substr(strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $jenjang)), 0, 12) ?: 'SANTRI',
         };
 
         $tahunCode = $penerimaan->tahunAjaranCode();
