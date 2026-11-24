@@ -525,10 +525,13 @@
 
             <div class="lembaga-card-body">
                 <h4 class="lembaga-title">{{ $item->nama }}</h4>
-                <div style="display:flex; align-items:center; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                     <span class="lembaga-code-pill">kode: {{ $item->kode }}</span>
                     @if($item->singkatan)
                     <span style="font-size:12px; color:var(--text-secondary); font-weight:600;">({{ $item->singkatan }})</span>
+                    @endif
+                    @if($item->prefix_registrasi)
+                    <span style="font-size:11px; font-weight:700; font-family:monospace; padding:2px 7px; border-radius:6px; background:rgba(0, 82, 255, 0.08); color:#0052FF; border:1px solid rgba(0, 82, 255, 0.2);" title="Prefix Nomor Registrasi SPMB">No. Reg: {{ $item->prefix_registrasi }}</span>
                     @endif
                 </div>
                 @if($item->alamat)
@@ -582,11 +585,12 @@
                     @if($isYayasan || (auth()->check() && auth()->user()->canDo('master_lembaga', 'edit')))
                     @php
                         $editPayload = [
-                            'id'              => $item->id,
-                            'kode'            => $item->kode,
-                            'nama'            => $item->nama,
-                            'singkatan'       => $item->singkatan,
-                            'kategori'        => $item->kategori,
+                            'id'                => $item->id,
+                            'kode'              => $item->kode,
+                            'nama'              => $item->nama,
+                            'singkatan'         => $item->singkatan,
+                            'prefix_registrasi' => $item->prefix_registrasi ?? '',
+                            'kategori'          => $item->kategori,
                             'alamat'          => $item->alamat ?? '',
                             'telepon'         => $item->telepon ?? '',
                             'email'           => $item->email ?? '',
@@ -667,6 +671,12 @@
                 </div>
 
                 <div class="mstr-form-group">
+                    <label class="mstr-form-label">Prefix No. Registrasi SPMB <span style="font-weight:400; color:var(--text-muted);">(Opsional)</span></label>
+                    <input type="text" name="prefix_registrasi" id="tambahPrefixRegistrasi" class="mstr-form-control" value="{{ old('_form_mode') === 'tambah' ? old('prefix_registrasi') : '' }}" placeholder="Contoh: RAKT / RAGM / SDIT / SMP" maxlength="20" style="text-transform:uppercase; font-family:monospace;">
+                    <span style="font-size:11.5px; color:var(--text-muted);">Hasil contoh: <strong id="tambahPrefixPreview" style="font-family:monospace;">{{ old('_form_mode') === 'tambah' && old('prefix_registrasi') ? strtoupper(preg_replace('/[^A-Za-z0-9]/', '', old('prefix_registrasi'))) : 'OTOMATIS' }}-01-202627</strong></span>
+                </div>
+
+                <div class="mstr-form-group">
                     <label class="mstr-form-label">Alamat Lengkap</label>
                     <textarea name="alamat" rows="2" class="mstr-form-control" placeholder="Jln. Nogososro No. 26 Josenan Taman Kota Madiun...">{{ old('_form_mode') === 'tambah' ? old('alamat') : '' }}</textarea>
                 </div>
@@ -744,7 +754,13 @@
 
                 <div class="mstr-form-group">
                     <label class="mstr-form-label">Nama Lembaga *</label>
-                    <input type="text" name="nama" id="editNama" class="mstr-form-control" required>
+                    <input type="text" name="nama" id="editNama" class="mstr-form-control" required maxlength="120">
+                </div>
+
+                <div class="mstr-form-group">
+                    <label class="mstr-form-label">Prefix No. Registrasi SPMB <span style="font-weight:400; color:var(--text-muted);">(Opsional)</span></label>
+                    <input type="text" name="prefix_registrasi" id="editPrefixRegistrasi" class="mstr-form-control" placeholder="Contoh: RAKT / RAGM / SDIT / SMP" maxlength="20" style="text-transform:uppercase; font-family:monospace;">
+                    <span style="font-size:11.5px; color:var(--text-muted);">Hasil contoh: <strong id="editPrefixPreview" style="font-family:monospace;">OTOMATIS-01-202627</strong></span>
                 </div>
 
                 <div class="mstr-form-group">
@@ -832,6 +848,11 @@
 
         document.getElementById('editNama').value = data.nama || '';
         document.getElementById('editSingkatan').value = data.singkatan || '';
+        var editPrefixEl = document.getElementById('editPrefixRegistrasi');
+        if (editPrefixEl) {
+            editPrefixEl.value = data.prefix_registrasi || '';
+            updatePrefixPreview(editPrefixEl, 'editPrefixPreview', data.singkatan || data.kode || '');
+        }
         document.getElementById('editKategori').value = data.kategori || 'formal';
         document.getElementById('editAlamat').value = data.alamat || '';
         document.getElementById('editTelepon').value = data.telepon || '';
@@ -873,6 +894,38 @@
             if (tambahKodeInput.value.trim() === '' && this.value.trim() !== '') {
                 tambahKodeInput.value = sanitizeKodeLembaga(this.value);
             }
+        });
+    }
+
+    function sanitizePrefixRegistrasi(val) {
+        return String(val || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+    }
+
+    function updatePrefixPreview(inputEl, previewId, fallbackSource) {
+        var previewEl = document.getElementById(previewId);
+        if (!previewEl) return;
+        var clean = sanitizePrefixRegistrasi(inputEl ? inputEl.value : '');
+        if (!clean && fallbackSource) {
+            clean = sanitizePrefixRegistrasi(fallbackSource).slice(0, 12);
+        }
+        previewEl.textContent = (clean || 'OTOMATIS') + '-01-202627';
+    }
+
+    var tambahPrefixInput = document.getElementById('tambahPrefixRegistrasi');
+    if (tambahPrefixInput) {
+        tambahPrefixInput.addEventListener('input', function () {
+            var clean = sanitizePrefixRegistrasi(this.value);
+            if (this.value !== clean) this.value = clean;
+            updatePrefixPreview(this, 'tambahPrefixPreview', document.getElementById('tambahSingkatan')?.value || '');
+        });
+    }
+
+    var editPrefixInput = document.getElementById('editPrefixRegistrasi');
+    if (editPrefixInput) {
+        editPrefixInput.addEventListener('input', function () {
+            var clean = sanitizePrefixRegistrasi(this.value);
+            if (this.value !== clean) this.value = clean;
+            updatePrefixPreview(this, 'editPrefixPreview', document.getElementById('editSingkatan')?.value || '');
         });
     }
 

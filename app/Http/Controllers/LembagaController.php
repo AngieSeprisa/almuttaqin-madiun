@@ -36,6 +36,11 @@ class LembagaController extends Controller
             }
         }
 
+        if ($request->has('prefix_registrasi')) {
+            $cleanPrefix = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', trim((string) $request->input('prefix_registrasi'))));
+            $merged['prefix_registrasi'] = $cleanPrefix === '' ? null : $cleanPrefix;
+        }
+
         if ($request->has('email')) {
             $email = trim((string) $request->input('email'));
             $merged['email'] = ($email === '' || $email === '-') ? null : $email;
@@ -109,10 +114,11 @@ class LembagaController extends Controller
         $this->normalizeLembagaInput($request, true);
 
         $validated = $request->validate([
-            'kode'      => ['required', 'string', 'max:60', 'alpha_dash', Rule::unique('lembagas', 'kode')],
-            'nama'      => 'required|string|max:120',
-            'singkatan' => 'required|string|max:60',
-            'kategori'  => 'required|in:formal,pesantren,yayasan',
+            'kode'              => ['required', 'string', 'max:60', 'alpha_dash', Rule::unique('lembagas', 'kode')],
+            'nama'              => 'required|string|max:120',
+            'singkatan'         => 'required|string|max:60',
+            'prefix_registrasi' => 'nullable|string|max:20|alpha_num',
+            'kategori'          => 'required|in:formal,pesantren,yayasan',
             'alamat'    => 'nullable|string|max:1000',
             'telepon'   => 'nullable|string|max:40',
             'email'     => 'nullable|email|max:120',
@@ -126,8 +132,10 @@ class LembagaController extends Controller
             'kode.alpha_dash'    => 'Kode lembaga hanya boleh berupa huruf, angka, tanda minus (-), atau garis bawah (_).',
             'nama.required'      => 'Nama lembaga wajib diisi.',
             'nama.max'           => 'Nama lembaga maksimal 120 karakter.',
-            'singkatan.required' => 'Singkatan lembaga wajib diisi.',
-            'singkatan.max'      => 'Singkatan lembaga maksimal 60 karakter.',
+            'singkatan.required'        => 'Singkatan lembaga wajib diisi.',
+            'singkatan.max'             => 'Singkatan lembaga maksimal 60 karakter.',
+            'prefix_registrasi.max'     => 'Prefix nomor registrasi maksimal 20 karakter.',
+            'prefix_registrasi.alpha_num' => 'Prefix nomor registrasi hanya boleh berupa huruf dan angka.',
             'kategori.required'  => 'Kategori lembaga wajib dipilih.',
             'kategori.in'        => 'Kategori lembaga tidak valid.',
             'email.email'        => 'Format email lembaga tidak valid. Kosongkan jika tidak ada email.',
@@ -197,9 +205,10 @@ class LembagaController extends Controller
         $this->normalizeLembagaInput($request, !$isCore);
 
         $validated = $request->validate([
-            'nama'      => 'required|string|max:120',
-            'singkatan' => 'required|string|max:60',
-            'kategori'  => 'required|in:formal,pesantren,yayasan',
+            'nama'              => 'required|string|max:120',
+            'singkatan'         => 'required|string|max:60',
+            'prefix_registrasi' => 'nullable|string|max:20|alpha_num',
+            'kategori'          => 'required|in:formal,pesantren,yayasan',
             'alamat'    => 'nullable|string|max:1000',
             'telepon'   => 'nullable|string|max:40',
             'email'     => 'nullable|email|max:120',

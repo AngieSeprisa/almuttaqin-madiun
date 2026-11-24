@@ -14,6 +14,7 @@ class Lembaga extends Model
         'kode',
         'nama',
         'singkatan',
+        'prefix_registrasi',
         'kategori',
         'alamat',
         'logo',
@@ -216,6 +217,22 @@ class Lembaga extends Model
         }
 
         return static::resolveByKode($activeKode);
+    }
+
+    /**
+     * Awalan (prefix) nomor registrasi SPMB untuk lembaga ini.
+     * Menggunakan prefix_registrasi kustom jika diisi, atau fallback dari singkatan/kode.
+     */
+    public function registrationPrefix(): string
+    {
+        $custom = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($this->prefix_registrasi ?? '')));
+        if ($custom !== '') {
+            return substr($custom, 0, 20);
+        }
+
+        $fallback = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $this->jenjang_key));
+
+        return substr($fallback, 0, 12) ?: 'SANTRI';
     }
 
     /**

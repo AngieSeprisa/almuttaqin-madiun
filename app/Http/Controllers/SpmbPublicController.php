@@ -564,10 +564,16 @@ class SpmbPublicController extends Controller
      */
     protected function generateRegistrationNumber(PenerimaanSantri $penerimaan, string $jenjang): string
     {
-        $lembagaCode = match (strtoupper(trim($jenjang))) {
-            'REGULER' => 'PONDOK',
-            default   => substr(strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $jenjang)), 0, 12) ?: 'SANTRI',
-        };
+        if (strtoupper(trim($jenjang)) === 'REGULER') {
+            $lembagaCode = 'PONDOK';
+        } else {
+            $lembaga = Lembaga::resolveByKode($jenjang) ?? Lembaga::resolveForJenjang($jenjang);
+            if ($lembaga && filled($lembaga->prefix_registrasi)) {
+                $lembagaCode = $lembaga->registrationPrefix();
+            } else {
+                $lembagaCode = substr(strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $jenjang)), 0, 12) ?: 'SANTRI';
+            }
+        }
 
         $tahunCode = $penerimaan->tahunAjaranCode();
         $prefix = $lembagaCode . '-';

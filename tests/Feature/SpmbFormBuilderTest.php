@@ -369,4 +369,63 @@ class SpmbFormBuilderTest extends TestCase
         $staleEvent->refresh();
         $this->assertEquals(['RA AL MUTTAQIN KOTA MADIUN', 'RA AL MUTTAQIN GEMARANG'], $staleEvent->jenjangs);
     }
+
+    public function test_prefix_nomor_registrasi_kustom_di_master_lembaga_dipakai_saat_pendaftaran_spmb(): void
+    {
+        $raKota = Lembaga::create([
+            'kode' => 'ra-kota', 'nama' => 'RA AL MUTTAQIN KOTA',
+            'singkatan' => 'RA AL MUTTAQIN KOTA MADIUN', 'prefix_registrasi' => 'RAKT',
+            'kategori' => 'formal', 'is_active' => true, 'urutan' => 4,
+        ]);
+        $raGemarang = Lembaga::create([
+            'kode' => 'ra-gemarang', 'nama' => 'RA AL MUTTAQIN GEMARANG',
+            'singkatan' => 'RA AL MUTTAQIN GEMARANG', 'prefix_registrasi' => 'RAGM',
+            'kategori' => 'formal', 'is_active' => true, 'urutan' => 5,
+        ]);
+
+        // Update prefix lewat Master Lembaga tetap ternormalisasi huruf kapital tanpa spasi/simbol
+        $this->actingAs($this->yayasanUser)->put(route('master.lembaga.update', $raGemarang->id), [
+            'kode'              => 'ra-gemarang',
+            'nama'              => 'RA AL MUTTAQIN GEMARANG',
+            'singkatan'         => 'RA AL MUTTAQIN GEMARANG',
+            'prefix_registrasi' => ' ra-gm ',
+            'kategori'          => 'formal',
+            'is_active'         => '1',
+        ])->assertRedirect(route('master.lembaga.index'));
+
+        $this->assertEquals('RAGM', $raGemarang->fresh()->prefix_registrasi);
+
+        $eventRa = PenerimaanSantri::create([
+            'judul'        => 'SPMB RA PREFIX',
+            'slug'         => 'spmb-ra-prefix',
+            'tahun_ajaran' => '2026/2027',
+            'jenjang'      => 'RA AL MUTTAQIN KOTA MADIUN, RA AL MUTTAQIN GEMARANG',
+            'jenjangs'     => ['RA AL MUTTAQIN KOTA MADIUN', 'RA AL MUTTAQIN GEMARANG'],
+            'is_active'    => true,
+            'created_by'   => $this->yayasanUser->id,
+        ]);
+
+        $this->post(route('spmb.store', $eventRa->slug), [
+            'jenjang'       => $raKota->jenjang_key,
+            'nama_lengkap'  => 'Calon Siswa Kota',
+            'jenis_kelamin' => 'Laki-laki',
+            'pj_biaya_hp'   => '08123456789',
+        ])->assertRedirect();
+
+        $this->post(route('spmb.store', $eventRa->slug), [
+            'jenjang'       => $raGemarang->jenjang_key,
+            'nama_lengkap'  => 'Calon Siswa Gemarang',
+            'jenis_kelamin' => 'Perempuan',
+            'pj_biaya_hp'   => '08123456780',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('pendaftarans', [
+            'nama_lengkap' => 'Calon Siswa Kota',
+            'no_induk'     => 'RAKT-01-202627',
+        ]);
+        $this->assertDatabaseHas('pendaftarans', [
+            'nama_lengkap' => 'Calon Siswa Gemarang',
+            'no_induk'     => 'RAGM-01-202627',
+        ]);
+    }
 }
