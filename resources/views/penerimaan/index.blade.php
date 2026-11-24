@@ -141,7 +141,12 @@
                     @endphp
                     <tr>
                         <td>
-                            <div style="font-weight:700; color:var(--text-primary);">{{ $event->judul }}</div>
+                            <div style="font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                <span>{{ $event->judul }}</span>
+                                @if($event->hasCustomFormSchema())
+                                    <span style="font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:999px; background:rgba(99,102,241,0.12); color:#4F46E5; border:1px solid rgba(99,102,241,0.22);">Form Kustom</span>
+                                @endif
+                            </div>
                             <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">{{ $event->tahun_ajaran }}</div>
                         </td>
                         <td>
@@ -231,6 +236,13 @@
                                     </button>
                                 </form>
 
+                                <a href="{{ route('penerimaan.formulir.edit', $event->id) }}" class="action-btn" style="color:#4F46E5; border-color:rgba(99,102,241,0.28); background:rgba(99,102,241,0.06);" title="Desain Formulir">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M9 11l3 3L22 4"></path>
+                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                    </svg>
+                                </a>
+
                                 <a href="{{ route('penerimaan.edit', $event->id) }}" class="action-btn action-btn-edit" title="Edit">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -301,6 +313,7 @@
                     <button type="button" class="btn btn-sm btn-secondary js-copy-link" data-url="{{ $publicUrl }}">Salin</button>
                     <a href="{{ route('pendaftaran.index', ['penerimaan_id' => $event->id]) }}" class="btn btn-sm btn-primary">Pendaftar</a>
                     @if(!auth()->check() || auth()->user()->canDo('pendaftaran', 'edit'))
+                    <a href="{{ route('penerimaan.formulir.edit', $event->id) }}" class="btn btn-sm btn-secondary" style="color:#4F46E5;">Form</a>
                     <a href="{{ route('penerimaan.edit', $event->id) }}" class="btn btn-sm btn-secondary">Edit</a>
                     @endif
                 </div>

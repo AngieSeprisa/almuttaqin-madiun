@@ -47,12 +47,95 @@
         </div>
     </div>
 @else
-    {{-- Ringkasan Info Event (1 Kartu Rapi & Mobile-Friendly) --}}
     @php
         $firstLokasi = count($availableJenjangs) === 1
             ? ($lokasiMap[$availableJenjangs[0]] ?? $penerimaan->lokasiForJenjang($availableJenjangs[0]))
             : $penerimaan->lokasiForJenjang(old('jenjang'));
+
+        $layoutMode = ($formSchema['layout'] ?? 'wizard') === 'single' || count($visibleSections) <= 1 ? 'single' : 'wizard';
+        $totalSteps = count($visibleSections);
+        $dokumenMap = \App\Support\SpmbFormSchema::DOKUMEN_FIELD_TO_FLAG;
+
+        // Mapping error key -> nomor step untuk auto-jump saat validasi gagal
+        $errorStepTarget = 1;
+        if ($errors->any()) {
+            $errKeys = $errors->keys();
+            foreach ($visibleSections as $sIdx => $sec) {
+                foreach ($sec['fields'] as $fld) {
+                    $k = ($fld['source'] ?? '') === 'custom' ? ('custom_fields.' . $fld['id']) : $fld['key'];
+                    if (in_array($k, $errKeys, true)) {
+                        $errorStepTarget = $sIdx + 1;
+                        break 2;
+                    }
+                }
+            }
+        }
     @endphp
+
+    <style>
+        .spmb-choice-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .spmb-choice-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 13px;
+            border-radius: 10px;
+            border: 1px solid #E2E8F0;
+            background: #FFFFFF;
+            cursor: pointer;
+            font-size: 13.5px;
+            color: #0F172A;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .spmb-choice-item:hover {
+            border-color: #93C5FD;
+            background: #F8FAFC;
+        }
+        .spmb-choice-item input {
+            width: 17px;
+            height: 17px;
+            accent-color: #0052FF;
+            flex-shrink: 0;
+        }
+        .spmb-field-help {
+            font-size: 12px;
+            color: #64748B;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+        .spmb-single-section {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-top: 4px solid #0052FF;
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+        }
+        .spmb-single-sec-head {
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #F1F5F9;
+        }
+        .spmb-single-sec-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: #0F172A;
+            margin: 0;
+        }
+        .spmb-single-sec-desc {
+            font-size: 13px;
+            color: #64748B;
+            margin: 4px 0 0 0;
+            line-height: 1.45;
+        }
+    </style>
+
+    {{-- Ringkasan Info Event --}}
     <div class="spmb-info-card">
         <div class="spmb-info-top">
             <span class="spmb-wave-badge">
@@ -82,6 +165,12 @@
             </div>
         </div>
     </div>
+
+    @if(!empty($formSchema['description']))
+    <div class="spmb-card" style="padding:14px 16px; margin-bottom:14px; font-size:13.5px; color:#334155; line-height:1.55;">
+        {!! nl2br(e($formSchema['description'])) !!}
+    </div>
+    @endif
 
     @php $syaratList = $penerimaan->syaratList(); @endphp
     @if(!empty($syaratList))
@@ -114,466 +203,231 @@
             <input type="text" name="website_url" tabindex="-1" autocomplete="off">
         </div>
 
+        @if($layoutMode === 'wizard')
         <div class="wizard-card">
             <div class="wizard-stepper" id="wizardStepper">
-                <div class="wizard-step is-active" data-step="1" id="tab_step_1">
-                    <div class="wizard-step-circle">01</div>
-                    <div class="wizard-step-title">
-                        <span class="spmb-step-full">Identitas</span>
-                        <span class="spmb-step-short">Identitas</span>
+                @foreach($visibleSections as $sIdx => $sec)
+                    @php $stepNum = $sIdx + 1; @endphp
+                    @if($sIdx > 0)
+                    <div class="wizard-divider" aria-hidden="true">
+                        <svg viewBox="0 0 16 60" fill="none" preserveAspectRatio="none"><path d="M0 0 L14 30 L0 60" stroke="currentColor" stroke-width="1.5" /></svg>
                     </div>
-                </div>
-                <div class="wizard-divider" aria-hidden="true">
-                    <svg viewBox="0 0 16 60" fill="none" preserveAspectRatio="none"><path d="M0 0 L14 30 L0 60" stroke="currentColor" stroke-width="1.5" /></svg>
-                </div>
-                <div class="wizard-step" data-step="2" id="tab_step_2">
-                    <div class="wizard-step-circle">02</div>
-                    <div class="wizard-step-title">
-                        <span class="spmb-step-full">Data Pribadi</span>
-                        <span class="spmb-step-short">Pribadi</span>
+                    @endif
+                    <div class="wizard-step {{ $stepNum === 1 ? 'is-active' : '' }}" data-step="{{ $stepNum }}" id="tab_step_{{ $stepNum }}">
+                        <div class="wizard-step-circle">{{ str_pad((string) $stepNum, 2, '0', STR_PAD_LEFT) }}</div>
+                        <div class="wizard-step-title">
+                            <span class="spmb-step-full">{{ $sec['title'] }}</span>
+                            <span class="spmb-step-short">{{ $sec['short_title'] ?? $sec['title'] }}</span>
+                        </div>
                     </div>
-                </div>
-                <div class="wizard-divider" aria-hidden="true">
-                    <svg viewBox="0 0 16 60" fill="none" preserveAspectRatio="none"><path d="M0 0 L14 30 L0 60" stroke="currentColor" stroke-width="1.5" /></svg>
-                </div>
-                <div class="wizard-step" data-step="3" id="tab_step_3">
-                    <div class="wizard-step-circle">03</div>
-                    <div class="wizard-step-title">
-                        <span class="spmb-step-full">Keluarga</span>
-                        <span class="spmb-step-short">Keluarga</span>
-                    </div>
-                </div>
-                <div class="wizard-divider" aria-hidden="true">
-                    <svg viewBox="0 0 16 60" fill="none" preserveAspectRatio="none"><path d="M0 0 L14 30 L0 60" stroke="currentColor" stroke-width="1.5" /></svg>
-                </div>
-                <div class="wizard-step" data-step="4" id="tab_step_4">
-                    <div class="wizard-step-circle">04</div>
-                    <div class="wizard-step-title">
-                        <span class="spmb-step-full">Alamat &amp; Berkas</span>
-                        <span class="spmb-step-short">Berkas</span>
-                    </div>
-                </div>
+                @endforeach
             </div>
             <div class="spmb-progress-track">
-                <div class="spmb-progress-bar" id="spmbProgressBar"></div>
+                <div class="spmb-progress-bar" id="spmbProgressBar" style="width: {{ round(100 / max(1, $totalSteps)) }}%;"></div>
             </div>
 
             <div class="wizard-body">
+        @endif
 
-                {{-- STEP 1: IDENTITAS --}}
-                <div class="wizard-step-pane is-active" id="pane_step_1">
-                    <div class="spmb-form-grid">
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="jenjang">Jenjang <span style="color:#EF4444;">*</span></label>
-                            @if(count($allowedJenjangs) === 1)
-                                <input type="hidden" name="jenjang" id="jenjang" value="{{ $allowedJenjangs[0] }}">
-                                <input type="text" class="wizard-input" value="{{ $allowedJenjangs[0] }}" readonly style="background:#F8FAFC;">
-                            @else
-                                <select name="jenjang" id="jenjang" class="wizard-select @error('jenjang') is-invalid @enderror" required>
-                                    <option value="">Pilih Jenjang</option>
-                                    @foreach($allowedJenjangs as $j)
-                                        @php $isAvail = in_array($j, $availableJenjangs, true); @endphp
-                                        <option value="{{ $j }}"
-                                                {{ old('jenjang') === $j && $isAvail ? 'selected' : '' }}
-                                                {{ $isAvail ? '' : 'disabled' }}>
-                                            {{ $j }}{{ $isAvail ? '' : ' (Kuota Penuh)' }}
-                                        </option>
+                @foreach($visibleSections as $sIdx => $sec)
+                @php
+                    $stepNum = $sIdx + 1;
+                    $regularFields = [];
+                    $dokumenFields = [];
+                    foreach ($sec['fields'] as $fld) {
+                        if (($fld['source'] ?? '') === 'builtin' && isset($dokumenMap[$fld['key']])) {
+                            $dokumenFields[] = $fld;
+                        } else {
+                            $regularFields[] = $fld;
+                        }
+                    }
+                @endphp
+
+                <div class="{{ $layoutMode === 'wizard' ? ('wizard-step-pane ' . ($stepNum === 1 ? 'is-active' : '')) : 'spmb-single-section' }}"
+                     id="pane_step_{{ $stepNum }}"
+                     data-step-pane="{{ $stepNum }}">
+
+                    @if($layoutMode === 'single' || !empty($sec['description']))
+                    <div class="{{ $layoutMode === 'single' ? 'spmb-single-sec-head' : '' }}" style="{{ $layoutMode === 'wizard' ? 'margin-bottom:14px;' : '' }}">
+                        @if($layoutMode === 'single')
+                            <h2 class="spmb-single-sec-title">{{ $sec['title'] }}</h2>
+                        @endif
+                        @if(!empty($sec['description']))
+                            <p class="spmb-single-sec-desc">{{ $sec['description'] }}</p>
+                        @endif
+                    </div>
+                    @endif
+
+                    @if(!empty($regularFields))
+                    <div class="spmb-form-grid" style="margin-bottom: {{ !empty($dokumenFields) ? '20px' : '0' }};">
+                        @foreach($regularFields as $fld)
+                        @php
+                            $isCustom = ($fld['source'] ?? '') === 'custom';
+                            $key = $isCustom ? $fld['id'] : $fld['key'];
+                            $inputName = $isCustom ? "custom_fields[{$key}]" : $key;
+                            $errName = $isCustom ? "custom_fields.{$key}" : $key;
+                            $inputId = $isCustom ? "cf_{$key}" : $key;
+                            $isReq = !empty($fld['required']);
+                            $type = $fld['type'] ?? 'text';
+                            $oldVal = $isCustom ? old("custom_fields.{$key}") : old($key);
+                            $isWide = !empty($fld['wide']) || in_array($type, ['textarea', 'radio', 'checkbox', 'file'], true);
+                            $isNomorKip = !$isCustom && $key === 'nomor_kip';
+                        @endphp
+
+                        <div class="wizard-form-group"
+                             @if($isNomorKip) id="wrapper_nomor_kip" @endif
+                             style="{{ $isWide ? 'grid-column: 1 / -1;' : '' }}{{ $isNomorKip ? (old('penerima_kip') == '1' ? 'display:flex;' : 'display:none;') : '' }}">
+                            <label class="wizard-label" for="{{ $inputId }}">
+                                {{ $fld['label'] }}
+                                @if($isReq)<span style="color:#EF4444;">*</span>@endif
+                            </label>
+
+                            {{-- FIELD KHUSUS: JENJANG --}}
+                            @if(!$isCustom && $key === 'jenjang')
+                                @if(count($allowedJenjangs) === 1)
+                                    <input type="hidden" name="jenjang" id="jenjang" value="{{ $allowedJenjangs[0] }}">
+                                    <input type="text" class="wizard-input" value="{{ $allowedJenjangs[0] }}" readonly style="background:#F8FAFC;">
+                                @else
+                                    <select name="jenjang" id="jenjang" class="wizard-select @error('jenjang') is-invalid @enderror" required>
+                                        <option value="">Pilih Jenjang</option>
+                                        @foreach($allowedJenjangs as $j)
+                                            @php $isAvail = in_array($j, $availableJenjangs, true); @endphp
+                                            <option value="{{ $j }}"
+                                                    {{ old('jenjang') === $j && $isAvail ? 'selected' : '' }}
+                                                    {{ $isAvail ? '' : 'disabled' }}>
+                                                {{ $j }}{{ $isAvail ? '' : ' (Kuota Penuh)' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                @endif
+
+                            {{-- FIELD KHUSUS: PENERIMA KIP --}}
+                            @elseif(!$isCustom && $key === 'penerima_kip')
+                                <select name="penerima_kip" id="penerima_kip" class="wizard-select">
+                                    <option value="0" {{ old('penerima_kip', '0') == '0' ? 'selected' : '' }}>Tidak</option>
+                                    <option value="1" {{ old('penerima_kip') == '1' ? 'selected' : '' }}>Ya</option>
+                                </select>
+
+                            {{-- TIPE SELECT / DROPDOWN --}}
+                            @elseif($type === 'select')
+                                @php
+                                    $defaultVal = null;
+                                    if (!$isCustom && in_array($key, ['ayah_status', 'ibu_status'], true)) $defaultVal = 'Hidup';
+                                    elseif (!$isCustom && $key === 'status_mondok') $defaultVal = 'Person';
+                                    $selVal = $oldVal !== null ? $oldVal : $defaultVal;
+                                @endphp
+                                <select name="{{ $inputName }}" id="{{ $inputId }}" class="wizard-select @error($errName) is-invalid @enderror" @if($isReq) required @endif>
+                                    @if($defaultVal === null)
+                                        <option value="">Pilih</option>
+                                    @endif
+                                    @foreach(($fld['options'] ?? []) as $opt)
+                                        <option value="{{ $opt }}" {{ (string) $selVal === (string) $opt ? 'selected' : '' }}>{{ $opt }}</option>
                                     @endforeach
                                 </select>
+
+                            {{-- TIPE RADIO (PILIHAN GANDA) --}}
+                            @elseif($type === 'radio')
+                                <div class="spmb-choice-list" data-required-group="{{ $isReq ? '1' : '0' }}" data-group-label="{{ $fld['label'] }}">
+                                    @foreach(($fld['options'] ?? []) as $oIdx => $opt)
+                                    <label class="spmb-choice-item">
+                                        <input type="radio" name="{{ $inputName }}" value="{{ $opt }}"
+                                               {{ (string) $oldVal === (string) $opt ? 'checked' : '' }}
+                                               @if($isReq && $oIdx === 0) required @endif>
+                                        <span>{{ $opt }}</span>
+                                    </label>
+                                    @endforeach
+                                </div>
+
+                            {{-- TIPE CHECKBOX (KOTAK CENTANG MULTI PILIHAN) --}}
+                            @elseif($type === 'checkbox')
+                                @php $oldArr = is_array($oldVal) ? $oldVal : []; @endphp
+                                <div class="spmb-choice-list" data-checkbox-group="{{ $isReq ? '1' : '0' }}" data-group-label="{{ $fld['label'] }}">
+                                    @foreach(($fld['options'] ?? []) as $opt)
+                                    <label class="spmb-choice-item">
+                                        <input type="checkbox" name="{{ $inputName }}[]" value="{{ $opt }}"
+                                               {{ in_array($opt, $oldArr, true) ? 'checked' : '' }}>
+                                        <span>{{ $opt }}</span>
+                                    </label>
+                                    @endforeach
+                                </div>
+
+                            {{-- TIPE TEXTAREA (PARAGRAF) --}}
+                            @elseif($type === 'textarea')
+                                <textarea name="{{ $inputName }}" id="{{ $inputId }}" rows="3"
+                                          class="wizard-textarea @error($errName) is-invalid @enderror"
+                                          placeholder="{{ $fld['placeholder'] ?? '' }}"
+                                          @if($isReq) required @endif>{{ $oldVal }}</textarea>
+
+                            {{-- TIPE FILE KUSTOM --}}
+                            @elseif($type === 'file')
+                                <input type="file" name="{{ $inputName }}" id="{{ $inputId }}"
+                                       accept="image/jpeg,image/png,image/webp,application/pdf"
+                                       class="wizard-input @error($errName) is-invalid @enderror"
+                                       style="padding:9px 12px;"
+                                       @if($isReq) required @endif>
+                                <div class="spmb-field-help">Format: JPG, PNG, WEBP, atau PDF (maks. 10 MB)</div>
+
+                            {{-- TIPE DATE --}}
+                            @elseif($type === 'date')
+                                <input type="date" name="{{ $inputName }}" id="{{ $inputId }}" value="{{ $oldVal }}"
+                                       class="wizard-input @error($errName) is-invalid @enderror"
+                                       @if($isReq) required @endif>
+
+                            {{-- TIPE NUMBER --}}
+                            @elseif($type === 'number')
+                                <input type="number" name="{{ $inputName }}" id="{{ $inputId }}" value="{{ $oldVal }}"
+                                       class="wizard-input @error($errName) is-invalid @enderror"
+                                       placeholder="{{ $fld['placeholder'] ?? '' }}"
+                                       @if(!$isCustom && $key === 'anak_ke') min="1" @elseif(!$isCustom && $key === 'jumlah_saudara') min="0" @endif
+                                       @if($isReq) required @endif>
+
+                            {{-- TIPE TEXT (DEFAULT) --}}
+                            @else
+                                @php
+                                    $textVal = $oldVal;
+                                    if ($textVal === null && !$isCustom && $key === 'warga_negara') {
+                                        $textVal = 'Indonesia';
+                                    }
+                                @endphp
+                                <input type="text" name="{{ $inputName }}" id="{{ $inputId }}" value="{{ $textVal }}"
+                                       class="wizard-input @error($errName) is-invalid @enderror"
+                                       placeholder="{{ $fld['placeholder'] ?? '' }}"
+                                       @if(!$isCustom && $key === 'nik') maxlength="16" @elseif(!$isCustom && $key === 'nisn') maxlength="20" @endif
+                                       @if($isReq) required @endif>
                             @endif
-                            @error('jenjang')<div class="invalid-feedback" style="display:block;">{{ $message }}</div>@enderror
-                        </div>
 
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="nama_lengkap">Nama Lengkap <span style="color:#EF4444;">*</span></label>
-                            <input type="text" name="nama_lengkap" id="nama_lengkap" value="{{ old('nama_lengkap') }}"
-                                   class="wizard-input @error('nama_lengkap') is-invalid @enderror" placeholder="Sesuai KK / Akta" required>
-                            @error('nama_lengkap')<div class="invalid-feedback" style="display:block;">{{ $message }}</div>@enderror
+                            @if(!empty($fld['help']))
+                                <div class="spmb-field-help">{{ $fld['help'] }}</div>
+                            @endif
+                            @error($errName)<div class="invalid-feedback" style="display:block;">{{ $message }}</div>@enderror
                         </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="jenis_kelamin">Jenis Kelamin <span style="color:#EF4444;">*</span></label>
-                            <select name="jenis_kelamin" id="jenis_kelamin" class="wizard-select @error('jenis_kelamin') is-invalid @enderror" required>
-                                <option value="">Pilih</option>
-                                <option value="Laki-laki" {{ old('jenis_kelamin') === 'Laki-laki' ? 'selected' : '' }}>Laki-laki</option>
-                                <option value="Perempuan" {{ old('jenis_kelamin') === 'Perempuan' ? 'selected' : '' }}>Perempuan</option>
-                            </select>
-                            @error('jenis_kelamin')<div class="invalid-feedback" style="display:block;">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="pj_biaya_hp">No. WhatsApp Aktif (Orang Tua / Wali) <span style="color:#EF4444;">*</span></label>
-                            <input type="text" name="pj_biaya_hp" id="pj_biaya_hp" value="{{ old('pj_biaya_hp') }}"
-                                   class="wizard-input @error('pj_biaya_hp') is-invalid @enderror" placeholder="08xxxxxxxxxx" required>
-                            @error('pj_biaya_hp')<div class="invalid-feedback" style="display:block;">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="nik">NIK (16 Digit)</label>
-                            <input type="text" name="nik" id="nik" maxlength="16" value="{{ old('nik') }}"
-                                   class="wizard-input @error('nik') is-invalid @enderror" placeholder="Nomor Induk Kependudukan">
-                            @error('nik')<div class="invalid-feedback" style="display:block;">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="nisn">NISN</label>
-                            <input type="text" name="nisn" id="nisn" maxlength="20" value="{{ old('nisn') }}"
-                                   class="wizard-input @error('nisn') is-invalid @enderror" placeholder="Nomor Induk Siswa Nasional">
-                            @error('nisn')<div class="invalid-feedback" style="display:block;">{{ $message }}</div>@enderror
-                        </div>
+                        @endforeach
                     </div>
+                    @endif
 
-                    <div class="wizard-footer" style="justify-content:flex-end;">
-                        <button type="button" class="btn-wizard-next js-btn-next" data-next="2">
-                            Selanjutnya
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                        </button>
-                    </div>
-                </div>
-
-                {{-- STEP 2: DATA PRIBADI --}}
-                <div class="wizard-step-pane" id="pane_step_2">
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:18px; margin-bottom:22px;">
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="nama_panggilan">Nama Panggilan</label>
-                            <input type="text" name="nama_panggilan" id="nama_panggilan" value="{{ old('nama_panggilan') }}" class="wizard-input" placeholder="Nama Panggilan">
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="tempat_lahir">Tempat Lahir</label>
-                            <input type="text" name="tempat_lahir" id="tempat_lahir" value="{{ old('tempat_lahir') }}" class="wizard-input" placeholder="Kota / Kabupaten">
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="tanggal_lahir">Tanggal Lahir</label>
-                            <input type="date" name="tanggal_lahir" id="tanggal_lahir" value="{{ old('tanggal_lahir') }}" class="wizard-input">
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="anak_ke">Anak Ke-</label>
-                            <input type="number" name="anak_ke" id="anak_ke" min="1" value="{{ old('anak_ke') }}" class="wizard-input" placeholder="1">
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="jumlah_saudara">Jumlah Saudara</label>
-                            <input type="number" name="jumlah_saudara" id="jumlah_saudara" min="0" value="{{ old('jumlah_saudara') }}" class="wizard-input" placeholder="0">
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="tinggal_bersama">Tinggal Bersama</label>
-                            <select name="tinggal_bersama" id="tinggal_bersama" class="wizard-select">
-                                <option value="">Pilih</option>
-                                @foreach (['Orang Tua Kandung', 'Ayah', 'Ibu', 'Wali'] as $tb)
-                                    <option value="{{ $tb }}" {{ old('tinggal_bersama') === $tb ? 'selected' : '' }}>{{ $tb }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="mulai_pengajian">Mulai Sambung Pengajian (Tahun)</label>
-                            <input type="text" name="mulai_pengajian" id="mulai_pengajian" value="{{ old('mulai_pengajian') }}" class="wizard-input" placeholder="2024">
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="status_mondok">Status Mondok</label>
-                            <select name="status_mondok" id="status_mondok" class="wizard-select">
-                                <option value="Person" {{ old('status_mondok', 'Person') === 'Person' ? 'selected' : '' }}>Person (Mandiri)</option>
-                                <option value="Utusan/Kiriman" {{ old('status_mondok') === 'Utusan/Kiriman' ? 'selected' : '' }}>Utusan / Kiriman</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:18px; margin-bottom:22px; padding-top:18px; border-top:1px solid #F3F4F6;">
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="pendidikan_terakhir">Pendidikan Terakhir</label>
-                            <select name="pendidikan_terakhir" id="pendidikan_terakhir" class="wizard-select">
-                                <option value="">Pilih</option>
-                                @foreach (['SD/MI', 'SMP/MTs', 'SMA/MA/SMK', 'D3', 'S1/D4', 'Lainnya'] as $pddk)
-                                    <option value="{{ $pddk }}" {{ old('pendidikan_terakhir') === $pddk ? 'selected' : '' }}>{{ $pddk }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="nama_sekolah_asal">Nama Sekolah Asal</label>
-                            <input type="text" name="nama_sekolah_asal" id="nama_sekolah_asal" value="{{ old('nama_sekolah_asal') }}" class="wizard-input" placeholder="Nama Sekolah Asal">
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="tahun_lulus">Tahun Lulus</label>
-                            <input type="text" name="tahun_lulus" id="tahun_lulus" value="{{ old('tahun_lulus') }}" class="wizard-input" placeholder="2027">
-                        </div>
-
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="penerima_kip">Penerima KIP / PIP / PKH</label>
-                            <select name="penerima_kip" id="penerima_kip" class="wizard-select">
-                                <option value="0" {{ old('penerima_kip', '0') == '0' ? 'selected' : '' }}>Tidak</option>
-                                <option value="1" {{ old('penerima_kip') == '1' ? 'selected' : '' }}>Ya</option>
-                            </select>
-                        </div>
-
-                        <div class="wizard-form-group" id="wrapper_nomor_kip" style="{{ old('penerima_kip') == '1' ? 'display:flex;' : 'display:none;' }}">
-                            <label class="wizard-label" for="nomor_kip">Nomor KIP / KKS / PKH</label>
-                            <input type="text" name="nomor_kip" id="nomor_kip" value="{{ old('nomor_kip') }}" class="wizard-input">
-                        </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:18px; padding-top:18px; border-top:1px solid #F3F4F6;">
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="penyakit_diderita">Riwayat Penyakit</label>
-                            <input type="text" name="penyakit_diderita" id="penyakit_diderita" value="{{ old('penyakit_diderita') }}" class="wizard-input" placeholder="Jika ada">
-                        </div>
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="alergi">Alergi</label>
-                            <input type="text" name="alergi" id="alergi" value="{{ old('alergi') }}" class="wizard-input" placeholder="Jika ada">
-                        </div>
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="gol_darah">Golongan Darah</label>
-                            <select name="gol_darah" id="gol_darah" class="wizard-select">
-                                <option value="">Pilih</option>
-                                @foreach (['A', 'B', 'AB', 'O', 'Tidak Tahu'] as $gd)
-                                    <option value="{{ $gd }}" {{ old('gol_darah') === $gd ? 'selected' : '' }}>{{ $gd }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="tinggi_badan">Tinggi Badan (cm)</label>
-                            <input type="number" name="tinggi_badan" id="tinggi_badan" value="{{ old('tinggi_badan') }}" class="wizard-input">
-                        </div>
-                        <div class="wizard-form-group">
-                            <label class="wizard-label" for="berat_badan">Berat Badan (kg)</label>
-                            <input type="number" name="berat_badan" id="berat_badan" value="{{ old('berat_badan') }}" class="wizard-input">
-                        </div>
-                        <div class="wizard-form-group" style="grid-column: 1 / -1;">
-                            <label class="wizard-label" for="keahlian_prestasi">Keahlian / Prestasi</label>
-                            <textarea name="keahlian_prestasi" id="keahlian_prestasi" rows="2" class="wizard-textarea">{{ old('keahlian_prestasi') }}</textarea>
-                        </div>
-                    </div>
-
-                    <div class="wizard-footer">
-                        <button type="button" class="btn-wizard-prev js-btn-prev" data-prev="1">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                            Sebelumnya
-                        </button>
-                        <button type="button" class="btn-wizard-next js-btn-next" data-next="3">
-                            Selanjutnya
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                        </button>
-                    </div>
-                </div>
-
-                {{-- STEP 3: KELUARGA --}}
-                <div class="wizard-step-pane" id="pane_step_3">
-                    <div class="wizard-subcard">
-                        <div class="wizard-subcard-title">Data Ayah</div>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_nama">Nama Ayah</label>
-                                <input type="text" name="ayah_nama" id="ayah_nama" value="{{ old('ayah_nama') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_status">Status Ayah</label>
-                                <select name="ayah_status" id="ayah_status" class="wizard-select">
-                                    <option value="Hidup" {{ old('ayah_status', 'Hidup') === 'Hidup' ? 'selected' : '' }}>Hidup</option>
-                                    <option value="Meninggal" {{ old('ayah_status') === 'Meninggal' ? 'selected' : '' }}>Meninggal</option>
-                                </select>
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_ttl">Tempat, Tanggal Lahir</label>
-                                <input type="text" name="ayah_ttl" id="ayah_ttl" value="{{ old('ayah_ttl') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_pendidikan">Pendidikan Terakhir</label>
-                                <input type="text" name="ayah_pendidikan" id="ayah_pendidikan" value="{{ old('ayah_pendidikan') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_pekerjaan">Pekerjaan</label>
-                                <input type="text" name="ayah_pekerjaan" id="ayah_pekerjaan" value="{{ old('ayah_pekerjaan') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_penghasilan">Penghasilan</label>
-                                <input type="text" name="ayah_penghasilan" id="ayah_penghasilan" value="{{ old('ayah_penghasilan') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_hp">No. HP / WA Ayah</label>
-                                <input type="text" name="ayah_hp" id="ayah_hp" value="{{ old('ayah_hp') }}" class="wizard-input" placeholder="08xxxxxxxxxx">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_daerah">Daerah Sambung</label>
-                                <input type="text" name="ayah_daerah" id="ayah_daerah" value="{{ old('ayah_daerah') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_desa">Desa Sambung</label>
-                                <input type="text" name="ayah_desa" id="ayah_desa" value="{{ old('ayah_desa') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ayah_kelompok">Kelompok Sambung</label>
-                                <input type="text" name="ayah_kelompok" id="ayah_kelompok" value="{{ old('ayah_kelompok') }}" class="wizard-input">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="wizard-subcard">
-                        <div class="wizard-subcard-title">Data Ibu</div>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_nama">Nama Ibu</label>
-                                <input type="text" name="ibu_nama" id="ibu_nama" value="{{ old('ibu_nama') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_status">Status Ibu</label>
-                                <select name="ibu_status" id="ibu_status" class="wizard-select">
-                                    <option value="Hidup" {{ old('ibu_status', 'Hidup') === 'Hidup' ? 'selected' : '' }}>Hidup</option>
-                                    <option value="Meninggal" {{ old('ibu_status') === 'Meninggal' ? 'selected' : '' }}>Meninggal</option>
-                                </select>
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_ttl">Tempat, Tanggal Lahir</label>
-                                <input type="text" name="ibu_ttl" id="ibu_ttl" value="{{ old('ibu_ttl') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_pendidikan">Pendidikan Terakhir</label>
-                                <input type="text" name="ibu_pendidikan" id="ibu_pendidikan" value="{{ old('ibu_pendidikan') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_pekerjaan">Pekerjaan</label>
-                                <input type="text" name="ibu_pekerjaan" id="ibu_pekerjaan" value="{{ old('ibu_pekerjaan') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_penghasilan">Penghasilan</label>
-                                <input type="text" name="ibu_penghasilan" id="ibu_penghasilan" value="{{ old('ibu_penghasilan') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_hp">No. HP / WA Ibu</label>
-                                <input type="text" name="ibu_hp" id="ibu_hp" value="{{ old('ibu_hp') }}" class="wizard-input" placeholder="08xxxxxxxxxx">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_daerah">Daerah Sambung</label>
-                                <input type="text" name="ibu_daerah" id="ibu_daerah" value="{{ old('ibu_daerah') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_desa">Desa Sambung</label>
-                                <input type="text" name="ibu_desa" id="ibu_desa" value="{{ old('ibu_desa') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="ibu_kelompok">Kelompok Sambung</label>
-                                <input type="text" name="ibu_kelompok" id="ibu_kelompok" value="{{ old('ibu_kelompok') }}" class="wizard-input">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="wizard-subcard">
-                        <div class="wizard-subcard-title">Penanggung Jawab Biaya</div>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="pj_biaya_nama">Nama Penanggung Jawab</label>
-                                <input type="text" name="pj_biaya_nama" id="pj_biaya_nama" value="{{ old('pj_biaya_nama') }}" class="wizard-input">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="wizard-footer">
-                        <button type="button" class="btn-wizard-prev js-btn-prev" data-prev="2">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                            Sebelumnya
-                        </button>
-                        <button type="button" class="btn-wizard-next js-btn-next" data-next="4">
-                            Selanjutnya
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                        </button>
-                    </div>
-                </div>
-
-                {{-- STEP 4: ALAMAT & BERKAS --}}
-                <div class="wizard-step-pane" id="pane_step_4">
-                    <div class="wizard-subcard">
-                        <div class="wizard-subcard-title">Alamat Domisili</div>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
-                            <div class="wizard-form-group" style="grid-column: 1 / -1;">
-                                <label class="wizard-label" for="alamat_jalan">Alamat Jalan / Dusun</label>
-                                <input type="text" name="alamat_jalan" id="alamat_jalan" value="{{ old('alamat_jalan') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="rt_rw">RT / RW</label>
-                                <input type="text" name="rt_rw" id="rt_rw" value="{{ old('rt_rw') }}" class="wizard-input" placeholder="001/002">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="desa_kelurahan">Desa / Kelurahan</label>
-                                <input type="text" name="desa_kelurahan" id="desa_kelurahan" value="{{ old('desa_kelurahan') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="kecamatan">Kecamatan</label>
-                                <input type="text" name="kecamatan" id="kecamatan" value="{{ old('kecamatan') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="kab_kota">Kabupaten / Kota</label>
-                                <input type="text" name="kab_kota" id="kab_kota" value="{{ old('kab_kota') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="kode_pos">Kode Pos</label>
-                                <input type="text" name="kode_pos" id="kode_pos" value="{{ old('kode_pos') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="provinsi">Provinsi</label>
-                                <input type="text" name="provinsi" id="provinsi" value="{{ old('provinsi') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="warga_negara">Kewarganegaraan</label>
-                                <input type="text" name="warga_negara" id="warga_negara" value="{{ old('warga_negara', 'Indonesia') }}" class="wizard-input">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="wizard-subcard">
-                        <div class="wizard-subcard-title">Struktur Sambung Pengajian</div>
-                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:16px;">
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="kelompok">Kelompok</label>
-                                <input type="text" name="kelompok" id="kelompok" value="{{ old('kelompok') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="desa">Desa</label>
-                                <input type="text" name="desa" id="desa" value="{{ old('desa') }}" class="wizard-input">
-                            </div>
-                            <div class="wizard-form-group">
-                                <label class="wizard-label" for="daerah">Daerah</label>
-                                <input type="text" name="daerah" id="daerah" value="{{ old('daerah') }}" class="wizard-input">
-                            </div>
-                        </div>
-                    </div>
-
-                    @php
-                        $visibleDokumen = [];
-                        foreach (\App\Models\PenerimaanSantri::DOKUMEN_META as $flagKey => $meta) {
-                            $mode = $dokumenConfig[$flagKey] ?? 'opsional';
-                            if ($mode !== 'tidak') {
-                                $visibleDokumen[] = [
-                                    'flag'     => $flagKey,
-                                    'foto'     => $meta['foto'],
-                                    'name'     => $meta['label'],
-                                    'required' => $mode === 'wajib',
-                                ];
-                            }
-                        }
-                    @endphp
-
-                    @if(!empty($visibleDokumen))
-                    <div class="wizard-subcard">
+                    {{-- DOKUMEN BAWAAN DENGAN UPLOAD KOMPRESI OTOMATIS --}}
+                    @if(!empty($dokumenFields))
+                    <div class="wizard-subcard" style="margin-top:4px;">
                         <div class="wizard-subcard-title">Dokumen</div>
                         <div class="gform-grid">
-                            @foreach ($visibleDokumen as $item)
+                            @foreach($dokumenFields as $df)
+                            @php
+                                $fotoKey = $df['key'];
+                                $flagKey = $dokumenMap[$fotoKey];
+                                $docReq = !empty($df['required']);
+                            @endphp
                             <div class="gform-card" data-berkas-card>
                                 <div class="gform-card-header">
                                     <label class="gform-label">
-                                        <input type="checkbox" name="{{ $item['flag'] }}" value="1" data-berkas-check {{ old($item['flag']) ? 'checked' : '' }} class="gform-checkbox">
-                                        <span class="gform-title">{{ $item['name'] }} @if($item['required'])<span style="color:#EF4444;">*</span>@endif</span>
+                                        <input type="checkbox" name="{{ $flagKey }}" value="1" data-berkas-check {{ old($flagKey) ? 'checked' : '' }} class="gform-checkbox">
+                                        <span class="gform-title">{{ $df['label'] }} @if($docReq)<span style="color:#EF4444;">*</span>@endif</span>
                                     </label>
                                 </div>
                                 <div class="gform-upload-area">
-                                    <input type="file" name="{{ $item['foto'] }}" id="{{ $item['foto'] }}"
+                                    <input type="file" name="{{ $fotoKey }}" id="{{ $fotoKey }}"
                                            accept="image/jpeg,image/png,image/webp" class="upload-input" data-berkas-file
-                                           @if($item['required']) required @endif>
-                                    <label for="{{ $item['foto'] }}" class="gform-add-btn" data-upload-drop>
+                                           @if($docReq) required @endif>
+                                    <label for="{{ $fotoKey }}" class="gform-add-btn" data-upload-drop>
                                         <svg class="gform-upload-icon" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
                                         </svg>
@@ -590,7 +444,8 @@
                                         </button>
                                     </div>
                                     <div class="upload-error" data-upload-error hidden></div>
-                                    @error($item['foto'])<div class="upload-error">{{ $message }}</div>@enderror
+                                    @if(!empty($df['help']))<div class="spmb-field-help">{{ $df['help'] }}</div>@endif
+                                    @error($fotoKey)<div class="upload-error">{{ $message }}</div>@enderror
                                 </div>
                             </div>
                             @endforeach
@@ -598,19 +453,40 @@
                     </div>
                     @endif
 
-                    <div class="wizard-footer">
-                        <button type="button" class="btn-wizard-prev js-btn-prev" data-prev="3">
+                    @if($layoutMode === 'wizard')
+                    <div class="wizard-footer" style="{{ $stepNum === 1 ? 'justify-content:flex-end;' : '' }}">
+                        @if($stepNum > 1)
+                        <button type="button" class="btn-wizard-prev js-btn-prev" data-prev="{{ $stepNum - 1 }}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="15 18 9 12 15 6"></polyline></svg>
                             Sebelumnya
                         </button>
+                        @endif
+
+                        @if($stepNum < $totalSteps)
+                        <button type="button" class="btn-wizard-next js-btn-next" data-next="{{ $stepNum + 1 }}">
+                            Selanjutnya
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        </button>
+                        @else
                         <button type="submit" class="btn-wizard-next" style="padding:12px 28px;">
                             Kirim Pendaftaran
                         </button>
+                        @endif
                     </div>
+                    @endif
                 </div>
+                @endforeach
 
+        @if($layoutMode === 'wizard')
             </div>
         </div>
+        @else
+        <div style="display:flex; justify-content:flex-end; margin-top:8px;">
+            <button type="submit" class="btn-wizard-next" style="padding:13px 30px; font-size:15px;">
+                Kirim Pendaftaran
+            </button>
+        </div>
+        @endif
     </form>
 @endif
 
@@ -621,61 +497,124 @@
 <script src="{{ asset('js/upload-berkas.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    var layoutMode = @json($layoutMode);
+    var totalSteps = {{ (int) $totalSteps }};
     var currentStep = 1;
-    var panes = [1, 2, 3, 4].map(function (i) { return document.getElementById('pane_step_' + i); });
-    var tabs = [1, 2, 3, 4].map(function (i) { return document.getElementById('tab_step_' + i); });
 
-    function goToStep(step) {
-        if (step < 1 || step > 4) return;
-        panes.forEach(function (p, idx) {
-            if (p) p.classList.toggle('is-active', idx + 1 === step);
-        });
-        tabs.forEach(function (t, idx) {
-            if (!t) return;
-            t.classList.remove('is-active', 'is-completed');
-            if (idx + 1 === step) t.classList.add('is-active');
-            else if (idx + 1 < step) t.classList.add('is-completed');
-        });
-        var bar = document.getElementById('spmbProgressBar');
-        if (bar) bar.style.width = (step * 25) + '%';
-        currentStep = step;
-        var stepper = document.getElementById('wizardStepper');
-        if (stepper) stepper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    function validatePane(paneEl) {
+        if (!paneEl) return true;
+        var controls = paneEl.querySelectorAll('input, select, textarea');
+        for (var i = 0; i < controls.length; i++) {
+            var el = controls[i];
+            if (el.disabled || el.type === 'hidden') continue;
+            if (el.offsetParent === null && el.type !== 'file') continue;
+            if (el.hasAttribute('required')) {
+                if (el.type === 'radio') {
+                    var radios = paneEl.querySelectorAll('input[type="radio"][name="' + CSS.escape(el.name) + '"]');
+                    var anyChecked = Array.prototype.some.call(radios, function (r) { return r.checked; });
+                    if (!anyChecked) {
+                        el.focus();
+                        el.reportValidity();
+                        return false;
+                    }
+                } else if (el.type === 'file') {
+                    if (!el.files || el.files.length === 0) {
+                        el.reportValidity();
+                        return false;
+                    }
+                } else if (!String(el.value || '').trim()) {
+                    el.focus();
+                    el.reportValidity();
+                    return false;
+                }
+            }
+        }
 
-    function validateStep1() {
-        var requiredIds = ['jenjang', 'nama_lengkap', 'jenis_kelamin', 'pj_biaya_hp'];
-        for (var i = 0; i < requiredIds.length; i++) {
-            var el = document.getElementById(requiredIds[i]);
-            if (el && el.hasAttribute('required') && !String(el.value || '').trim()) {
-                el.focus();
-                el.reportValidity();
+        // Validasi grup checkbox wajib
+        var cbGroups = paneEl.querySelectorAll('[data-checkbox-group="1"]');
+        for (var g = 0; g < cbGroups.length; g++) {
+            var group = cbGroups[g];
+            var checked = group.querySelectorAll('input[type="checkbox"]:checked');
+            if (checked.length === 0) {
+                var lbl = group.getAttribute('data-group-label') || 'Pertanyaan';
+                alert(lbl + ' wajib dipilih minimal satu.');
+                var firstCb = group.querySelector('input[type="checkbox"]');
+                if (firstCb) firstCb.focus();
                 return false;
             }
         }
+
         return true;
     }
 
-    tabs.forEach(function (t, idx) {
-        if (t) t.addEventListener('click', function () {
-            var target = idx + 1;
-            if (target > 1 && currentStep === 1 && !validateStep1()) return;
-            goToStep(target);
-        });
-    });
+    if (layoutMode === 'wizard' && totalSteps > 1) {
+        var panes = [];
+        var tabs = [];
+        for (var s = 1; s <= totalSteps; s++) {
+            panes.push(document.getElementById('pane_step_' + s));
+            tabs.push(document.getElementById('tab_step_' + s));
+        }
 
-    document.querySelectorAll('.js-btn-next').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            if (currentStep === 1 && !validateStep1()) return;
-            goToStep(parseInt(this.getAttribute('data-next'), 10));
-        });
-    });
+        function goToStep(step) {
+            if (step < 1 || step > totalSteps) return;
+            panes.forEach(function (p, idx) {
+                if (p) p.classList.toggle('is-active', idx + 1 === step);
+            });
+            tabs.forEach(function (t, idx) {
+                if (!t) return;
+                t.classList.remove('is-active', 'is-completed');
+                if (idx + 1 === step) t.classList.add('is-active');
+                else if (idx + 1 < step) t.classList.add('is-completed');
+            });
+            var bar = document.getElementById('spmbProgressBar');
+            if (bar) bar.style.width = Math.round((step / totalSteps) * 100) + '%';
+            currentStep = step;
+            var stepper = document.getElementById('wizardStepper');
+            if (stepper) stepper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
 
-    document.querySelectorAll('.js-btn-prev').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            goToStep(parseInt(this.getAttribute('data-prev'), 10));
+        tabs.forEach(function (t, idx) {
+            if (t) t.addEventListener('click', function () {
+                var target = idx + 1;
+                if (target > currentStep && !validatePane(panes[currentStep - 1])) return;
+                goToStep(target);
+            });
         });
-    });
+
+        document.querySelectorAll('.js-btn-next').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                if (!validatePane(panes[currentStep - 1])) return;
+                goToStep(parseInt(this.getAttribute('data-next'), 10));
+            });
+        });
+
+        document.querySelectorAll('.js-btn-prev').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                goToStep(parseInt(this.getAttribute('data-prev'), 10));
+            });
+        });
+
+        @if ($errors->any())
+            goToStep({{ (int) $errorStepTarget }});
+        @endif
+    }
+
+    // Validasi checkbox wajib saat submit pada mode single / final step
+    var formEl = document.getElementById('formSpmbPublic');
+    if (formEl) {
+        formEl.addEventListener('submit', function (ev) {
+            var cbGroups = formEl.querySelectorAll('[data-checkbox-group="1"]');
+            for (var g = 0; g < cbGroups.length; g++) {
+                var group = cbGroups[g];
+                if (group.querySelectorAll('input[type="checkbox"]:checked').length === 0) {
+                    ev.preventDefault();
+                    var lbl = group.getAttribute('data-group-label') || 'Pertanyaan';
+                    alert(lbl + ' wajib dipilih minimal satu.');
+                    return false;
+                }
+            }
+        });
+    }
 
     var selectKip = document.getElementById('penerima_kip');
     var wrapperKip = document.getElementById('wrapper_nomor_kip');
@@ -702,22 +641,6 @@ document.addEventListener('DOMContentLoaded', function () {
         jenjangEl.addEventListener('change', updateLokasiChip);
         updateLokasiChip();
     }
-
-    @if ($errors->any())
-        @php
-            $errorKeys = $errors->keys();
-            $step1Fields = ['jenjang', 'nama_lengkap', 'jenis_kelamin', 'pj_biaya_hp', 'nik', 'nisn'];
-            $step2Fields = ['nama_panggilan', 'tempat_lahir', 'tanggal_lahir', 'anak_ke', 'jumlah_saudara', 'tinggal_bersama', 'mulai_pengajian', 'status_mondok', 'pendidikan_terakhir', 'nama_sekolah_asal', 'tahun_lulus', 'penerima_kip', 'nomor_kip', 'penyakit_diderita', 'alergi', 'gol_darah', 'tinggi_badan', 'berat_badan', 'keahlian_prestasi'];
-            $step3Fields = ['ayah_nama', 'ayah_status', 'ayah_ttl', 'ayah_pendidikan', 'ayah_pekerjaan', 'ayah_penghasilan', 'ayah_hp', 'ayah_daerah', 'ayah_desa', 'ayah_kelompok', 'ibu_nama', 'ibu_status', 'ibu_ttl', 'ibu_pendidikan', 'ibu_pekerjaan', 'ibu_penghasilan', 'ibu_hp', 'ibu_daerah', 'ibu_desa', 'ibu_kelompok', 'pj_biaya_nama'];
-            $targetStep = 4;
-            foreach ($errorKeys as $k) {
-                if (in_array($k, $step1Fields, true)) { $targetStep = 1; break; }
-                if (in_array($k, $step2Fields, true)) { $targetStep = 2; break; }
-                if (in_array($k, $step3Fields, true)) { $targetStep = 3; break; }
-            }
-        @endphp
-        goToStep({{ $targetStep }});
-    @endif
 });
 </script>
 @endpush

@@ -170,6 +170,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/{id}/edit', [PenerimaanSantriController::class, 'edit'])->whereNumber('id')->name('edit');
         Route::put('/{id}', [PenerimaanSantriController::class, 'update'])->whereNumber('id')->name('update');
         Route::patch('/{id}/toggle', [PenerimaanSantriController::class, 'toggleStatus'])->whereNumber('id')->name('toggle');
+        Route::get('/{id}/formulir', [PenerimaanSantriController::class, 'editFormBuilder'])->whereNumber('id')->name('formulir.edit');
+        Route::put('/{id}/formulir', [PenerimaanSantriController::class, 'updateFormBuilder'])->whereNumber('id')->name('formulir.update');
+        Route::post('/{id}/formulir/reset', [PenerimaanSantriController::class, 'resetFormBuilder'])->whereNumber('id')->name('formulir.reset');
     });
 
     Route::delete('/penerimaan/{id}', [PenerimaanSantriController::class, 'destroy'])

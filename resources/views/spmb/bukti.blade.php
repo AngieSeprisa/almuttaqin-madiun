@@ -53,6 +53,25 @@
             <span class="detail-value">{{ $lokasiSeleksi }}</span>
         </div>
         @endif
+        @php
+            $buktiCustoms = is_array($pendaftaran->custom_responses) ? $pendaftaran->custom_responses : [];
+        @endphp
+        @foreach($buktiCustoms as $bc)
+            @php
+                $bcVal = $bc['value'] ?? null;
+                if (($bc['type'] ?? '') === 'file') {
+                    $bcText = !empty($bc['original_name']) ? 'Terlampir (' . $bc['original_name'] . ')' : 'Terlampir';
+                } elseif (is_array($bcVal)) {
+                    $bcText = implode(', ', $bcVal);
+                } else {
+                    $bcText = (string) ($bcVal ?? '-');
+                }
+            @endphp
+            <div class="detail-item">
+                <span class="detail-label">{{ $bc['label'] ?? 'Tambahan' }}</span>
+                <span class="detail-value">{{ $bcText }}</span>
+            </div>
+        @endforeach
     </div>
 
     <div class="spmb-actions-stack" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; padding-top:18px; border-top:1px solid #E2E8F0;">

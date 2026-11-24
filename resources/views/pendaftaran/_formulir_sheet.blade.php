@@ -217,6 +217,36 @@
         </div>
     </div>
 
+    @php
+        $printCustomResponses = collect(is_array($p->custom_responses) ? $p->custom_responses : [])
+            ->filter(fn ($item) => !empty($item['label']) && isset($item['value']) && $item['value'] !== '' && $item['value'] !== [])
+            ->values();
+    @endphp
+    @if($printCustomResponses->isNotEmpty())
+    {{-- ===== 4. INFORMASI TAMBAHAN (PERTANYAAN KUSTOM) ===== --}}
+    <div class="sec">4.&nbsp; INFORMASI TAMBAHAN</div>
+    <div class="ind">
+        @foreach($printCustomResponses as $ci => $cItem)
+            @php
+                $cVal = $cItem['value'];
+                if (($cItem['type'] ?? '') === 'file') {
+                    $cDisplay = 'Terlampir' . (!empty($cItem['original_name']) ? ' (' . $cItem['original_name'] . ')' : '');
+                } elseif (is_array($cVal)) {
+                    $cDisplay = implode(', ', $cVal);
+                } else {
+                    $cDisplay = (string) $cVal;
+                }
+            @endphp
+            <div class="r">
+                <span class="n">{{ $ci + 1 }}.</span>
+                <span class="l">{{ $cItem['label'] }}</span>
+                <span class="c">:</span>
+                <span class="v">{{ $cDisplay }}</span>
+            </div>
+        @endforeach
+    </div>
+    @endif
+
     {{-- ===== TANDA TANGAN ===== --}}
     <div class="ttd">
         <div>

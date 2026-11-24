@@ -373,6 +373,14 @@ class PendaftaranController extends Controller
             }
         }
 
+        if (is_array($pendaftaran->custom_responses)) {
+            foreach ($pendaftaran->custom_responses as $resp) {
+                if (($resp['type'] ?? '') === 'file' && !empty($resp['value']) && is_string($resp['value'])) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->delete($resp['value']);
+                }
+            }
+        }
+
         $pendaftaran->delete();
 
         if ($request->expectsJson() || $request->ajax()) {

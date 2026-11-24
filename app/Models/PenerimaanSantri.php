@@ -36,6 +36,7 @@ class PenerimaanSantri extends Model
         'lokasi_seleksi',
         'lokasi_seleksi_per_jenjang',
         'syarat_dokumen',
+        'form_schema',
         'catatan_syarat',
         'is_active',
         'created_by',
@@ -46,6 +47,7 @@ class PenerimaanSantri extends Model
         'kontak_wa_per_jenjang'      => 'array',
         'lokasi_seleksi_per_jenjang' => 'array',
         'syarat_dokumen'             => 'array',
+        'form_schema'                => 'array',
         'is_active'                  => 'boolean',
     ];
 
@@ -403,6 +405,22 @@ class PenerimaanSantri extends Model
             array_map('trim', preg_split('/\r\n|\r|\n/', (string) $this->catatan_syarat)),
             fn ($line) => $line !== ''
         ));
+    }
+
+    /**
+     * Cek apakah event ini sudah memiliki skema formulir kustom.
+     */
+    public function hasCustomFormSchema(): bool
+    {
+        return is_array($this->form_schema) && !empty($this->form_schema['sections']);
+    }
+
+    /**
+     * Kembalikan skema formulir final (kustom atau standar bawaan).
+     */
+    public function resolvedFormSchema(): array
+    {
+        return \App\Support\SpmbFormSchema::resolve($this->form_schema, $this->dokumenConfig());
     }
 
     /**

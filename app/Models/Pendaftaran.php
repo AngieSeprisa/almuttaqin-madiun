@@ -103,6 +103,7 @@ class Pendaftaran extends Model
         'foto_kk',
         'foto_ktp_ortu',
         'foto_surat_pernyataan',
+        'custom_responses',
         'status_pendaftaran',
     ];
 
@@ -125,6 +126,7 @@ class Pendaftaran extends Model
         'berkas_ktp_ortu' => 'boolean',
         'berkas_surat_pernyataan' => 'boolean',
         'penerima_kip' => 'boolean',
+        'custom_responses' => 'array',
     ];
 
     /**

@@ -470,5 +470,61 @@
 
     </div>
 
+    @php
+        $customResponses = is_array($pendaftaran->custom_responses) ? $pendaftaran->custom_responses : [];
+    @endphp
+    @if(!empty($customResponses))
+    {{-- SEKSI 5: PERTANYAAN TAMBAHAN (FORM KUSTOM) --}}
+    <div class="form-section-card">
+        <div class="form-section-header">
+            <div class="form-section-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+            </div>
+            <div class="form-section-title-wrap">
+                <h2 class="form-section-title">5. Informasi Tambahan (Formulir Kustom)</h2>
+            </div>
+        </div>
+
+        <div class="detail-grid">
+            @foreach($customResponses as $resp)
+            @php
+                $rType = $resp['type'] ?? 'text';
+                $rLabel = $resp['label'] ?? 'Pertanyaan';
+                $rVal = $resp['value'] ?? null;
+                $rOrig = $resp['original_name'] ?? null;
+            @endphp
+            <div class="detail-item" style="{{ in_array($rType, ['textarea', 'file'], true) ? 'grid-column: 1 / -1;' : '' }}">
+                <span class="detail-label">{{ $rLabel }}</span>
+                <span class="detail-value">
+                    @if($rType === 'file' && is_string($rVal) && $rVal !== '')
+                        @php
+                            $fileUrl = asset('storage/' . $rVal);
+                            $isImg = preg_match('/\.(jpg|jpeg|png|webp|gif)$/i', $rVal);
+                        @endphp
+                        @if($isImg)
+                            <a href="{{ $fileUrl }}" target="_blank" rel="noopener" style="display:inline-flex; flex-direction:column; gap:6px; text-decoration:none;">
+                                <img src="{{ $fileUrl }}" alt="{{ $rLabel }}" style="max-width:220px; max-height:160px; border-radius:10px; border:1px solid var(--border-light); object-fit:cover;">
+                                <span style="font-size:12px; color:var(--electric-blue); font-weight:600;">{{ $rOrig ?: 'Lihat Lampiran' }}</span>
+                            </a>
+                        @else
+                            <a href="{{ $fileUrl }}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary" style="display:inline-flex; align-items:center; gap:6px;">
+                                Buka Berkas{{ $rOrig ? ' (' . $rOrig . ')' : '' }}
+                            </a>
+                        @endif
+                    @elseif(is_array($rVal))
+                        {{ implode(', ', $rVal) ?: '-' }}
+                    @else
+                        {!! nl2br(e((string) ($rVal ?? '-'))) !!}
+                    @endif
+                </span>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
 </div>
 @endsection

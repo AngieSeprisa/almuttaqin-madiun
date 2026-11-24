@@ -3,13 +3,24 @@
 @section('title', $isEdit ? 'Edit Penerimaan' : 'Buat Penerimaan')
 
 @section('header-actions')
-<a href="{{ route('penerimaan.index') }}" class="btn btn-secondary">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
-        <line x1="19" y1="12" x2="5" y2="12"></line>
-        <polyline points="12 19 5 12 12 5"></polyline>
-    </svg>
-    Kembali
-</a>
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    @if($isEdit)
+    <a href="{{ route('penerimaan.formulir.edit', $penerimaan->id) }}" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+        </svg>
+        Desain Formulir
+    </a>
+    @endif
+    <a href="{{ route('penerimaan.index') }}" class="btn btn-secondary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        Kembali
+    </a>
+</div>
 @endsection
 
 @section('content')

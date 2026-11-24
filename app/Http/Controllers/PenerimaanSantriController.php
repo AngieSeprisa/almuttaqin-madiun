@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Lembaga;
 use App\Models\PenerimaanGelombang;
 use App\Models\PenerimaanSantri;
+use App\Support\SpmbFormSchema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -413,6 +414,90 @@ class PenerimaanSantriController extends Controller
             : ($legacyLokasi !== '' ? $legacyLokasi : null);
 
         return [$jenjangs, $summary, $waPerJenjang, $fallbackWa, $lokasiPerJenjang, $fallbackLokasi];
+    }
+
+    /**
+     * Halaman Form Builder (ala Google Form) khusus untuk 1 Link Penerimaan.
+     */
+    public function editFormBuilder($id)
+    {
+        $penerimaan = PenerimaanSantri::with('gelombangs')->findOrFail($id);
+        $this->ensureEventInActiveRoom($penerimaan);
+
+        $dokumenConfig = $penerimaan->dokumenConfig();
+        $schema = $penerimaan->resolvedFormSchema();
+        $defaultSchema = SpmbFormSchema::defaultSchema($dokumenConfig);
+        $compactSchema = SpmbFormSchema::compactSchema($dokumenConfig);
+        $builtinCatalog = SpmbFormSchema::builtinCatalog();
+        $fieldTypes = SpmbFormSchema::FIELD_TYPES;
+
+        return view('penerimaan.formulir', compact(
+            'penerimaan',
+            'schema',
+            'defaultSchema',
+            'compactSchema',
+            'builtinCatalog',
+            'fieldTypes'
+        ));
+    }
+
+    /**
+     * Simpan skema kustom formulir pendaftaran pada Link Penerimaan.
+     */
+    public function updateFormBuilder(Request $request, $id)
+    {
+        $penerimaan = PenerimaanSantri::findOrFail($id);
+        $this->ensureEventInActiveRoom($penerimaan);
+
+        $rawSchema = $request->input('form_schema');
+        if (is_string($request->input('form_schema_json'))) {
+            $decoded = json_decode($request->input('form_schema_json'), true);
+            if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                return back()->with('error', 'Format skema formulir tidak valid. Silakan coba simpan kembali.');
+            }
+            $rawSchema = $decoded;
+        }
+
+        if (!is_array($rawSchema) || empty($rawSchema['sections'])) {
+            return back()->with('error', 'Formulir minimal harus memiliki 1 bagian dengan pertanyaan aktif.');
+        }
+
+        $cleanSchema = SpmbFormSchema::sanitizeSubmittedSchema($rawSchema);
+        $syncedDokumen = SpmbFormSchema::extractDokumenConfig($cleanSchema);
+
+        $penerimaan->update([
+            'form_schema'    => $cleanSchema,
+            'syarat_dokumen' => $syncedDokumen,
+        ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'ok'      => true,
+                'message' => 'Desain formulir pendaftaran berhasil disimpan.',
+                'schema'  => $cleanSchema,
+            ]);
+        }
+
+        return redirect()
+            ->route('penerimaan.formulir.edit', $penerimaan->id)
+            ->with('success', 'Desain formulir pendaftaran berhasil disimpan.');
+    }
+
+    /**
+     * Kembalikan desain formulir ke tampilan standar bawaan.
+     */
+    public function resetFormBuilder($id)
+    {
+        $penerimaan = PenerimaanSantri::findOrFail($id);
+        $this->ensureEventInActiveRoom($penerimaan);
+
+        $penerimaan->update([
+            'form_schema' => null,
+        ]);
+
+        return redirect()
+            ->route('penerimaan.formulir.edit', $penerimaan->id)
+            ->with('success', 'Formulir dikembalikan ke desain standar bawaan.');
     }
 
     protected function normalizeDokumen(array $input): array

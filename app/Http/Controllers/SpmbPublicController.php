@@ -7,8 +7,10 @@ use App\Models\Lembaga;
 use App\Models\Pendaftaran;
 use App\Models\PenerimaanSantri;
 use App\Services\ImageCompressor;
+use App\Support\SpmbFormSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -140,6 +142,8 @@ class SpmbPublicController extends Controller
         $availableJenjangs = $penerimaan->availableJenjangs();
         $dokumenConfig = $penerimaan->dokumenConfig();
         $lokasiMap = $penerimaan->lokasiMap();
+        $formSchema = $penerimaan->resolvedFormSchema();
+        $visibleSections = SpmbFormSchema::visibleSections($formSchema);
 
         return view('spmb.form', compact(
             'penerimaan',
@@ -149,7 +153,9 @@ class SpmbPublicController extends Controller
             'allowedJenjangs',
             'availableJenjangs',
             'dokumenConfig',
-            'lokasiMap'
+            'lokasiMap',
+            'formSchema',
+            'visibleSections'
         ));
     }
 
@@ -172,40 +178,121 @@ class SpmbPublicController extends Controller
         $activeGelombang = $penerimaan->activeGelombang();
         $availableJenjangs = $penerimaan->availableJenjangs();
         $dokumenConfig = $penerimaan->dokumenConfig();
+        $formSchema = $penerimaan->resolvedFormSchema();
+        $activeFields = SpmbFormSchema::activeFieldsFlat($formSchema);
 
-        $baseRequest = new PendaftaranRequest();
-        $rules = $baseRequest->rules();
-        $attributes = $baseRequest->attributes();
-        $messages = $baseRequest->messages();
-
-        $rules['jenjang'] = ['required', Rule::in($availableJenjangs)];
-        $messages['jenjang.in'] = 'Kuota untuk lembaga/jenjang yang dipilih sudah penuh atau tidak tersedia.';
-        $rules['nama_lengkap'] = 'required|string|max:255';
-        $rules['jenis_kelamin'] = 'required|in:Laki-laki,Perempuan';
-        $rules['pj_biaya_hp'] = 'required|string|max:30';
-        $rules['nik'] = array_values(array_filter([
-            'nullable',
-            'string',
-            'max:16',
-            $request->filled('nik') ? Rule::unique('pendaftarans', 'nik') : null,
-        ]));
-
-        foreach (PenerimaanSantri::DOKUMEN_META as $flagKey => $meta) {
-            $fotoField = $meta['foto'];
-            $mode = $dokumenConfig[$flagKey] ?? 'opsional';
-            if ($mode === 'wajib') {
-                $rules[$fotoField] = 'required|file|image|mimes:jpg,jpeg,png,webp|max:10240';
-            } elseif ($mode === 'tidak') {
-                unset($rules[$fotoField], $rules[$flagKey]);
+        $activeBuiltins = [];
+        $activeCustoms = [];
+        foreach ($activeFields as $fld) {
+            if (($fld['source'] ?? '') === 'builtin') {
+                $activeBuiltins[$fld['key']] = $fld;
+            } else {
+                $activeCustoms[$fld['id']] = $fld;
             }
         }
 
-        $attributes['pj_biaya_hp'] = 'No. WhatsApp Aktif (Orang Tua / Wali)';
+        $baseRequest = new PendaftaranRequest();
+        $baseRules = $baseRequest->rules();
+        $attributes = $baseRequest->attributes();
+        $messages = $baseRequest->messages();
+
+        $rules = [];
+
+        // Field inti terkunci selalu wajib
+        $rules['jenjang'] = ['required', Rule::in($availableJenjangs)];
+        $messages['jenjang.in'] = 'Kuota untuk lembaga/jenjang yang dipilih sudah penuh atau tidak tersedia.';
+        $rules['nama_lengkap'] = 'required|string|max:255';
+        if (isset($activeBuiltins['jenjang']['label'])) {
+            $attributes['jenjang'] = $activeBuiltins['jenjang']['label'];
+        }
+        if (isset($activeBuiltins['nama_lengkap']['label'])) {
+            $attributes['nama_lengkap'] = $activeBuiltins['nama_lengkap']['label'];
+        }
+
+        // Validasi dinamis untuk seluruh field bawaan yang aktif di skema
+        foreach ($activeBuiltins as $key => $fld) {
+            if (in_array($key, ['jenjang', 'nama_lengkap'], true)) {
+                continue;
+            }
+
+            $isReq = !empty($fld['required']);
+            $attributes[$key] = $fld['label'] ?: ($attributes[$key] ?? $key);
+
+            if ($key === 'nik') {
+                $rules['nik'] = array_values(array_filter([
+                    $isReq ? 'required' : 'nullable',
+                    'string',
+                    'max:16',
+                    $request->filled('nik') ? Rule::unique('pendaftarans', 'nik') : null,
+                ]));
+                continue;
+            }
+
+            if (isset(SpmbFormSchema::DOKUMEN_FIELD_TO_FLAG[$key])) {
+                $flagKey = SpmbFormSchema::DOKUMEN_FIELD_TO_FLAG[$key];
+                $rules[$flagKey] = 'nullable|boolean';
+                $rules[$key] = ($isReq ? 'required' : 'nullable') . '|file|image|mimes:jpg,jpeg,png,webp|max:10240';
+                continue;
+            }
+
+            $baseRule = $baseRules[$key] ?? 'nullable|string|max:255';
+            if (is_string($baseRule)) {
+                if ($isReq) {
+                    $rules[$key] = preg_replace('/^nullable\|?/', 'required|', $baseRule);
+                    if (!str_starts_with($rules[$key], 'required')) {
+                        $rules[$key] = 'required|' . $rules[$key];
+                    }
+                    $rules[$key] = rtrim($rules[$key], '|');
+                } else {
+                    $rules[$key] = $baseRule;
+                }
+            } else {
+                $rules[$key] = $baseRule;
+            }
+        }
+
+        // Validasi dinamis untuk seluruh pertanyaan kustom ala Google Form
+        foreach ($activeCustoms as $cfId => $fld) {
+            $isReq = !empty($fld['required']);
+            $type = $fld['type'] ?? 'text';
+            $fieldPath = "custom_fields.{$cfId}";
+            $attributes[$fieldPath] = $fld['label'];
+            $options = is_array($fld['options'] ?? null) ? $fld['options'] : [];
+
+            if ($type === 'textarea') {
+                $rules[$fieldPath] = ($isReq ? 'required' : 'nullable') . '|string|max:3000';
+            } elseif ($type === 'number') {
+                $rules[$fieldPath] = ($isReq ? 'required' : 'nullable') . '|numeric';
+            } elseif ($type === 'date') {
+                $rules[$fieldPath] = ($isReq ? 'required' : 'nullable') . '|date';
+            } elseif (in_array($type, ['radio', 'select'], true)) {
+                $rules[$fieldPath] = array_values(array_filter([
+                    $isReq ? 'required' : 'nullable',
+                    'string',
+                    !empty($options) ? Rule::in($options) : null,
+                ]));
+            } elseif ($type === 'checkbox') {
+                $rules[$fieldPath] = $isReq ? 'required|array|min:1' : 'nullable|array';
+                if (!empty($options)) {
+                    $rules["{$fieldPath}.*"] = [Rule::in($options)];
+                }
+            } elseif ($type === 'file') {
+                $rules[$fieldPath] = ($isReq ? 'required' : 'nullable') . '|file|mimes:jpg,jpeg,png,webp,pdf|max:10240';
+                $messages["{$fieldPath}.mimes"] = ':attribute harus berformat JPG, PNG, WEBP, atau PDF.';
+                $messages["{$fieldPath}.max"] = ':attribute terlalu besar (maksimal 10 MB).';
+            } else {
+                $rules[$fieldPath] = ($isReq ? 'required' : 'nullable') . '|string|max:500';
+            }
+        }
 
         $input = $request->all();
-        $input['penerima_kip'] = $request->boolean('penerima_kip');
-        foreach (array_keys(PenerimaanSantri::DOKUMEN_META) as $flagKey) {
-            $input[$flagKey] = $request->boolean($flagKey);
+        if (isset($activeBuiltins['penerima_kip'])) {
+            $input['penerima_kip'] = $request->boolean('penerima_kip');
+        }
+        foreach (SpmbFormSchema::DOKUMEN_FIELD_TO_FLAG as $fotoKey => $flagKey) {
+            if (isset($activeBuiltins[$fotoKey])) {
+                $input[$flagKey] = $request->boolean($flagKey);
+            }
         }
 
         if (count($availableJenjangs) === 1 && empty($input['jenjang'])) {
@@ -217,13 +304,17 @@ class SpmbPublicController extends Controller
             return back()->withInput()->withErrors($validator);
         }
 
-        $data = $validator->validated();
+        $validated = $validator->validated();
+        $data = $validated;
+        unset($data['custom_fields']);
 
         $stored = [];
+        $storedCustomFiles = [];
         try {
+            // Simpan foto berkas bawaan
             foreach (Pendaftaran::FOTO_BERKAS as $field => [$flag]) {
                 unset($data[$field]);
-                if (($dokumenConfig[$flag] ?? 'opsional') === 'tidak') {
+                if (!isset($activeBuiltins[$field])) {
                     unset($data[$flag]);
                     continue;
                 }
@@ -234,9 +325,56 @@ class SpmbPublicController extends Controller
                     $data[$flag] = true;
                 }
             }
+
+            // Susun & simpan jawaban pertanyaan kustom
+            $customResponses = [];
+            $submittedCustom = is_array($validated['custom_fields'] ?? null) ? $validated['custom_fields'] : [];
+
+            foreach ($activeCustoms as $cfId => $fld) {
+                $type = $fld['type'] ?? 'text';
+                $entry = [
+                    'id'      => $cfId,
+                    'section' => $fld['_section_title'] ?? 'Tambahan',
+                    'label'   => $fld['label'],
+                    'type'    => $type,
+                ];
+
+                if ($type === 'file') {
+                    if ($request->hasFile("custom_fields.{$cfId}")) {
+                        $uploaded = $request->file("custom_fields.{$cfId}");
+                        $mime = strtolower((string) $uploaded->getMimeType());
+                        if (str_starts_with($mime, 'image/')) {
+                            $savedPath = $compressor->store($uploaded, 'berkas/custom');
+                        } else {
+                            $savedPath = $uploaded->store('berkas/custom', 'public');
+                        }
+                        $storedCustomFiles[] = $savedPath;
+                        $entry['value'] = $savedPath;
+                        $entry['original_name'] = $uploaded->getClientOriginalName();
+                        $customResponses[] = $entry;
+                    }
+                } elseif ($type === 'checkbox') {
+                    $vals = $submittedCustom[$cfId] ?? [];
+                    if (is_array($vals) && !empty($vals)) {
+                        $entry['value'] = array_values($vals);
+                        $customResponses[] = $entry;
+                    }
+                } else {
+                    $val = $submittedCustom[$cfId] ?? null;
+                    if ($val !== null && trim((string) $val) !== '') {
+                        $entry['value'] = trim((string) $val);
+                        $customResponses[] = $entry;
+                    }
+                }
+            }
+
+            $data['custom_responses'] = !empty($customResponses) ? $customResponses : null;
         } catch (RuntimeException $e) {
             foreach ($stored as $path) {
                 $compressor->delete($path);
+            }
+            foreach ($storedCustomFiles as $path) {
+                Storage::disk('public')->delete($path);
             }
 
             return back()->withInput()->withErrors(['foto_berkas' => $e->getMessage()]);
@@ -263,6 +401,9 @@ class SpmbPublicController extends Controller
         } catch (\Throwable $e) {
             foreach ($stored as $path) {
                 $compressor->delete($path);
+            }
+            foreach ($storedCustomFiles as $path) {
+                Storage::disk('public')->delete($path);
             }
             throw $e;
         }
