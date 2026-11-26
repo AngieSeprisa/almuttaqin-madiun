@@ -183,20 +183,46 @@
     }
 
     .cm-toolbar {
-        display: flex;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
         align-items: center;
-        justify-content: space-between;
         gap: 12px;
-        flex-wrap: wrap;
     }
 
     .cm-tabs {
+        grid-column: 2;
+        justify-self: center;
         display: inline-flex;
         padding: 4px;
         border-radius: 12px;
         background: var(--card-bg, #ffffff);
         border: 1px solid var(--border-light, #e2e8f0);
         gap: 4px;
+    }
+
+    .cm-filter-wrap {
+        grid-column: 3;
+        justify-self: end;
+    }
+
+    @media (max-width: 768px) {
+        .cm-toolbar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cm-filter-wrap {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .cm-filter-select {
+            width: 100%;
+            max-width: 100%;
+        }
     }
 
     .cm-tab-btn {
@@ -568,19 +594,21 @@
             </button>
         </div>
 
-        <select id="filterJuz" class="form-select cm-filter-select" aria-label="Pilih Juz" style="{{ $activeTab === 'quran' ? '' : 'display:none;' }}">
-            <option value="">Semua Juz</option>
-            @foreach($juzItems as $jItem)
-                <option value="{{ $jItem['juz'] }}">{{ $jItem['label'] }}</option>
-            @endforeach
-        </select>
+        <div class="cm-filter-wrap">
+            <select id="filterJuz" class="form-select cm-filter-select" aria-label="Pilih Juz" style="{{ $activeTab === 'quran' ? '' : 'display:none;' }}">
+                <option value="">Semua Juz</option>
+                @foreach($juzItems as $jItem)
+                    <option value="{{ $jItem['juz'] }}">{{ $jItem['label'] }}</option>
+                @endforeach
+            </select>
 
-        <select id="filterHadist" class="form-select cm-filter-select" aria-label="Pilih Kitab" style="{{ $activeTab === 'hadist' ? '' : 'display:none;' }}">
-            <option value="">Semua Kitab</option>
-            @foreach($hadistItems as $hItem)
-                <option value="{{ $hItem['id'] }}">{{ $hItem['nama'] }}</option>
-            @endforeach
-        </select>
+            <select id="filterHadist" class="form-select cm-filter-select" aria-label="Pilih Kitab" style="{{ $activeTab === 'hadist' ? '' : 'display:none;' }}">
+                <option value="">Semua Kitab</option>
+                @foreach($hadistItems as $hItem)
+                    <option value="{{ $hItem['id'] }}">{{ $hItem['nama'] }}</option>
+                @endforeach
+            </select>
+        </div>
     </div>
 
     {{-- PANEL 1: AL-QUR'AN PER JUZ --}}
