@@ -80,28 +80,6 @@
         border: 1px solid var(--border-light, #e2e8f0);
     }
 
-    .cm-mode-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 5px 12px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 700;
-    }
-
-    .cm-mode-badge.is-edit {
-        background: #eff6ff;
-        color: #1d4ed8;
-        border: 1px solid #bfdbfe;
-    }
-
-    .cm-mode-badge.is-view {
-        background: var(--bg-page, #f1f5f9);
-        color: var(--text-secondary, #475569);
-        border: 1px solid var(--border-light, #e2e8f0);
-    }
-
     .cm-summary-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -514,12 +492,6 @@
         background: rgba(37, 99, 235, 0.18);
         color: #93c5fd;
     }
-
-    .dark-mode .cm-mode-badge.is-edit {
-        background: rgba(37, 99, 235, 0.18);
-        color: #93c5fd;
-        border-color: rgba(59, 130, 246, 0.35);
-    }
 </style>
 @endpush
 
@@ -543,9 +515,6 @@
             <span class="cm-student-name">{{ $siswa->nama_lengkap }}</span>
             <span class="cm-student-kelas">{{ $siswa->kelas_tampil }}</span>
         </div>
-        <span class="cm-mode-badge {{ $isEditMode ? 'is-edit' : 'is-view' }}">
-            {{ $isEditMode ? 'Mode Edit' : 'Mode Lihat' }}
-        </span>
     </div>
 
     {{-- Ringkasan Persentase Terpisah: Al-Qur'an & Al-Hadist --}}
