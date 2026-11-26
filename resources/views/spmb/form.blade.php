@@ -184,6 +184,37 @@
     </div>
     @endif
 
+    @if (session('duplicate_registration'))
+    @php $dupReg = session('duplicate_registration'); @endphp
+    <div class="spmb-card" style="padding:16px 18px; margin-bottom:16px; border:1px solid #F59E0B; background:#FFFBEB;">
+        <div style="font-size:14px; font-weight:800; color:#92400E; margin-bottom:6px;">
+            Data Calon Santri Sudah Terdaftar
+        </div>
+        <div style="font-size:13.5px; color:#78350F; line-height:1.5; margin-bottom:12px;">
+            Atas nama <strong>{{ $dupReg['nama_lengkap'] ?? '-' }}</strong> dengan Nomor Registrasi
+            <strong style="font-family:monospace;">{{ $dupReg['no_induk'] ?? '-' }}</strong> sudah tercatat di sistem.
+            Jika ingin memperbaiki data yang salah ketik, silakan hubungi panitia tanpa perlu mendaftar ulang.
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            @if(!empty($dupReg['bukti_url']))
+            <a href="{{ $dupReg['bukti_url'] }}" class="btn btn-primary" style="font-size:13px; padding:8px 14px;">
+                Lihat Bukti Pendaftaran
+            </a>
+            @endif
+            @if(!empty($dupReg['cek_status_url']))
+            <a href="{{ $dupReg['cek_status_url'] }}" class="btn btn-secondary" style="font-size:13px; padding:8px 14px;">
+                Cek Status
+            </a>
+            @endif
+            @if(!empty($dupReg['wa_url']))
+            <a href="{{ $dupReg['wa_url'] }}" target="_blank" class="btn btn-success" style="font-size:13px; padding:8px 14px;">
+                Hubungi Panitia via WA
+            </a>
+            @endif
+        </div>
+    </div>
+    @endif
+
     @if ($errors->any())
     <div class="alert-banner alert-error" style="margin-bottom: 16px; border-radius:12px;">
         <div>
@@ -198,6 +229,7 @@
 
     <form action="{{ route('spmb.store', $penerimaan->slug) }}" method="POST" enctype="multipart/form-data" id="formSpmbPublic">
         @csrf
+        <input type="hidden" name="submission_token" value="{{ old('submission_token', $submissionToken ?? \Illuminate\Support\Str::uuid()) }}">
         {{-- Honeypot anti-bot --}}
         <div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
             <input type="text" name="website_url" tabindex="-1" autocomplete="off">
@@ -603,10 +635,15 @@ document.addEventListener('DOMContentLoaded', function () {
         @endif
     }
 
-    // Validasi checkbox wajib saat submit pada mode single / final step
+    // Validasi checkbox wajib & cegah double-submit saat mengirim formulir
     var formEl = document.getElementById('formSpmbPublic');
+    var isSubmitting = false;
     if (formEl) {
         formEl.addEventListener('submit', function (ev) {
+            if (isSubmitting) {
+                ev.preventDefault();
+                return false;
+            }
             var cbGroups = formEl.querySelectorAll('[data-checkbox-group="1"]');
             for (var g = 0; g < cbGroups.length; g++) {
                 var group = cbGroups[g];
@@ -617,6 +654,26 @@ document.addEventListener('DOMContentLoaded', function () {
                     return false;
                 }
             }
+            isSubmitting = true;
+            formEl.querySelectorAll('button[type="submit"]').forEach(function (btn) {
+                btn.setAttribute('data-orig-text', btn.textContent.trim());
+                btn.disabled = true;
+                btn.style.opacity = '0.7';
+                btn.style.cursor = 'not-allowed';
+                btn.textContent = 'Mengirim Pendaftaran...';
+            });
+        });
+
+        window.addEventListener('pageshow', function () {
+            if (!isSubmitting) return;
+            isSubmitting = false;
+            formEl.querySelectorAll('button[type="submit"]').forEach(function (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '';
+                btn.style.cursor = '';
+                var orig = btn.getAttribute('data-orig-text');
+                if (orig) btn.textContent = orig;
+            });
         });
     }
 

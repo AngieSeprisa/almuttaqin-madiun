@@ -563,4 +563,100 @@ class SpmbFormBuilderTest extends TestCase
             ->assertSee('name="foto_kk"', false)
             ->assertSee('name="foto_ktp_ortu"', false);
     }
+
+    public function test_cegah_pendaftaran_spmb_duplikat_berdasarkan_nisn_nik_nama_ttl_wa_typo_dan_double_submit(): void
+    {
+        // 1. Pendaftaran pertama (simulasi kasus nyata typo nama & NIK awal)
+        $this->post(route('spmb.store', $this->eventSdit->slug), [
+            'submission_token' => 'token-submit-aisha-001',
+            'jenjang'          => 'SD IT',
+            'nama_lengkap'     => 'AISHA OKATAVANI ADZKIYA',
+            'nik'              => '3520081305930001',
+            'nisn'             => '3204878056',
+            'tanggal_lahir'    => '2020-05-10',
+            'jenis_kelamin'    => 'Perempuan',
+            'pj_biaya_hp'      => '081234567890',
+        ])->assertRedirect();
+
+        $first = Pendaftaran::where('nisn', '3204878056')->firstOrFail();
+        $this->assertSame(1, Pendaftaran::where('penerimaan_santri_id', $this->eventSdit->id)->count());
+
+        // 2. Percobaan ke-2: NIK diganti & typo nama diperbaiki, tapi NISN sama -> DITOLAK
+        $this->post(route('spmb.store', $this->eventSdit->slug), [
+            'submission_token' => 'token-submit-aisha-002',
+            'jenjang'          => 'SD IT',
+            'nama_lengkap'     => 'AISHA OKTAVANI ADZKIYA',
+            'nik'              => '3577034511920001',
+            'nisn'             => '3204878056',
+            'tanggal_lahir'    => '2020-05-10',
+            'jenis_kelamin'    => 'Perempuan',
+            'pj_biaya_hp'      => '081234567890',
+        ])->assertSessionHasErrors('nisn')
+          ->assertSessionHas('duplicate_registration.no_induk', $first->no_induk);
+
+        $this->assertSame(1, Pendaftaran::where('penerimaan_santri_id', $this->eventSdit->id)->count());
+
+        // 3. Percobaan ke-3: NIK sama -> DITOLAK dengan informasi bukti pendaftaran
+        $this->post(route('spmb.store', $this->eventSdit->slug), [
+            'submission_token' => 'token-submit-aisha-003',
+            'jenjang'          => 'SD IT',
+            'nama_lengkap'     => 'NAMA BERBEDA',
+            'nik'              => '3520081305930001',
+            'jenis_kelamin'    => 'Perempuan',
+            'pj_biaya_hp'      => '089999999999',
+        ])->assertSessionHasErrors('nik')
+          ->assertSessionHas('duplicate_registration.no_induk', $first->no_induk);
+
+        // 4. Percobaan ke-4: NISN kosong & NIK baru, nama typo tipis + tanggal lahir & WA sama -> DITOLAK
+        $this->post(route('spmb.store', $this->eventSdit->slug), [
+            'submission_token' => 'token-submit-aisha-004',
+            'jenjang'          => 'SD IT',
+            'nama_lengkap'     => 'AISHA OKTAVANI ADZKIYA',
+            'nik'              => '3519075810200001',
+            'tanggal_lahir'    => '2020-05-10',
+            'jenis_kelamin'    => 'Perempuan',
+            'pj_biaya_hp'      => '+62 812-3456-7890',
+        ])->assertSessionHasErrors('nama_lengkap')
+          ->assertSessionHas('duplicate_registration.no_induk', $first->no_induk);
+
+        // 5. Percobaan ke-5: Nama persis sama + WA sama (tanpa NIK/NISN/TTL) -> DITOLAK
+        $this->post(route('spmb.store', $this->eventSdit->slug), [
+            'submission_token' => 'token-submit-aisha-005',
+            'jenjang'          => 'SD IT',
+            'nama_lengkap'     => '  aisha   okatavani   adzkiya ',
+            'jenis_kelamin'    => 'Perempuan',
+            'pj_biaya_hp'      => '6281234567890',
+        ])->assertSessionHasErrors('nama_lengkap');
+
+        $this->assertSame(1, Pendaftaran::where('penerimaan_santri_id', $this->eventSdit->id)->count());
+
+        // 6. Double-submit dengan submission_token sama -> langsung redirect ke bukti awal tanpa membuat baris baru
+        $this->post(route('spmb.store', $this->eventSdit->slug), [
+            'submission_token' => 'token-submit-aisha-001',
+            'jenjang'          => 'SD IT',
+            'nama_lengkap'     => 'AISHA OKATAVANI ADZKIYA',
+            'nik'              => '3520081305930001',
+            'nisn'             => '3204878056',
+            'tanggal_lahir'    => '2020-05-10',
+            'jenis_kelamin'    => 'Perempuan',
+            'pj_biaya_hp'      => '081234567890',
+        ])->assertRedirect(route('spmb.bukti', [
+            'slug'  => $this->eventSdit->slug,
+            'token' => $first->public_token,
+        ]));
+
+        $this->assertSame(1, Pendaftaran::where('penerimaan_santri_id', $this->eventSdit->id)->count());
+
+        // 7. Adik / saudara kandung dengan WA orang tua sama namun nama & tanggal lahir berbeda -> TETAP DIIZINKAN
+        $this->post(route('spmb.store', $this->eventSdit->slug), [
+            'submission_token' => 'token-submit-adik-001',
+            'jenjang'          => 'SD IT',
+            'nama_lengkap'     => 'MUHAMMAD RAFIF ALFATIH',
+            'tanggal_lahir'    => '2022-01-15',
+            'jenis_kelamin'    => 'Laki-laki',
+            'pj_biaya_hp'      => '081234567890',
+        ])->assertRedirect();
+
+        $this->assertSame(2, Pendaftaran::where('penerimaan_santri_id', $this->eventSdit->id)->count());
+    }
 }

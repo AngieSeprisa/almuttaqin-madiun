@@ -10,6 +10,7 @@ use App\Services\ImageCompressor;
 use App\Support\SpmbFormSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -149,6 +150,7 @@ class SpmbPublicController extends Controller
         $lokasiMap = $penerimaan->lokasiMap();
         $formSchema = $penerimaan->resolvedFormSchema();
         $visibleSections = SpmbFormSchema::visibleSections($formSchema);
+        $submissionToken = (string) Str::uuid();
 
         return view('spmb.form', compact(
             'penerimaan',
@@ -161,7 +163,8 @@ class SpmbPublicController extends Controller
             'dokumenConfig',
             'lokasiMap',
             'formSchema',
-            'visibleSections'
+            'visibleSections',
+            'submissionToken'
         ));
     }
 
@@ -179,6 +182,25 @@ class SpmbPublicController extends Controller
         if (!$penerimaan->isOpen()) {
             return redirect()->route('spmb.show', $slug)
                 ->with('error', 'Pendaftaran sedang ditutup.');
+        }
+
+        // Idempotency check: cegah pendaftaran ganda akibat double-click / retry browser dengan token form yang sama
+        $submissionToken = trim((string) $request->input('submission_token', ''));
+        $doneTokenCacheKey = $submissionToken !== ''
+            ? ('spmb_done_token:' . $penerimaan->id . ':' . sha1($submissionToken))
+            : null;
+
+        if ($doneTokenCacheKey) {
+            $existingId = Cache::get($doneTokenCacheKey);
+            if ($existingId) {
+                $alreadyCreated = Pendaftaran::where('penerimaan_santri_id', $penerimaan->id)->find($existingId);
+                if ($alreadyCreated) {
+                    return redirect()->route('spmb.bukti', [
+                        'slug'  => $penerimaan->slug,
+                        'token' => $alreadyCreated->public_token,
+                    ])->with('success', 'Pendaftaran Anda sudah tercatat sebelumnya.');
+                }
+            }
         }
 
         $activeGelombang = $penerimaan->activeGelombang();
@@ -225,12 +247,11 @@ class SpmbPublicController extends Controller
             $attributes[$key] = $fld['label'] ?: ($attributes[$key] ?? $key);
 
             if ($key === 'nik') {
-                $rules['nik'] = array_values(array_filter([
+                $rules['nik'] = [
                     $isReq ? 'required' : 'nullable',
                     'string',
                     'max:16',
-                    $request->filled('nik') ? Rule::unique('pendaftarans', 'nik') : null,
-                ]));
+                ];
                 continue;
             }
 
@@ -292,6 +313,15 @@ class SpmbPublicController extends Controller
         }
 
         $input = $request->all();
+        if (isset($input['nama_lengkap']) && is_string($input['nama_lengkap'])) {
+            $input['nama_lengkap'] = preg_replace('/\s+/', ' ', trim($input['nama_lengkap']));
+        }
+        foreach (['nik', 'nisn'] as $idField) {
+            if (array_key_exists($idField, $input) && is_string($input[$idField])) {
+                $cleanId = preg_replace('/\s+/', '', trim($input[$idField]));
+                $input[$idField] = ($cleanId === '' || $cleanId === '-') ? null : $cleanId;
+            }
+        }
         if (isset($activeBuiltins['penerima_kip'])) {
             $input['penerima_kip'] = $request->boolean('penerima_kip');
         }
@@ -314,110 +344,321 @@ class SpmbPublicController extends Controller
         $data = $validated;
         unset($data['custom_fields']);
 
-        $stored = [];
-        $storedCustomFiles = [];
+        // Kunci atomik per event agar klik ganda / request paralel tidak menembus cek duplikat
+        $lock = null;
         try {
-            // Simpan foto berkas bawaan
-            foreach (Pendaftaran::FOTO_BERKAS as $field => [$flag]) {
-                unset($data[$field]);
-                if (!isset($activeBuiltins[$field])) {
-                    unset($data[$flag]);
-                    continue;
-                }
-
-                if ($request->hasFile($field)) {
-                    $stored[$field] = $compressor->store($request->file($field), 'berkas');
-                    $data[$field] = $stored[$field];
-                    $data[$flag] = true;
-                }
-            }
-
-            // Susun & simpan jawaban pertanyaan kustom
-            $customResponses = [];
-            $submittedCustom = is_array($validated['custom_fields'] ?? null) ? $validated['custom_fields'] : [];
-
-            foreach ($activeCustoms as $cfId => $fld) {
-                $type = $fld['type'] ?? 'text';
-                $entry = [
-                    'id'      => $cfId,
-                    'section' => $fld['_section_title'] ?? 'Tambahan',
-                    'label'   => $fld['label'],
-                    'type'    => $type,
-                ];
-
-                if ($type === 'file') {
-                    if ($request->hasFile("custom_fields.{$cfId}")) {
-                        $uploaded = $request->file("custom_fields.{$cfId}");
-                        $mime = strtolower((string) $uploaded->getMimeType());
-                        if (str_starts_with($mime, 'image/')) {
-                            $savedPath = $compressor->store($uploaded, 'berkas/custom');
-                        } else {
-                            $savedPath = $uploaded->store('berkas/custom', 'public');
-                        }
-                        $storedCustomFiles[] = $savedPath;
-                        $entry['value'] = $savedPath;
-                        $entry['original_name'] = $uploaded->getClientOriginalName();
-                        $customResponses[] = $entry;
-                    }
-                } elseif ($type === 'checkbox') {
-                    $vals = $submittedCustom[$cfId] ?? [];
-                    if (is_array($vals) && !empty($vals)) {
-                        $entry['value'] = array_values($vals);
-                        $customResponses[] = $entry;
-                    }
-                } else {
-                    $val = $submittedCustom[$cfId] ?? null;
-                    if ($val !== null && trim((string) $val) !== '') {
-                        $entry['value'] = trim((string) $val);
-                        $customResponses[] = $entry;
-                    }
-                }
-            }
-
-            $data['custom_responses'] = !empty($customResponses) ? $customResponses : null;
-        } catch (RuntimeException $e) {
-            foreach ($stored as $path) {
-                $compressor->delete($path);
-            }
-            foreach ($storedCustomFiles as $path) {
-                Storage::disk('public')->delete($path);
-            }
-
-            return back()->withInput()->withErrors(['foto_berkas' => $e->getMessage()]);
-        }
-
-        if (empty($data['nik'])) {
-            $data['nik'] = null;
-        }
-
-        foreach (['pj_biaya_hp', 'ayah_hp', 'ibu_hp'] as $hpField) {
-            if (!empty($data[$hpField])) {
-                $data[$hpField] = preg_replace('/[^0-9+]/', '', (string) $data[$hpField]);
-            }
-        }
-
-        $data['penerimaan_santri_id'] = $penerimaan->id;
-        $data['penerimaan_gelombang_id'] = $activeGelombang?->id;
-        $data['status_pendaftaran'] = 'Pending';
-        $data['no_induk'] = $this->generateRegistrationNumber($penerimaan, $data['jenjang']);
-        $data['public_token'] = Str::random(40);
-
-        try {
-            $pendaftaran = Pendaftaran::create($data);
+            $lock = Cache::lock('spmb_store_event:' . $penerimaan->id, 10);
+            $lock->block(5);
         } catch (\Throwable $e) {
-            foreach ($stored as $path) {
-                $compressor->delete($path);
+            $lock = null;
+        }
+
+        try {
+            // Cek ulang idempotency token setelah mendapatkan lock
+            if ($doneTokenCacheKey) {
+                $existingId = Cache::get($doneTokenCacheKey);
+                if ($existingId) {
+                    $alreadyCreated = Pendaftaran::where('penerimaan_santri_id', $penerimaan->id)->find($existingId);
+                    if ($alreadyCreated) {
+                        return redirect()->route('spmb.bukti', [
+                            'slug'  => $penerimaan->slug,
+                            'token' => $alreadyCreated->public_token,
+                        ])->with('success', 'Pendaftaran Anda sudah tercatat sebelumnya.');
+                    }
+                }
             }
-            foreach ($storedCustomFiles as $path) {
-                Storage::disk('public')->delete($path);
+
+            // Cek duplikat multi-kriteria (NIK, NISN, Nama + Tanggal Lahir, Nama + No. WA, atau kemiripan nama + TTL + WA)
+            $duplicate = $this->findDuplicatePendaftaran($penerimaan, $data);
+            if ($duplicate !== null) {
+                return $this->duplicateRedirectResponse($penerimaan, $duplicate);
             }
-            throw $e;
+
+            $stored = [];
+            $storedCustomFiles = [];
+            try {
+                // Simpan foto berkas bawaan
+                foreach (Pendaftaran::FOTO_BERKAS as $field => [$flag]) {
+                    unset($data[$field]);
+                    if (!isset($activeBuiltins[$field])) {
+                        unset($data[$flag]);
+                        continue;
+                    }
+
+                    if ($request->hasFile($field)) {
+                        $stored[$field] = $compressor->store($request->file($field), 'berkas');
+                        $data[$field] = $stored[$field];
+                        $data[$flag] = true;
+                    }
+                }
+
+                // Susun & simpan jawaban pertanyaan kustom
+                $customResponses = [];
+                $submittedCustom = is_array($validated['custom_fields'] ?? null) ? $validated['custom_fields'] : [];
+
+                foreach ($activeCustoms as $cfId => $fld) {
+                    $type = $fld['type'] ?? 'text';
+                    $entry = [
+                        'id'      => $cfId,
+                        'section' => $fld['_section_title'] ?? 'Tambahan',
+                        'label'   => $fld['label'],
+                        'type'    => $type,
+                    ];
+
+                    if ($type === 'file') {
+                        if ($request->hasFile("custom_fields.{$cfId}")) {
+                            $uploaded = $request->file("custom_fields.{$cfId}");
+                            $mime = strtolower((string) $uploaded->getMimeType());
+                            if (str_starts_with($mime, 'image/')) {
+                                $savedPath = $compressor->store($uploaded, 'berkas/custom');
+                            } else {
+                                $savedPath = $uploaded->store('berkas/custom', 'public');
+                            }
+                            $storedCustomFiles[] = $savedPath;
+                            $entry['value'] = $savedPath;
+                            $entry['original_name'] = $uploaded->getClientOriginalName();
+                            $customResponses[] = $entry;
+                        }
+                    } elseif ($type === 'checkbox') {
+                        $vals = $submittedCustom[$cfId] ?? [];
+                        if (is_array($vals) && !empty($vals)) {
+                            $entry['value'] = array_values($vals);
+                            $customResponses[] = $entry;
+                        }
+                    } else {
+                        $val = $submittedCustom[$cfId] ?? null;
+                        if ($val !== null && trim((string) $val) !== '') {
+                            $entry['value'] = trim((string) $val);
+                            $customResponses[] = $entry;
+                        }
+                    }
+                }
+
+                $data['custom_responses'] = !empty($customResponses) ? $customResponses : null;
+            } catch (RuntimeException $e) {
+                foreach ($stored as $path) {
+                    $compressor->delete($path);
+                }
+                foreach ($storedCustomFiles as $path) {
+                    Storage::disk('public')->delete($path);
+                }
+
+                return back()->withInput()->withErrors(['foto_berkas' => $e->getMessage()]);
+            }
+
+            if (empty($data['nik'])) {
+                $data['nik'] = null;
+            }
+            if (empty($data['nisn'])) {
+                $data['nisn'] = null;
+            }
+
+            foreach (['pj_biaya_hp', 'ayah_hp', 'ibu_hp'] as $hpField) {
+                if (!empty($data[$hpField])) {
+                    $data[$hpField] = preg_replace('/[^0-9+]/', '', (string) $data[$hpField]);
+                }
+            }
+
+            $data['penerimaan_santri_id'] = $penerimaan->id;
+            $data['penerimaan_gelombang_id'] = $activeGelombang?->id;
+            $data['status_pendaftaran'] = 'Pending';
+            $data['no_induk'] = $this->generateRegistrationNumber($penerimaan, $data['jenjang']);
+            $data['public_token'] = Str::random(40);
+
+            try {
+                $pendaftaran = Pendaftaran::create($data);
+            } catch (\Throwable $e) {
+                foreach ($stored as $path) {
+                    $compressor->delete($path);
+                }
+                foreach ($storedCustomFiles as $path) {
+                    Storage::disk('public')->delete($path);
+                }
+                throw $e;
+            }
+
+            if ($doneTokenCacheKey) {
+                Cache::put($doneTokenCacheKey, $pendaftaran->id, now()->addMinutes(30));
+            }
+        } finally {
+            if ($lock) {
+                try {
+                    $lock->release();
+                } catch (\Throwable $e) {
+                    // abaikan kegagalan release lock
+                }
+            }
         }
 
         return redirect()->route('spmb.bukti', [
             'slug'  => $penerimaan->slug,
             'token' => $pendaftaran->public_token,
         ])->with('success', 'Pendaftaran berhasil dikirim.');
+    }
+
+    /**
+     * Deteksi apakah calon santri sudah terdaftar sebelumnya untuk mencegah pendaftaran ganda/berulang.
+     */
+    protected function findDuplicatePendaftaran(PenerimaanSantri $penerimaan, array $data): ?array
+    {
+        $nik = trim((string) ($data['nik'] ?? ''));
+        $nisn = trim((string) ($data['nisn'] ?? ''));
+        $nisnDigits = preg_replace('/\D+/', '', $nisn);
+        $namaNorm = $this->normalizeComparableName((string) ($data['nama_lengkap'] ?? ''));
+        $hpNorm = $this->normalizeComparablePhone((string) ($data['pj_biaya_hp'] ?? ''));
+
+        $tglLahir = '';
+        if (!empty($data['tanggal_lahir'])) {
+            try {
+                $tglLahir = \Illuminate\Support\Carbon::parse($data['tanggal_lahir'])->toDateString();
+            } catch (\Throwable $e) {
+                $tglLahir = '';
+            }
+        }
+
+        // 1. Cek NIK unik secara global di tabel pendaftarans
+        if ($nik !== '') {
+            $byNik = Pendaftaran::where('nik', $nik)->first();
+            if ($byNik) {
+                return [
+                    'record' => $byNik,
+                    'field'  => 'nik',
+                    'reason' => 'NIK',
+                ];
+            }
+        }
+
+        // Ambil pendaftar aktif (selain Ditolak) pada event penerimaan yang sama
+        $eventCandidates = Pendaftaran::where('penerimaan_santri_id', $penerimaan->id)
+            ->where(function ($q) {
+                $q->whereNull('status_pendaftaran')
+                  ->orWhere('status_pendaftaran', '!=', 'Ditolak');
+            })
+            ->get(['id', 'no_induk', 'public_token', 'jenjang', 'nama_lengkap', 'nik', 'nisn', 'tanggal_lahir', 'pj_biaya_hp']);
+
+        if ($eventCandidates->isEmpty()) {
+            return null;
+        }
+
+        // 2. Cek NISN sama pada event yang sama (minimal 5 digit dan bukan angka nol semua)
+        if ($nisnDigits !== '' && strlen($nisnDigits) >= 5 && trim($nisnDigits, '0') !== '') {
+            foreach ($eventCandidates as $cand) {
+                $candNisn = preg_replace('/\D+/', '', (string) ($cand->nisn ?? ''));
+                if ($candNisn !== '' && $candNisn === $nisnDigits) {
+                    return [
+                        'record' => $cand,
+                        'field'  => 'nisn',
+                        'reason' => 'NISN',
+                    ];
+                }
+            }
+        }
+
+        // 3. Cek Nama Lengkap + Tanggal Lahir sama pada event yang sama
+        if ($namaNorm !== '' && $tglLahir !== '') {
+            foreach ($eventCandidates as $cand) {
+                $candNama = $this->normalizeComparableName((string) ($cand->nama_lengkap ?? ''));
+                $candTgl = $cand->tanggal_lahir ? $cand->tanggal_lahir->toDateString() : '';
+                if ($candNama === $namaNorm && $candTgl === $tglLahir) {
+                    return [
+                        'record' => $cand,
+                        'field'  => 'nama_lengkap',
+                        'reason' => 'Nama Lengkap dan Tanggal Lahir',
+                    ];
+                }
+            }
+        }
+
+        // 4. Cek Nama Lengkap + No. WhatsApp sama pada event yang sama
+        if ($namaNorm !== '' && strlen($hpNorm) >= 8) {
+            foreach ($eventCandidates as $cand) {
+                $candNama = $this->normalizeComparableName((string) ($cand->nama_lengkap ?? ''));
+                $candHp = $this->normalizeComparablePhone((string) ($cand->pj_biaya_hp ?? ''));
+                if ($candNama === $namaNorm && $candHp !== '' && $candHp === $hpNorm) {
+                    return [
+                        'record' => $cand,
+                        'field'  => 'nama_lengkap',
+                        'reason' => 'Nama Lengkap dan Nomor WhatsApp',
+                    ];
+                }
+            }
+        }
+
+        // 5. Cek typo tipis pada Nama (>= 85% mirip) dengan Tanggal Lahir & No. WhatsApp sama pada event yang sama
+        if (mb_strlen($namaNorm) >= 6 && $tglLahir !== '' && strlen($hpNorm) >= 8) {
+            foreach ($eventCandidates as $cand) {
+                $candTgl = $cand->tanggal_lahir ? $cand->tanggal_lahir->toDateString() : '';
+                $candHp = $this->normalizeComparablePhone((string) ($cand->pj_biaya_hp ?? ''));
+                if ($candTgl !== $tglLahir || $candHp === '' || $candHp !== $hpNorm) {
+                    continue;
+                }
+                $candNama = $this->normalizeComparableName((string) ($cand->nama_lengkap ?? ''));
+                if (mb_strlen($candNama) < 6) {
+                    continue;
+                }
+                similar_text($namaNorm, $candNama, $pct);
+                if ($pct >= 85.0) {
+                    return [
+                        'record' => $cand,
+                        'field'  => 'nama_lengkap',
+                        'reason' => 'Data Calon Santri',
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function normalizeComparableName(string $name): string
+    {
+        $clean = mb_strtolower(trim($name));
+        $clean = preg_replace('/[^a-z0-9\s]/u', ' ', $clean);
+
+        return trim((string) preg_replace('/\s+/', ' ', $clean));
+    }
+
+    protected function normalizeComparablePhone(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', $phone);
+        if ($digits === '') {
+            return '';
+        }
+        if (str_starts_with($digits, '62')) {
+            return '0' . substr($digits, 2);
+        }
+
+        return $digits;
+    }
+
+    protected function duplicateRedirectResponse(PenerimaanSantri $penerimaan, array $duplicate)
+    {
+        /** @var Pendaftaran $existing */
+        $existing = $duplicate['record'];
+        $noReg = $existing->no_induk ?: '-';
+        $field = $duplicate['field'] ?? 'nama_lengkap';
+        $reason = $duplicate['reason'] ?? 'Data';
+
+        $waMessage = "Assalamu'alaikum Panitia {$penerimaan->judul},\n"
+            . "Saya ingin menanyakan / memperbaiki data pendaftaran atas nama {$existing->nama_lengkap} "
+            . "(No. Registrasi: {$noReg}).";
+
+        return back()
+            ->withInput()
+            ->withErrors([
+                $field => "{$reason} sudah terdaftar sebelumnya dengan No. Registrasi {$noReg} atas nama {$existing->nama_lengkap}. Tidak perlu mendaftar ulang; silakan buka Cek Status atau hubungi panitia jika perlu memperbaiki data.",
+            ])
+            ->with('duplicate_registration', [
+                'no_induk'       => $noReg,
+                'nama_lengkap'   => $existing->nama_lengkap,
+                'jenjang'        => $existing->jenjang,
+                'reason'         => $reason,
+                'bukti_url'      => $existing->public_token
+                    ? route('spmb.bukti', ['slug' => $penerimaan->slug, 'token' => $existing->public_token])
+                    : null,
+                'cek_status_url' => route('spmb.cek-status', ['slug' => $penerimaan->slug, 'kode' => $noReg]),
+                'wa_url'         => $penerimaan->waUrl($waMessage, $existing->jenjang),
+            ]);
     }
 
     public function bukti(string $slug, string $token)
