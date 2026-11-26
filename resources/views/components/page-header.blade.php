@@ -57,6 +57,18 @@
                 $bcParent = 'Pondok';
                 $bcParentRoute = route('pondok.jurnal.index');
                 $bcChild = 'Jurnal Mengaji';
+            } elseif (request()->routeIs('pondok.capaian.*')) {
+                $bcParent = 'Pondok';
+                $bcParentRoute = route('pondok.capaian.index');
+                $bcChild = 'Capaian Materi';
+            } elseif (request()->routeIs('pelanggaran.input')) {
+                $bcParent = 'Pelanggaran';
+                $bcParentRoute = route('pelanggaran.rekap');
+                $bcChild = 'Input Pelanggaran';
+            } elseif (request()->routeIs('pelanggaran.rekap')) {
+                $bcParent = 'Pelanggaran';
+                $bcParentRoute = route('pelanggaran.rekap');
+                $bcChild = 'Rekap Pelanggaran';
             } elseif (request()->routeIs('perpustakaan.buku.*')) {
                 $bcParent = 'Perpustakaan';
                 $bcParentRoute = route('perpustakaan.buku.index');

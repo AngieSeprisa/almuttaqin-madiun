@@ -13,6 +13,7 @@ use App\Http\Controllers\ImportSiswaController;
 use App\Http\Controllers\JadwalPelajaranController;
 use App\Http\Controllers\LembagaController;
 use App\Http\Controllers\NfcInputController;
+use App\Http\Controllers\PelanggaranController;
 use App\Http\Controllers\PendaftaranController;
 use App\Http\Controllers\PenerimaanSantriController;
 use App\Http\Controllers\PengaturanAbsensiController;
@@ -26,6 +27,7 @@ use App\Http\Controllers\PerizinanController;
 use App\Http\Controllers\PerizinanHaidController;
 use App\Http\Controllers\PerpustakaanController;
 use App\Http\Controllers\PlottingEkskulController;
+use App\Http\Controllers\PondokCapaianMateriController;
 use App\Http\Controllers\PondokPengajianController;
 use App\Http\Controllers\PresensiController;
 use App\Http\Controllers\ProfileController;
@@ -445,6 +447,40 @@ Route::middleware('auth')->group(function () {
         Route::get('/rekap-absensi', [RekapPondokController::class, 'pengajian'])
             ->middleware('permission:rekap_pengajian,view')
             ->name('rekap-absensi');
+
+        // 4. Capaian Materi Makna Siswa (Al-Qur'an & Al-Hadist)
+        Route::get('/capaian-materi', [PondokCapaianMateriController::class, 'index'])
+            ->middleware('permission:capaian_materi,view')
+            ->name('capaian.index');
+        Route::get('/capaian-materi/{siswa}', [PondokCapaianMateriController::class, 'show'])
+            ->whereNumber('siswa')
+            ->middleware('permission:capaian_materi,view')
+            ->name('capaian.show');
+        Route::post('/capaian-materi/{siswa}/toggle', [PondokCapaianMateriController::class, 'toggle'])
+            ->whereNumber('siswa')
+            ->middleware('permission:capaian_materi,create|edit')
+            ->name('capaian.toggle');
+    });
+
+    // Menu Pelanggaran (Input Pelanggaran & Rekap Pelanggaran)
+    Route::prefix('pelanggaran')->name('pelanggaran.')->group(function () {
+        Route::get('/input', [PelanggaranController::class, 'input'])
+            ->middleware('permission:pelanggaran_input,view|create')
+            ->name('input');
+        Route::post('/', [PelanggaranController::class, 'store'])
+            ->middleware('permission:pelanggaran_input,create')
+            ->name('store');
+        Route::get('/rekap', [PelanggaranController::class, 'rekap'])
+            ->middleware('permission:pelanggaran_rekap,view')
+            ->name('rekap');
+        Route::put('/{pelanggaran}', [PelanggaranController::class, 'update'])
+            ->whereNumber('pelanggaran')
+            ->middleware('permission:pelanggaran_rekap,edit')
+            ->name('update');
+        Route::delete('/{pelanggaran}', [PelanggaranController::class, 'destroy'])
+            ->whereNumber('pelanggaran')
+            ->middleware('permission:pelanggaran_rekap,delete')
+            ->name('destroy');
     });
 
     // Menu Perpustakaan (Daftar Buku & Pinjam Buku)

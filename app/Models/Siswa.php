@@ -109,6 +109,41 @@ class Siswa extends Model
     }
 
     /**
+     * Label kelas siswa yang siap ditampilkan
+     */
+    public function getKelasTampilAttribute(): string
+    {
+        $kelas = trim((string) ($this->kelas ?? ''));
+        if ($kelas !== '') {
+            return $kelas;
+        }
+
+        if ($this->relationLoaded('kelasPengajian') && $this->kelasPengajian) {
+            return $this->kelasPengajian->nama_kelas;
+        }
+
+        $jenjang = trim((string) ($this->jenjang ?? ''));
+
+        return $jenjang !== '' ? $jenjang : '-';
+    }
+
+    /**
+     * Relasi ke data capaian materi pondok
+     */
+    public function capaianMateris()
+    {
+        return $this->hasMany(PondokCapaianMateri::class, 'siswa_id');
+    }
+
+    /**
+     * Relasi ke data pelanggaran siswa
+     */
+    public function pelanggarans()
+    {
+        return $this->hasMany(Pelanggaran::class, 'siswa_id');
+    }
+
+    /**
      * Relasi ke data ekstrakurikuler yang diikuti
      */
     public function ekstrakurikulers()

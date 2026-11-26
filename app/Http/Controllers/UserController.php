@@ -46,6 +46,7 @@ class UserController extends Controller
                 'materi_pondok'    => 'Daftar Materi',
                 'target_pengajian' => 'Target Pengajian',
                 'jurnal_mengaji'   => 'Jurnal Mengaji',
+                'capaian_materi'   => 'Capaian Materi',
             ],
             'Perpustakaan' => [
                 'daftar_buku' => 'Daftar Buku',
@@ -55,6 +56,10 @@ class UserController extends Controller
                 'perizinan_sambang' => 'Sambang',
                 'perizinan_sakit'   => 'Sakit',
                 'perizinan_haid'    => 'Haid',
+            ],
+            'Pelanggaran' => [
+                'pelanggaran_input' => 'Input Pelanggaran',
+                'pelanggaran_rekap' => 'Rekap Pelanggaran',
             ],
             'Pendaftaran' => [
                 'pendaftaran' => 'Pendaftaran',

@@ -201,9 +201,10 @@ class User extends Authenticatable
             'data_warga'         => ['siswa', 'guru_warga', 'lulus_warga', 'mutasi_warga'],
             'sekolah'            => ['sekolah_jurnal', 'sekolah_rekap_jurnal', 'ekskul', 'jadwal_pelajaran', 'jadwal_saya'],
             'ujian'              => ['ujian_soal', 'ujian_ljk', 'ujian_sesi', 'ujian_koreksi', 'ujian_nilai'],
-            'pondok'             => ['materi_pondok', 'target_pengajian', 'jurnal_mengaji'],
+            'pondok'             => ['materi_pondok', 'target_pengajian', 'jurnal_mengaji', 'capaian_materi'],
             'perpustakaan'       => ['daftar_buku', 'pinjam_buku'],
             'perizinan'          => ['perizinan_sambang', 'perizinan_sakit', 'perizinan_haid'],
+            'pelanggaran'        => ['pelanggaran_input', 'pelanggaran_rekap'],
             'rekap_absensi'      => ['rekap_sholat', 'rekap_pengajian', 'rekap_sekolah', 'rekap_guru', 'rekap_ekskul'],
             'rekap_pondok'       => ['rekap_sholat', 'rekap_pengajian'],
             'data_master'        => ['master_jam', 'master_lembaga', 'master_import_siswa'],
@@ -239,6 +240,9 @@ class User extends Authenticatable
             'materi_pondok'            => 'pondok',
             'target_pengajian'         => 'pondok',
             'jurnal_mengaji'           => 'pondok',
+            'capaian_materi'           => 'pondok',
+            'pelanggaran_input'        => 'pelanggaran',
+            'pelanggaran_rekap'        => 'pelanggaran',
             'daftar_buku'              => 'perpustakaan',
             'pinjam_buku'              => 'perpustakaan',
             'rekap_sholat'             => 'rekap_absensi',
@@ -315,8 +319,9 @@ class User extends Authenticatable
         $granularCodes = [
             'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_saya', 'ujian',
             'ujian_soal', 'ujian_ljk', 'ujian_sesi', 'ujian_koreksi', 'ujian_nilai',
-            'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
+            'materi_pondok', 'target_pengajian', 'jurnal_mengaji', 'capaian_materi',
             'daftar_buku', 'pinjam_buku',
+            'pelanggaran_input', 'pelanggaran_rekap',
             'guru_warga', 'lulus_warga', 'mutasi_warga', 'nfc',
             'rekap_sholat', 'rekap_pengajian', 'rekap_sekolah', 'rekap_guru',
             'pengaturan_sesi', 'monitor_rfid', 'plotting_pengajian', 'guru_pondok',
@@ -331,38 +336,42 @@ class User extends Authenticatable
         if (in_array($this->role, ['admin_lembaga', 'guru']) && in_array($menuCode, [
             'sekolah', 'sekolah_jurnal', 'sekolah_rekap_jurnal', 'jadwal_pelajaran', 'jadwal_saya', 'ujian',
             'ujian_soal', 'ujian_ljk', 'ujian_sesi', 'ujian_koreksi', 'ujian_nilai',
-            'ekskul', 'jurnal_ekskul', 'plotting_ekskul', 'rekap_ekskul', 'rekap_sekolah'
+            'ekskul', 'jurnal_ekskul', 'plotting_ekskul', 'rekap_ekskul', 'rekap_sekolah',
+            'pelanggaran', 'pelanggaran_input', 'pelanggaran_rekap'
         ], true)) {
             return true;
         }
 
         if ($this->role === 'admin_lembaga' && $this->hasAccessToLembaga('pondok') && in_array($menuCode, [
-            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
+            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji', 'capaian_materi',
             'pengaturan_pondok', 'plotting_kamar', 'plotting_pengajian', 'plotting_kelas_pengajian', 'guru_pondok',
             'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'rekap_guru',
-            'perizinan', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'
+            'perizinan', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit',
+            'pelanggaran', 'pelanggaran_input', 'pelanggaran_rekap'
         ], true)) {
             return true;
         }
 
         if (in_array($this->role, ['guru', 'musyrif']) && in_array($menuCode, [
-            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
+            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji', 'capaian_materi',
             'perpustakaan', 'daftar_buku', 'pinjam_buku',
             'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_absensi', 'rekap_guru',
-            'perizinan', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit'
+            'perizinan', 'perizinan_haid', 'perizinan_sambang', 'perizinan_sakit',
+            'pelanggaran', 'pelanggaran_input', 'pelanggaran_rekap'
         ], true)) {
             return true;
         }
 
         if ($this->role === 'admin_lembaga' && in_array($menuCode, [
-            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji',
+            'pondok', 'materi_pondok', 'target_pengajian', 'jurnal_mengaji', 'capaian_materi',
             'perpustakaan', 'daftar_buku', 'pinjam_buku',
             'presensi', 'rekap_absensi', 'rekap_pondok', 'rekap_sholat', 'rekap_pengajian', 'rekap_sekolah', 'rekap_guru',
             'pengaturan_absensi', 'pengaturan_sekolah', 'pengaturan_sesi', 'monitor_rfid', 'guru_sekolah',
             'plotting_mapel', 'plotting_kelas', 'plotting_ekskul', 'ekskul', 'jurnal_ekskul', 'rekap_ekskul',
             'jadwal_pelajaran', 'jadwal_saya',
             'data_master', 'master_kelas', 'master_jam', 'master_lembaga', 'master_import_siswa',
-            'perizinan', 'perizinan_haid'
+            'perizinan', 'perizinan_haid',
+            'pelanggaran', 'pelanggaran_input', 'pelanggaran_rekap'
         ], true)) {
             return true;
         }

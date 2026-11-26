@@ -57,6 +57,42 @@ class MushafMadinah
     }
 
     /**
+     * Pemetaan standar 30 Juz Mushaf Madinah (604 Halaman).
+     * Juz 1: 1-21, Juz 2-29: 20 halaman per juz, Juz 30: 582-604.
+     */
+    public static function daftarJuz(): array
+    {
+        $juzList = [];
+        for ($j = 1; $j <= 30; $j++) {
+            if ($j === 1) {
+                $awal = 1;
+                $akhir = 21;
+            } elseif ($j === 30) {
+                $awal = 582;
+                $akhir = self::TOTAL_HALAMAN;
+            } else {
+                $awal = 22 + (($j - 2) * 20);
+                $akhir = $awal + 19;
+            }
+
+            $juzList[$j] = [
+                'juz'            => $j,
+                'label'          => 'Juz ' . $j,
+                'halaman_awal'   => $awal,
+                'halaman_akhir'  => $akhir,
+                'jumlah_halaman' => $akhir - $awal + 1,
+            ];
+        }
+
+        return $juzList;
+    }
+
+    public static function getJuz(int $juz): ?array
+    {
+        return self::daftarJuz()[$juz] ?? null;
+    }
+
+    /**
      * Daftar sesi pengajian pondok yang sinkron dengan Rekap Absensi Pengajian.
      */
     public static function daftarSesiPengajian(): array

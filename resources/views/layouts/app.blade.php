@@ -320,8 +320,9 @@
                     $canMateriPondok    = !$authUser || $authUser->canDo('materi_pondok', 'view');
                     $canTargetPengajian = !$authUser || $authUser->canDo('target_pengajian', 'view');
                     $canJurnalMengaji   = !$authUser || $authUser->canDo('jurnal_mengaji', 'view');
-                    $showPondokGroup    = $canMateriPondok || $canTargetPengajian || $canJurnalMengaji;
-                    $isPondokMenuActive = request()->routeIs('pondok.materi.*') || request()->routeIs('pondok.target.*') || request()->routeIs('pondok.jurnal.*') || request()->routeIs('pondok.rekap-jurnal*');
+                    $canCapaianMateri   = !$authUser || $authUser->canDo('capaian_materi', 'view');
+                    $showPondokGroup    = $canMateriPondok || $canTargetPengajian || $canJurnalMengaji || $canCapaianMateri;
+                    $isPondokMenuActive = request()->routeIs('pondok.materi.*') || request()->routeIs('pondok.target.*') || request()->routeIs('pondok.jurnal.*') || request()->routeIs('pondok.rekap-jurnal*') || request()->routeIs('pondok.capaian.*');
                 @endphp
                 @if($showPondokGroup)
                 <div class="nav-group {{ $isPondokMenuActive ? 'open' : '' }}" id="navGroupPondok">
@@ -358,6 +359,12 @@
                         <a href="{{ route('pondok.jurnal.index') }}" class="subnav-item {{ request()->routeIs('pondok.jurnal.*') ? 'active' : '' }}" title="Jurnal Mengaji">
                             <span class="subnav-dot"></span>
                             <span class="subnav-text">Jurnal Mengaji</span>
+                        </a>
+                        @endif
+                        @if($canCapaianMateri)
+                        <a href="{{ route('pondok.capaian.index') }}" class="subnav-item {{ request()->routeIs('pondok.capaian.*') ? 'active' : '' }}" title="Capaian Materi">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Capaian Materi</span>
                         </a>
                         @endif
                     </div>
@@ -447,6 +454,47 @@
                         <a href="{{ route('perizinan.haid') }}" class="subnav-item {{ request()->routeIs('perizinan.haid*') ? 'active' : '' }}" title="Haid">
                             <span class="subnav-dot" style="background:#ec4899;"></span>
                             <span class="subnav-text">Haid</span>
+                        </a>
+                        @endif
+                    </div>
+                </div>
+                @endif
+
+                {{-- Menu Pelanggaran --}}
+                @php
+                    $canPelanggaranInput = !$authUser || $authUser->canDo('pelanggaran_input', 'view') || $authUser->canDo('pelanggaran_input', 'create');
+                    $canPelanggaranRekap = !$authUser || $authUser->canDo('pelanggaran_rekap', 'view');
+                    $showPelanggaranGroup = $canPelanggaranInput || $canPelanggaranRekap;
+                    $isPelanggaranActive = request()->routeIs('pelanggaran.*');
+                @endphp
+                @if($showPelanggaranGroup)
+                <div class="nav-group {{ $isPelanggaranActive ? 'open' : '' }}" id="navGroupPelanggaran">
+                    <button type="button" class="nav-item nav-item-has-sub {{ $isPelanggaranActive ? 'active' : '' }}" id="togglePelanggaran" title="Pelanggaran">
+                        <span class="nav-item-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                                <line x1="12" y1="9" x2="12" y2="13"></line>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                            </svg>
+                        </span>
+                        <span class="nav-item-text">Pelanggaran</span>
+                        <span class="nav-item-arrow">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </span>
+                    </button>
+                    <div class="sidebar-subnav">
+                        @if($canPelanggaranInput)
+                        <a href="{{ route('pelanggaran.input') }}" class="subnav-item {{ request()->routeIs('pelanggaran.input') ? 'active' : '' }}" title="Input Pelanggaran">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Input Pelanggaran</span>
+                        </a>
+                        @endif
+                        @if($canPelanggaranRekap)
+                        <a href="{{ route('pelanggaran.rekap') }}" class="subnav-item {{ request()->routeIs('pelanggaran.rekap') ? 'active' : '' }}" title="Rekap Pelanggaran">
+                            <span class="subnav-dot"></span>
+                            <span class="subnav-text">Rekap Pelanggaran</span>
                         </a>
                         @endif
                     </div>
