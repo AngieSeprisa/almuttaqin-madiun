@@ -1276,4 +1276,99 @@ class UjianOmrTest extends TestCase
         $docRes->assertRedirect();
         $docRes->assertSessionHas('error');
     }
+
+    public function test_pengaturan_jam_sesi_ujian_cetak_nomor_meja_dan_perbaikan_sesi_ujian(): void
+    {
+        // Buat data TimeSlot dummy (seperti di produksi yang menyebabkan Jam Ke-0 ( - ) berulang)
+        \App\Models\TimeSlot::create([
+            'jenjang'       => 'SMP',
+            'hari'          => 'Senin',
+            'jam_ke'        => 0,
+            'waktu_mulai'   => '07:00',
+            'waktu_selesai' => '07:30',
+            'is_break'      => true,
+            'is_active'     => true,
+        ]);
+
+        // Siswa aktif pada kelas ini & kelas lain
+        Siswa::create([
+            'nama_lengkap' => 'Zaki Pratama',
+            'nisn'         => '1111222233',
+            'kelas'        => $this->kelas->nama_kelas,
+            'status'       => 'aktif',
+        ]);
+        Siswa::create([
+            'nama_lengkap' => 'Aisyah Putri',
+            'nisn'         => '4444555566',
+            'kelas'        => $this->kelas->nama_kelas,
+            'status'       => 'aktif',
+        ]);
+        Siswa::create([
+            'nama_lengkap' => 'Siswa Kelas Lain',
+            'nisn'         => '9999888877',
+            'kelas'        => '9Z',
+            'status'       => 'aktif',
+        ]);
+
+        // 1. Halaman Soal Ujian menampilkan tab Pengaturan
+        $soalRes = $this->actingAs($this->admin)->get(route('ujian.soal'));
+        $soalRes->assertStatus(200);
+        $soalRes->assertSee(route('ujian.pengaturan'), false);
+        $soalRes->assertSee('Pengaturan');
+
+        // 2. Buka halaman Pengaturan Ujian & tambah Jam Sesi Ujian
+        $pengaturanRes = $this->actingAs($this->admin)->get(route('ujian.pengaturan'));
+        $pengaturanRes->assertStatus(200);
+        $pengaturanRes->assertSee('Pengaturan Jam Sesi Ujian');
+        $pengaturanRes->assertSee('Cetak Nomor Meja Ujian per Kelas');
+
+        $storeJamRes = $this->actingAs($this->admin)->post(route('ujian.sesi-jam.store'), [
+            'nama_sesi'   => 'Sesi Pagi 1',
+            'jam_mulai'   => '07:30',
+            'jam_selesai' => '09:00',
+            'urutan'      => 1,
+        ]);
+        $storeJamRes->assertRedirect(route('ujian.pengaturan'));
+        $storeJamRes->assertSessionHas('success');
+
+        $sesiJam = \App\Models\UjianSesiJam::where('nama_sesi', 'Sesi Pagi 1')->firstOrFail();
+
+        // Update jam sesi
+        $updateJamRes = $this->actingAs($this->admin)->put(route('ujian.sesi-jam.update', $sesiJam->id), [
+            'nama_sesi'   => 'Sesi 1',
+            'jam_mulai'   => '07:30',
+            'jam_selesai' => '09:15',
+            'urutan'      => 1,
+            'is_active'   => 1,
+        ]);
+        $updateJamRes->assertRedirect(route('ujian.pengaturan'));
+        $this->assertSame('09:15', $sesiJam->fresh()->jam_selesai);
+
+        // 3. Halaman Sesi Ujian menggunakan Jam Sesi Ujian yang benar & TIDAK menampilkan "Jam Ke-0 ( - )"
+        $sesiRes = $this->actingAs($this->admin)->get(route('ujian.sesi'));
+        $sesiRes->assertStatus(200);
+        $sesiRes->assertSee('Sesi 1 (07:30 - 09:15)');
+        $sesiRes->assertDontSee('Jam Ke-0 ( - )');
+
+        // 4. Cetak Nomor Meja per kelas (urut abjad: Aisyah Putri = 7A-01, Zaki Pratama = 7A-02, Siswa Kelas Lain tidak ikut)
+        $cetakMejaRes = $this->actingAs($this->admin)->get(route('ujian.cetak-nomor-meja', [
+            'kelas_id'    => $this->kelas->id,
+            'judul_ujian' => 'PAS Ganjil 2026',
+            'ruang'       => 'Ruang 01',
+            'awalan'      => '7A-',
+        ]));
+        $cetakMejaRes->assertStatus(200);
+        $cetakMejaRes->assertSee('PAS Ganjil 2026');
+        $cetakMejaRes->assertSee('Ruang 01');
+        $cetakMejaRes->assertSee('7A-01');
+        $cetakMejaRes->assertSee('7A-02');
+        $cetakMejaRes->assertSee('Aisyah Putri');
+        $cetakMejaRes->assertSee('Zaki Pratama');
+        $cetakMejaRes->assertDontSee('Siswa Kelas Lain');
+
+        // 5. Hapus jam sesi berjalan lancar
+        $delJamRes = $this->actingAs($this->admin)->delete(route('ujian.sesi-jam.destroy', $sesiJam->id));
+        $delJamRes->assertRedirect(route('ujian.pengaturan'));
+        $this->assertDatabaseMissing('ujian_sesi_jams', ['id' => $sesiJam->id]);
+    }
 }

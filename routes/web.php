@@ -557,6 +557,21 @@ Route::middleware('auth')->group(function () {
         Route::get('/soal', [UjianController::class, 'soalIndex'])
             ->middleware('permission:ujian_soal|ujian,view')
             ->name('soal');
+        Route::get('/pengaturan', [UjianController::class, 'pengaturan'])
+            ->middleware('permission:ujian_soal|ujian_sesi|ujian,view')
+            ->name('pengaturan');
+        Route::post('/pengaturan/sesi-jam', [UjianController::class, 'storeSesiJam'])
+            ->middleware('permission:ujian_soal|ujian_sesi|ujian,create|edit')
+            ->name('sesi-jam.store');
+        Route::put('/pengaturan/sesi-jam/{sesiJam}', [UjianController::class, 'updateSesiJam'])
+            ->middleware('permission:ujian_soal|ujian_sesi|ujian,edit')
+            ->name('sesi-jam.update');
+        Route::delete('/pengaturan/sesi-jam/{sesiJam}', [UjianController::class, 'destroySesiJam'])
+            ->middleware('permission:ujian_soal|ujian_sesi|ujian,delete|edit')
+            ->name('sesi-jam.destroy');
+        Route::get('/pengaturan/cetak-nomor-meja', [UjianController::class, 'cetakNomorMeja'])
+            ->middleware('permission:ujian_soal|ujian_sesi|ujian_ljk|ujian,view')
+            ->name('cetak-nomor-meja');
         Route::get('/download-template', [UjianController::class, 'downloadTemplate'])
             ->middleware('permission:ujian_soal|ujian,view')
             ->name('download-template');

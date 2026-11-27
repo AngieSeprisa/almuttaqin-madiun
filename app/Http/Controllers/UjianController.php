@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Ujian;
 use App\Models\UjianKunci;
 use App\Models\UjianHasil;
+use App\Models\UjianSesiJam;
 use App\Models\UjianSoal;
 use App\Models\Classroom;
 use App\Models\Lembaga;
@@ -128,6 +129,163 @@ class UjianController extends Controller
         $mapels = $this->scopedMapels();
 
         return view('ujian.soal-index', compact('ujians', 'kelases', 'mapels'));
+    }
+
+    /**
+     * Halaman Pengaturan Ujian (Jam Sesi Ujian & Cetak Nomor Meja per Kelas)
+     */
+    public function pengaturan()
+    {
+        $scoped = $this->scopedFormal();
+
+        $sesiJams = UjianSesiJam::forLembaga($scoped)
+            ->orderBy('urutan')
+            ->orderBy('jam_mulai')
+            ->get();
+
+        $kelases = $this->scopedKelases();
+
+        $siswaCountsByKelas = [];
+        foreach ($kelases as $k) {
+            $namaKelas = $k->nama_kelas;
+            $q = Siswa::where(function ($sub) use ($namaKelas) {
+                $sub->where('kelas', $namaKelas)
+                    ->orWhereHas('pendaftaran', fn ($sq) => $sq->where('kelas', $namaKelas));
+            })->where('status', 'aktif');
+            if ($scoped) {
+                $q->forLembaga($scoped->kode);
+            }
+            $siswaCountsByKelas[$k->id] = $q->count();
+        }
+
+        $nextUrutan = ($sesiJams->max('urutan') ?? 0) + 1;
+
+        return view('ujian.pengaturan', compact('sesiJams', 'kelases', 'siswaCountsByKelas', 'nextUrutan'));
+    }
+
+    /**
+     * Tambah Jam Sesi Ujian
+     */
+    public function storeSesiJam(Request $request)
+    {
+        $scoped = $this->scopedFormal();
+
+        $validated = $request->validate([
+            'nama_sesi'   => 'required|string|max:100',
+            'jam_mulai'   => 'required|date_format:H:i',
+            'jam_selesai' => 'required|date_format:H:i|after:jam_mulai',
+            'urutan'      => 'nullable|integer|min:1|max:50',
+        ], [
+            'nama_sesi.required'   => 'Nama sesi wajib diisi.',
+            'jam_mulai.required'   => 'Jam mulai wajib diisi.',
+            'jam_selesai.required' => 'Jam selesai wajib diisi.',
+            'jam_selesai.after'    => 'Jam selesai harus lebih akhir daripada jam mulai.',
+        ]);
+
+        UjianSesiJam::create([
+            'lembaga_id'  => $scoped?->id,
+            'nama_sesi'   => trim($validated['nama_sesi']),
+            'jam_mulai'   => $validated['jam_mulai'],
+            'jam_selesai' => $validated['jam_selesai'],
+            'urutan'      => (int) ($validated['urutan'] ?? 1),
+            'is_active'   => true,
+        ]);
+
+        return redirect()->route('ujian.pengaturan')
+            ->with('success', 'Jam sesi ujian berhasil ditambahkan.');
+    }
+
+    /**
+     * Ubah Jam Sesi Ujian
+     */
+    public function updateSesiJam(Request $request, UjianSesiJam $sesiJam)
+    {
+        $scoped = $this->scopedFormal();
+        if ($scoped && (int) $sesiJam->lembaga_id !== (int) $scoped->id) {
+            abort(403, 'Anda tidak memiliki akses ke jam sesi lembaga lain.');
+        }
+
+        $validated = $request->validate([
+            'nama_sesi'   => 'required|string|max:100',
+            'jam_mulai'   => 'required|date_format:H:i',
+            'jam_selesai' => 'required|date_format:H:i|after:jam_mulai',
+            'urutan'      => 'required|integer|min:1|max:50',
+            'is_active'   => 'nullable|boolean',
+        ], [
+            'jam_selesai.after' => 'Jam selesai harus lebih akhir daripada jam mulai.',
+        ]);
+
+        $sesiJam->update([
+            'nama_sesi'   => trim($validated['nama_sesi']),
+            'jam_mulai'   => $validated['jam_mulai'],
+            'jam_selesai' => $validated['jam_selesai'],
+            'urutan'      => (int) $validated['urutan'],
+            'is_active'   => (bool) ($validated['is_active'] ?? true),
+        ]);
+
+        return redirect()->route('ujian.pengaturan')
+            ->with('success', 'Jam sesi ujian berhasil diperbarui.');
+    }
+
+    /**
+     * Hapus Jam Sesi Ujian
+     */
+    public function destroySesiJam(UjianSesiJam $sesiJam)
+    {
+        $scoped = $this->scopedFormal();
+        if ($scoped && (int) $sesiJam->lembaga_id !== (int) $scoped->id) {
+            abort(403, 'Anda tidak memiliki akses ke jam sesi lembaga lain.');
+        }
+
+        $sesiJam->delete();
+
+        return redirect()->route('ujian.pengaturan')
+            ->with('success', 'Jam sesi ujian berhasil dihapus.');
+    }
+
+    /**
+     * Cetak Kartu Nomor Meja Ujian per Kelas (Siap Print A4)
+     */
+    public function cetakNomorMeja(Request $request)
+    {
+        $scoped = $this->scopedFormal();
+        $validated = $request->validate([
+            'kelas_id'    => 'required|exists:classrooms,id',
+            'judul_ujian' => 'nullable|string|max:120',
+            'ruang'       => 'nullable|string|max:60',
+            'awalan'      => 'nullable|string|max:20',
+        ]);
+
+        $kelas = Classroom::with('lembaga')->findOrFail($validated['kelas_id']);
+        if ($scoped && !Classroom::forJenjang($scoped->kode)->whereKey($kelas->id)->exists()) {
+            abort(403, 'Kelas yang dipilih bukan milik lembaga ruang kerja Anda.');
+        }
+
+        $namaKelas = $kelas->nama_kelas;
+        $siswaQuery = Siswa::with('pendaftaran')
+            ->where(function ($sub) use ($namaKelas) {
+                $sub->where('kelas', $namaKelas)
+                    ->orWhereHas('pendaftaran', fn ($sq) => $sq->where('kelas', $namaKelas));
+            })
+            ->where('status', 'aktif');
+        if ($scoped) {
+            $siswaQuery->forLembaga($scoped->kode);
+        }
+        $siswas = $siswaQuery->orderBy('nama_lengkap')->get();
+
+        $lembagaNama = $kelas->lembaga?->nama ?? $scoped?->nama ?? 'YAYASAN PONDOK PESANTREN MUTTAQIN';
+        $judulUjian = trim((string) ($validated['judul_ujian'] ?? '')) ?: 'NOMOR MEJA UJIAN';
+        $ruangLabel = trim((string) ($validated['ruang'] ?? '')) ?: ('Ruang ' . $kelas->nama_kelas);
+        $awalan = trim((string) ($validated['awalan'] ?? ''));
+
+        return view('ujian.cetak-nomor-meja', compact(
+            'kelas',
+            'siswas',
+            'lembagaNama',
+            'judulUjian',
+            'ruangLabel',
+            'awalan'
+        ));
     }
 
     /**
@@ -878,13 +1036,21 @@ class UjianController extends Controller
             ->latest('tanggal_ujian')
             ->get();
 
-        $timeSlotsQuery = TimeSlot::active();
-        if ($scoped) {
-            $timeSlotsQuery->forJenjang($scoped->kode);
-        }
-        $timeSlots = $timeSlotsQuery->orderBy('jam_ke')->get();
+        $sesiJams = UjianSesiJam::active()
+            ->forLembaga($scoped)
+            ->orderBy('urutan')
+            ->orderBy('jam_mulai')
+            ->get();
 
-        return view('ujian.sesi-index', compact('kelases', 'mapels', 'gurus', 'ujians', 'timeSlots'));
+        if ($sesiJams->isEmpty() && $scoped) {
+            $sesiJams = UjianSesiJam::active()
+                ->whereNull('lembaga_id')
+                ->orderBy('urutan')
+                ->orderBy('jam_mulai')
+                ->get();
+        }
+
+        return view('ujian.sesi-index', compact('kelases', 'mapels', 'gurus', 'ujians', 'sesiJams'));
     }
 
     /**
