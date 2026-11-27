@@ -561,7 +561,7 @@ Route::middleware('auth')->group(function () {
             ->middleware('permission:ujian_soal|ujian,view')
             ->name('download-template');
         Route::post('/{ujian}/upload-word', [UjianController::class, 'uploadWordSoal'])
-            ->middleware('permission:ujian_soal|ujian,edit')
+            ->middleware('permission:ujian_soal|ujian,create|edit')
             ->name('upload-word');
         Route::post('/{ujian}/timer', [UjianController::class, 'updateTimer'])
             ->middleware('permission:ujian_soal|ujian,edit')

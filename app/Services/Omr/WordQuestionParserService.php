@@ -31,44 +31,274 @@ class WordQuestionParserService
             throw new \Exception("Format dokumen Word tidak valid (word/document.xml tidak ditemukan).");
         }
 
+        // Ambil definisi penomoran otomatis Microsoft Word bila tersedia (word/numbering.xml)
+        $numberingXml = $zip->getFromName('word/numbering.xml') ?: null;
+
         $zip->close();
 
-        // Bersihkan dan ekstrak teks per paragraf
-        $paragraphs = $this->extractParagraphs($xmlContent);
+        // Bersihkan dan ekstrak teks per paragraf (termasuk auto-numbering & Shift+Enter)
+        $paragraphs = $this->extractParagraphs($xmlContent, $numberingXml);
 
         return $this->parseParagraphsToQuestions($paragraphs);
     }
 
     /**
-     * Ekstrak teks paragraf dari XML Word
+     * Parsing word/numbering.xml agar daftar bernomor otomatis Word (<w:numPr>) dapat direkonstruksi
+     * menjadi awalan "1. ", "2. ", "A. ", "B. ", dst.
      */
-    private function extractParagraphs(string $xmlContent): array
+    private function parseNumberingDefinitions(?string $numberingXml): array
+    {
+        if (empty($numberingXml)) {
+            return [];
+        }
+
+        $dom = new \DOMDocument();
+        if (!@$dom->loadXML($numberingXml, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET)) {
+            return [];
+        }
+
+        $xpath = new \DOMXPath($dom);
+        $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+
+        $abstractDefs = [];
+        foreach ($xpath->query('//w:abstractNum') as $absNode) {
+            $absId = $absNode->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'abstractNumId')?->nodeValue
+                ?? $absNode->attributes?->getNamedItem('abstractNumId')?->nodeValue;
+            if ($absId === null) {
+                continue;
+            }
+            $levels = [];
+            foreach ($xpath->query('./w:lvl', $absNode) as $lvlNode) {
+                $ilvl = (int) ($lvlNode->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'ilvl')?->nodeValue
+                    ?? $lvlNode->attributes?->getNamedItem('ilvl')?->nodeValue ?? 0);
+                $numFmtNode = $xpath->query('./w:numFmt', $lvlNode)->item(0);
+                $startNode = $xpath->query('./w:start', $lvlNode)->item(0);
+                $fmt = $numFmtNode?->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'val')?->nodeValue
+                    ?? $numFmtNode?->attributes?->getNamedItem('val')?->nodeValue ?? 'decimal';
+                $start = (int) ($startNode?->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'val')?->nodeValue
+                    ?? $startNode?->attributes?->getNamedItem('val')?->nodeValue ?? 1);
+                $levels[$ilvl] = ['fmt' => $fmt, 'start' => max(1, $start)];
+            }
+            $abstractDefs[$absId] = $levels;
+        }
+
+        $numDefs = [];
+        foreach ($xpath->query('//w:num') as $numNode) {
+            $numId = $numNode->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'numId')?->nodeValue
+                ?? $numNode->attributes?->getNamedItem('numId')?->nodeValue;
+            $absRefNode = $xpath->query('./w:abstractNumId', $numNode)->item(0);
+            $absId = $absRefNode?->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'val')?->nodeValue
+                ?? $absRefNode?->attributes?->getNamedItem('val')?->nodeValue;
+
+            if ($numId === null || $absId === null || !isset($abstractDefs[$absId])) {
+                continue;
+            }
+
+            $levels = $abstractDefs[$absId];
+            foreach ($xpath->query('./w:lvlOverride', $numNode) as $ovNode) {
+                $ilvl = (int) ($ovNode->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'ilvl')?->nodeValue
+                    ?? $ovNode->attributes?->getNamedItem('ilvl')?->nodeValue ?? 0);
+                $soNode = $xpath->query('./w:startOverride', $ovNode)->item(0);
+                if ($soNode) {
+                    $soVal = (int) ($soNode->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'val')?->nodeValue
+                        ?? $soNode->attributes?->getNamedItem('val')?->nodeValue ?? 1);
+                    if (!isset($levels[$ilvl])) {
+                        $levels[$ilvl] = ['fmt' => 'decimal', 'start' => max(1, $soVal)];
+                    } else {
+                        $levels[$ilvl]['start'] = max(1, $soVal);
+                    }
+                }
+            }
+            $numDefs[$numId] = $levels;
+        }
+
+        return $numDefs;
+    }
+
+    /**
+     * Format angka/huruf untuk item daftar otomatis Word (<w:numPr>)
+     */
+    private function formatListMarker(string $fmt, int $val): string
+    {
+        return match ($fmt) {
+            'decimal'     => $val . '. ',
+            'upperLetter',
+            'lowerLetter' => ($val >= 1 && $val <= 26) ? (chr(64 + $val) . '. ') : '',
+            'upperRoman',
+            'lowerRoman'  => $this->toRoman($val) . '. ',
+            default       => '',
+        };
+    }
+
+    private function toRoman(int $number): string
+    {
+        $map = [
+            10 => 'X', 9 => 'IX', 5 => 'V', 4 => 'IV', 1 => 'I',
+        ];
+        $res = '';
+        $n = max(1, min(20, $number));
+        foreach ($map as $val => $sym) {
+            while ($n >= $val) {
+                $res .= $sym;
+                $n -= $val;
+            }
+        }
+        return $res;
+    }
+
+    /**
+     * Ekstrak teks paragraf dari XML Word menggunakan DOMDocument (aman terhadap <w:p/>, nested XML, <w:br/>, dan auto-numbering)
+     */
+    private function extractParagraphs(string $xmlContent, ?string $numberingXml = null): array
     {
         $paragraphs = [];
+        $numDefs = $this->parseNumberingDefinitions($numberingXml);
+        $listCounters = []; // [numId][ilvl] => int
 
-        // Hapus namespace XML agar parsing regex / DOM lebih mudah
+        $dom = new \DOMDocument();
+        if (@$dom->loadXML($xmlContent, LIBXML_NOERROR | LIBXML_NOWARNING | LIBXML_NONET)) {
+            $xpath = new \DOMXPath($dom);
+            $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+            $xpath->registerNamespace('mc', 'http://schemas.openxmlformats.org/markup-compatibility/2006');
+
+            // Ambil semua <w:p> di dalam body (kecuali yang berada di dalam mc:Fallback agar tidak duplikat)
+            $pNodes = $xpath->query('//w:body//w:p[not(ancestor::mc:Fallback)]');
+
+            foreach ($pNodes as $pNode) {
+                // Ekstrak teks dengan memisahkan <w:br/> dan <w:cr/> menjadi baris tersendiri
+                $lines = [''];
+                $this->collectParagraphLines($pNode, $lines);
+
+                // Bersihkan whitespace (termasuk NBSP \u00A0 & zero-width space)
+                $cleanLines = [];
+                foreach ($lines as $rawLine) {
+                    $clean = preg_replace('/[\s\x{00A0}\x{200B}\x{FEFF}]+/u', ' ', $rawLine);
+                    $clean = trim((string) $clean);
+                    if ($clean !== '') {
+                        $cleanLines[] = $clean;
+                    }
+                }
+
+                if (empty($cleanLines)) {
+                    continue;
+                }
+
+                // Cek penomoran otomatis Word (<w:pPr><w:numPr>)
+                $prefix = '';
+                $numPrNode = $xpath->query('./w:pPr/w:numPr', $pNode)->item(0);
+                if ($numPrNode) {
+                    $numIdNode = $xpath->query('./w:numId', $numPrNode)->item(0);
+                    $ilvlNode = $xpath->query('./w:ilvl', $numPrNode)->item(0);
+                    $numId = $numIdNode?->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'val')?->nodeValue
+                        ?? $numIdNode?->attributes?->getNamedItem('val')?->nodeValue;
+                    $ilvl = (int) ($ilvlNode?->attributes?->getNamedItemNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'val')?->nodeValue
+                        ?? $ilvlNode?->attributes?->getNamedItem('val')?->nodeValue ?? 0);
+
+                    if ($numId !== null && $numId !== '0') {
+                        $def = $numDefs[$numId][$ilvl] ?? [
+                            'fmt'   => $ilvl === 0 ? 'decimal' : 'upperLetter',
+                            'start' => 1,
+                        ];
+
+                        if (!isset($listCounters[$numId][$ilvl])) {
+                            $listCounters[$numId][$ilvl] = $def['start'];
+                        } else {
+                            $listCounters[$numId][$ilvl]++;
+                        }
+
+                        // Reset level anak pada numId yang sama (misal ilvl=0 maju ke soal berikutnya => opsi ilvl=1 reset ke A)
+                        foreach (array_keys($listCounters[$numId]) as $lvlKey) {
+                            if ($lvlKey > $ilvl) {
+                                unset($listCounters[$numId][$lvlKey]);
+                            }
+                        }
+
+                        // Jika sebuah item bernomor decimal baru muncul, reset semua daftar huruf (opsi A-E) yang terpisah
+                        if ($def['fmt'] === 'decimal') {
+                            foreach ($listCounters as $otherNumId => $lvls) {
+                                foreach ($lvls as $otherLvl => $v) {
+                                    $otherFmt = $numDefs[$otherNumId][$otherLvl]['fmt'] ?? ($otherLvl > 0 ? 'upperLetter' : 'decimal');
+                                    if (in_array($otherFmt, ['upperLetter', 'lowerLetter'], true)) {
+                                        unset($listCounters[$otherNumId][$otherLvl]);
+                                    }
+                                }
+                            }
+                        }
+
+                        $firstLine = $cleanLines[0];
+                        $alreadyHasPrefix =
+                            ($def['fmt'] === 'decimal' && preg_match('/^(?:(?:no|soal)\.?\s*)?\d+[\.\)\:\-]/i', $firstLine)) ||
+                            (in_array($def['fmt'], ['upperLetter', 'lowerLetter'], true) && preg_match('/^\(?[A-Ea-e][\.\)\:\-]/', $firstLine)) ||
+                            (in_array($def['fmt'], ['upperRoman', 'lowerRoman'], true) && preg_match('/^[IVX]+[\.\)]/i', $firstLine));
+
+                        if (!$alreadyHasPrefix) {
+                            $prefix = $this->formatListMarker($def['fmt'], $listCounters[$numId][$ilvl]);
+                        }
+                    }
+                }
+
+                if ($prefix !== '') {
+                    $cleanLines[0] = $prefix . $cleanLines[0];
+                }
+
+                foreach ($cleanLines as $cl) {
+                    $paragraphs[] = $cl;
+                }
+            }
+
+            if (!empty($paragraphs)) {
+                return $paragraphs;
+            }
+        }
+
+        // Fallback regex bila DOMDocument gagal memuat XML non-standar
         $cleanXml = preg_replace('/(<\/?)w:/', '$1', $xmlContent);
-
-        // Cari setiap blok <p> ... </p>
-        if (preg_match_all('/<p\b[^>]*>(.*?)<\/p>/is', $cleanXml, $matches)) {
+        if (preg_match_all('/<p(?:\s[^>]*)?>((?:(?!<p[\s>]).)*?)<\/p>/is', $cleanXml, $matches)) {
             foreach ($matches[1] as $pXml) {
-                // Konversi <tab/> menjadi spasi ganda
                 $pXml = preg_replace('/<tab\/>/i', '  ', $pXml);
-
-                // Ambil semua teks dalam <t>...</t>
-                if (preg_match_all('/<t\b[^>]*>(.*?)<\/t>/is', $pXml, $tMatches)) {
-                    $text = implode('', $tMatches[1]);
-                    $text = html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
-                    $text = trim(preg_replace('/\s+/', ' ', $text));
-
-                    if ($text !== '') {
-                        $paragraphs[] = $text;
+                $segments = preg_split('/<(?:br|cr)\b[^>]*\/?>/i', $pXml);
+                foreach ($segments as $seg) {
+                    if (preg_match_all('/<t\b[^>]*>(.*?)<\/t>/is', $seg, $tMatches)) {
+                        $text = implode('', $tMatches[1]);
+                        $text = html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
+                        $text = trim((string) preg_replace('/[\s\x{00A0}\x{200B}\x{FEFF}]+/u', ' ', $text));
+                        if ($text !== '') {
+                            $paragraphs[] = $text;
+                        }
                     }
                 }
             }
         }
 
         return $paragraphs;
+    }
+
+    /**
+     * Kumpulkan teks dari node <w:p> secara rekursif sambil menghormati <w:tab/>, <w:br/>, <w:cr/>, dan skip <mc:Fallback>.
+     */
+    private function collectParagraphLines(\DOMNode $node, array &$lines): void
+    {
+        foreach ($node->childNodes as $child) {
+            if ($child->nodeType !== XML_ELEMENT_NODE) {
+                continue;
+            }
+
+            $local = $child->localName;
+            // Skip properti paragraf, teks terhapus (track changes), fallback duplikat, dan nested paragraf (diproses tersendiri)
+            if (in_array($local, ['pPr', 'rPr', 'del', 'Fallback', 'p'], true)) {
+                continue;
+            }
+
+            if ($local === 't') {
+                $lines[count($lines) - 1] .= $child->textContent;
+            } elseif ($local === 'tab') {
+                $lines[count($lines) - 1] .= '  ';
+            } elseif ($local === 'br' || $local === 'cr') {
+                $lines[] = '';
+            } else {
+                $this->collectParagraphLines($child, $lines);
+            }
+        }
     }
 
     /**
@@ -139,9 +369,9 @@ class WordQuestionParserService
 
             // 2. Cek baris KUNCI JAWABAN / PEDOMAN
             if ($currentMode === 'pg') {
-                if (preg_match('/^(kunci\s*jawaban|kunci|jawaban|ans|key)\s*[:=\-]\s*([A-Ea-e])\b/i', $line, $km)) {
+                if (preg_match('/^(?:kunci\s*jawaban|jawaban\s*benar|kunci|jawaban|ans|key)\s*[:=\-]?\s*\(?([A-Ea-e])\)?(?:\b|\.)/i', $line, $km)) {
                     if ($currentSoal !== null) {
-                        $currentSoal['kunci'] = strtoupper($km[2]);
+                        $currentSoal['kunci'] = strtoupper($km[1]);
                     }
                     continue;
                 }
@@ -156,25 +386,27 @@ class WordQuestionParserService
                 }
             }
 
-            // 3. Cek baris nomor soal baru (misal: "1.", "1)", "1. ", "No. 1.")
-            if (preg_match('/^(?:no\.?\s*)?(\d+)[\.\)\:\-]\s*(.*)$/i', $line, $qm)) {
+            // 3. Cek baris nomor soal baru (misal: "1.", "1)", "No. 1.", "Soal 1.") — hindari angka desimal/ribuan seperti "3.5" atau "1.000"
+            if (preg_match('/^(?:(?:no|soal)\.?\s*)?(\d{1,3})([\.\)\:\-])(?:\s+(.*)|$|(?=\D)(.*))$/iu', $line, $qm)) {
                 $nomor = (int) $qm[1];
-                $teks = trim($qm[2]);
+                $teks = trim(($qm[3] ?? '') !== '' ? $qm[3] : ($qm[4] ?? ''));
 
-                $flushCurrent();
-                $inPedoman = false;
+                if ($nomor >= 1 && $nomor <= 200) {
+                    $flushCurrent();
+                    $inPedoman = false;
 
-                $currentSoal = [
-                    'tipe_soal'       => $currentMode,
-                    'nomor'           => $nomor,
-                    'pertanyaan'      => $teks,
-                    'opsi'            => [],
-                    'kunci'           => $currentMode === 'pg' ? 'A' : null,
-                    'skor_maks'       => null,
-                    'pedoman_jawaban' => null,
-                    'timer_detik'     => null,
-                ];
-                continue;
+                    $currentSoal = [
+                        'tipe_soal'       => $currentMode,
+                        'nomor'           => $nomor,
+                        'pertanyaan'      => $teks,
+                        'opsi'            => [],
+                        'kunci'           => $currentMode === 'pg' ? 'A' : null,
+                        'skor_maks'       => null,
+                        'pedoman_jawaban' => null,
+                        'timer_detik'     => null,
+                    ];
+                    continue;
+                }
             }
 
             // Jika belum ada nomor soal, lewati (kop soal / petunjuk awal)
@@ -234,6 +466,14 @@ class WordQuestionParserService
         ksort($soalsPg);
         ksort($soalsEssay);
 
+        // Normalisasi nomor PG menjadi 1..N agar selalu selaras dengan LJK dan kunci jawaban
+        $pgList = [];
+        $pgSeq = 1;
+        foreach ($soalsPg as $pg) {
+            $pg['nomor'] = $pgSeq++;
+            $pgList[] = $pg;
+        }
+
         // Normalisasi nomor essay menjadi 1..N agar selalu selaras dengan nomor Essay pada LJK
         $normalizedEssay = [];
         $essaySeq = 1;
@@ -241,8 +481,6 @@ class WordQuestionParserService
             $es['nomor'] = $essaySeq++;
             $normalizedEssay[] = $es;
         }
-
-        $pgList = array_values($soalsPg);
 
         return [
             'soals'            => $pgList,
@@ -325,12 +563,12 @@ class WordQuestionParserService
         return [
             'tipe_soal'       => $isEssay ? 'essay' : 'pg',
             'nomor'           => $s['nomor'],
-            'pertanyaan'      => trim($s['pertanyaan']),
-            'opsi_a'          => $isEssay ? null : ($s['opsi']['A'] ?? ''),
-            'opsi_b'          => $isEssay ? null : ($s['opsi']['B'] ?? ''),
-            'opsi_c'          => $isEssay ? null : ($s['opsi']['C'] ?? ''),
-            'opsi_d'          => $isEssay ? null : ($s['opsi']['D'] ?? ''),
-            'opsi_e'          => $isEssay ? null : ($s['opsi']['E'] ?? null),
+            'pertanyaan'      => trim((string) ($s['pertanyaan'] ?? '')),
+            'opsi_a'          => $isEssay ? null : trim((string) ($s['opsi']['A'] ?? '')),
+            'opsi_b'          => $isEssay ? null : trim((string) ($s['opsi']['B'] ?? '')),
+            'opsi_c'          => $isEssay ? null : trim((string) ($s['opsi']['C'] ?? '')),
+            'opsi_d'          => $isEssay ? null : trim((string) ($s['opsi']['D'] ?? '')),
+            'opsi_e'          => $isEssay ? null : (isset($s['opsi']['E']) ? trim((string) $s['opsi']['E']) : null),
             'kunci'           => $isEssay ? null : ($s['kunci'] ?? 'A'),
             'skor_maks'       => $s['skor_maks'] ?? null,
             'pedoman_jawaban' => $s['pedoman_jawaban'] ?? null,

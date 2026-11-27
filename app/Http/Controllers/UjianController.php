@@ -225,7 +225,7 @@ class UjianController extends Controller
             'timer_essay_default' => 'nullable|integer|min:15|max:3600',
             'tanggal_ujian'       => 'required|date',
             'status'              => 'required|in:draft,aktif,selesai',
-            'file_word'           => 'nullable|file|mimes:docx|max:10240',
+            'file_word'           => 'nullable|file|max:15360',
         ]);
 
         $jumlahPg = (int) $validated['jumlah_soal'];
@@ -426,18 +426,67 @@ class UjianController extends Controller
     }
 
     /**
+     * Validasi struktural berkas Word (.docx) yang tahan terhadap perbedaan MIME libmagic (application/zip vs docx).
+     */
+    protected function validateDocxFile($file): ?string
+    {
+        if (!$file || !$file->isValid()) {
+            $maxUpload = ini_get('upload_max_filesize') ?: '2M';
+            return "Berkas gagal diunggah ke server. Pastikan ukuran file Word tidak melebihi batas upload server ({$maxUpload}).";
+        }
+
+        $ext = strtolower((string) $file->getClientOriginalExtension());
+        if ($ext === 'doc') {
+            return 'Format .doc (Word 97-2003) belum didukung. Buka file di Microsoft Word lalu pilih Save As menjadi Word Document (.docx).';
+        }
+        if ($ext !== 'docx') {
+            return 'Format file harus Word (.docx).';
+        }
+
+        $zip = new \ZipArchive();
+        if ($zip->open($file->getRealPath()) !== true) {
+            return 'File .docx tidak dapat dibuka. Pastikan berkas tidak rusak dan bukan hasil ganti ekstensi manual.';
+        }
+
+        $hasDocXml = $zip->locateName('word/document.xml') !== false;
+        $zip->close();
+
+        if (!$hasDocXml) {
+            return 'Struktur berkas Word (.docx) tidak valid (word/document.xml tidak ditemukan).';
+        }
+
+        return null;
+    }
+
+    /**
      * Unggah naskah soal Word (.docx) dan ekstrak butir soal PG & Essay otomatis
      */
     public function uploadWordSoal(Request $request, Ujian $ujian)
     {
         $this->ensureUjianInRoom($ujian);
+
+        // Tangani lebih dulu jika file melebihi batas upload PHP server (upload_max_filesize / post_max_size)
+        $rawError = $_FILES['file_word']['error'] ?? UPLOAD_ERR_OK;
+        if (in_array($rawError, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            $maxUpload = ini_get('upload_max_filesize') ?: '2M';
+            return redirect()->back()->with('error', "Ukuran file Word melebihi batas upload server ({$maxUpload}). Silakan perkecil ukuran gambar di dalam file Word lalu unggah ulang.");
+        }
+
         $request->validate([
-            'file_word'      => 'required|file|mimes:docx|max:15360', // max 15MB
+            'file_word'      => 'required|file|max:15360', // max 15MB, validasi struktural .docx di bawah
             'timer_per_soal' => 'nullable|integer|min:10|max:1800',
             'timer_essay'    => 'nullable|integer|min:15|max:3600',
+        ], [
+            'file_word.required' => 'Silakan pilih file Word (.docx) terlebih dahulu.',
+            'file_word.uploaded' => 'Berkas gagal diunggah ke server. Pastikan ukuran file tidak melebihi batas upload server (' . (ini_get('upload_max_filesize') ?: '2M') . ').',
+            'file_word.max'      => 'Ukuran berkas Word maksimal 15 MB.',
         ]);
 
         $file = $request->file('file_word');
+        if ($docxError = $this->validateDocxFile($file)) {
+            return redirect()->back()->with('error', $docxError);
+        }
+
         $timerPg = (int) ($request->input('timer_per_soal') ?: ($ujian->timer_default ?: 90));
         $timerEssay = (int) ($request->input('timer_essay') ?: ($ujian->timer_essay_default ?: 180));
 
@@ -454,6 +503,7 @@ class UjianController extends Controller
 
             return redirect()->back()->with('success', "Naskah soal Word berhasil diproses! {$summary} terbaca dan kunci jawaban telah disinkronkan.");
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Gagal upload/parse soal Word ujian #' . $ujian->id . ': ' . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal memproses file Word: ' . $e->getMessage());
         }
     }
@@ -468,6 +518,25 @@ class UjianController extends Controller
 
         $soalsPg = $parsed['soals_pg'] ?? $parsed['soals'] ?? [];
         $soalsEssay = $parsed['soals_essay'] ?? [];
+
+        // Jika ujian khusus Essay (0 PG) dan guru menulis nomor 1, 2, 3 tanpa pemisah [ESSAY] serta tanpa opsi A-D, konversi otomatis ke Essay
+        if (empty($soalsEssay) && !empty($soalsPg) && !$ujian->hasPg() && $ujian->hasEssay()) {
+            $allWithoutOptions = collect($soalsPg)->every(fn ($s) => empty($s['opsi_a']) && empty($s['opsi_b']) && empty($s['opsi_c']) && empty($s['opsi_d']));
+            if ($allWithoutOptions) {
+                $soalsEssay = array_map(function ($s) {
+                    $s['tipe_soal'] = 'essay';
+                    $s['kunci'] = null;
+                    return $s;
+                }, $soalsPg);
+                $soalsPg = [];
+                $parsed['soals'] = [];
+                $parsed['soals_pg'] = [];
+                $parsed['soals_essay'] = $soalsEssay;
+                $parsed['total_soal'] = 0;
+                $parsed['total_soal_pg'] = 0;
+                $parsed['total_soal_essay'] = count($soalsEssay);
+            }
+        }
 
         if (empty($soalsPg) && empty($soalsEssay)) {
             throw new \Exception("Tidak ada butir soal yang berhasil terdeteksi dalam file Word. Pastikan format penomoran sesuai template (misal: 1. Pertanyaan, A. Pilihan, B. Pilihan... atau bagian [ESSAY]).");

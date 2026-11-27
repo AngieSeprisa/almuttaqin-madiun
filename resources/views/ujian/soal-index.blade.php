@@ -50,6 +50,21 @@
     </div>
     @endif
 
+    @if($errors->any())
+    <div class="alert-banner alert-danger" style="display:flex; align-items:flex-start; gap:10px; padding:12px 18px; border-radius:12px; background:#fef2f2; border:1px solid #fecaca; color:#991b1b;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex-shrink:0; margin-top:2px;">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <div style="font-weight:600; font-size:13.5px;">
+            @foreach($errors->all() as $err)
+                <div>{{ $err }}</div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     {{-- Filter & Search Bar Card (Standard Menu Card) --}}
     <div class="form-section-card filter-card">
         <form action="{{ route('ujian.soal') }}" method="GET" class="filter-form">
@@ -218,7 +233,15 @@
                         <td style="text-align:center;">
                             <div class="action-btn-group">
                                 {{-- Tombol Upload Word --}}
-                                <button type="button" class="action-btn action-btn-success" onclick="openUploadModal({{ $ujian->id }}, '{{ addslashes($ujian->nama_ujian) }}', {{ $ujian->timer_default }}, {{ $ujian->timer_essay_default ?? 180 }})" title="Upload Naskah Word" aria-label="Upload Word {{ $ujian->nama_ujian }}">
+                                <button type="button"
+                                        class="action-btn action-btn-success"
+                                        data-upload-url="{{ route('ujian.upload-word', $ujian->id) }}"
+                                        data-nama="{{ $ujian->nama_ujian }}"
+                                        data-timer-pg="{{ $ujian->timer_default ?? 90 }}"
+                                        data-timer-essay="{{ $ujian->timer_essay_default ?? 180 }}"
+                                        onclick="openUploadModal(this)"
+                                        title="Upload Naskah Word"
+                                        aria-label="Upload Word {{ $ujian->nama_ujian }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                         <polyline points="17 8 12 3 7 8"></polyline>
@@ -238,7 +261,15 @@
                                 @endif
 
                                 {{-- Tombol Timer --}}
-                                <button type="button" class="action-btn action-btn-edit" onclick="openTimerModal({{ $ujian->id }}, '{{ addslashes($ujian->nama_ujian) }}', {{ $ujian->timer_default }}, {{ $ujian->timer_essay_default ?? 180 }})" title="Atur Timer Soal" aria-label="Atur Timer {{ $ujian->nama_ujian }}">
+                                <button type="button"
+                                        class="action-btn action-btn-edit"
+                                        data-timer-url="{{ route('ujian.update-timer', $ujian->id) }}"
+                                        data-nama="{{ $ujian->nama_ujian }}"
+                                        data-timer-pg="{{ $ujian->timer_default ?? 90 }}"
+                                        data-timer-essay="{{ $ujian->timer_essay_default ?? 180 }}"
+                                        onclick="openTimerModal(this)"
+                                        title="Atur Timer Soal"
+                                        aria-label="Atur Timer {{ $ujian->nama_ujian }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <circle cx="12" cy="12" r="10"></circle>
                                         <polyline points="12 6 12 12 16 14"></polyline>
@@ -302,7 +333,7 @@
             <div style="padding:20px 22px;">
                 <div style="margin-bottom:14px;">
                     <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:#1e293b;">Pilih Berkas Word (.docx)</label>
-                    <input type="file" name="file_word" accept=".docx" required style="width:100%; font-size:13px; padding:8px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
+                    <input type="file" name="file_word" id="uploadWordFileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required style="width:100%; font-size:13px; padding:8px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
                     <span style="font-size:11.5px; color:#64748b; margin-top:4px; display:block;">
                         Format .docx. Mendukung soal PG (opsi A-E &amp; Kunci:) serta bagian <code>[ESSAY]</code> untuk soal uraian.
                     </span>
@@ -320,7 +351,7 @@
             </div>
             <div style="padding:14px 22px; border-top:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:flex-end; gap:8px;">
                 <button type="button" class="btn btn-secondary" onclick="closeUploadModal()" style="padding:7px 14px; font-size:13px; border-radius:8px;">Batal</button>
-                <button type="submit" class="btn btn-primary" style="padding:7px 16px; font-size:13px; border-radius:8px;">Mulai Proses Ekstraksi</button>
+                <button type="submit" id="btnSubmitUploadWord" class="btn btn-primary" style="padding:7px 16px; font-size:13px; border-radius:8px;">Mulai Proses Ekstraksi</button>
             </div>
         </form>
     </div>
@@ -357,22 +388,49 @@
 </div>
 
 <script>
-    function openUploadModal(ujianId, namaUjian, timerDefault, timerEssayDefault) {
-        document.getElementById('uploadModalTitle').textContent = 'Upload Soal: ' + namaUjian;
-        document.getElementById('uploadTimerInput').value = timerDefault || 90;
-        document.getElementById('uploadTimerEssayInput').value = timerEssayDefault || 180;
-        document.getElementById('formUploadDocx').action = '/ujian/' + ujianId + '/upload-word';
+    function openUploadModal(btn) {
+        var nama = btn.getAttribute('data-nama') || '';
+        var timerPg = btn.getAttribute('data-timer-pg') || 90;
+        var timerEssay = btn.getAttribute('data-timer-essay') || 180;
+        var uploadUrl = btn.getAttribute('data-upload-url') || '';
+
+        document.getElementById('uploadModalTitle').textContent = 'Upload Soal: ' + nama;
+        document.getElementById('uploadTimerInput').value = timerPg;
+        document.getElementById('uploadTimerEssayInput').value = timerEssay;
+        document.getElementById('uploadWordFileInput').value = '';
+        document.getElementById('formUploadDocx').action = uploadUrl;
+        var submitBtn = document.getElementById('btnSubmitUploadWord');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Mulai Proses Ekstraksi';
+        }
         document.getElementById('uploadModal').style.display = 'flex';
     }
     function closeUploadModal() {
         document.getElementById('uploadModal').style.display = 'none';
     }
 
-    function openTimerModal(ujianId, namaUjian, timerDefault, timerEssayDefault) {
-        document.getElementById('timerModalTitle').textContent = 'Atur Timer: ' + namaUjian;
-        document.getElementById('timerDefaultInput').value = timerDefault || 90;
-        document.getElementById('timerEssayDefaultInput').value = timerEssayDefault || 180;
-        document.getElementById('formTimer').action = '/ujian/' + ujianId + '/timer';
+    var formUploadDocx = document.getElementById('formUploadDocx');
+    if (formUploadDocx) {
+        formUploadDocx.addEventListener('submit', function () {
+            var submitBtn = document.getElementById('btnSubmitUploadWord');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Memproses...';
+            }
+        });
+    }
+
+    function openTimerModal(btn) {
+        var nama = btn.getAttribute('data-nama') || '';
+        var timerPg = btn.getAttribute('data-timer-pg') || 90;
+        var timerEssay = btn.getAttribute('data-timer-essay') || 180;
+        var timerUrl = btn.getAttribute('data-timer-url') || '';
+
+        document.getElementById('timerModalTitle').textContent = 'Atur Timer: ' + nama;
+        document.getElementById('timerDefaultInput').value = timerPg;
+        document.getElementById('timerEssayDefaultInput').value = timerEssay;
+        document.getElementById('formTimer').action = timerUrl;
         document.getElementById('timerModal').style.display = 'flex';
     }
     function closeTimerModal() {

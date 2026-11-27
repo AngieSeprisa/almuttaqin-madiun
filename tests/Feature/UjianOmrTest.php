@@ -1163,4 +1163,117 @@ class UjianOmrTest extends TestCase
         $exportRes = $this->actingAs($this->admin)->get(route('ujian.export-excel', $ujian->id));
         $exportRes->assertStatus(200);
     }
+
+    public function test_upload_word_mime_zip_dan_autonumbering_word_serta_shift_enter(): void
+    {
+        $ujian = Ujian::create([
+            'kode_ujian'    => 'UJN-WORD-REAL',
+            'nama_ujian'    => 'PAS "Ganjil" Bahasa Indonesia',
+            'mapel_id'      => $this->mapel->id,
+            'kelas_id'      => $this->kelas->id,
+            'guru_id'       => $this->admin->id,
+            'jumlah_soal'   => 2,
+            'jumlah_opsi'   => 4,
+            'bobot_benar'   => 1,
+            'tanggal_ujian' => now()->toDateString(),
+            'status'        => 'aktif',
+        ]);
+
+        // Bangun .docx realistis ala Microsoft Word:
+        // - Memiliki word/numbering.xml (auto-numbering 1, 2 & auto-lettering A, B, C, D tanpa teks "1."/"A." di <w:t>)
+        // - Memiliki self-closing <w:p/> dan <w:br/> (Shift+Enter)
+        // - Memiliki angka desimal "3.5" dan "1.500" di dalam soal agar tidak terpotong menjadi nomor soal palsu
+        // - Memiliki bagian [ESSAY] dengan auto-numbering
+        $tmpDocx = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'word_autonum_' . uniqid() . '.docx';
+        $zip = new \ZipArchive();
+        $zip->open($tmpDocx, \ZipArchive::CREATE | \ZipArchive::OVERWRITE);
+        $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+    <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+</Types>');
+        $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>');
+        $zip->addFromString('word/numbering.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:abstractNum w:abstractNumId="1">
+        <w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/></w:lvl>
+        <w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="upperLetter"/></w:lvl>
+    </w:abstractNum>
+    <w:num w:numId="1"><w:abstractNumId w:val="1"/></w:num>
+</w:numbering>');
+        $zip->addFromString('word/document.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        <w:p/>
+        <w:p>
+            <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+            <w:r><w:t>Harga sebuah buku adalah Rp 1.500 dan pensil 3.5 kali lipatnya.</w:t><w:br/><w:t>Berapakah nilai yang benar?</w:t></w:r>
+        </w:p>
+        <w:p><w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Pilihan Pertama</w:t></w:r></w:p>
+        <w:p><w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Pilihan Kedua</w:t></w:r></w:p>
+        <w:p><w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Pilihan Ketiga</w:t></w:r></w:p>
+        <w:p><w:pPr><w:numPr><w:ilvl w:val="1"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Pilihan Keempat</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Kunci: B</w:t></w:r></w:p>
+        <w:p/>
+        <w:p>
+            <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+            <w:r><w:t>Ibukota Provinsi Jawa Timur adalah...</w:t><w:br/><w:t>A. Bandung</w:t><w:br/><w:t>B. Surabaya</w:t><w:br/><w:t>C. Medan</w:t><w:br/><w:t>D. Semarang</w:t><w:br/><w:t>Kunci Jawaban: B</w:t></w:r>
+        </w:p>
+        <w:p><w:r><w:t>[ESSAY]</w:t></w:r></w:p>
+        <w:p>
+            <w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>
+            <w:r><w:t>Jelaskan manfaat membaca buku setiap hari!</w:t></w:r>
+        </w:p>
+    </w:body>
+</w:document>');
+        $zip->close();
+
+        // Simulasikan MIME type application/zip (sering terjadi di server Linux libmagic)
+        $uploadedZipMime = new \Illuminate\Http\UploadedFile(
+            $tmpDocx,
+            'soal_real_word.docx',
+            'application/zip',
+            null,
+            true
+        );
+
+        $res = $this->actingAs($this->admin)->post(route('ujian.upload-word', $ujian->id), [
+            'file_word'      => $uploadedZipMime,
+            'timer_per_soal' => 90,
+            'timer_essay'    => 180,
+        ]);
+        @unlink($tmpDocx);
+
+        $res->assertRedirect();
+        $res->assertSessionHas('success');
+
+        $ujian->refresh();
+        $this->assertSame(2, $ujian->jumlah_soal);
+        $this->assertSame(1, $ujian->jumlah_soal_essay);
+
+        $pg = $ujian->soalsPg()->get();
+        $this->assertCount(2, $pg);
+        $this->assertSame('Pilihan Pertama', $pg[0]->opsi_a);
+        $this->assertSame('Pilihan Kedua', $pg[0]->opsi_b);
+        $this->assertSame('B', $pg[0]->kunci_jawaban);
+        $this->assertSame('Surabaya', $pg[1]->opsi_b);
+        $this->assertSame('B', $pg[1]->kunci_jawaban);
+
+        $essay = $ujian->soalsEssay()->get();
+        $this->assertCount(1, $essay);
+        $this->assertStringContainsString('manfaat membaca buku', $essay[0]->pertanyaan);
+
+        // Pastikan file .doc (format lama) menghasilkan pesan error informatif di session('error')
+        $fakeDoc = \Illuminate\Http\UploadedFile::fake()->create('soal_lama.doc', 20, 'application/msword');
+        $docRes = $this->actingAs($this->admin)->post(route('ujian.upload-word', $ujian->id), [
+            'file_word' => $fakeDoc,
+        ]);
+        $docRes->assertRedirect();
+        $docRes->assertSessionHas('error');
+    }
 }
