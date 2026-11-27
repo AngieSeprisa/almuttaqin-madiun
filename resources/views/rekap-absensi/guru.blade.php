@@ -4,19 +4,79 @@
 
 @section('header-actions')
 @php
-    $headerExportParams = array_merge(request()->all(), [
-        'tanggal' => $tanggal ?? \Carbon\Carbon::today()->toDateString(),
+    $activeRefDate = !empty($tanggal) ? \Carbon\Carbon::parse($tanggal) : \Carbon\Carbon::today();
+    $defaultWeekVal = $activeRefDate->format('o-\WW');
+    $defaultMonthVal = $activeRefDate->format('Y-m');
+    $headerBaseParams = [];
+    if (request()->exists('lembaga_id')) {
+        $headerBaseParams['lembaga_id'] = request()->get('lembaga_id') === '' ? 'all' : request()->get('lembaga_id');
+    } elseif (!empty($lembagaId)) {
+        $headerBaseParams['lembaga_id'] = $lembagaId;
+    }
+    if (!empty($status)) {
+        $headerBaseParams['status'] = $status;
+    }
+    if (!empty($search)) {
+        $headerBaseParams['search'] = $search;
+    }
+    $headerExportParams = array_merge($headerBaseParams, [
+        'periode' => 'harian',
+        'tanggal' => $activeRefDate->toDateString(),
     ]);
 @endphp
 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <a href="{{ route('rekap-absensi.export', $headerExportParams) }}" class="btn btn-secondary btn-header-action" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-        </svg>
-        <span>Ekspor Excel</span>
-    </a>
+    <div class="guru-export-dropdown" id="guruExportDropdown">
+        <button type="button"
+                id="btnToggleGuruExport"
+                class="btn btn-secondary btn-header-action"
+                aria-expanded="false"
+                aria-controls="guruExportMenu"
+                style="display:inline-flex; align-items:center; gap:7px; cursor:pointer;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download Excel</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px; opacity:0.75;">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        </button>
+
+        <div class="guru-export-menu" id="guruExportMenu">
+            <form action="{{ route('rekap-absensi.export') }}" method="GET" class="guru-export-block">
+                <input type="hidden" name="periode" value="mingguan">
+                @foreach($headerBaseParams as $k => $v)
+                    <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                @endforeach
+                <label class="guru-export-label" for="exportWeekInput">Download Per Minggu</label>
+                <div class="guru-export-row">
+                    <input type="week" id="exportWeekInput" name="minggu" value="{{ $defaultWeekVal }}" class="guru-export-input" required>
+                    <button type="submit" class="btn btn-primary guru-export-submit">Unduh</button>
+                </div>
+            </form>
+
+            <div class="guru-export-divider"></div>
+
+            <form action="{{ route('rekap-absensi.export') }}" method="GET" class="guru-export-block">
+                <input type="hidden" name="periode" value="bulanan">
+                @foreach($headerBaseParams as $k => $v)
+                    <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                @endforeach
+                <label class="guru-export-label" for="exportMonthInput">Download Per Bulan</label>
+                <div class="guru-export-row">
+                    <input type="month" id="exportMonthInput" name="bulan_tahun" value="{{ $defaultMonthVal }}" class="guru-export-input" required>
+                    <button type="submit" class="btn btn-primary guru-export-submit">Unduh</button>
+                </div>
+            </form>
+
+            <div class="guru-export-divider"></div>
+
+            <a href="{{ route('rekap-absensi.export', $headerExportParams) }}" class="guru-export-quick-link">
+                <span>Download Harian ({{ $activeRefDate->copy()->locale('id')->translatedFormat('d M Y') }})</span>
+            </a>
+        </div>
+    </div>
 
     <a href="{{ route('rekap-absensi.cetak', $headerExportParams) }}" target="_blank" class="btn btn-primary btn-header-action" style="display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
@@ -35,6 +95,107 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
+    }
+
+    /* Dropdown Download Excel (Per Minggu & Per Bulan) */
+    .guru-export-dropdown {
+        position: relative;
+        display: inline-flex;
+    }
+    .guru-export-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        width: 300px;
+        max-width: calc(100vw - 24px);
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+        padding: 12px;
+        z-index: 1200;
+    }
+    .guru-export-menu.is-open {
+        display: block;
+    }
+    .dark-mode .guru-export-menu {
+        background: #1e293b;
+        border-color: #334155;
+        box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+    }
+    .guru-export-block {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin: 0;
+    }
+    .guru-export-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #334155;
+    }
+    .dark-mode .guru-export-label {
+        color: #e2e8f0;
+    }
+    .guru-export-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .guru-export-input {
+        flex: 1;
+        min-width: 0;
+        padding: 7px 9px;
+        font-size: 12.5px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: #0f172a;
+    }
+    .dark-mode .guru-export-input {
+        background: #0f172a;
+        border-color: #334155;
+        color: #f8fafc;
+    }
+    .guru-export-submit {
+        padding: 7px 12px !important;
+        font-size: 12.5px !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        flex-shrink: 0;
+    }
+    .guru-export-divider {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 10px 0;
+    }
+    .dark-mode .guru-export-divider {
+        background: #334155;
+    }
+    .guru-export-quick-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7px 10px;
+        border-radius: 8px;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #475569;
+        text-decoration: none;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        transition: background 0.15s ease;
+    }
+    .guru-export-quick-link:hover {
+        background: #eff6ff;
+        color: #0052FF;
+        border-color: #bfdbfe;
+    }
+    .dark-mode .guru-export-quick-link {
+        background: #0f172a;
+        border-color: #334155;
+        color: #cbd5e1;
     }
 
     /* 3 Kartu Header Presensi (Jam & Tanggal + Jam Masuk + Jam Pulang) */
@@ -807,8 +968,30 @@
         ? substr($presensiSaya->jam_pulang, 0, 5)
         : '--:--';
 
-    $exportParams = array_merge(request()->all(), [
-        'tanggal' => $tanggal ?? $todayDateStr,
+    $activeCarbon = !empty($tanggal) ? \Carbon\Carbon::parse($tanggal) : \Carbon\Carbon::today();
+    $sheetBaseParams = [];
+    if (request()->exists('lembaga_id')) {
+        $sheetBaseParams['lembaga_id'] = request()->get('lembaga_id') === '' ? 'all' : request()->get('lembaga_id');
+    } elseif (!empty($lembagaId)) {
+        $sheetBaseParams['lembaga_id'] = $lembagaId;
+    }
+    if (!empty($status)) {
+        $sheetBaseParams['status'] = $status;
+    }
+    if (!empty($search)) {
+        $sheetBaseParams['search'] = $search;
+    }
+    $exportParams = array_merge($sheetBaseParams, [
+        'periode' => 'harian',
+        'tanggal' => $activeCarbon->toDateString(),
+    ]);
+    $exportWeeklyParams = array_merge($sheetBaseParams, [
+        'periode' => 'mingguan',
+        'minggu'  => $activeCarbon->format('o-\WW'),
+    ]);
+    $exportMonthlyParams = array_merge($sheetBaseParams, [
+        'periode'     => 'bulanan',
+        'bulan_tahun' => $activeCarbon->format('Y-m'),
     ]);
 
     $hasActiveFilter = !empty($search)
@@ -1313,8 +1496,8 @@
             </div>
         </a>
 
-        {{-- Opsi 3: Ekspor Excel / CSV --}}
-        <a href="{{ route('rekap-absensi.export', $exportParams) }}" class="sheet-action-item" title="Ekspor Excel">
+        {{-- Opsi 3: Download Excel Per Minggu --}}
+        <a href="{{ route('rekap-absensi.export', $exportWeeklyParams) }}" class="sheet-action-item" title="Download Per Minggu">
             <div class="sheet-action-icon icon-view">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -1323,7 +1506,21 @@
                 </svg>
             </div>
             <div class="sheet-action-text">
-                <span class="sheet-action-title">Ekspor Excel</span>
+                <span class="sheet-action-title">Download Per Minggu</span>
+            </div>
+        </a>
+
+        {{-- Opsi 4: Download Excel Per Bulan --}}
+        <a href="{{ route('rekap-absensi.export', $exportMonthlyParams) }}" class="sheet-action-item" title="Download Per Bulan">
+            <div class="sheet-action-icon icon-view">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+            </div>
+            <div class="sheet-action-text">
+                <span class="sheet-action-title">Download Per Bulan</span>
             </div>
         </a>
     </div>
@@ -1409,6 +1606,31 @@ document.addEventListener('DOMContentLoaded', function () {
         };
         updateLiveClock();
         setInterval(updateLiveClock, 1000);
+    }
+
+    // Dropdown Download Excel (Per Minggu & Per Bulan)
+    var exportDropdown = document.getElementById('guruExportDropdown');
+    var exportToggleBtn = document.getElementById('btnToggleGuruExport');
+    var exportMenu = document.getElementById('guruExportMenu');
+    if (exportToggleBtn && exportMenu) {
+        exportToggleBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var willOpen = !exportMenu.classList.contains('is-open');
+            exportMenu.classList.toggle('is-open', willOpen);
+            exportToggleBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+        document.addEventListener('click', function (e) {
+            if (exportDropdown && !exportDropdown.contains(e.target)) {
+                exportMenu.classList.remove('is-open');
+                exportToggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && exportMenu.classList.contains('is-open')) {
+                exportMenu.classList.remove('is-open');
+                exportToggleBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
     }
 
     var modal = document.getElementById('modalKoreksi');

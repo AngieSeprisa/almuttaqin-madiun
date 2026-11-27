@@ -568,4 +568,124 @@ class RekapGuruTest extends TestCase
         $response->assertSee('06:28');
         $response->assertSee('15:42');
     }
+
+    public function test_download_rekap_absensi_guru_per_minggu_dan_per_bulan(): void
+    {
+        $guruSmp = User::factory()->create([
+            'name'               => 'Ustadz Hasan',
+            'nip'                => '19900101001',
+            'primary_lembaga_id' => $this->lembaga->id,
+        ]);
+        $guruSma = User::factory()->create([
+            'name'               => 'Ustadz Lain SMA',
+            'nip'                => '19900101002',
+            'primary_lembaga_id' => $this->sma->id,
+        ]);
+
+        // Minggu 2026-W48 = Senin 23 Nov 2026 s.d. Minggu 29 Nov 2026
+        // 1) Di dalam minggu W48 (Senin & Rabu)
+        PresensiGuru::create([
+            'user_id'    => $guruSmp->id,
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => '2026-11-23',
+            'jam_masuk'  => '07:00:00',
+            'jam_pulang' => '15:00:00',
+            'status'     => 'hadir',
+        ]);
+        PresensiGuru::create([
+            'user_id'    => $guruSmp->id,
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => '2026-11-25',
+            'jam_masuk'  => '07:40:00',
+            'status'     => 'terlambat',
+        ]);
+        // 2) Di luar minggu W48, masih di bulan November 2026
+        PresensiGuru::create([
+            'user_id'    => $guruSmp->id,
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => '2026-11-10',
+            'jam_masuk'  => '07:05:00',
+            'status'     => 'izin',
+        ]);
+        // 3) Di bulan lain (Oktober 2026)
+        PresensiGuru::create([
+            'user_id'    => $guruSmp->id,
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => '2026-10-15',
+            'jam_masuk'  => '07:00:00',
+            'status'     => 'hadir',
+        ]);
+        // 4) Guru SMA di minggu W48 (tidak boleh masuk saat filter SMP)
+        PresensiGuru::create([
+            'user_id'    => $guruSma->id,
+            'lembaga_id' => $this->sma->id,
+            'tanggal'    => '2026-11-24',
+            'jam_masuk'  => '07:00:00',
+            'status'     => 'hadir',
+        ]);
+
+        // Cek halaman menampilkan kontrol download mingguan dan bulanan
+        $pageRes = $this->actingAs($this->admin)->get(route('rekap-absensi.guru', [
+            'lembaga_id' => $this->lembaga->id,
+            'tanggal'    => '2026-11-25',
+        ]));
+        $pageRes->assertStatus(200);
+        $pageRes->assertSee('Download Per Minggu');
+        $pageRes->assertSee('Download Per Bulan');
+
+        // 1. Uji Download Per Minggu (2026-W48 => 23-29 Nov 2026) hanya memuat 2 record SMP (bukan 10 Nov / Okt / SMA)
+        $weeklyRes = $this->actingAs($this->admin)->get(route('rekap-absensi.export', [
+            'lembaga_id' => $this->lembaga->id,
+            'periode'    => 'mingguan',
+            'minggu'     => '2026-W48',
+        ]));
+        $weeklyRes->assertStatus(200);
+        $this->assertStringContainsString('rekap_absensi_guru_mingguan_20261123_20261129.xlsx', (string) $weeklyRes->headers->get('content-disposition'));
+
+        $weeklyTmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test_weekly_' . uniqid() . '.xlsx';
+        file_put_contents($weeklyTmp, $weeklyRes->streamedContent());
+        $weeklyBook = \PhpOffice\PhpSpreadsheet\IOFactory::load($weeklyTmp);
+        @unlink($weeklyTmp);
+
+        $this->assertSame(['Ringkasan Per Guru', 'Detail Harian'], $weeklyBook->getSheetNames());
+        $weeklySummary = $weeklyBook->getSheetByName('Ringkasan Per Guru')->toArray();
+        // Baris 6 (index 5): Ustadz Hasan -> Hadir 1, Terlambat 1, Izin 0, Total 2
+        $this->assertSame('Ustadz Hasan', $weeklySummary[5][2]);
+        $this->assertEquals(1, $weeklySummary[5][4]); // Tepat Waktu
+        $this->assertEquals(1, $weeklySummary[5][5]); // Terlambat
+        $this->assertEquals(2, $weeklySummary[5][9]); // Total Hari
+
+        $weeklyDetail = $weeklyBook->getSheetByName('Detail Harian')->toArray();
+        // Header di baris 5 (index 4), hanya 2 baris data (index 5 & 6)
+        $this->assertCount(7, $weeklyDetail);
+        $this->assertSame('23/11/2026', $weeklyDetail[5][1]);
+        $this->assertSame('25/11/2026', $weeklyDetail[6][1]);
+
+        // 2. Uji Download Per Bulan (2026-11) memuat 3 record November SMP (10 Nov, 23 Nov, 25 Nov), bukan Okt / SMA
+        $monthlyRes = $this->actingAs($this->admin)->get(route('rekap-absensi.export', [
+            'lembaga_id'  => $this->lembaga->id,
+            'periode'     => 'bulanan',
+            'bulan_tahun' => '2026-11',
+        ]));
+        $monthlyRes->assertStatus(200);
+        $this->assertStringContainsString('rekap_absensi_guru_bulanan_2026_11.xlsx', (string) $monthlyRes->headers->get('content-disposition'));
+
+        $monthlyTmp = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'test_monthly_' . uniqid() . '.xlsx';
+        file_put_contents($monthlyTmp, $monthlyRes->streamedContent());
+        $monthlyBook = \PhpOffice\PhpSpreadsheet\IOFactory::load($monthlyTmp);
+        @unlink($monthlyTmp);
+
+        $monthlySummary = $monthlyBook->getSheetByName('Ringkasan Per Guru')->toArray();
+        $this->assertSame('Ustadz Hasan', $monthlySummary[5][2]);
+        $this->assertEquals(1, $monthlySummary[5][4]); // Hadir
+        $this->assertEquals(1, $monthlySummary[5][5]); // Terlambat
+        $this->assertEquals(1, $monthlySummary[5][6]); // Izin
+        $this->assertEquals(3, $monthlySummary[5][9]); // Total Hari
+
+        $monthlyDetail = $monthlyBook->getSheetByName('Detail Harian')->toArray();
+        $this->assertCount(8, $monthlyDetail); // 5 baris header + 3 baris data November
+        $this->assertSame('10/11/2026', $monthlyDetail[5][1]);
+        $this->assertSame('23/11/2026', $monthlyDetail[6][1]);
+        $this->assertSame('25/11/2026', $monthlyDetail[7][1]);
+    }
 }

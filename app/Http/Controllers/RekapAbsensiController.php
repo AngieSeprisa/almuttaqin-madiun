@@ -9,6 +9,12 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class RekapAbsensiController extends Controller
 {
@@ -171,7 +177,100 @@ class RekapAbsensiController extends Controller
     }
 
     /**
-     * Ekspor Rekap Absensi Guru ke CSV/Excel.
+     * Resolusi periode ekspor/cetak (harian, mingguan, atau bulanan) menjadi rentang tanggal & label.
+     *
+     * @return array{periode:string, start:Carbon, end:Carbon, label:string, file_suffix:string, bulan:int, tahun:int}
+     */
+    protected function resolvePeriodRange(Request $request): array
+    {
+        $periode = strtolower(trim((string) $request->get('periode', '')));
+        $tanggalParam = $request->get('tanggal');
+        $refDate = !empty($tanggalParam)
+            ? Carbon::parse($tanggalParam)
+            : Carbon::today();
+
+        if (!in_array($periode, ['harian', 'mingguan', 'bulanan'], true)) {
+            $periode = !empty($tanggalParam) ? 'harian' : 'bulanan';
+        }
+
+        if ($periode === 'mingguan') {
+            $mingguParam = trim((string) $request->get('minggu', ''));
+            $startParam = trim((string) $request->get('tanggal_mulai', ''));
+            $endParam = trim((string) $request->get('tanggal_selesai', ''));
+
+            if ($mingguParam !== '' && preg_match('/^(\d{4})-W(\d{2})$/i', $mingguParam, $m)) {
+                $start = Carbon::now()->setISODate((int) $m[1], (int) $m[2], 1)->startOfDay();
+                $end = $start->copy()->addDays(6)->endOfDay();
+            } elseif ($startParam !== '' && $endParam !== '') {
+                $start = Carbon::parse($startParam)->startOfDay();
+                $end = Carbon::parse($endParam)->endOfDay();
+                if ($end->lt($start)) {
+                    [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];
+                }
+            } else {
+                $start = $refDate->copy()->startOfWeek(Carbon::MONDAY)->startOfDay();
+                $end = $refDate->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay();
+            }
+
+            $label = 'Mingguan (' . $start->copy()->locale('id')->translatedFormat('d M Y') . ' - ' . $end->copy()->locale('id')->translatedFormat('d M Y') . ')';
+            $suffix = 'mingguan_' . $start->format('Ymd') . '_' . $end->format('Ymd');
+
+            return [
+                'periode'     => 'mingguan',
+                'start'       => $start,
+                'end'         => $end,
+                'label'       => $label,
+                'file_suffix' => $suffix,
+                'bulan'       => (int) $start->month,
+                'tahun'       => (int) $start->year,
+            ];
+        }
+
+        if ($periode === 'bulanan') {
+            $bulanTahunParam = trim((string) $request->get('bulan_tahun', ''));
+            if ($bulanTahunParam !== '' && preg_match('/^(\d{4})-(\d{2})$/', $bulanTahunParam, $m)) {
+                $tahun = (int) $m[1];
+                $bulan = max(1, min(12, (int) $m[2]));
+            } else {
+                $tahun = (int) $request->get('tahun', $refDate->year);
+                $bulan = max(1, min(12, (int) $request->get('bulan', $refDate->month)));
+            }
+
+            $start = Carbon::create($tahun, $bulan, 1)->startOfDay();
+            $end = $start->copy()->endOfMonth()->endOfDay();
+            $label = 'Bulanan (' . $start->copy()->locale('id')->translatedFormat('F Y') . ')';
+            $suffix = 'bulanan_' . $tahun . '_' . str_pad((string) $bulan, 2, '0', STR_PAD_LEFT);
+
+            return [
+                'periode'     => 'bulanan',
+                'start'       => $start,
+                'end'         => $end,
+                'label'       => $label,
+                'file_suffix' => $suffix,
+                'bulan'       => $bulan,
+                'tahun'       => $tahun,
+            ];
+        }
+
+        // Harian
+        $start = $refDate->copy()->startOfDay();
+        $end = $refDate->copy()->endOfDay();
+        $label = 'Harian (' . $start->copy()->locale('id')->translatedFormat('d F Y') . ')';
+        $suffix = 'harian_' . $start->format('Ymd');
+
+        return [
+            'periode'     => 'harian',
+            'start'       => $start,
+            'end'         => $end,
+            'label'       => $label,
+            'file_suffix' => $suffix,
+            'bulan'       => (int) $start->month,
+            'tahun'       => (int) $start->year,
+        ];
+    }
+
+    /**
+     * Ekspor Rekap Absensi Guru ke Excel (.xlsx) mendukung periode Harian, Mingguan, dan Bulanan.
      */
     public function export(Request $request)
     {
@@ -179,53 +278,183 @@ class RekapAbsensiController extends Controller
         $user = auth()->user();
         [$lembagas, $lembagaId, $defaultLembagaId, $allowedLembagaIds] = $this->resolveScopedLembagaFilter($user, $request);
 
-        $bulan = (int) $request->get('bulan', Carbon::now()->month);
-        $tahun = (int) $request->get('tahun', Carbon::now()->year);
-        $tanggal = $request->get('tanggal');
+        $period = $this->resolvePeriodRange($request);
+        $status = $request->get('status');
+        $search = $request->get('search');
 
-        $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
+        // Sinkronisasi seluruh tap RFID dalam rentang periode terpilih
+        $this->syncRfidTapsToPresensiGuru(null, $period['bulan'], $period['tahun'], $period['start'], $period['end']);
 
-        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, null, null, $allowedLembagaIds);
+        $query = $this->buildPresensiQuery(
+            $lembagaId,
+            null,
+            $period['bulan'],
+            $period['tahun'],
+            $status,
+            $search,
+            $allowedLembagaIds,
+            $period['start'],
+            $period['end']
+        );
         $records = $query->orderBy('tanggal', 'asc')->orderBy('jam_masuk', 'asc')->get();
 
-        $fileName = 'rekap_absensi_guru_' . $tahun . '_' . str_pad($bulan, 2, '0', STR_PAD_LEFT) . '.csv';
+        $lembagaObj = $lembagaId ? Lembaga::find($lembagaId) : null;
+        $lembagaLabel = $lembagaObj ? $lembagaObj->nama : 'Semua Lembaga';
 
-        $headers = [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$fileName}\"",
-            'Pragma'              => 'no-cache',
-            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires'             => '0',
+        $spreadsheet = new Spreadsheet();
+        $headerFillStyle = [
+            'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 10],
+            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '0052FF']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']]],
+        ];
+        $thinBorderStyle = [
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E2E8F0']]],
         ];
 
-        $callback = function () use ($records) {
-            $handle = fopen('php://output', 'w');
-            // Add UTF-8 BOM
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+        // Jika periode mingguan atau bulanan, buat Sheet 1: Ringkasan Per Guru lalu Sheet 2: Detail Harian
+        if (in_array($period['periode'], ['mingguan', 'bulanan'], true)) {
+            $summarySheet = $spreadsheet->getActiveSheet();
+            $summarySheet->setTitle('Ringkasan Per Guru');
 
-            // Header kolom
-            fputcsv($handle, ['No', 'Tanggal', 'NIP', 'Nama Guru', 'Lembaga', 'Jam Masuk', 'Jam Pulang', 'Status', 'Jarak Masuk (m)', 'Keterangan']);
+            $summarySheet->setCellValue('A1', 'YAYASAN PONDOK PESANTREN AL-MUTTAQIN');
+            $summarySheet->setCellValue('A2', 'REKAPITULASI ABSENSI GURU - ' . strtoupper($period['label']));
+            $summarySheet->setCellValue('A3', 'Lembaga: ' . $lembagaLabel . ' | Dicetak: ' . Carbon::now('Asia/Jakarta')->format('d/m/Y H:i') . ' WIB');
+            $summarySheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+            $summarySheet->getStyle('A2')->getFont()->setBold(true)->setSize(11);
+            $summarySheet->getStyle('A3')->getFont()->setItalic(true)->getColor()->setRGB('475569');
 
+            $sumHeaders = ['No', 'NIP', 'Nama Guru', 'Lembaga', 'Tepat Waktu', 'Terlambat', 'Izin', 'Sakit', 'Alpa', 'Total Hari'];
+            $col = 'A';
+            foreach ($sumHeaders as $h) {
+                $summarySheet->setCellValue($col . '5', $h);
+                $col++;
+            }
+            $summarySheet->getStyle('A5:J5')->applyFromArray($headerFillStyle);
+            $summarySheet->getRowDimension(5)->setRowHeight(24);
+
+            // Kelompokkan data per guru (dan lembaga)
+            $grouped = $records->groupBy(fn ($r) => ($r->user_id ?? 0) . '_' . ($r->lembaga_id ?? 0))
+                ->sortBy(fn ($items) => strtolower($items->first()->user?->name ?? ''));
+
+            $rIdx = 6;
             $no = 1;
-            foreach ($records as $row) {
-                fputcsv($handle, [
-                    $no++,
-                    $row->tanggal ? ($row->tanggal instanceof \Carbon\Carbon ? $row->tanggal->format('d/m/Y') : \Carbon\Carbon::parse($row->tanggal)->format('d/m/Y')) : '-',
-                    $row->user?->nip ?? '-',
-                    $row->user?->name ?? '-',
-                    $row->lembaga?->nama ?? '-',
-                    $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '-',
-                    $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '-',
-                    $row->status_label,
-                    $row->jarak_masuk_meter ?? '-',
-                    $row->keterangan ?? '-',
-                ]);
+            $totHadir = $totTelat = $totIzin = $totSakit = $totAlpa = $totSemua = 0;
+
+            foreach ($grouped as $items) {
+                $first = $items->first();
+                $cHadir = $items->where('status', 'hadir')->count();
+                $cTelat = $items->where('status', 'terlambat')->count();
+                $cIzin = $items->where('status', 'izin')->count();
+                $cSakit = $items->where('status', 'sakit')->count();
+                $cAlpa = $items->where('status', 'alpa')->count();
+                $cTotal = $items->count();
+
+                $totHadir += $cHadir;
+                $totTelat += $cTelat;
+                $totIzin += $cIzin;
+                $totSakit += $cSakit;
+                $totAlpa += $cAlpa;
+                $totSemua += $cTotal;
+
+                $summarySheet->setCellValue('A' . $rIdx, $no++);
+                $summarySheet->setCellValueExplicit('B' . $rIdx, (string) ($first->user?->nip ?: '-'), DataType::TYPE_STRING);
+                $summarySheet->setCellValue('C' . $rIdx, $first->user?->name ?? '-');
+                $summarySheet->setCellValue('D' . $rIdx, $first->lembaga?->nama ?? '-');
+                $summarySheet->setCellValue('E' . $rIdx, $cHadir);
+                $summarySheet->setCellValue('F' . $rIdx, $cTelat);
+                $summarySheet->setCellValue('G' . $rIdx, $cIzin);
+                $summarySheet->setCellValue('H' . $rIdx, $cSakit);
+                $summarySheet->setCellValue('I' . $rIdx, $cAlpa);
+                $summarySheet->setCellValue('J' . $rIdx, $cTotal);
+
+                $summarySheet->getStyle("A{$rIdx}:B{$rIdx}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $summarySheet->getStyle("E{$rIdx}:J{$rIdx}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $summarySheet->getStyle("A{$rIdx}:J{$rIdx}")->applyFromArray($thinBorderStyle);
+                $rIdx++;
             }
 
-            fclose($handle);
-        };
+            // Baris total keseluruhan
+            $summarySheet->setCellValue('A' . $rIdx, '');
+            $summarySheet->setCellValue('C' . $rIdx, 'TOTAL');
+            $summarySheet->setCellValue('E' . $rIdx, $totHadir);
+            $summarySheet->setCellValue('F' . $rIdx, $totTelat);
+            $summarySheet->setCellValue('G' . $rIdx, $totIzin);
+            $summarySheet->setCellValue('H' . $rIdx, $totSakit);
+            $summarySheet->setCellValue('I' . $rIdx, $totAlpa);
+            $summarySheet->setCellValue('J' . $rIdx, $totSemua);
+            $summarySheet->getStyle("A{$rIdx}:J{$rIdx}")->getFont()->setBold(true);
+            $summarySheet->getStyle("A{$rIdx}:J{$rIdx}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F1F5F9');
+            $summarySheet->getStyle("E{$rIdx}:J{$rIdx}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $summarySheet->getStyle("A{$rIdx}:J{$rIdx}")->applyFromArray($thinBorderStyle);
 
-        return response()->stream($callback, 200, $headers);
+            foreach (range('A', 'J') as $c) {
+                $summarySheet->getColumnDimension($c)->setAutoSize(true);
+            }
+
+            $detailSheet = $spreadsheet->createSheet();
+            $detailSheet->setTitle('Detail Harian');
+        } else {
+            $detailSheet = $spreadsheet->getActiveSheet();
+            $detailSheet->setTitle('Detail Harian');
+        }
+
+        // Isi Sheet Detail Harian
+        $detailSheet->setCellValue('A1', 'YAYASAN PONDOK PESANTREN AL-MUTTAQIN');
+        $detailSheet->setCellValue('A2', 'DETAIL ABSENSI GURU - ' . strtoupper($period['label']));
+        $detailSheet->setCellValue('A3', 'Lembaga: ' . $lembagaLabel);
+        $detailSheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $detailSheet->getStyle('A2')->getFont()->setBold(true)->setSize(11);
+        $detailSheet->getStyle('A3')->getFont()->setItalic(true)->getColor()->setRGB('475569');
+
+        $detailHeaders = ['No', 'Tanggal', 'Hari', 'NIP', 'Nama Guru', 'Lembaga', 'Jam Masuk', 'Jam Pulang', 'Status', 'Jarak Masuk (m)', 'Keterangan'];
+        $col = 'A';
+        foreach ($detailHeaders as $h) {
+            $detailSheet->setCellValue($col . '5', $h);
+            $col++;
+        }
+        $detailSheet->getStyle('A5:K5')->applyFromArray($headerFillStyle);
+        $detailSheet->getRowDimension(5)->setRowHeight(24);
+
+        $rowNum = 6;
+        $no = 1;
+        foreach ($records as $row) {
+            $tglObj = $row->tanggal
+                ? ($row->tanggal instanceof Carbon ? $row->tanggal : Carbon::parse($row->tanggal))
+                : null;
+
+            $detailSheet->setCellValue('A' . $rowNum, $no++);
+            $detailSheet->setCellValue('B' . $rowNum, $tglObj ? $tglObj->format('d/m/Y') : '-');
+            $detailSheet->setCellValue('C' . $rowNum, $tglObj ? $tglObj->copy()->locale('id')->translatedFormat('l') : '-');
+            $detailSheet->setCellValueExplicit('D' . $rowNum, (string) ($row->user?->nip ?: '-'), DataType::TYPE_STRING);
+            $detailSheet->setCellValue('E' . $rowNum, $row->user?->name ?? '-');
+            $detailSheet->setCellValue('F' . $rowNum, $row->lembaga?->nama ?? '-');
+            $detailSheet->setCellValue('G' . $rowNum, $row->jam_masuk ? substr($row->jam_masuk, 0, 5) : '-');
+            $detailSheet->setCellValue('H' . $rowNum, $row->jam_pulang ? substr($row->jam_pulang, 0, 5) : '-');
+            $detailSheet->setCellValue('I' . $rowNum, $row->status_label);
+            $detailSheet->setCellValue('J' . $rowNum, $row->jarak_masuk_meter ?? '-');
+            $detailSheet->setCellValue('K' . $rowNum, $row->keterangan ?? '-');
+
+            $detailSheet->getStyle("A{$rowNum}:D{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $detailSheet->getStyle("G{$rowNum}:J{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $detailSheet->getStyle("A{$rowNum}:K{$rowNum}")->applyFromArray($thinBorderStyle);
+            $rowNum++;
+        }
+
+        foreach (range('A', 'K') as $c) {
+            $detailSheet->getColumnDimension($c)->setAutoSize(true);
+        }
+
+        $spreadsheet->setActiveSheetIndex(0);
+        $fileName = 'rekap_absensi_guru_' . $period['file_suffix'] . '.xlsx';
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'max-age=0',
+        ]);
     }
 
     /**
@@ -237,15 +466,25 @@ class RekapAbsensiController extends Controller
         $user = auth()->user();
         [$lembagas, $lembagaId, $defaultLembagaId, $allowedLembagaIds] = $this->resolveScopedLembagaFilter($user, $request);
 
-        $bulan = (int) $request->get('bulan', Carbon::now()->month);
-        $tahun = (int) $request->get('tahun', Carbon::now()->year);
-        $tanggal = $request->get('tanggal');
+        $period = $this->resolvePeriodRange($request);
+        $bulan = $period['bulan'];
+        $tahun = $period['tahun'];
 
-        $this->syncRfidTapsToPresensiGuru($tanggal, $bulan, $tahun);
+        $this->syncRfidTapsToPresensiGuru(null, $bulan, $tahun, $period['start'], $period['end']);
 
         $lembaga = $lembagaId ? Lembaga::find($lembagaId) : ($user->currentLembaga() ?: Lembaga::first());
 
-        $query = $this->buildPresensiQuery($lembagaId, $tanggal, $bulan, $tahun, null, null, $allowedLembagaIds);
+        $query = $this->buildPresensiQuery(
+            $lembagaId,
+            null,
+            $bulan,
+            $tahun,
+            $request->get('status'),
+            $request->get('search'),
+            $allowedLembagaIds,
+            $period['start'],
+            $period['end']
+        );
         $records = $query->orderBy('tanggal', 'asc')->orderBy('jam_masuk', 'asc')->get();
 
         $namaBulan = [
@@ -253,8 +492,9 @@ class RekapAbsensiController extends Controller
             5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
             9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
         ][$bulan] ?? '';
+        $periodeLabel = $period['label'];
 
-        return view('rekap-absensi.cetak', compact('records', 'lembaga', 'bulan', 'tahun', 'namaBulan'));
+        return view('rekap-absensi.cetak', compact('records', 'lembaga', 'bulan', 'tahun', 'namaBulan', 'periodeLabel'));
     }
 
     /**
@@ -264,8 +504,17 @@ class RekapAbsensiController extends Controller
      * - Tidak akan bocor ke SMA atau lembaga lainnya.
      * - Opsi "Semua Lembaga" tetap menampilkan seluruh guru sesuai hak akses lembaga user.
      */
-    protected function buildPresensiQuery(?int $lembagaId, ?string $tanggal, int $bulan, int $tahun, ?string $status = null, ?string $search = null, ?array $allowedLembagaIds = null)
-    {
+    protected function buildPresensiQuery(
+        ?int $lembagaId,
+        ?string $tanggal,
+        int $bulan,
+        int $tahun,
+        ?string $status = null,
+        ?string $search = null,
+        ?array $allowedLembagaIds = null,
+        ?Carbon $startDate = null,
+        ?Carbon $endDate = null
+    ) {
         $query = PresensiGuru::with(['user', 'lembaga']);
 
         if ($lembagaId) {
@@ -278,7 +527,9 @@ class RekapAbsensiController extends Controller
             }
         }
 
-        if ($tanggal) {
+        if ($startDate && $endDate) {
+            $query->whereBetween('tanggal', [$startDate->toDateString(), $endDate->toDateString()]);
+        } elseif ($tanggal) {
             $query->whereDate('tanggal', $tanggal);
         } else {
             $query->whereMonth('tanggal', $bulan)->whereYear('tanggal', $tahun);
@@ -309,8 +560,13 @@ class RekapAbsensiController extends Controller
      * Memastikan tap yang tercatat di dashboard RFID multi-lokasi otomatis masuk ke rekap absensi guru
      * dan dipetakan ke lembaga tempat guru tersebut terdaftar.
      */
-    protected function syncRfidTapsToPresensiGuru(?string $tanggal = null, ?int $bulan = null, ?int $tahun = null): void
-    {
+    protected function syncRfidTapsToPresensiGuru(
+        ?string $tanggal = null,
+        ?int $bulan = null,
+        ?int $tahun = null,
+        ?Carbon $startDate = null,
+        ?Carbon $endDate = null
+    ): void {
         try {
             if (!Schema::hasTable('presensis') || !Schema::hasTable('presensi_gurus')) {
                 return;
@@ -318,7 +574,9 @@ class RekapAbsensiController extends Controller
 
             $tapsQuery = Presensi::where('tipe_entitas', 'guru_pegawai');
 
-            if ($tanggal) {
+            if ($startDate && $endDate) {
+                $tapsQuery->whereBetween('waktu_tap', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()]);
+            } elseif ($tanggal) {
                 $tapsQuery->whereDate('waktu_tap', $tanggal);
             } else {
                 // Batasi sinkronisasi ke hari ini agar performa tetap ringan dan cepat

@@ -100,7 +100,7 @@
 
     <div class="title-section">
         <h3>REKAPITULASI KEHADIRAN GURU</h3>
-        <p>Periode: <strong>{{ $namaBulan }} {{ $tahun }}</strong></p>
+        <p>Periode: <strong>{{ $periodeLabel ?? ($namaBulan . ' ' . $tahun) }}</strong></p>
     </div>
 
     <table>
