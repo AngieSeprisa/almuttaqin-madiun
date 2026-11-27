@@ -72,51 +72,127 @@ class WordQuestionParserService
     }
 
     /**
-     * Kelompokkan baris paragraf menjadi struktur nomor soal, pertanyaan, opsi, dan kunci
+     * Kelompokkan baris paragraf menjadi struktur soal Pilihan Ganda (PG) dan Essay/Uraian
      */
     private function parseParagraphsToQuestions(array $paragraphs): array
     {
-        $soals = [];
+        $soalsPg = [];
+        $soalsEssay = [];
         $currentSoal = null;
+        $currentMode = 'pg'; // 'pg' atau 'essay'
+        $inPedoman = false;
         $maxOpsiCount = 4;
+
+        $flushCurrent = function () use (&$currentSoal, &$soalsPg, &$soalsEssay) {
+            if ($currentSoal === null) {
+                return;
+            }
+            $finalized = $this->finalizeSoal($currentSoal);
+            if ($finalized['tipe_soal'] === 'essay') {
+                $soalsEssay[$finalized['nomor']] = $finalized;
+            } else {
+                $soalsPg[$finalized['nomor']] = $finalized;
+            }
+            $currentSoal = null;
+        };
 
         foreach ($paragraphs as $line) {
             $line = trim($line);
-            if ($line === '') continue;
+            if ($line === '') {
+                continue;
+            }
 
-            // 1. Cek baris KUNCI JAWABAN (misal: "Kunci: A" atau "Jawaban: B" atau "Kunci Jawaban = C")
-            if (preg_match('/^(kunci\s*jawaban|kunci|jawaban|ans|key)\s*[:=\-]\s*([A-Ea-e])/i', $line, $km)) {
-                if ($currentSoal !== null) {
-                    $currentSoal['kunci'] = strtoupper($km[2]);
+            // 0. Deteksi penanda bagian [ESSAY] / BAGIAN B. ESSAY / SOAL URAIAN
+            if ($this->isEssaySectionHeader($line)) {
+                $flushCurrent();
+                $currentMode = 'essay';
+                $inPedoman = false;
+                continue;
+            }
+
+            // 0b. Deteksi penanda bagian [PILIHAN GANDA] / BAGIAN A. PILIHAN GANDA
+            if ($this->isPgSectionHeader($line)) {
+                $flushCurrent();
+                $currentMode = 'pg';
+                $inPedoman = false;
+                continue;
+            }
+
+            // 1. Cek baris TIMER per soal (misal: "Timer: 180", "Timer: 3 menit", "Waktu: 120 detik")
+            if ($currentSoal !== null && preg_match('/^(?:timer|waktu)\s*[:=\-]\s*(\d+)\s*(menit|mnt|m|detik|dtk|s)?\b/i', $line, $tm)) {
+                $val = (int) $tm[1];
+                $unit = strtolower($tm[2] ?? 'detik');
+                if (in_array($unit, ['menit', 'mnt', 'm'], true)) {
+                    $val *= 60;
+                }
+                if ($val >= 5 && $val <= 3600) {
+                    $currentSoal['timer_detik'] = $val;
                 }
                 continue;
             }
 
-            // 2. Cek baris nomor soal baru (misal: "1.", "1)", "1. ", "No. 1.")
+            // 1b. Cek baris SKOR MAKS khusus essay (misal: "Skor: 20", "Skor Maks: 25", "Poin: 10")
+            if ($currentSoal !== null && $currentMode === 'essay' && preg_match('/^(?:skor(?:\s*maks(?:imal)?)?|poin|bobot)\s*[:=\-]\s*(\d+(?:[\.,]\d+)?)/i', $line, $sm)) {
+                $currentSoal['skor_maks'] = (float) str_replace(',', '.', $sm[1]);
+                continue;
+            }
+
+            // 2. Cek baris KUNCI JAWABAN / PEDOMAN
+            if ($currentMode === 'pg') {
+                if (preg_match('/^(kunci\s*jawaban|kunci|jawaban|ans|key)\s*[:=\-]\s*([A-Ea-e])\b/i', $line, $km)) {
+                    if ($currentSoal !== null) {
+                        $currentSoal['kunci'] = strtoupper($km[2]);
+                    }
+                    continue;
+                }
+            } else {
+                // Mode essay: Kunci / Pedoman / Jawaban / Rubrik bisa berupa kalimat panjang
+                if (preg_match('/^(pedoman(?:\s*jawaban)?|kunci(?:\s*jawaban)?|jawaban|rubrik)\s*[:=\-]\s*(.*)$/i', $line, $pm)) {
+                    if ($currentSoal !== null) {
+                        $currentSoal['pedoman_jawaban'] = trim($pm[2]);
+                        $inPedoman = true;
+                    }
+                    continue;
+                }
+            }
+
+            // 3. Cek baris nomor soal baru (misal: "1.", "1)", "1. ", "No. 1.")
             if (preg_match('/^(?:no\.?\s*)?(\d+)[\.\)\:\-]\s*(.*)$/i', $line, $qm)) {
-                $nomor = (int)$qm[1];
+                $nomor = (int) $qm[1];
                 $teks = trim($qm[2]);
 
-                // Simpan soal sebelumnya jika ada
-                if ($currentSoal !== null) {
-                    $soals[$currentSoal['nomor']] = $this->finalizeSoal($currentSoal);
-                }
+                $flushCurrent();
+                $inPedoman = false;
 
                 $currentSoal = [
-                    'nomor'      => $nomor,
-                    'pertanyaan' => $teks,
-                    'opsi'       => [],
-                    'kunci'      => 'A',
+                    'tipe_soal'       => $currentMode,
+                    'nomor'           => $nomor,
+                    'pertanyaan'      => $teks,
+                    'opsi'            => [],
+                    'kunci'           => $currentMode === 'pg' ? 'A' : null,
+                    'skor_maks'       => null,
+                    'pedoman_jawaban' => null,
+                    'timer_detik'     => null,
                 ];
                 continue;
             }
 
-            // Jika belum ada nomor soal, lewati (mungkin kop soal / petunjuk awal)
+            // Jika belum ada nomor soal, lewati (kop soal / petunjuk awal)
             if ($currentSoal === null) {
                 continue;
             }
 
-            // 3. Cek apakah baris ini memuat OPSI GANDA DALAM SATU BARIS (misal: "A. Merah B. Kuning C. Hijau D. Biru")
+            // Mode Essay: lanjutan teks pertanyaan atau lanjutan pedoman jawaban
+            if ($currentMode === 'essay') {
+                if ($inPedoman) {
+                    $currentSoal['pedoman_jawaban'] = trim(($currentSoal['pedoman_jawaban'] ?? '') . "\n" . $line);
+                } else {
+                    $currentSoal['pertanyaan'] .= ($currentSoal['pertanyaan'] !== '' ? "\n" : '') . $line;
+                }
+                continue;
+            }
+
+            // Mode PG: cek opsi ganda dalam satu baris (misal: "A. Merah B. Kuning C. Hijau D. Biru")
             $multiOptions = $this->extractInlineOptions($line);
             if (!empty($multiOptions)) {
                 foreach ($multiOptions as $opt => $optText) {
@@ -125,18 +201,17 @@ class WordQuestionParserService
                 continue;
             }
 
-            // 4. Cek baris opsi tunggal (misal: "A. Jakarta" atau "A) Jakarta" atau "(A) Jakarta")
+            // Mode PG: cek baris opsi tunggal (misal: "A. Jakarta" atau "A) Jakarta" atau "(A) Jakarta")
             if (preg_match('/^\(?([A-Ea-e])[\.\)\:\-]\s*(.*)$/i', $line, $om)) {
                 $huruf = strtoupper($om[1]);
                 $currentSoal['opsi'][$huruf] = trim($om[2]);
                 continue;
             }
 
-            // 5. Jika tidak ada opsi yang terdeteksi, anggap baris lanjutan teks pertanyaan
+            // Mode PG: lanjutan teks pertanyaan atau opsi terakhir
             if (empty($currentSoal['opsi'])) {
                 $currentSoal['pertanyaan'] .= ($currentSoal['pertanyaan'] !== '' ? "\n" : '') . $line;
             } else {
-                // Lanjutan teks opsi terakhir
                 end($currentSoal['opsi']);
                 $lastOpt = key($currentSoal['opsi']);
                 if ($lastOpt) {
@@ -146,25 +221,78 @@ class WordQuestionParserService
         }
 
         // Simpan soal terakhir
-        if ($currentSoal !== null) {
-            $soals[$currentSoal['nomor']] = $this->finalizeSoal($currentSoal);
-        }
+        $flushCurrent();
 
-        // Hitung estimasi jumlah opsi (4 atau 5)
-        foreach ($soals as $s) {
+        // Hitung estimasi jumlah opsi (4 atau 5) dari soal PG
+        foreach ($soalsPg as $s) {
             if (!empty($s['opsi_e'])) {
                 $maxOpsiCount = 5;
                 break;
             }
         }
 
-        ksort($soals);
+        ksort($soalsPg);
+        ksort($soalsEssay);
+
+        // Normalisasi nomor essay menjadi 1..N agar selalu selaras dengan nomor Essay pada LJK
+        $normalizedEssay = [];
+        $essaySeq = 1;
+        foreach ($soalsEssay as $es) {
+            $es['nomor'] = $essaySeq++;
+            $normalizedEssay[] = $es;
+        }
+
+        $pgList = array_values($soalsPg);
 
         return [
-            'soals'       => array_values($soals),
-            'total_soal'  => count($soals),
-            'jumlah_opsi' => $maxOpsiCount,
+            'soals'            => $pgList,
+            'soals_pg'         => $pgList,
+            'soals_essay'      => $normalizedEssay,
+            'total_soal'       => count($pgList),
+            'total_soal_pg'    => count($pgList),
+            'total_soal_essay' => count($normalizedEssay),
+            'jumlah_opsi'      => $maxOpsiCount,
         ];
+    }
+
+    /**
+     * Deteksi baris penanda dimulainya bagian Soal Essay / Uraian
+     */
+    private function isEssaySectionHeader(string $line): bool
+    {
+        if (mb_strlen($line) > 80) {
+            return false;
+        }
+
+        if (preg_match('/^\[?\s*(?:bagian\s*(?:b|ii|2)\s*[:.\-]?\s*)?(?:soal\s+)?(?:essay|esai|uraian)(?:\s*\/\s*(?:essay|esai|uraian))?\s*\]?(?:\s*[:.\-].*)?$/i', $line)) {
+            return true;
+        }
+
+        if (preg_match('/^(?:B|II)[\.\)]\s*(?:soal\s+)?(?:essay|esai|uraian)\b/i', $line)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Deteksi baris penanda dimulainya bagian Soal Pilihan Ganda
+     */
+    private function isPgSectionHeader(string $line): bool
+    {
+        if (mb_strlen($line) > 80) {
+            return false;
+        }
+
+        if (preg_match('/^\[?\s*(?:bagian\s*(?:a|i|1)\s*[:.\-]?\s*)?(?:soal\s+)?(?:pilihan\s+ganda|pg)\s*\]?(?:\s*[:.\-].*)?$/i', $line)) {
+            return true;
+        }
+
+        if (preg_match('/^(?:A|I)[\.\)]\s*(?:soal\s+)?(?:pilihan\s+ganda|pg)\b/i', $line)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -192,15 +320,21 @@ class WordQuestionParserService
      */
     private function finalizeSoal(array $s): array
     {
+        $isEssay = ($s['tipe_soal'] ?? 'pg') === 'essay';
+
         return [
-            'nomor'      => $s['nomor'],
-            'pertanyaan' => trim($s['pertanyaan']),
-            'opsi_a'     => $s['opsi']['A'] ?? '',
-            'opsi_b'     => $s['opsi']['B'] ?? '',
-            'opsi_c'     => $s['opsi']['C'] ?? '',
-            'opsi_d'     => $s['opsi']['D'] ?? '',
-            'opsi_e'     => $s['opsi']['E'] ?? null,
-            'kunci'      => $s['kunci'] ?? 'A',
+            'tipe_soal'       => $isEssay ? 'essay' : 'pg',
+            'nomor'           => $s['nomor'],
+            'pertanyaan'      => trim($s['pertanyaan']),
+            'opsi_a'          => $isEssay ? null : ($s['opsi']['A'] ?? ''),
+            'opsi_b'          => $isEssay ? null : ($s['opsi']['B'] ?? ''),
+            'opsi_c'          => $isEssay ? null : ($s['opsi']['C'] ?? ''),
+            'opsi_d'          => $isEssay ? null : ($s['opsi']['D'] ?? ''),
+            'opsi_e'          => $isEssay ? null : ($s['opsi']['E'] ?? null),
+            'kunci'           => $isEssay ? null : ($s['kunci'] ?? 'A'),
+            'skor_maks'       => $s['skor_maks'] ?? null,
+            'pedoman_jawaban' => $s['pedoman_jawaban'] ?? null,
+            'timer_detik'     => $s['timer_detik'] ?? null,
         ];
     }
 
@@ -242,10 +376,11 @@ class WordQuestionParserService
         </w:p>
         <w:p>
             <w:pPr><w:jc w:val="center"/></w:pPr>
-            <w:r><w:rPr><w:i/><w:sz w:val="20"/></w:rPr><w:t>Petunjuk: Tulis nomor soal berurutan (1, 2, 3...), pilihan opsi (A, B, C, D, E), dan baris Kunci: di bawah setiap soal.</w:t></w:r>
+            <w:r><w:rPr><w:i/><w:sz w:val="20"/></w:rPr><w:t>Petunjuk: Tulis soal Pilihan Ganda dengan nomor (1, 2, 3...), opsi (A-E), dan Kunci:. Jika ada soal uraian, tulis pemisah [ESSAY] lalu nomor 1, 2, dst.</w:t></w:r>
         </w:p>
         <w:p><w:r><w:t></w:t></w:r></w:p>
 
+        <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>[PILIHAN GANDA]</w:t></w:r></w:p>
         <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>1. Manakah di bawah ini yang merupakan rukun Islam pertama?</w:t></w:r></w:p>
         <w:p><w:r><w:t>A. Mengucapkan dua kalimat syahadat</w:t></w:r></w:p>
         <w:p><w:r><w:t>B. Menunaikan ibadah sholat lima waktu</w:t></w:r></w:p>
@@ -271,6 +406,17 @@ class WordQuestionParserService
         <w:p><w:r><w:t>D. Medan</w:t></w:r></w:p>
         <w:p><w:r><w:t>E. Makassar</w:t></w:r></w:p>
         <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Kunci: B</w:t></w:r></w:p>
+        <w:p><w:r><w:t></w:t></w:r></w:p>
+
+        <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>[ESSAY]</w:t></w:r></w:p>
+        <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>1. Jelaskan secara singkat pengertian dan hikmah menuntut ilmu dalam Islam!</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Pedoman: Menjelaskan kewajiban menuntut ilmu bagi muslim serta minimal 2 hikmah seperti meningkatkan derajat dan kemudahan jalan menuju surga.</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Timer: 180 detik</w:t></w:r></w:p>
+        <w:p><w:r><w:t></w:t></w:r></w:p>
+
+        <w:p><w:r><w:rPr><w:b/></w:rPr><w:t>2. Sebutkan 3 contoh adab santri terhadap guru di lingkungan pondok pesantren!</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Pedoman: Menghormati dan menyapa dengan sopan, menyimak pelajaran dengan tenang, serta melaksanakan nasihat dan tugas dengan ikhlas.</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Timer: 180 detik</w:t></w:r></w:p>
     </w:body>
 </w:document>';
         $zip->addFromString('word/document.xml', $documentXml);

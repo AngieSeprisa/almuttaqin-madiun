@@ -13,6 +13,7 @@ class UjianSoal extends Model
 
     protected $fillable = [
         'ujian_id',
+        'tipe_soal',
         'nomor_soal',
         'pertanyaan',
         'opsi_a',
@@ -21,6 +22,8 @@ class UjianSoal extends Model
         'opsi_d',
         'opsi_e',
         'kunci_jawaban',
+        'skor_maks',
+        'pedoman_jawaban',
         'timer_detik',
         'gambar',
     ];
@@ -28,7 +31,13 @@ class UjianSoal extends Model
     protected $casts = [
         'nomor_soal'  => 'integer',
         'timer_detik' => 'integer',
+        'skor_maks'   => 'decimal:2',
     ];
+
+    public function isEssay(): bool
+    {
+        return ($this->tipe_soal ?? 'pg') === 'essay';
+    }
 
     public function ujian()
     {

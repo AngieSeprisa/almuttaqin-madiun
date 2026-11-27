@@ -20,6 +20,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -102,7 +104,7 @@ class UjianController extends Controller
     {
         $scoped = $this->scopedFormal();
         $query = Ujian::with(['mapel', 'kelas', 'guru'])
-            ->withCount(['soals', 'kuncis'])
+            ->withCount(['soals', 'soalsPg', 'soalsEssay', 'kuncis'])
             ->forLembaga($scoped);
 
         if ($request->filled('search')) {
@@ -144,13 +146,17 @@ class UjianController extends Controller
 
         return view('ujian.form', [
             'ujian' => new Ujian([
-                'kode_ujian'    => $suggestedKode,
-                'jumlah_soal'   => 40,
-                'jumlah_opsi'   => 4,
-                'bobot_benar'   => 1.00,
-                'timer_default' => 90,
-                'tanggal_ujian' => now()->toDateString(),
-                'status'        => 'draft',
+                'kode_ujian'          => $suggestedKode,
+                'jumlah_soal'         => 40,
+                'jumlah_soal_essay'   => 0,
+                'jumlah_opsi'         => 4,
+                'bobot_benar'         => 1.00,
+                'bobot_pg'            => 100.00,
+                'bobot_essay'         => 0.00,
+                'timer_default'       => 90,
+                'timer_essay_default' => 180,
+                'tanggal_ujian'       => now()->toDateString(),
+                'status'              => 'draft',
             ]),
             'isEdit'  => false,
             'kelases' => $kelases,
@@ -160,24 +166,76 @@ class UjianController extends Controller
     }
 
     /**
+     * Hitung dan validasi pasangan bobot persen PG & Essay agar total konsisten 100%.
+     */
+    protected function resolveBobotPersen(int $jumlahPg, int $jumlahEssay, mixed $bobotPg, mixed $bobotEssay): array
+    {
+        if ($jumlahPg <= 0 && $jumlahEssay <= 0) {
+            throw ValidationException::withMessages([
+                'jumlah_soal' => 'Ujian minimal harus memiliki 1 soal Pilihan Ganda atau 1 soal Essay.',
+            ]);
+        }
+
+        if ($jumlahPg > 0 && $jumlahEssay <= 0) {
+            return ['bobot_pg' => 100.00, 'bobot_essay' => 0.00];
+        }
+
+        if ($jumlahPg <= 0 && $jumlahEssay > 0) {
+            return ['bobot_pg' => 0.00, 'bobot_essay' => 100.00];
+        }
+
+        // Keduanya ada (PG + Essay)
+        $hasInputPg = $bobotPg !== null && $bobotPg !== '';
+        $hasInputEssay = $bobotEssay !== null && $bobotEssay !== '';
+
+        if (!$hasInputPg && !$hasInputEssay) {
+            return ['bobot_pg' => 70.00, 'bobot_essay' => 30.00];
+        }
+
+        $pgVal = $hasInputPg ? round((float) $bobotPg, 2) : round(100.0 - (float) $bobotEssay, 2);
+        $esVal = $hasInputEssay ? round((float) $bobotEssay, 2) : round(100.0 - $pgVal, 2);
+
+        if ($pgVal <= 0 || $esVal <= 0 || abs(($pgVal + $esVal) - 100.0) > 0.05) {
+            throw ValidationException::withMessages([
+                'bobot_essay' => 'Jika ujian memuat PG dan Essay, total Bobot PG (%) + Bobot Essay (%) harus tepat 100% dan masing-masing lebih dari 0%.',
+            ]);
+        }
+
+        return ['bobot_pg' => $pgVal, 'bobot_essay' => $esVal];
+    }
+
+    /**
      * Simpan ujian baru
      */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'kode_ujian'    => 'required|string|max:50|unique:ujian,kode_ujian',
-            'nama_ujian'    => 'required|string|max:200',
-            'mapel_id'      => 'nullable|exists:mata_pelajarans,id',
-            'kelas_id'      => 'nullable|exists:classrooms,id',
-            'guru_id'       => 'nullable|exists:users,id',
-            'jumlah_soal'   => 'required|integer|min:1|max:100',
-            'jumlah_opsi'   => 'required|integer|in:4,5',
-            'bobot_benar'   => 'required|numeric|min:0.1|max:100',
-            'timer_default' => 'nullable|integer|min:10|max:1800',
-            'tanggal_ujian' => 'required|date',
-            'status'        => 'required|in:draft,aktif,selesai',
-            'file_word'     => 'nullable|file|mimes:docx|max:10240',
+            'kode_ujian'          => 'required|string|max:50|unique:ujian,kode_ujian',
+            'nama_ujian'          => 'required|string|max:200',
+            'mapel_id'            => 'nullable|exists:mata_pelajarans,id',
+            'kelas_id'            => 'nullable|exists:classrooms,id',
+            'guru_id'             => 'nullable|exists:users,id',
+            'jumlah_soal'         => 'required|integer|min:0|max:100',
+            'jumlah_soal_essay'   => 'nullable|integer|min:0|max:50',
+            'jumlah_opsi'         => 'required|integer|in:4,5',
+            'bobot_benar'         => 'nullable|numeric|min:0.1|max:100',
+            'bobot_pg'            => 'nullable|numeric|min:0|max:100',
+            'bobot_essay'         => 'nullable|numeric|min:0|max:100',
+            'timer_default'       => 'nullable|integer|min:10|max:1800',
+            'timer_essay_default' => 'nullable|integer|min:15|max:3600',
+            'tanggal_ujian'       => 'required|date',
+            'status'              => 'required|in:draft,aktif,selesai',
+            'file_word'           => 'nullable|file|mimes:docx|max:10240',
         ]);
+
+        $jumlahPg = (int) $validated['jumlah_soal'];
+        $jumlahEssay = (int) ($validated['jumlah_soal_essay'] ?? 0);
+        $bobotPersen = $this->resolveBobotPersen(
+            $jumlahPg,
+            $jumlahEssay,
+            $validated['bobot_pg'] ?? null,
+            $validated['bobot_essay'] ?? null
+        );
 
         $scoped = $this->scopedFormal();
         if ($scoped) {
@@ -193,48 +251,62 @@ class UjianController extends Controller
                 ?? (!empty($validated['mapel_id']) ? MataPelajaran::whereKey($validated['mapel_id'])->value('lembaga_id') : null);
         }
 
-        $timerDefault = $validated['timer_default'] ?? 90;
+        $timerDefault = (int) ($validated['timer_default'] ?? 90);
+        $timerEssayDefault = (int) ($validated['timer_essay_default'] ?? 180);
+        $bobotBenar = (float) ($validated['bobot_benar'] ?? 1.00);
 
-        $ujian = DB::transaction(function () use ($validated, $timerDefault, $request, $lembagaId) {
+        $ujian = DB::transaction(function () use ($validated, $jumlahPg, $jumlahEssay, $bobotPersen, $bobotBenar, $timerDefault, $timerEssayDefault, $request, $lembagaId) {
             $ujian = Ujian::create([
-                'lembaga_id'    => $lembagaId,
-                'kode_ujian'    => $validated['kode_ujian'],
-                'nama_ujian'    => $validated['nama_ujian'],
-                'mapel_id'      => $validated['mapel_id'] ?? null,
-                'kelas_id'      => $validated['kelas_id'] ?? null,
-                'guru_id'       => $validated['guru_id'] ?? null,
-                'jumlah_soal'   => $validated['jumlah_soal'],
-                'jumlah_opsi'   => $validated['jumlah_opsi'],
-                'bobot_benar'   => $validated['bobot_benar'],
-                'timer_default' => $timerDefault,
-                'tanggal_ujian' => $validated['tanggal_ujian'],
-                'status'        => $validated['status'],
+                'lembaga_id'          => $lembagaId,
+                'kode_ujian'          => $validated['kode_ujian'],
+                'nama_ujian'          => $validated['nama_ujian'],
+                'mapel_id'            => $validated['mapel_id'] ?? null,
+                'kelas_id'            => $validated['kelas_id'] ?? null,
+                'guru_id'             => $validated['guru_id'] ?? null,
+                'jumlah_soal'         => $jumlahPg,
+                'jumlah_soal_essay'   => $jumlahEssay,
+                'jumlah_opsi'         => $validated['jumlah_opsi'],
+                'bobot_benar'         => $bobotBenar,
+                'bobot_pg'            => $bobotPersen['bobot_pg'],
+                'bobot_essay'         => $bobotPersen['bobot_essay'],
+                'timer_default'       => $timerDefault,
+                'timer_essay_default' => $timerEssayDefault,
+                'tanggal_ujian'       => $validated['tanggal_ujian'],
+                'status'              => $validated['status'],
             ]);
 
-            // Inisialisasi kunci jawaban default jika belum ada naskah Word
-            $kunciData = [];
-            for ($no = 1; $no <= $ujian->jumlah_soal; $no++) {
-                $kunciData[] = [
-                    'ujian_id'      => $ujian->id,
-                    'nomor_soal'    => $no,
-                    'kunci_jawaban' => 'A',
-                    'bobot'         => $ujian->bobot_benar,
-                    'created_at'    => now(),
-                    'updated_at'    => now(),
-                ];
+            // Inisialisasi kunci jawaban default PG jika ada soal PG
+            if ($ujian->jumlah_soal > 0) {
+                $kunciData = [];
+                for ($no = 1; $no <= $ujian->jumlah_soal; $no++) {
+                    $kunciData[] = [
+                        'ujian_id'      => $ujian->id,
+                        'nomor_soal'    => $no,
+                        'kunci_jawaban' => 'A',
+                        'bobot'         => $ujian->bobot_benar,
+                        'created_at'    => now(),
+                        'updated_at'    => now(),
+                    ];
+                }
+                UjianKunci::insert($kunciData);
             }
-            UjianKunci::insert($kunciData);
 
             // Jika ada file Word (.docx) diunggah langsung saat pembuatan
             if ($request->hasFile('file_word')) {
-                $this->processUploadedWordFile($request->file('file_word'), $ujian);
+                $this->processUploadedWordFile($request->file('file_word'), $ujian, $timerDefault, $timerEssayDefault);
             }
 
             return $ujian;
         });
 
-        return redirect()->route('ujian.kunci', $ujian->id)
-            ->with('success', "Ujian {$ujian->nama_ujian} berhasil dibuat. Silakan atur kunci jawaban atau unggah naskah soal.");
+        $ujian->refresh();
+        if ($ujian->hasPg()) {
+            return redirect()->route('ujian.kunci', $ujian->id)
+                ->with('success', "Ujian {$ujian->nama_ujian} berhasil dibuat. Silakan atur kunci jawaban atau unggah naskah soal.");
+        }
+
+        return redirect()->route('ujian.soal')
+            ->with('success', "Ujian Essay {$ujian->nama_ujian} berhasil dibuat.");
     }
 
     /**
@@ -264,18 +336,39 @@ class UjianController extends Controller
         $this->ensureUjianInRoom($ujian);
 
         $validated = $request->validate([
-            'kode_ujian'    => 'required|string|max:50|unique:ujian,kode_ujian,' . $ujian->id,
-            'nama_ujian'    => 'required|string|max:200',
-            'mapel_id'      => 'nullable|exists:mata_pelajarans,id',
-            'kelas_id'      => 'nullable|exists:classrooms,id',
-            'guru_id'       => 'nullable|exists:users,id',
-            'jumlah_soal'   => 'required|integer|min:1|max:100',
-            'jumlah_opsi'   => 'required|integer|in:4,5',
-            'bobot_benar'   => 'required|numeric|min:0.1|max:100',
-            'timer_default' => 'nullable|integer|min:10|max:1800',
-            'tanggal_ujian' => 'required|date',
-            'status'        => 'required|in:draft,aktif,selesai',
+            'kode_ujian'          => 'required|string|max:50|unique:ujian,kode_ujian,' . $ujian->id,
+            'nama_ujian'          => 'required|string|max:200',
+            'mapel_id'            => 'nullable|exists:mata_pelajarans,id',
+            'kelas_id'            => 'nullable|exists:classrooms,id',
+            'guru_id'             => 'nullable|exists:users,id',
+            'jumlah_soal'         => 'required|integer|min:0|max:100',
+            'jumlah_soal_essay'   => 'nullable|integer|min:0|max:50',
+            'jumlah_opsi'         => 'required|integer|in:4,5',
+            'bobot_benar'         => 'nullable|numeric|min:0.1|max:100',
+            'bobot_pg'            => 'nullable|numeric|min:0|max:100',
+            'bobot_essay'         => 'nullable|numeric|min:0|max:100',
+            'timer_default'       => 'nullable|integer|min:10|max:1800',
+            'timer_essay_default' => 'nullable|integer|min:15|max:3600',
+            'tanggal_ujian'       => 'required|date',
+            'status'              => 'required|in:draft,aktif,selesai',
         ]);
+
+        $jumlahPg = (int) $validated['jumlah_soal'];
+        $jumlahEssay = (int) ($validated['jumlah_soal_essay'] ?? 0);
+        $bobotPersen = $this->resolveBobotPersen(
+            $jumlahPg,
+            $jumlahEssay,
+            $validated['bobot_pg'] ?? null,
+            $validated['bobot_essay'] ?? null
+        );
+
+        $validated['jumlah_soal'] = $jumlahPg;
+        $validated['jumlah_soal_essay'] = $jumlahEssay;
+        $validated['bobot_benar'] = (float) ($validated['bobot_benar'] ?? $ujian->bobot_benar ?? 1.00);
+        $validated['bobot_pg'] = $bobotPersen['bobot_pg'];
+        $validated['bobot_essay'] = $bobotPersen['bobot_essay'];
+        $validated['timer_default'] = (int) ($validated['timer_default'] ?? $ujian->timer_default ?? 90);
+        $validated['timer_essay_default'] = (int) ($validated['timer_essay_default'] ?? $ujian->timer_essay_default ?? 180);
 
         $scoped = $this->scopedFormal();
         if ($scoped) {
@@ -311,6 +404,8 @@ class UjianController extends Controller
                     ->where('nomor_soal', '>', $ujian->jumlah_soal)
                     ->delete();
             }
+
+            $this->recalculateAllScores($ujian->fresh(['kuncis', 'hasils']));
         });
 
         return redirect()->route('ujian.soal')
@@ -331,81 +426,142 @@ class UjianController extends Controller
     }
 
     /**
-     * Unggah naskah soal Word (.docx) dan ekstrak butir soal otomatis
+     * Unggah naskah soal Word (.docx) dan ekstrak butir soal PG & Essay otomatis
      */
     public function uploadWordSoal(Request $request, Ujian $ujian)
     {
         $this->ensureUjianInRoom($ujian);
         $request->validate([
-            'file_word'     => 'required|file|mimes:docx|max:15360', // max 15MB
-            'timer_per_soal'=> 'nullable|integer|min:10|max:1800',
+            'file_word'      => 'required|file|mimes:docx|max:15360', // max 15MB
+            'timer_per_soal' => 'nullable|integer|min:10|max:1800',
+            'timer_essay'    => 'nullable|integer|min:15|max:3600',
         ]);
 
         $file = $request->file('file_word');
-        $timer = (int) ($request->input('timer_per_soal') ?: ($ujian->timer_default ?: 90));
+        $timerPg = (int) ($request->input('timer_per_soal') ?: ($ujian->timer_default ?: 90));
+        $timerEssay = (int) ($request->input('timer_essay') ?: ($ujian->timer_essay_default ?: 180));
 
         try {
-            $parsed = $this->processUploadedWordFile($file, $ujian, $timer);
+            $parsed = $this->processUploadedWordFile($file, $ujian, $timerPg, $timerEssay);
+            $parts = [];
+            if ($parsed['total_soal_pg'] > 0) {
+                $parts[] = "{$parsed['total_soal_pg']} soal PG";
+            }
+            if ($parsed['total_soal_essay'] > 0) {
+                $parts[] = "{$parsed['total_soal_essay']} soal Essay";
+            }
+            $summary = implode(' dan ', $parts);
 
-            return redirect()->back()->with('success', "Naskah soal Word berhasil diproses! {$parsed['total_soal']} butir soal terbaca dan kunci jawaban telah disinkronkan.");
+            return redirect()->back()->with('success', "Naskah soal Word berhasil diproses! {$summary} terbaca dan kunci jawaban telah disinkronkan.");
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Gagal memproses file Word: ' . $e->getMessage());
         }
     }
 
     /**
-     * Helper pemrosesan file Word (.docx)
+     * Helper pemrosesan file Word (.docx) untuk PG dan/atau Essay
      */
-    private function processUploadedWordFile($uploadedFile, Ujian $ujian, int $timer = 90): array
+    private function processUploadedWordFile($uploadedFile, Ujian $ujian, int $timerPg = 90, int $timerEssay = 180): array
     {
         $parser = new WordQuestionParserService();
         $parsed = $parser->parse($uploadedFile->getRealPath());
 
-        if (empty($parsed['soals'])) {
-            throw new \Exception("Tidak ada butir soal yang berhasil terdeteksi dalam file Word. Pastikan format penomoran sesuai template (misal: 1. Pertanyaan, A. Pilihan, B. Pilihan...).");
+        $soalsPg = $parsed['soals_pg'] ?? $parsed['soals'] ?? [];
+        $soalsEssay = $parsed['soals_essay'] ?? [];
+
+        if (empty($soalsPg) && empty($soalsEssay)) {
+            throw new \Exception("Tidak ada butir soal yang berhasil terdeteksi dalam file Word. Pastikan format penomoran sesuai template (misal: 1. Pertanyaan, A. Pilihan, B. Pilihan... atau bagian [ESSAY]).");
         }
 
         // Simpan file asli ke storage
         $storedPath = $uploadedFile->store('naskah_ujian', 'public');
 
-        DB::transaction(function () use ($ujian, $parsed, $storedPath, $timer) {
+        DB::transaction(function () use ($ujian, $parsed, $soalsPg, $soalsEssay, $storedPath, $timerPg, $timerEssay) {
             // Hapus soal lama
             UjianSoal::where('ujian_id', $ujian->id)->delete();
 
             $soalInserts = [];
             $kunciMap = [];
+            $now = now();
 
-            foreach ($parsed['soals'] as $item) {
+            foreach ($soalsPg as $item) {
                 $no = (int) $item['nomor'];
                 $soalInserts[] = [
-                    'ujian_id'      => $ujian->id,
-                    'nomor_soal'    => $no,
-                    'pertanyaan'    => $item['pertanyaan'],
-                    'opsi_a'        => $item['opsi_a'],
-                    'opsi_b'        => $item['opsi_b'],
-                    'opsi_c'        => $item['opsi_c'],
-                    'opsi_d'        => $item['opsi_d'],
-                    'opsi_e'        => $item['opsi_e'],
-                    'kunci_jawaban' => $item['kunci'] ?? 'A',
-                    'timer_detik'   => $timer,
-                    'created_at'    => now(),
-                    'updated_at'    => now(),
+                    'ujian_id'        => $ujian->id,
+                    'tipe_soal'       => 'pg',
+                    'nomor_soal'      => $no,
+                    'pertanyaan'      => $item['pertanyaan'],
+                    'opsi_a'          => $item['opsi_a'],
+                    'opsi_b'          => $item['opsi_b'],
+                    'opsi_c'          => $item['opsi_c'],
+                    'opsi_d'          => $item['opsi_d'],
+                    'opsi_e'          => $item['opsi_e'],
+                    'kunci_jawaban'   => $item['kunci'] ?? 'A',
+                    'skor_maks'       => null,
+                    'pedoman_jawaban' => null,
+                    'timer_detik'     => !empty($item['timer_detik']) ? (int) $item['timer_detik'] : $timerPg,
+                    'created_at'      => $now,
+                    'updated_at'      => $now,
                 ];
 
                 $kunciMap[$no] = strtoupper($item['kunci'] ?? 'A');
             }
 
-            UjianSoal::insert($soalInserts);
+            foreach ($soalsEssay as $item) {
+                $no = (int) $item['nomor'];
+                $soalInserts[] = [
+                    'ujian_id'        => $ujian->id,
+                    'tipe_soal'       => 'essay',
+                    'nomor_soal'      => $no,
+                    'pertanyaan'      => $item['pertanyaan'],
+                    'opsi_a'          => null,
+                    'opsi_b'          => null,
+                    'opsi_c'          => null,
+                    'opsi_d'          => null,
+                    'opsi_e'          => null,
+                    'kunci_jawaban'   => null,
+                    'skor_maks'       => $item['skor_maks'] ?? null,
+                    'pedoman_jawaban' => $item['pedoman_jawaban'] ?? null,
+                    'timer_detik'     => !empty($item['timer_detik']) ? (int) $item['timer_detik'] : $timerEssay,
+                    'created_at'      => $now,
+                    'updated_at'      => $now,
+                ];
+            }
+
+            if (!empty($soalInserts)) {
+                UjianSoal::insert($soalInserts);
+            }
+
+            $pgCount = count($soalsPg);
+            $essayCount = count($soalsEssay);
+
+            // Tentukan bobot persen otomatis jika berubah komposisi
+            $bobotPg = (float) $ujian->bobot_pg;
+            $bobotEssay = (float) $ujian->bobot_essay;
+            if ($pgCount > 0 && $essayCount === 0) {
+                $bobotPg = 100.00;
+                $bobotEssay = 0.00;
+            } elseif ($pgCount === 0 && $essayCount > 0) {
+                $bobotPg = 0.00;
+                $bobotEssay = 100.00;
+            } elseif ($pgCount > 0 && $essayCount > 0 && ($bobotEssay <= 0 || $bobotPg <= 0 || abs(($bobotPg + $bobotEssay) - 100.0) > 0.05)) {
+                $bobotPg = 70.00;
+                $bobotEssay = 30.00;
+            }
 
             // Update informasi ujian
             $ujian->update([
-                'file_soal'     => $storedPath,
-                'jumlah_soal'   => count($parsed['soals']),
-                'jumlah_opsi'   => $parsed['jumlah_opsi'] ?? $ujian->jumlah_opsi,
-                'timer_default' => $timer,
+                'file_soal'           => $storedPath,
+                'jumlah_soal'         => $pgCount,
+                'jumlah_soal_essay'   => $essayCount,
+                'jumlah_opsi'         => $parsed['jumlah_opsi'] ?? $ujian->jumlah_opsi,
+                'bobot_pg'            => $bobotPg,
+                'bobot_essay'         => $bobotEssay,
+                'timer_default'       => $timerPg,
+                'timer_essay_default' => $timerEssay,
             ]);
 
-            // Sinkronkan ke tabel ujian_kunci
+            // Sinkronkan ke tabel ujian_kunci (khusus PG)
             foreach ($kunciMap as $no => $kunciLetter) {
                 UjianKunci::updateOrCreate(
                     ['ujian_id' => $ujian->id, 'nomor_soal' => $no],
@@ -413,9 +569,9 @@ class UjianController extends Controller
                 );
             }
 
-            // Hapus kunci yang melebihi jumlah soal baru
+            // Hapus kunci yang melebihi jumlah soal PG baru
             UjianKunci::where('ujian_id', $ujian->id)
-                ->where('nomor_soal', '>', count($parsed['soals']))
+                ->where('nomor_soal', '>', $pgCount)
                 ->delete();
         });
 
@@ -482,19 +638,25 @@ class UjianController extends Controller
     }
 
     /**
-     * Update timer per soal
+     * Update timer per soal (PG dan Essay)
      */
     public function updateTimer(Request $request, Ujian $ujian)
     {
         $this->ensureUjianInRoom($ujian);
         $validated = $request->validate([
-            'timer_default'  => 'required|integer|min:10|max:1800',
-            'soal_timer'     => 'nullable|array',
-            'soal_timer.*'   => 'integer|min:10|max:1800',
+            'timer_default'       => 'required|integer|min:10|max:1800',
+            'timer_essay_default' => 'nullable|integer|min:15|max:3600',
+            'soal_timer'          => 'nullable|array',
+            'soal_timer.*'        => 'integer|min:10|max:3600',
         ]);
 
-        DB::transaction(function () use ($ujian, $validated) {
-            $ujian->update(['timer_default' => $validated['timer_default']]);
+        $timerEssay = (int) ($validated['timer_essay_default'] ?? $ujian->timer_essay_default ?? 180);
+
+        DB::transaction(function () use ($ujian, $validated, $timerEssay) {
+            $ujian->update([
+                'timer_default'       => $validated['timer_default'],
+                'timer_essay_default' => $timerEssay,
+            ]);
 
             if (!empty($validated['soal_timer'])) {
                 foreach ($validated['soal_timer'] as $soalId => $detik) {
@@ -504,7 +666,12 @@ class UjianController extends Controller
                 }
             } else {
                 UjianSoal::where('ujian_id', $ujian->id)
+                    ->where('tipe_soal', 'pg')
                     ->update(['timer_detik' => $validated['timer_default']]);
+
+                UjianSoal::where('ujian_id', $ujian->id)
+                    ->where('tipe_soal', 'essay')
+                    ->update(['timer_detik' => $timerEssay]);
             }
         });
 
@@ -611,9 +778,15 @@ class UjianController extends Controller
             $barcodes[$s->id] = QrCodeGenerator::barcode128Svg($barcodePayload, 165, 62);
         }
 
-        $bubbleCoords = LjkTemplateService::getBubbleCoordinates($ujian->jumlah_soal, $ujian->jumlah_opsi);
+        $bubbleCoords = $ujian->jumlah_soal > 0
+            ? LjkTemplateService::getBubbleCoordinates($ujian->jumlah_soal, $ujian->jumlah_opsi)
+            : [];
+        $essayLayout = LjkTemplateService::calculateEssayLayout(
+            (int) $ujian->jumlah_soal,
+            (int) ($ujian->jumlah_soal_essay ?? 0)
+        );
 
-        return view('ujian.cetak-ljk', compact('ujian', 'siswas', 'qrCodes', 'barcodes', 'tipeKode', 'bubbleCoords'));
+        return view('ujian.cetak-ljk', compact('ujian', 'siswas', 'qrCodes', 'barcodes', 'tipeKode', 'bubbleCoords', 'essayLayout'));
     }
 
     // =========================================================================
@@ -653,16 +826,18 @@ class UjianController extends Controller
         $this->ensureUjianInRoom($ujian);
         $ujian->load(['mapel', 'kelas', 'guru', 'soals']);
 
-        $soals = $ujian->soals;
+        $soalsPg = $ujian->soals->filter(fn ($s) => ($s->tipe_soal ?? 'pg') !== 'essay')->values();
+        $soalsEssay = $ujian->soals->filter(fn ($s) => ($s->tipe_soal ?? 'pg') === 'essay')->values();
 
-        // Jika belum ada butir soal di tabel ujian_soal, buat representasi fallback
-        if ($soals->isEmpty()) {
-            $dummy = [];
+        // Fallback PG jika belum ada butir soal PG di tabel ujian_soal
+        if ($soalsPg->isEmpty() && $ujian->hasPg()) {
+            $dummyPg = [];
             for ($no = 1; $no <= $ujian->jumlah_soal; $no++) {
-                $dummy[] = new UjianSoal([
+                $dummyPg[] = new UjianSoal([
                     'id'          => $no,
+                    'tipe_soal'   => 'pg',
                     'nomor_soal'  => $no,
-                    'pertanyaan'  => "Soal nomor {$no}. Silakan kerjakan dan hitamkan bulatan jawaban pada lembar jawab LJK Anda.",
+                    'pertanyaan'  => "Soal Pilihan Ganda nomor {$no}. Silakan kerjakan dan hitamkan bulatan jawaban pada lembar jawab LJK Anda.",
                     'opsi_a'      => 'Pilihan A',
                     'opsi_b'      => 'Pilihan B',
                     'opsi_c'      => 'Pilihan C',
@@ -671,9 +846,25 @@ class UjianController extends Controller
                     'timer_detik' => $ujian->timer_default ?: 90,
                 ]);
             }
-            $soals = collect($dummy);
+            $soalsPg = collect($dummyPg);
         }
 
+        // Fallback Essay jika belum ada butir soal Essay di tabel ujian_soal
+        if ($soalsEssay->isEmpty() && $ujian->hasEssay()) {
+            $dummyEssay = [];
+            for ($no = 1; $no <= $ujian->jumlah_soal_essay; $no++) {
+                $dummyEssay[] = new UjianSoal([
+                    'id'          => 10000 + $no,
+                    'tipe_soal'   => 'essay',
+                    'nomor_soal'  => $no,
+                    'pertanyaan'  => "Soal Essay nomor {$no}. Silakan tuliskan jawaban uraian Anda pada kolom Jawaban Essay di Lembar Jawab.",
+                    'timer_detik' => $ujian->timer_essay_default ?: 180,
+                ]);
+            }
+            $soalsEssay = collect($dummyEssay);
+        }
+
+        $soals = $soalsPg->concat($soalsEssay)->values();
         $activeSlot = $request->input('jam_ujian', 'Jam Sesi Ujian');
 
         return view('ujian.proyektor', compact('ujian', 'soals', 'activeSlot'));
@@ -684,7 +875,35 @@ class UjianController extends Controller
     // =========================================================================
 
     /**
-     * Sub menu 4: Halaman Koreksi LJK
+     * Helper daftar siswa kelas untuk ujian tertentu (aktif)
+     */
+    protected function getSiswasForUjian(?Ujian $ujian, ?Lembaga $scoped)
+    {
+        $siswasKelas = collect();
+        if ($ujian && $ujian->kelas_id && $ujian->kelas) {
+            $namaKelas = $ujian->kelas->nama_kelas;
+            $q = Siswa::where(function ($sub) use ($namaKelas) {
+                $sub->where('kelas', $namaKelas)
+                    ->orWhereHas('pendaftaran', fn ($sq) => $sq->where('kelas', $namaKelas));
+            })->where('status', 'aktif');
+            if ($scoped) {
+                $q->forLembaga($scoped->kode);
+            }
+            $siswasKelas = $q->orderBy('nama_lengkap')->get(['id', 'nama_lengkap', 'nisn']);
+        }
+        if ($siswasKelas->isEmpty()) {
+            $fallback = Siswa::where('status', 'aktif');
+            if ($scoped) {
+                $fallback->forLembaga($scoped->kode);
+            }
+            $siswasKelas = $fallback->orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap', 'nisn']);
+        }
+
+        return $siswasKelas;
+    }
+
+    /**
+     * Sub menu 4: Halaman Koreksi LJK & Input/Upload Nilai Essay
      */
     public function koreksiIndex(Request $request)
     {
@@ -698,59 +917,29 @@ class UjianController extends Controller
         $selectedUjianId = $request->input('ujian_id') ?: ($ujians->first()?->id ?? null);
         $ujian = $selectedUjianId ? $ujians->firstWhere('id', (int) $selectedUjianId) : null;
 
-        $siswasKelas = collect();
-        if ($ujian && $ujian->kelas_id && $ujian->kelas) {
-            $namaKelas = $ujian->kelas->nama_kelas;
-            $q = Siswa::where(function ($sub) use ($namaKelas) {
-                $sub->where('kelas', $namaKelas)
-                    ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
-            });
-            if ($scoped) {
-                $q->forLembaga($scoped->kode);
-            }
-            $siswasKelas = $q->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
-        }
-        if ($siswasKelas->isEmpty()) {
-            $fallback = Siswa::query();
-            if ($scoped) {
-                $fallback->forLembaga($scoped->kode);
-            }
-            $siswasKelas = $fallback->orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
-        }
+        $siswasKelas = $this->getSiswasForUjian($ujian, $scoped);
+        $hasilsBySiswa = $ujian
+            ? UjianHasil::where('ujian_id', $ujian->id)->get()->keyBy('siswa_id')
+            : collect();
+        $activeTab = $request->input('tab', ($ujian && !$ujian->hasPg() && $ujian->hasEssay()) ? 'essay' : 'omr');
 
-        return view('ujian.upload-scan', compact('ujians', 'ujian', 'siswasKelas'));
+        return view('ujian.upload-scan', compact('ujians', 'ujian', 'siswasKelas', 'hasilsBySiswa', 'activeTab'));
     }
 
     /**
-     * Upload scan LJK untuk satu ujian
+     * Upload scan LJK & Input/Upload Nilai Essay untuk satu ujian
      */
-    public function uploadScan(Ujian $ujian)
+    public function uploadScan(Request $request, Ujian $ujian)
     {
         $this->ensureUjianInRoom($ujian);
         $scoped = $this->scopedFormal();
         $ujians = Ujian::with(['mapel', 'kelas', 'guru'])->withCount('hasils')->forLembaga($scoped)->latest('tanggal_ujian')->get();
 
-        $siswasKelas = collect();
-        if ($ujian && $ujian->kelas_id && $ujian->kelas) {
-            $namaKelas = $ujian->kelas->nama_kelas;
-            $q = Siswa::where(function ($sub) use ($namaKelas) {
-                $sub->where('kelas', $namaKelas)
-                    ->orWhereHas('pendaftaran', fn($sq) => $sq->where('kelas', $namaKelas));
-            });
-            if ($scoped) {
-                $q->forLembaga($scoped->kode);
-            }
-            $siswasKelas = $q->orderBy('nama_lengkap')->get(['id', 'nama_lengkap']);
-        }
-        if ($siswasKelas->isEmpty()) {
-            $fallback = Siswa::query();
-            if ($scoped) {
-                $fallback->forLembaga($scoped->kode);
-            }
-            $siswasKelas = $fallback->orderBy('nama_lengkap')->take(100)->get(['id', 'nama_lengkap']);
-        }
+        $siswasKelas = $this->getSiswasForUjian($ujian, $scoped);
+        $hasilsBySiswa = UjianHasil::where('ujian_id', $ujian->id)->get()->keyBy('siswa_id');
+        $activeTab = $request->input('tab', (!$ujian->hasPg() && $ujian->hasEssay()) ? 'essay' : 'omr');
 
-        return view('ujian.upload-scan', compact('ujians', 'ujian', 'siswasKelas'));
+        return view('ujian.upload-scan', compact('ujians', 'ujian', 'siswasKelas', 'hasilsBySiswa', 'activeTab'));
     }
 
     /**
@@ -805,6 +994,330 @@ class UjianController extends Controller
                 'message' => 'Terjadi kesalahan saat memproses file: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Simpan input langsung Nilai Essay (0-100) oleh Guru per siswa dan hitung ulang Nilai Akhir
+     */
+    public function saveNilaiEssay(Request $request, Ujian $ujian)
+    {
+        $this->ensureUjianInRoom($ujian);
+        $scoped = $this->scopedFormal();
+
+        $request->validate([
+            'nilai_essay'   => 'required|array',
+            'nilai_essay.*' => 'nullable|numeric|min:0|max:100',
+        ]);
+
+        $inputs = $request->input('nilai_essay', []);
+        $savedCount = 0;
+
+        DB::transaction(function () use ($ujian, $scoped, $inputs, &$savedCount) {
+            foreach ($inputs as $siswaIdRaw => $valRaw) {
+                $siswaId = (int) $siswaIdRaw;
+                if ($siswaId <= 0) {
+                    continue;
+                }
+
+                $siswaQuery = Siswa::whereKey($siswaId);
+                if ($scoped) {
+                    $siswaQuery->forLembaga($scoped->kode);
+                }
+                if (!$siswaQuery->exists()) {
+                    continue;
+                }
+
+                $existing = UjianHasil::where('ujian_id', $ujian->id)
+                    ->where('siswa_id', $siswaId)
+                    ->first();
+
+                $isBlank = ($valRaw === null || trim((string) $valRaw) === '');
+
+                if ($isBlank) {
+                    if ($existing && $existing->nilai_essay !== null) {
+                        $nilaiPg = $existing->nilai_pg !== null ? (float) $existing->nilai_pg : 0.0;
+                        $existing->update([
+                            'nilai_essay' => null,
+                            'nilai_akhir' => $ujian->hitungNilaiAkhir($nilaiPg, null),
+                        ]);
+                        $savedCount++;
+                    }
+                    continue;
+                }
+
+                $nilaiEssay = round((float) str_replace(',', '.', (string) $valRaw), 2);
+                $nilaiEssay = max(0.0, min(100.0, $nilaiEssay));
+
+                if ($existing) {
+                    $nilaiPg = $existing->nilai_pg !== null ? (float) $existing->nilai_pg : 0.0;
+                    $existing->update([
+                        'nilai_pg'    => $nilaiPg,
+                        'nilai_essay' => $nilaiEssay,
+                        'nilai_akhir' => $ujian->hitungNilaiAkhir($nilaiPg, $nilaiEssay),
+                    ]);
+                } else {
+                    $nilaiPg = 0.0;
+                    UjianHasil::create([
+                        'ujian_id'      => $ujian->id,
+                        'siswa_id'      => $siswaId,
+                        'jawaban_siswa' => [],
+                        'jumlah_benar'  => 0,
+                        'jumlah_salah'  => 0,
+                        'jumlah_kosong' => (int) $ujian->jumlah_soal,
+                        'nilai_pg'      => $nilaiPg,
+                        'nilai_essay'   => $nilaiEssay,
+                        'nilai_akhir'   => $ujian->hitungNilaiAkhir($nilaiPg, $nilaiEssay),
+                        'status_scan'   => 'valid',
+                        'catatan_scan'  => $ujian->hasPg()
+                            ? 'Nilai Essay diinput Guru (LJK PG belum discan).'
+                            : 'Nilai Essay diinput oleh Guru.',
+                        'waktu_scan'    => now(),
+                    ]);
+                }
+
+                $savedCount++;
+            }
+        });
+
+        return redirect()->route('ujian.upload-scan', ['ujian' => $ujian->id, 'tab' => 'essay'])
+            ->with('success', "Nilai Essay untuk {$savedCount} siswa berhasil disimpan dan Nilai Akhir otomatis diperbarui.");
+    }
+
+    /**
+     * Unduh Template Excel (.xlsx) untuk Upload Nilai Essay oleh Guru
+     */
+    public function downloadTemplateNilaiEssay(Ujian $ujian)
+    {
+        $this->ensureUjianInRoom($ujian);
+        $ujian->load(['mapel', 'kelas']);
+
+        $siswas = $this->getSiswasForUjian($ujian, $this->scopedFormal());
+        $hasilsBySiswa = UjianHasil::where('ujian_id', $ujian->id)->get()->keyBy('siswa_id');
+        $weights = $ujian->getEffectiveWeights();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Nilai Essay');
+
+        $sheet->setCellValue('A1', 'TEMPLATE UPLOAD NILAI ESSAY UJIAN');
+        $sheet->setCellValue('A2', 'Ujian: ' . $ujian->nama_ujian . ' | Kelas: ' . ($ujian->kelas?->nama_kelas ?? '-') . ' | Mapel: ' . ($ujian->mapel?->mata_pelajaran ?? '-'));
+        $sheet->setCellValue('A3', "Bobot Penilaian: PG {$weights['pg']}% | Essay {$weights['essay']}% — Isi kolom Nilai Essay dengan angka 0 s.d. 100, jangan ubah ID Siswa.");
+
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A2')->getFont()->setBold(true);
+        $sheet->getStyle('A3')->getFont()->setItalic(true)->getColor()->setRGB('475569');
+
+        $headers = ['ID Siswa', 'NISN', 'Nama Siswa', 'Nilai PG', 'Nilai Essay (0-100)'];
+        $col = 'A';
+        foreach ($headers as $h) {
+            $sheet->setCellValue($col . '5', $h);
+            $sheet->getStyle($col . '5')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+            $sheet->getStyle($col . '5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('0052FF');
+            $sheet->getStyle($col . '5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $col++;
+        }
+
+        $row = 6;
+        foreach ($siswas as $siswa) {
+            $hasil = $hasilsBySiswa->get($siswa->id);
+            $sheet->setCellValue('A' . $row, $siswa->id);
+            $sheet->setCellValueExplicit('B' . $row, (string) ($siswa->nisn ?: '-'), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue('C' . $row, $siswa->nama_lengkap);
+            $sheet->setCellValue('D' . $row, $hasil && $hasil->nilai_pg !== null ? (float) $hasil->nilai_pg : '');
+            $sheet->setCellValue('E' . $row, $hasil && $hasil->nilai_essay !== null ? (float) $hasil->nilai_essay : '');
+
+            $sheet->getStyle('A' . $row . ':B' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D' . $row . ':E' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('E' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('FEF9C3');
+            $row++;
+        }
+
+        foreach (range('A', 'E') as $c) {
+            $sheet->getColumnDimension($c)->setAutoSize(true);
+        }
+
+        $safeName = preg_replace('/[^A-Za-z0-9_\-]+/', '_', $ujian->nama_ujian);
+        $filename = 'Template_Nilai_Essay_' . trim($safeName, '_') . '.xlsx';
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type'  => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'max-age=0',
+        ]);
+    }
+
+    /**
+     * Upload file Excel/CSV Nilai Essay dari Guru dan hitung ulang Nilai Akhir
+     */
+    public function uploadNilaiEssay(Request $request, Ujian $ujian)
+    {
+        $this->ensureUjianInRoom($ujian);
+        $scoped = $this->scopedFormal();
+
+        $request->validate([
+            'file_essay' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+        ], [
+            'file_essay.required' => 'Silakan pilih file Excel/CSV nilai essay terlebih dahulu.',
+            'file_essay.mimes'    => 'Format file harus .xlsx, .xls, atau .csv.',
+        ]);
+
+        try {
+            $spreadsheet = IOFactory::load($request->file('file_essay')->getRealPath());
+            $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+        } catch (\Throwable $e) {
+            return redirect()->route('ujian.upload-scan', ['ujian' => $ujian->id, 'tab' => 'essay'])
+                ->with('error', 'Gagal membaca file Excel: ' . $e->getMessage());
+        }
+
+        // Deteksi baris header otomatis
+        $headerIdx = null;
+        $colId = null;
+        $colNisn = null;
+        $colNama = null;
+        $colEssay = null;
+
+        foreach ($rows as $idx => $r) {
+            if ($idx > 15) {
+                break;
+            }
+            $normalized = array_map(fn ($v) => strtolower(trim((string) $v)), $r);
+            foreach ($normalized as $cIdx => $label) {
+                if ($label === '') {
+                    continue;
+                }
+                if ($colId === null && (str_contains($label, 'id siswa') || $label === 'id')) {
+                    $colId = $cIdx;
+                } elseif ($colNisn === null && (str_contains($label, 'nisn') || $label === 'nis')) {
+                    $colNisn = $cIdx;
+                } elseif ($colNama === null && str_contains($label, 'nama')) {
+                    $colNama = $cIdx;
+                } elseif ($colEssay === null && (str_contains($label, 'essay') || str_contains($label, 'esai') || str_contains($label, 'uraian'))) {
+                    $colEssay = $cIdx;
+                }
+            }
+            if ($colEssay !== null && ($colId !== null || $colNisn !== null || $colNama !== null)) {
+                $headerIdx = $idx;
+                break;
+            }
+            $colId = $colNisn = $colNama = $colEssay = null;
+        }
+
+        if ($headerIdx === null || $colEssay === null) {
+            return redirect()->route('ujian.upload-scan', ['ujian' => $ujian->id, 'tab' => 'essay'])
+                ->with('error', 'Header kolom tidak dikenali. Gunakan tombol "Unduh Template Excel" agar format kolom (ID Siswa, NISN, Nama Siswa, Nilai Essay) sesuai.');
+        }
+
+        // Indeks siswa di kelas/room agar pencocokan cepat dan aman lintas lembaga
+        $allSiswaQuery = Siswa::query();
+        if ($scoped) {
+            $allSiswaQuery->forLembaga($scoped->kode);
+        }
+        $allSiswas = $allSiswaQuery->get(['id', 'nama_lengkap', 'nisn']);
+        $byId = $allSiswas->keyBy('id');
+        $byNisn = [];
+        $byNama = [];
+        foreach ($allSiswas as $sw) {
+            $cleanNisn = preg_replace('/\D+/', '', (string) ($sw->nisn ?? ''));
+            if ($cleanNisn !== '') {
+                $byNisn[$cleanNisn] = $sw;
+            }
+            $cleanNama = strtolower(trim(preg_replace('/\s+/', ' ', (string) $sw->nama_lengkap)));
+            if ($cleanNama !== '') {
+                $byNama[$cleanNama] = $sw;
+            }
+        }
+
+        $imported = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($rows, $headerIdx, $colId, $colNisn, $colNama, $colEssay, $byId, $byNisn, $byNama, $ujian, &$imported, &$skipped) {
+            for ($i = $headerIdx + 1; $i < count($rows); $i++) {
+                $r = $rows[$i];
+                $rawScore = $r[$colEssay] ?? null;
+
+                if ($rawScore === null || trim((string) $rawScore) === '') {
+                    continue;
+                }
+
+                $scoreStr = str_replace(',', '.', trim((string) $rawScore));
+                if (!is_numeric($scoreStr)) {
+                    $skipped++;
+                    continue;
+                }
+
+                $nilaiEssay = round((float) $scoreStr, 2);
+                if ($nilaiEssay < 0 || $nilaiEssay > 100) {
+                    $skipped++;
+                    continue;
+                }
+
+                $siswa = null;
+                if ($colId !== null && !empty($r[$colId])) {
+                    $siswa = $byId->get((int) $r[$colId]);
+                }
+                if (!$siswa && $colNisn !== null && !empty($r[$colNisn])) {
+                    $cleanNisn = preg_replace('/\D+/', '', (string) $r[$colNisn]);
+                    $siswa = $byNisn[$cleanNisn] ?? null;
+                }
+                if (!$siswa && $colNama !== null && !empty($r[$colNama])) {
+                    $cleanNama = strtolower(trim(preg_replace('/\s+/', ' ', (string) $r[$colNama])));
+                    $siswa = $byNama[$cleanNama] ?? null;
+                }
+
+                if (!$siswa) {
+                    $skipped++;
+                    continue;
+                }
+
+                $existing = UjianHasil::where('ujian_id', $ujian->id)
+                    ->where('siswa_id', $siswa->id)
+                    ->first();
+
+                if ($existing) {
+                    $nilaiPg = $existing->nilai_pg !== null ? (float) $existing->nilai_pg : 0.0;
+                    $existing->update([
+                        'nilai_pg'    => $nilaiPg,
+                        'nilai_essay' => $nilaiEssay,
+                        'nilai_akhir' => $ujian->hitungNilaiAkhir($nilaiPg, $nilaiEssay),
+                    ]);
+                } else {
+                    $nilaiPg = 0.0;
+                    UjianHasil::create([
+                        'ujian_id'      => $ujian->id,
+                        'siswa_id'      => $siswa->id,
+                        'jawaban_siswa' => [],
+                        'jumlah_benar'  => 0,
+                        'jumlah_salah'  => 0,
+                        'jumlah_kosong' => (int) $ujian->jumlah_soal,
+                        'nilai_pg'      => $nilaiPg,
+                        'nilai_essay'   => $nilaiEssay,
+                        'nilai_akhir'   => $ujian->hitungNilaiAkhir($nilaiPg, $nilaiEssay),
+                        'status_scan'   => 'valid',
+                        'catatan_scan'  => $ujian->hasPg()
+                            ? 'Nilai Essay diupload Excel (LJK PG belum discan).'
+                            : 'Nilai Essay diupload via Excel oleh Guru.',
+                        'waktu_scan'    => now(),
+                    ]);
+                }
+
+                $imported++;
+            }
+        });
+
+        if ($imported === 0) {
+            return redirect()->route('ujian.upload-scan', ['ujian' => $ujian->id, 'tab' => 'essay'])
+                ->with('error', 'Tidak ada nilai essay valid yang dapat diimpor. Pastikan kolom Nilai Essay berisi angka 0-100 dan nama/ID siswa cocok.');
+        }
+
+        $msg = "Berhasil mengupload Nilai Essay untuk {$imported} siswa dan menghitung ulang Nilai Akhir.";
+        if ($skipped > 0) {
+            $msg .= " ({$skipped} baris dilewati karena nilai tidak valid atau siswa tidak ditemukan.)";
+        }
+
+        return redirect()->route('ujian.upload-scan', ['ujian' => $ujian->id, 'tab' => 'essay'])
+            ->with('success', $msg);
     }
 
     // =========================================================================
@@ -903,13 +1416,13 @@ class UjianController extends Controller
         if ($request->has('jawaban') && is_array($request->input('jawaban'))) {
             $inputAnswers = $request->input('jawaban');
             foreach ($inputAnswers as $no => $ans) {
-                $noInt = (int)$no;
+                $noInt = (int) $no;
                 if ($noInt >= 1 && $noInt <= $ujian->jumlah_soal) {
-                    $ansClean = trim((string)$ans);
+                    $ansClean = trim((string) $ans);
                     $currentAnswers[$noInt] = $ansClean !== '' ? strtoupper($ansClean) : null;
                 }
             }
-        } else {
+        } elseif ($request->filled('nomor_soal') && $ujian->jumlah_soal > 0) {
             $validated = $request->validate([
                 'nomor_soal' => 'required|integer|min:1|max:' . $ujian->jumlah_soal,
                 'jawaban'    => 'nullable|string|in:A,B,C,D,E,GANDA,null',
@@ -918,6 +1431,17 @@ class UjianController extends Controller
             $nomor = $validated['nomor_soal'];
             $jawabanBaru = $validated['jawaban'] === 'null' ? null : $validated['jawaban'];
             $currentAnswers[$nomor] = $jawabanBaru;
+        }
+
+        $nilaiEssay = $hasil->nilai_essay !== null ? (float) $hasil->nilai_essay : null;
+        if ($request->has('nilai_essay')) {
+            $rawEs = $request->input('nilai_essay');
+            if ($rawEs === null || trim((string) $rawEs) === '') {
+                $nilaiEssay = null;
+            } else {
+                $request->validate(['nilai_essay' => 'numeric|min:0|max:100']);
+                $nilaiEssay = round((float) $rawEs, 2);
+            }
         }
 
         $kunciMap = $ujian->kuncis->pluck('kunci_jawaban', 'nomor_soal')->all();
@@ -933,7 +1457,7 @@ class UjianController extends Controller
         for ($no = 1; $no <= $ujian->jumlah_soal; $no++) {
             $jawab = $currentAnswers[$no] ?? null;
             $kunci = $kunciMap[$no] ?? null;
-            $b = (float)($bobotMap[$no] ?? $ujian->bobot_benar ?? 1.0);
+            $b = (float) ($bobotMap[$no] ?? $ujian->bobot_benar ?? 1.0);
 
             if ($jawab === 'GANDA') {
                 $hasGanda = true;
@@ -948,7 +1472,8 @@ class UjianController extends Controller
             }
         }
 
-        $nilai = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
+        $nilaiPg = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
+        $nilaiAkhir = $ujian->hitungNilaiAkhir($nilaiPg, $nilaiEssay);
 
         $hasil->update([
             'siswa_id'      => $hasil->siswa_id,
@@ -956,7 +1481,9 @@ class UjianController extends Controller
             'jumlah_benar'  => $benar,
             'jumlah_salah'  => $salah,
             'jumlah_kosong' => $kosong,
-            'nilai_akhir'   => $nilai,
+            'nilai_pg'      => $nilaiPg,
+            'nilai_essay'   => $nilaiEssay,
+            'nilai_akhir'   => $nilaiAkhir,
             'status_scan'   => $hasGanda ? 'perlu_cek_manual' : 'valid',
             'catatan_scan'  => $hasGanda ? 'Masih terdapat jawaban ganda.' : 'Telah diverifikasi manual oleh Guru.',
         ]);
@@ -964,7 +1491,7 @@ class UjianController extends Controller
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => "Jawaban berhasil diperbarui. Nilai akhir: $nilai",
+                'message' => "Jawaban berhasil diperbarui. Nilai akhir: $nilaiAkhir",
                 'data'    => $hasil->fresh(),
             ]);
         }
@@ -1025,7 +1552,10 @@ class UjianController extends Controller
                     $salah++;
                 }
             }
-            $nilai = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
+            $nilaiPg = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
+            $existing = UjianHasil::where('ujian_id', $ujian->id)->where('siswa_id', $siswa->id)->first();
+            $existingEssay = ($existing && $existing->nilai_essay !== null) ? (float) $existing->nilai_essay : null;
+            $nilaiAkhir = $ujian->hitungNilaiAkhir($nilaiPg, $existingEssay);
 
             $hasil = UjianHasil::updateOrCreate(
                 [
@@ -1037,7 +1567,8 @@ class UjianController extends Controller
                     'jumlah_benar'  => $benar,
                     'jumlah_salah'  => $salah,
                     'jumlah_kosong' => $kosong,
-                    'nilai_akhir'   => $nilai,
+                    'nilai_pg'      => $nilaiPg,
+                    'nilai_akhir'   => $nilaiAkhir,
                     'status_scan'   => 'valid',
                     'catatan_scan'  => 'Telah diverifikasi manual oleh Guru (' . $siswa->nama_lengkap . ')',
                     'waktu_scan'    => now(),
@@ -1091,27 +1622,52 @@ class UjianController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Hasil Ujian');
 
+        $hasEssay = $ujian->hasEssay();
+        $weights = $ujian->getEffectiveWeights();
+
         $sheet->setCellValue('A1', 'YAYASAN PONDOK PESANTREN AL-MUTTAQIN');
         $sheet->setCellValue('A2', 'REKAPITULASI HASIL UJIAN & KOREKSI LJK');
         $sheet->setCellValue('A4', 'Nama Ujian: ' . $ujian->nama_ujian);
         $sheet->setCellValue('A5', 'Mata Pelajaran: ' . ($ujian->mapel?->mata_pelajaran ?? '-'));
         $sheet->setCellValue('D4', 'Kelas: ' . ($ujian->kelas?->nama_kelas ?? '-'));
         $sheet->setCellValue('D5', 'Tanggal: ' . $ujian->tanggal_ujian?->format('d/m/Y'));
+        if ($hasEssay) {
+            $sheet->setCellValue('G4', 'Komposisi: ' . $ujian->ringkasan_soal);
+            $sheet->setCellValue('G5', "Bobot: PG {$weights['pg']}% | Essay {$weights['essay']}%");
+        }
 
         $sheet->getStyle('A1:A2')->getFont()->setBold(true)->setSize(13);
-        $sheet->getStyle('A4:D5')->getFont()->setBold(true);
+        $sheet->getStyle('A4:G5')->getFont()->setBold(true);
 
-        $headers = [
-            'No',
-            'NISN',
-            'Nama Siswa',
-            'Jumlah Benar',
-            'Jumlah Salah',
-            'Jumlah Kosong',
-            'Nilai Akhir',
-            'Status Koreksi',
-            'Catatan / Rincian',
-        ];
+        if ($hasEssay) {
+            $headers = [
+                'No',
+                'NISN',
+                'Nama Siswa',
+                'Benar PG',
+                'Salah PG',
+                'Kosong PG',
+                "Nilai PG ({$weights['pg']}%)",
+                "Nilai Essay ({$weights['essay']}%)",
+                'Nilai Akhir',
+                'Status Koreksi',
+                'Catatan / Rincian',
+            ];
+            $lastCol = 'K';
+        } else {
+            $headers = [
+                'No',
+                'NISN',
+                'Nama Siswa',
+                'Jumlah Benar',
+                'Jumlah Salah',
+                'Jumlah Kosong',
+                'Nilai Akhir',
+                'Status Koreksi',
+                'Catatan / Rincian',
+            ];
+            $lastCol = 'I';
+        }
 
         $col = 'A';
         $row = 7;
@@ -1132,24 +1688,38 @@ class UjianController extends Controller
             $sheet->setCellValue('D' . $row, $h->jumlah_benar);
             $sheet->setCellValue('E' . $row, $h->jumlah_salah);
             $sheet->setCellValue('F' . $row, $h->jumlah_kosong);
-            $sheet->setCellValue('G' . $row, $h->nilai_akhir);
-            $sheet->setCellValue('H' . $row, $h->status_scan === 'valid' ? 'Valid' : 'Perlu Cek');
-            $sheet->setCellValue('I' . $row, $h->catatan_scan ?? '-');
 
-            $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('B' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('D' . $row . ':G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('H' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            if ($hasEssay) {
+                $sheet->setCellValue('G' . $row, $h->nilai_pg !== null ? (float) $h->nilai_pg : 0);
+                $sheet->setCellValue('H' . $row, $h->nilai_essay !== null ? (float) $h->nilai_essay : '-');
+                $sheet->setCellValue('I' . $row, (float) $h->nilai_akhir);
+                $sheet->setCellValue('J' . $row, $h->status_scan === 'valid' ? 'Valid' : 'Perlu Cek');
+                $sheet->setCellValue('K' . $row, $h->catatan_scan ?? '-');
 
-            if ($h->status_scan !== 'valid') {
-                $sheet->getStyle('H' . $row)->getFont()->getColor()->setRGB('D97706');
+                $sheet->getStyle('A' . $row . ':B' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('D' . $row . ':J' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                if ($h->status_scan !== 'valid') {
+                    $sheet->getStyle('J' . $row)->getFont()->getColor()->setRGB('D97706');
+                }
+            } else {
+                $sheet->setCellValue('G' . $row, (float) $h->nilai_akhir);
+                $sheet->setCellValue('H' . $row, $h->status_scan === 'valid' ? 'Valid' : 'Perlu Cek');
+                $sheet->setCellValue('I' . $row, $h->catatan_scan ?? '-');
+
+                $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('B' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('D' . $row . ':G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('H' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                if ($h->status_scan !== 'valid') {
+                    $sheet->getStyle('H' . $row)->getFont()->getColor()->setRGB('D97706');
+                }
             }
 
             $no++;
             $row++;
         }
 
-        foreach (range('A', 'I') as $c) {
+        foreach (range('A', $lastCol) as $c) {
             $sheet->getColumnDimension($c)->setAutoSize(true);
         }
 
@@ -1195,13 +1765,16 @@ class UjianController extends Controller
                 }
             }
 
-            $nilai = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
+            $nilaiPg = $totalSkorMaks > 0 ? round(($totalDidapat / $totalSkorMaks) * 100, 2) : 0.0;
+            $nilaiEssay = $hasil->nilai_essay !== null ? (float) $hasil->nilai_essay : null;
+            $nilaiAkhir = $ujian->hitungNilaiAkhir($nilaiPg, $nilaiEssay);
 
             $hasil->update([
                 'jumlah_benar'  => $benar,
                 'jumlah_salah'  => $salah,
                 'jumlah_kosong' => $kosong,
-                'nilai_akhir'   => $nilai,
+                'nilai_pg'      => $nilaiPg,
+                'nilai_akhir'   => $nilaiAkhir,
             ]);
         }
     }

@@ -244,6 +244,102 @@
             background: #ffffff;
         }
 
+        /* AREA JAWABAN ESSAY DI HALAMAN 1 (DI BAWAH GRID PG TANPA MENGGESER OMR) */
+        .essay-section-p1 {
+            margin-top: 8px;
+            border: 1px solid #94a3b8;
+            border-radius: 4px;
+            padding: 5px 8px 6px;
+            background: #ffffff;
+        }
+        .essay-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #64748b;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            font-size: 7.8pt;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            color: #0f172a;
+            text-transform: uppercase;
+        }
+        .essay-section-note {
+            font-size: 6.8pt;
+            font-weight: 600;
+            color: #475569;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .essay-item {
+            margin-bottom: 4px;
+        }
+        .essay-item:last-child {
+            margin-bottom: 0;
+        }
+        .essay-line-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 5px;
+            height: 5.3mm;
+        }
+        .essay-num-label {
+            font-size: 8pt;
+            font-weight: 700;
+            color: #0f172a;
+            min-width: 18px;
+            line-height: 1;
+            padding-bottom: 1px;
+        }
+        .essay-write-line {
+            flex: 1;
+            height: 100%;
+            border-bottom: 0.75pt dotted #64748b;
+        }
+
+        /* HALAMAN BELAKANG LANJUTAN ESSAY (OTOMATIS BILA RUANG HALAMAN 1 KURANG) */
+        .ljk-sheet-essay .essay-back-content {
+            position: absolute;
+            top: 14mm;
+            left: 18mm;
+            right: 18mm;
+            bottom: 16mm;
+        }
+        .essay-back-header {
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 12px;
+        }
+        .essay-back-header h2 {
+            font-size: 11pt;
+            font-weight: 800;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            color: #0f172a;
+        }
+        .essay-back-meta {
+            font-size: 8.2pt;
+            color: #334155;
+            margin-top: 3px;
+        }
+        .essay-back-item {
+            margin-bottom: 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 5px 9px 7px;
+        }
+        .essay-back-line-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            height: 6mm;
+        }
+
         /* FOOTER / TANDA TANGAN */
         .ljk-footer {
             position: absolute;
@@ -264,11 +360,17 @@
 
     @php
         $activeCodeType = ($tipeKode ?? 'qr') === 'barcode' ? 'barcode' : 'qr';
+        $essayLayout = $essayLayout ?? ['has_essay' => false, 'page1_numbers' => [], 'page1_lines' => 0, 'extra_pages' => [], 'total_pages_per_siswa' => 1];
     @endphp
 
     <div class="no-print-bar">
         <span style="font-size:13px; font-weight:600; color:#334155;">
-            {{ count($siswas) }} Lembar LJK Siap Cetak
+            {{ count($siswas) }} Siswa Siap Cetak
+            @if(($essayLayout['total_pages_per_siswa'] ?? 1) > 1)
+                &bull; {{ $essayLayout['total_pages_per_siswa'] }} Hal/Siswa (Otomatis Lanjut Halaman Belakang)
+            @elseif($essayLayout['has_essay'] ?? false)
+                &bull; 1 Halaman A4 (PG + Essay)
+            @endif
         </span>
 
         <div style="display:inline-flex; align-items:center; background:#f1f5f9; padding:3px; border-radius:8px; border:1px solid #cbd5e1;">
@@ -291,8 +393,9 @@
     </div>
 
     @php
-        $numCols = count($bubbleCoords) <= 40 ? 4 : 5;
-        $perCol = (int) ceil(count($bubbleCoords) / $numCols);
+        $hasPgGrid = count($bubbleCoords) > 0;
+        $numCols = $hasPgGrid ? (count($bubbleCoords) <= 40 ? 4 : 5) : 4;
+        $perCol = $hasPgGrid ? (int) ceil(count($bubbleCoords) / $numCols) : 0;
         $opsiList = $ujian->jumlah_opsi == 5 ? ['A', 'B', 'C', 'D', 'E'] : ['A', 'B', 'C', 'D'];
     @endphp
 
@@ -360,13 +463,16 @@
                     <strong style="color:#0f172a;">PETUNJUK & TATA TERTIB:</strong>
                     <div style="font-size:6.8pt; color:#334155; line-height:1.35; margin-top:2px; white-space:pre-line;">{{ $ujian->peraturan_efektif }}</div>
                 </div>
+                @if($hasPgGrid)
                 <div class="instruction-samples" style="flex-shrink:0;">
                     <span>Benar: <span class="sample-bubble filled">A</span></span>
                     <span>Salah: <span class="sample-bubble">✓</span> <span class="sample-bubble">✗</span> <span class="sample-bubble">●</span></span>
                 </div>
+                @endif
             </div>
 
-            {{-- OMR BUBBLE GRID --}}
+            {{-- OMR BUBBLE GRID (PILIHAN GANDA) --}}
+            @if($hasPgGrid)
             <div class="omr-grid-container">
                 @for($c = 0; $c < $numCols; $c++)
                     @php
@@ -389,6 +495,30 @@
                     </div>
                 @endfor
             </div>
+            @endif
+
+            {{-- AREA JAWABAN ESSAY PADA HALAMAN 1 (OTOMATIS SESUAI RUANG TERSEDIA) --}}
+            @if(!empty($essayLayout['page1_numbers']))
+            <div class="essay-section-p1">
+                <div class="essay-section-header">
+                    <span>{{ $hasPgGrid ? 'BAGIAN II — JAWABAN ESSAY / URAIAN' : 'LEMBAR JAWABAN ESSAY / URAIAN' }}</span>
+                    @if(!empty($essayLayout['extra_pages']))
+                        <span class="essay-section-note">Nomor {{ min($essayLayout['page1_numbers']) }}–{{ max($essayLayout['page1_numbers']) }} (Berlanjut di halaman belakang)</span>
+                    @endif
+                </div>
+
+                @foreach($essayLayout['page1_numbers'] as $essayNo)
+                <div class="essay-item">
+                    @for($ln = 0; $ln < $essayLayout['page1_lines']; $ln++)
+                    <div class="essay-line-row">
+                        <span class="essay-num-label">{{ $ln === 0 ? $essayNo . '.' : '' }}</span>
+                        <div class="essay-write-line"></div>
+                    </div>
+                    @endfor
+                </div>
+                @endforeach
+            </div>
+            @endif
 
             {{-- FOOTER / CATATAN KALIBRASI --}}
             <div class="ljk-footer">
@@ -401,6 +531,51 @@
             </div>
         </div>
     </div>
+
+    {{-- HALAMAN BELAKANG OTOMATIS BILA SOAL ESSAY MELEBIHI RUANG HALAMAN 1 --}}
+    @if(!empty($essayLayout['extra_pages']))
+        @foreach($essayLayout['extra_pages'] as $extraPage)
+        <div class="ljk-sheet ljk-sheet-essay">
+            <div class="essay-back-content">
+                <div class="essay-back-header">
+                    <div>
+                        <h2>LANJUTAN JAWABAN ESSAY / URAIAN</h2>
+                        <div class="essay-back-meta">
+                            <strong>Nama:</strong> {{ $siswa->nama_lengkap }} &bull;
+                            <strong>NISN:</strong> {{ $siswa->nisn ?: '-' }} &bull;
+                            <strong>Kelas:</strong> {{ $ujian->kelas?->nama_kelas ?? '-' }} &bull;
+                            <strong>Mapel:</strong> {{ $ujian->mapel?->mata_pelajaran ?? '-' }}
+                        </div>
+                    </div>
+                    <div style="text-align:right; font-size:8pt; font-weight:700; color:#334155;">
+                        <div>{{ $ujian->kode_ujian }}</div>
+                        <div>Halaman {{ $extraPage['page_number'] }} dari {{ $essayLayout['total_pages_per_siswa'] }}</div>
+                    </div>
+                </div>
+
+                @foreach($extraPage['numbers'] as $essayNo)
+                <div class="essay-back-item">
+                    @for($ln = 0; $ln < $extraPage['lines']; $ln++)
+                    <div class="essay-back-line-row">
+                        <span class="essay-num-label">{{ $ln === 0 ? $essayNo . '.' : '' }}</span>
+                        <div class="essay-write-line"></div>
+                    </div>
+                    @endfor
+                </div>
+                @endforeach
+
+                <div class="ljk-footer" style="bottom:0;">
+                    <div>
+                        Lanjutan Jawaban Essay &bull; {{ $ujian->nama_ujian }} &bull; Halaman {{ $extraPage['page_number'] }}/{{ $essayLayout['total_pages_per_siswa'] }}
+                    </div>
+                    <div style="text-align:right;">
+                        Paraf Pengawas: _____________________
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endforeach
+    @endif
     @endforeach
 
     <script>

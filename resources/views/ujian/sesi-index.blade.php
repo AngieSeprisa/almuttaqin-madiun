@@ -197,8 +197,16 @@
                             {{ $u->guru?->name ?? '-' }}
                         </td>
                         <td style="text-align:center;">
-                            <div style="font-weight:700; color:var(--text-primary); font-size:13px;">{{ $u->jumlah_soal }} Butir</div>
-                            <div style="font-size:11.5px; color:var(--text-muted);">{{ $u->timer_default }} dtk/soal</div>
+                            <div style="font-weight:700; color:var(--text-primary); font-size:13px;">{{ $u->ringkasan_soal }}</div>
+                            <div style="font-size:11.5px; color:var(--text-muted);">
+                                @if($u->hasPg() && $u->hasEssay())
+                                    PG {{ $u->timer_default }}d &bull; Essay {{ $u->timer_essay_default ?? 180 }}d
+                                @elseif($u->hasEssay())
+                                    {{ $u->timer_essay_default ?? 180 }} dtk/soal
+                                @else
+                                    {{ $u->timer_default }} dtk/soal
+                                @endif
+                            </div>
                         </td>
                         <td style="text-align:center;">
                             <a href="{{ route('ujian.proyektor', $u->id) }}" class="btn btn-sm btn-primary" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:12px; font-weight:600; text-decoration:none;">
@@ -278,8 +286,13 @@
 
         if (match) {
             matchedUjian = match;
+            const essayCount = parseInt(match.jumlah_soal_essay || 0, 10);
+            const pgCount = parseInt(match.jumlah_soal || 0, 10);
+            const komposisi = essayCount > 0 && pgCount > 0
+                ? `${pgCount} PG + ${essayCount} Essay`
+                : (essayCount > 0 ? `${essayCount} Soal Essay` : `${pgCount} Butir Soal`);
             document.getElementById('matchExamTitle').textContent = match.nama_ujian;
-            document.getElementById('matchExamMeta').textContent = `${match.jumlah_soal} Butir Soal • Timer: ${match.timer_default} detik/soal • Kode: ${match.kode_ujian}`;
+            document.getElementById('matchExamMeta').textContent = `${komposisi} • Timer PG: ${match.timer_default} dtk${essayCount > 0 ? ` • Essay: ${match.timer_essay_default || 180} dtk` : ''} • Kode: ${match.kode_ujian}`;
             matchBox.style.display = 'flex';
             noBox.style.display = 'none';
             btn.disabled = false;

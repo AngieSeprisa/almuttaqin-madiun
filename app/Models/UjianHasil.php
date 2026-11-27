@@ -18,6 +18,9 @@ class UjianHasil extends Model
         'jumlah_benar',
         'jumlah_salah',
         'jumlah_kosong',
+        'nilai_pg',
+        'nilai_essay',
+        'skor_essay_detail',
         'nilai_akhir',
         'status_scan',
         'catatan_scan',
@@ -25,12 +28,15 @@ class UjianHasil extends Model
     ];
 
     protected $casts = [
-        'jawaban_siswa' => 'array',
-        'jumlah_benar'  => 'integer',
-        'jumlah_salah'  => 'integer',
-        'jumlah_kosong' => 'integer',
-        'nilai_akhir'   => 'decimal:2',
-        'waktu_scan'    => 'datetime',
+        'jawaban_siswa'     => 'array',
+        'jumlah_benar'      => 'integer',
+        'jumlah_salah'      => 'integer',
+        'jumlah_kosong'     => 'integer',
+        'nilai_pg'          => 'decimal:2',
+        'nilai_essay'       => 'decimal:2',
+        'skor_essay_detail' => 'array',
+        'nilai_akhir'       => 'decimal:2',
+        'waktu_scan'        => 'datetime',
     ];
 
     /**

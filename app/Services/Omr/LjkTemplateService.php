@@ -170,5 +170,82 @@ class LjkTemplateService
     {
         return 'LJK-' . $ujian->id . '-' . str_pad((string) $siswa->id, 4, '0', STR_PAD_LEFT);
     }
+
+    /**
+     * Hitung tata letak otomatis area jawaban Essay pada LJK A4:
+     * - Prioritaskan muat dalam 1 halaman A4 (di bawah grid OMR PG tanpa menggeser koordinat OMR).
+     * - Jika ruang halaman 1 tidak mencukupi seluruh nomor essay, otomatis tambahkan halaman belakang lanjutan.
+     */
+    public static function calculateEssayLayout(int $jumlahPg, int $jumlahEssay): array
+    {
+        $jumlahPg = max(0, $jumlahPg);
+        $jumlahEssay = max(0, $jumlahEssay);
+
+        if ($jumlahEssay === 0) {
+            return [
+                'has_essay'            => false,
+                'page1_numbers'        => [],
+                'page1_lines'          => 0,
+                'extra_pages'          => [],
+                'total_pages_per_siswa' => 1,
+            ];
+        }
+
+        // Batas bawah aman area konten halaman 1 (di atas .ljk-footer dan marker bawah)
+        $safeBottomPage1Mm = 255.0;
+        $essayHeaderMm = 8.5;
+
+        if ($jumlahPg > 0) {
+            $numCols = $jumlahPg <= 40 ? 4 : 5;
+            $rows = (int) ceil($jumlahPg / $numCols);
+            $pgBottomMm = self::NOMINAL_GRID_START_Y_MM + ($rows * self::ROW_HEIGHT_MM) + 4.0;
+            $minItemHeightMm = 21.5; // 1 baris label nomor + 3 garis tulis @ 5.3mm
+        } else {
+            // Ujian khusus Essay (tanpa grid bulatan PG)
+            $pgBottomMm = 74.0;
+            $minItemHeightMm = 28.0; // ruang lebih lega pada halaman 1
+        }
+
+        $availPage1Mm = max(0.0, $safeBottomPage1Mm - $pgBottomMm);
+        $maxFitPage1 = $availPage1Mm >= ($essayHeaderMm + $minItemHeightMm)
+            ? (int) floor(($availPage1Mm - $essayHeaderMm) / $minItemHeightMm)
+            : 0;
+
+        $countPage1 = min($jumlahEssay, $maxFitPage1);
+        $page1Numbers = $countPage1 > 0 ? range(1, $countPage1) : [];
+
+        $page1Lines = 0;
+        if ($countPage1 > 0) {
+            $perItemMm = ($availPage1Mm - $essayHeaderMm) / $countPage1;
+            $page1Lines = min(5, max(3, (int) floor(($perItemMm - 5.5) / 5.3)));
+        }
+
+        $extraPages = [];
+        if ($countPage1 < $jumlahEssay) {
+            $remaining = range($countPage1 + 1, $jumlahEssay);
+            $maxPerBackPage = 6; // maks 6 nomor essay per halaman belakang A4 agar tetap lega ditulis
+            $chunks = array_chunk($remaining, $maxPerBackPage);
+
+            foreach ($chunks as $idx => $chunk) {
+                $chunkCount = count($chunk);
+                $perItemBackMm = 226.0 / max(1, $chunkCount);
+                $linesBack = min(8, max(4, (int) floor(($perItemBackMm - 6.5) / 6.0)));
+
+                $extraPages[] = [
+                    'page_number' => $idx + 2,
+                    'numbers'     => $chunk,
+                    'lines'       => $linesBack,
+                ];
+            }
+        }
+
+        return [
+            'has_essay'             => true,
+            'page1_numbers'         => $page1Numbers,
+            'page1_lines'           => $page1Lines,
+            'extra_pages'           => $extraPages,
+            'total_pages_per_siswa' => 1 + count($extraPages),
+        ];
+    }
 }
 

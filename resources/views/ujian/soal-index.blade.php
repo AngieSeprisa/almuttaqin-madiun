@@ -163,13 +163,27 @@
                             {{ $ujian->guru?->name ?? '-' }}
                         </td>
                         <td style="text-align:center;">
-                            <div style="font-weight:700; color:var(--text-primary); font-size:13px;">{{ $ujian->jumlah_soal }} Butir</div>
-                            <div style="font-size:11.5px; color:var(--text-muted);">{{ $ujian->timer_default }} dtk/soal</div>
+                            <div style="font-weight:700; color:var(--text-primary); font-size:13px;">{{ $ujian->ringkasan_soal }}</div>
+                            <div style="font-size:11.5px; color:var(--text-muted);">
+                                @if($ujian->hasPg() && $ujian->hasEssay())
+                                    PG {{ (float) $ujian->bobot_pg }}% &bull; Essay {{ (float) $ujian->bobot_essay }}%
+                                @elseif($ujian->hasEssay())
+                                    {{ $ujian->timer_essay_default ?? 180 }} dtk/essay
+                                @else
+                                    {{ $ujian->timer_default }} dtk/soal
+                                @endif
+                            </div>
                         </td>
                         <td style="text-align:center;">
                             @if($ujian->soals_count > 0)
                                 <span class="status-pill status-sudah_kembali" style="font-size:11px; padding:3px 8px;">
-                                    {{ $ujian->soals_count }} Soal
+                                    @if(($ujian->soals_essay_count ?? 0) > 0 && ($ujian->soals_pg_count ?? 0) > 0)
+                                        {{ $ujian->soals_pg_count }} PG + {{ $ujian->soals_essay_count }} Essay
+                                    @elseif(($ujian->soals_essay_count ?? 0) > 0)
+                                        {{ $ujian->soals_essay_count }} Essay
+                                    @else
+                                        {{ $ujian->soals_count }} Soal
+                                    @endif
                                 </span>
                                 @if($ujian->file_soal)
                                     <div style="margin-top:3px;">
@@ -183,7 +197,11 @@
                             @endif
                         </td>
                         <td style="text-align:center;">
-                            @if($ujian->kuncis_count >= $ujian->jumlah_soal && $ujian->jumlah_soal > 0)
+                            @if(!$ujian->hasPg() && $ujian->hasEssay())
+                                <span class="status-pill status-sudah_kembali" style="font-size:11px; padding:3px 8px;">
+                                    Essay ({{ $ujian->jumlah_soal_essay }})
+                                </span>
+                            @elseif($ujian->kuncis_count >= $ujian->jumlah_soal && $ujian->jumlah_soal > 0)
                                 <span class="status-pill status-sudah_kembali" style="font-size:11px; padding:3px 8px;">
                                     Lengkap ({{ $ujian->kuncis_count }})
                                 </span>
@@ -200,7 +218,7 @@
                         <td style="text-align:center;">
                             <div class="action-btn-group">
                                 {{-- Tombol Upload Word --}}
-                                <button type="button" class="action-btn action-btn-success" onclick="openUploadModal({{ $ujian->id }}, '{{ addslashes($ujian->nama_ujian) }}', {{ $ujian->timer_default }})" title="Upload Naskah Word" aria-label="Upload Word {{ $ujian->nama_ujian }}">
+                                <button type="button" class="action-btn action-btn-success" onclick="openUploadModal({{ $ujian->id }}, '{{ addslashes($ujian->nama_ujian) }}', {{ $ujian->timer_default }}, {{ $ujian->timer_essay_default ?? 180 }})" title="Upload Naskah Word" aria-label="Upload Word {{ $ujian->nama_ujian }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                         <polyline points="17 8 12 3 7 8"></polyline>
@@ -209,6 +227,7 @@
                                 </button>
 
                                 {{-- Tombol Kunci Jawaban --}}
+                                @if($ujian->hasPg())
                                 <a href="{{ route('ujian.kunci', $ujian->id) }}" class="action-btn action-btn-view" title="Kunci Jawaban" aria-label="Kunci Jawaban {{ $ujian->nama_ujian }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <circle cx="7.5" cy="15.5" r="5.5"></circle>
@@ -216,9 +235,10 @@
                                         <path d="M15.5 7.5l3 3L22 7l-3-3"></path>
                                     </svg>
                                 </a>
+                                @endif
 
                                 {{-- Tombol Timer --}}
-                                <button type="button" class="action-btn action-btn-edit" onclick="openTimerModal({{ $ujian->id }}, '{{ addslashes($ujian->nama_ujian) }}', {{ $ujian->timer_default }})" title="Atur Timer Soal" aria-label="Atur Timer {{ $ujian->nama_ujian }}">
+                                <button type="button" class="action-btn action-btn-edit" onclick="openTimerModal({{ $ujian->id }}, '{{ addslashes($ujian->nama_ujian) }}', {{ $ujian->timer_default }}, {{ $ujian->timer_essay_default ?? 180 }})" title="Atur Timer Soal" aria-label="Atur Timer {{ $ujian->nama_ujian }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <circle cx="12" cy="12" r="10"></circle>
                                         <polyline points="12 6 12 12 16 14"></polyline>
@@ -284,15 +304,18 @@
                     <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:#1e293b;">Pilih Berkas Word (.docx)</label>
                     <input type="file" name="file_word" accept=".docx" required style="width:100%; font-size:13px; padding:8px; border:1px dashed #cbd5e1; border-radius:8px; background:#f8fafc;">
                     <span style="font-size:11.5px; color:#64748b; margin-top:4px; display:block;">
-                        Format harus .docx. Sistem akan mengekstrak nomor soal, opsi A-E, dan baris Kunci secara otomatis.
+                        Format .docx. Mendukung soal PG (opsi A-E &amp; Kunci:) serta bagian <code>[ESSAY]</code> untuk soal uraian.
                     </span>
                 </div>
-                <div style="margin-bottom:14px;">
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:#1e293b;">Batas Waktu Timer per Soal (Detik)</label>
-                    <input type="number" name="timer_per_soal" id="uploadTimerInput" min="10" max="1800" value="90" style="width:100%; padding:8px 12px; font-size:13px; border:1px solid #cbd5e1; border-radius:8px;">
-                    <span style="font-size:11.5px; color:#64748b; margin-top:4px; display:block;">
-                        Contoh: 60 = 1 menit per soal, 90 = 1.5 menit per soal.
-                    </span>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+                    <div>
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:#1e293b;">Timer Soal PG (Detik)</label>
+                        <input type="number" name="timer_per_soal" id="uploadTimerInput" min="10" max="1800" value="90" style="width:100%; padding:8px 12px; font-size:13px; border:1px solid #cbd5e1; border-radius:8px;">
+                    </div>
+                    <div>
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:#1e293b;">Timer Soal Essay (Detik)</label>
+                        <input type="number" name="timer_essay" id="uploadTimerEssayInput" min="15" max="3600" value="180" style="width:100%; padding:8px 12px; font-size:13px; border:1px solid #cbd5e1; border-radius:8px;">
+                    </div>
                 </div>
             </div>
             <div style="padding:14px 22px; border-top:1px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:flex-end; gap:8px;">
@@ -314,8 +337,12 @@
             </div>
             <div style="padding:20px 22px;">
                 <div style="margin-bottom:14px;">
-                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:#1e293b;">Timer Default Seluruh Soal (Detik)</label>
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:#1e293b;">Timer Default Soal PG (Detik)</label>
                     <input type="number" name="timer_default" id="timerDefaultInput" min="10" max="1800" required style="width:100%; padding:8px 12px; font-size:13px; border:1px solid #cbd5e1; border-radius:8px;">
+                </div>
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px; color:#1e293b;">Timer Default Soal Essay (Detik)</label>
+                    <input type="number" name="timer_essay_default" id="timerEssayDefaultInput" min="15" max="3600" style="width:100%; padding:8px 12px; font-size:13px; border:1px solid #cbd5e1; border-radius:8px;">
                     <span style="font-size:11.5px; color:#64748b; margin-top:4px; display:block;">
                         Waktu hitung mundur per nomor soal saat ditampilkan di layar proyektor.
                     </span>
@@ -330,9 +357,10 @@
 </div>
 
 <script>
-    function openUploadModal(ujianId, namaUjian, timerDefault) {
+    function openUploadModal(ujianId, namaUjian, timerDefault, timerEssayDefault) {
         document.getElementById('uploadModalTitle').textContent = 'Upload Soal: ' + namaUjian;
         document.getElementById('uploadTimerInput').value = timerDefault || 90;
+        document.getElementById('uploadTimerEssayInput').value = timerEssayDefault || 180;
         document.getElementById('formUploadDocx').action = '/ujian/' + ujianId + '/upload-word';
         document.getElementById('uploadModal').style.display = 'flex';
     }
@@ -340,9 +368,10 @@
         document.getElementById('uploadModal').style.display = 'none';
     }
 
-    function openTimerModal(ujianId, namaUjian, timerDefault) {
+    function openTimerModal(ujianId, namaUjian, timerDefault, timerEssayDefault) {
         document.getElementById('timerModalTitle').textContent = 'Atur Timer: ' + namaUjian;
         document.getElementById('timerDefaultInput').value = timerDefault || 90;
+        document.getElementById('timerEssayDefaultInput').value = timerEssayDefault || 180;
         document.getElementById('formTimer').action = '/ujian/' + ujianId + '/timer';
         document.getElementById('timerModal').style.display = 'flex';
     }

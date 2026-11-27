@@ -107,6 +107,40 @@
             letter-spacing: 0.06em;
             margin-bottom: 20px;
         }
+        .q-number-pill.is-essay {
+            background: rgba(168, 85, 247, 0.20);
+            border-color: #a855f7;
+            color: #d8b4fe;
+        }
+        .essay-prompt-box {
+            background: rgba(15, 23, 42, 0.72);
+            border: 2px dashed #475569;
+            border-radius: 14px;
+            padding: 22px 26px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 19px;
+            color: #cbd5e1;
+        }
+        .drawer-section-title {
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #94a3b8;
+            margin: 16px 0 8px;
+        }
+        .num-btn.is-essay-btn {
+            border-color: #7e22ce;
+            color: #e9d5ff;
+        }
+        .num-btn.is-essay-btn.active,
+        .num-btn.is-essay-btn:hover {
+            background: #9333ea;
+            border-color: #9333ea;
+            color: #ffffff;
+        }
         .q-text {
             font-size: 26px;
             line-height: 1.5;
@@ -335,6 +369,8 @@
     <script>
         const soalsData = @json($soals);
         const totalSoals = soalsData.length;
+        const totalPg = soalsData.filter(s => (s.tipe_soal || 'pg') !== 'essay').length;
+        const totalEssay = soalsData.filter(s => (s.tipe_soal || 'pg') === 'essay').length;
         let currentIndex = 0;
         let timeLeft = 0;
         let isPaused = false;
@@ -367,35 +403,60 @@
             const pill = document.getElementById('questionNumberPill');
             const qText = document.getElementById('questionText');
             const optGrid = document.getElementById('optionsGrid');
+            const isEssay = (q.tipe_soal || 'pg') === 'essay';
 
-            pill.textContent = `SOAL NOMOR ${q.nomor_soal} DARI ${totalSoals}`;
+            pill.classList.toggle('is-essay', isEssay);
+            if (isEssay) {
+                pill.textContent = `SOAL ESSAY NOMOR ${q.nomor_soal} DARI ${totalEssay}`;
+            } else if (totalEssay > 0) {
+                pill.textContent = `SOAL PG NOMOR ${q.nomor_soal} DARI ${totalPg}`;
+            } else {
+                pill.textContent = `SOAL NOMOR ${q.nomor_soal} DARI ${totalSoals}`;
+            }
             qText.textContent = q.pertanyaan;
 
-            // Render opsi A-E
-            const opsiList = [];
-            if (q.opsi_a) opsiList.push({ letter: 'A', text: q.opsi_a });
-            if (q.opsi_b) opsiList.push({ letter: 'B', text: q.opsi_b });
-            if (q.opsi_c) opsiList.push({ letter: 'C', text: q.opsi_c });
-            if (q.opsi_d) opsiList.push({ letter: 'D', text: q.opsi_d });
-            if (q.opsi_e) opsiList.push({ letter: 'E', text: q.opsi_e });
-
-            let html = '';
-            opsiList.forEach(item => {
-                html += `
-                    <div class="opt-box">
-                        <div class="opt-letter">${item.letter}</div>
-                        <div>${item.text}</div>
+            if (isEssay) {
+                optGrid.innerHTML = `
+                    <div class="essay-prompt-box">
+                        <div style="width:44px; height:44px; border-radius:12px; background:rgba(168,85,247,0.22); color:#d8b4fe; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <div style="font-weight:700; color:#f8fafc; margin-bottom:2px;">Soal Uraian / Essay</div>
+                            <div style="font-size:16px; color:#94a3b8;">Tuliskan jawaban Anda secara jelas dan rapi pada kolom Jawaban Essay nomor <strong>${q.nomor_soal}</strong> di Lembar Jawab.</div>
+                        </div>
                     </div>
                 `;
-            });
-            optGrid.innerHTML = html;
+            } else {
+                // Render opsi A-E
+                const opsiList = [];
+                if (q.opsi_a) opsiList.push({ letter: 'A', text: q.opsi_a });
+                if (q.opsi_b) opsiList.push({ letter: 'B', text: q.opsi_b });
+                if (q.opsi_c) opsiList.push({ letter: 'C', text: q.opsi_c });
+                if (q.opsi_d) opsiList.push({ letter: 'D', text: q.opsi_d });
+                if (q.opsi_e) opsiList.push({ letter: 'E', text: q.opsi_e });
+
+                let html = '';
+                opsiList.forEach(item => {
+                    html += `
+                        <div class="opt-box">
+                            <div class="opt-letter">${item.letter}</div>
+                            <div>${item.text}</div>
+                        </div>
+                    `;
+                });
+                optGrid.innerHTML = html;
+            }
 
             // Tombol disable check
             document.getElementById('btnPrev').disabled = (currentIndex === 0);
             document.getElementById('btnNext').disabled = (currentIndex === totalSoals - 1);
 
             // Set Timer
-            timeLeft = q.timer_detik || 90;
+            timeLeft = q.timer_detik || (isEssay ? {{ $ujian->timer_essay_default ?? 180 }} : {{ $ujian->timer_default ?? 90 }});
             updateTimerDisplay();
             startTimer();
             updateDrawerActiveNumber();
@@ -492,10 +553,31 @@
 
         function initNumberGrid() {
             const grid = document.getElementById('numberGrid');
-            let html = '';
-            for (let i = 0; i < totalSoals; i++) {
-                html += `<button type="button" class="num-btn" id="numBtn-${i}" onclick="jumpToQuestion(${i})">${i + 1}</button>`;
+            if (totalPg > 0 && totalEssay > 0) {
+                grid.style.display = 'block';
+                let pgBtns = '';
+                let essayBtns = '';
+                soalsData.forEach((s, i) => {
+                    if ((s.tipe_soal || 'pg') === 'essay') {
+                        essayBtns += `<button type="button" class="num-btn is-essay-btn" id="numBtn-${i}" onclick="jumpToQuestion(${i})">E${s.nomor_soal}</button>`;
+                    } else {
+                        pgBtns += `<button type="button" class="num-btn" id="numBtn-${i}" onclick="jumpToQuestion(${i})">${s.nomor_soal}</button>`;
+                    }
+                });
+                grid.innerHTML = `
+                    <div class="drawer-section-title">Pilihan Ganda (${totalPg} Soal)</div>
+                    <div class="number-grid" style="margin-top:6px;">${pgBtns}</div>
+                    <div class="drawer-section-title">Essay / Uraian (${totalEssay} Soal)</div>
+                    <div class="number-grid" style="margin-top:6px;">${essayBtns}</div>
+                `;
+                return;
             }
+
+            let html = '';
+            soalsData.forEach((s, i) => {
+                const isEssay = (s.tipe_soal || 'pg') === 'essay';
+                html += `<button type="button" class="num-btn ${isEssay ? 'is-essay-btn' : ''}" id="numBtn-${i}" onclick="jumpToQuestion(${i})">${isEssay ? 'E' + s.nomor_soal : s.nomor_soal}</button>`;
+            });
             grid.innerHTML = html;
         }
 

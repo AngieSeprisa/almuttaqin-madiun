@@ -19,23 +19,31 @@ class Ujian extends Model
         'kelas_id',
         'guru_id',
         'jumlah_soal',
+        'jumlah_soal_essay',
         'jumlah_opsi',
         'bobot_benar',
+        'bobot_pg',
+        'bobot_essay',
         'tanggal_ujian',
         'status',
         'file_soal',
         'timer_default',
+        'timer_essay_default',
         'peraturan_ujian',
         'jam_mulai',
         'jam_selesai',
     ];
 
     protected $casts = [
-        'jumlah_soal'   => 'integer',
-        'jumlah_opsi'   => 'integer',
-        'timer_default' => 'integer',
-        'bobot_benar'   => 'decimal:2',
-        'tanggal_ujian' => 'date',
+        'jumlah_soal'         => 'integer',
+        'jumlah_soal_essay'   => 'integer',
+        'jumlah_opsi'         => 'integer',
+        'timer_default'       => 'integer',
+        'timer_essay_default' => 'integer',
+        'bobot_benar'         => 'decimal:2',
+        'bobot_pg'            => 'decimal:2',
+        'bobot_essay'         => 'decimal:2',
+        'tanggal_ujian'       => 'date',
     ];
 
     /**
@@ -63,11 +71,101 @@ class Ujian extends Model
     }
 
     /**
-     * Relasi ke Butir Soal Ujian
+     * Relasi ke Butir Soal Ujian (PG lebih dulu lalu Essay)
      */
     public function soals()
     {
-        return $this->hasMany(UjianSoal::class, 'ujian_id')->orderBy('nomor_soal');
+        return $this->hasMany(UjianSoal::class, 'ujian_id')
+            ->orderByRaw("CASE WHEN tipe_soal = 'essay' THEN 1 ELSE 0 END")
+            ->orderBy('nomor_soal');
+    }
+
+    /**
+     * Relasi ke Butir Soal Pilihan Ganda
+     */
+    public function soalsPg()
+    {
+        return $this->hasMany(UjianSoal::class, 'ujian_id')
+            ->where('tipe_soal', 'pg')
+            ->orderBy('nomor_soal');
+    }
+
+    /**
+     * Relasi ke Butir Soal Essay
+     */
+    public function soalsEssay()
+    {
+        return $this->hasMany(UjianSoal::class, 'ujian_id')
+            ->where('tipe_soal', 'essay')
+            ->orderBy('nomor_soal');
+    }
+
+    public function hasPg(): bool
+    {
+        return (int) $this->jumlah_soal > 0;
+    }
+
+    public function hasEssay(): bool
+    {
+        return (int) ($this->jumlah_soal_essay ?? 0) > 0;
+    }
+
+    /**
+     * Kembalikan persentase bobot efektif PG & Essay (total selalu 100%)
+     */
+    public function getEffectiveWeights(): array
+    {
+        $hasPg = $this->hasPg();
+        $hasEssay = $this->hasEssay();
+
+        if ($hasPg && !$hasEssay) {
+            return ['pg' => 100.0, 'essay' => 0.0];
+        }
+
+        if (!$hasPg && $hasEssay) {
+            return ['pg' => 0.0, 'essay' => 100.0];
+        }
+
+        $pg = max(0.0, (float) ($this->bobot_pg ?? 70));
+        $es = max(0.0, (float) ($this->bobot_essay ?? 30));
+        $total = $pg + $es;
+
+        if ($total <= 0.0) {
+            return ['pg' => 70.0, 'essay' => 30.0];
+        }
+
+        return [
+            'pg'    => round(($pg / $total) * 100, 2),
+            'essay' => round(($es / $total) * 100, 2),
+        ];
+    }
+
+    /**
+     * Hitung Nilai Akhir gabungan PG & Essay memakai bobot persen
+     */
+    public function hitungNilaiAkhir(?float $nilaiPg, ?float $nilaiEssay): float
+    {
+        $weights = $this->getEffectiveWeights();
+        $pg = $nilaiPg ?? 0.0;
+        $es = $nilaiEssay ?? 0.0;
+
+        return round((($pg * $weights['pg']) + ($es * $weights['essay'])) / 100.0, 2);
+    }
+
+    /**
+     * Label ringkas komposisi soal (misal: "25 PG + 5 Essay")
+     */
+    public function getRingkasanSoalAttribute(): string
+    {
+        $parts = [];
+        if ($this->hasPg()) {
+            $parts[] = $this->jumlah_soal . ' PG';
+        }
+        if ($this->hasEssay()) {
+            $parts[] = $this->jumlah_soal_essay . ' Essay';
+        }
+
+        return !empty($parts) ? implode(' + ', $parts) : '0 Soal';
     }
 
     /**
@@ -145,14 +243,20 @@ class Ujian extends Model
         $terendah = $totalPeserta > 0 ? $hasils->min('nilai_akhir') : 0;
         $perluCek = $hasils->where('status_scan', 'perlu_cek_manual')->count();
         $valid = $hasils->where('status_scan', 'valid')->count();
+        $essayDinilai = $hasils->whereNotNull('nilai_essay')->count();
+        $rataPg = $totalPeserta > 0 ? round($hasils->avg(fn ($h) => $h->nilai_pg ?? $h->nilai_akhir), 2) : 0;
+        $rataEssay = $essayDinilai > 0 ? round($hasils->whereNotNull('nilai_essay')->avg('nilai_essay'), 2) : 0;
 
         return [
-            'total_peserta' => $totalPeserta,
-            'rata_rata'     => $rataRata,
+            'total_peserta'   => $totalPeserta,
+            'rata_rata'       => $rataRata,
+            'rata_rata_pg'    => $rataPg,
+            'rata_rata_essay' => $rataEssay,
+            'essay_dinilai'   => $essayDinilai,
             'nilai_tertinggi' => $tertinggi,
             'nilai_terendah'  => $terendah,
-            'perlu_cek'     => $perluCek,
-            'valid'         => $valid,
+            'perlu_cek'       => $perluCek,
+            'valid'           => $valid,
         ];
     }
 

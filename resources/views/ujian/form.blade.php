@@ -77,6 +77,16 @@
         @endif
 
         <div class="ujian-form-body">
+            @if($errors->any())
+            <div style="background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:12px 16px; border-radius:10px; margin-bottom:18px; font-size:13px;">
+                <ul style="margin:0; padding-left:18px;">
+                    @foreach($errors->all() as $err)
+                        <li>{{ $err }}</li>
+                    @endforeach
+                </ul>
+            </div>
+            @endif
+
             <div class="form-grid">
                 {{-- KODE UJIAN --}}
                 <div class="form-group">
@@ -136,18 +146,18 @@
                     <input type="date" name="tanggal_ujian" class="form-input" value="{{ old('tanggal_ujian', $ujian->tanggal_ujian?->format('Y-m-d') ?? date('Y-m-d')) }}" required>
                 </div>
 
-                {{-- JUMLAH SOAL --}}
+                {{-- JUMLAH SOAL PG --}}
                 <div class="form-group">
-                    <label class="form-label">Jumlah Soal <span style="color:#ef4444;">*</span></label>
-                    <select name="jumlah_soal" class="form-select" required>
-                        <option value="20" {{ old('jumlah_soal', $ujian->jumlah_soal) == 20 ? 'selected' : '' }}>20 Soal</option>
-                        <option value="25" {{ old('jumlah_soal', $ujian->jumlah_soal) == 25 ? 'selected' : '' }}>25 Soal</option>
-                        <option value="30" {{ old('jumlah_soal', $ujian->jumlah_soal) == 30 ? 'selected' : '' }}>30 Soal</option>
-                        <option value="40" {{ old('jumlah_soal', $ujian->jumlah_soal) == 40 ? 'selected' : '' }}>40 Soal (Standar LJK)</option>
-                        <option value="50" {{ old('jumlah_soal', $ujian->jumlah_soal) == 50 ? 'selected' : '' }}>50 Soal</option>
-                        <option value="60" {{ old('jumlah_soal', $ujian->jumlah_soal) == 60 ? 'selected' : '' }}>60 Soal</option>
-                    </select>
-                    <span class="form-help">Tata letak bulatan LJK akan otomatis disesuaikan secara proporsional.</span>
+                    <label class="form-label">Jumlah Soal Pilihan Ganda <span style="color:#ef4444;">*</span></label>
+                    <input type="number" min="0" max="100" name="jumlah_soal" id="inputJumlahPg" class="form-input" value="{{ old('jumlah_soal', $ujian->jumlah_soal ?? 40) }}" required oninput="syncBobotFields()">
+                    <span class="form-help">Isi 0 jika ujian hanya berupa soal Essay.</span>
+                </div>
+
+                {{-- JUMLAH SOAL ESSAY --}}
+                <div class="form-group">
+                    <label class="form-label">Jumlah Soal Essay / Uraian</label>
+                    <input type="number" min="0" max="50" name="jumlah_soal_essay" id="inputJumlahEssay" class="form-input" value="{{ old('jumlah_soal_essay', $ujian->jumlah_soal_essay ?? 0) }}" oninput="syncBobotFields()">
+                    <span class="form-help">Isi 0 jika hanya PG. LJK otomatis 1 halaman dan menambah halaman belakang bila ruang kurang.</span>
                 </div>
 
                 {{-- JUMLAH OPSI JAWABAN --}}
@@ -159,11 +169,39 @@
                     </select>
                 </div>
 
+                {{-- BOBOT PG (%) --}}
+                <div class="form-group" id="groupBobotPg">
+                    <label class="form-label">Bobot Pilihan Ganda (%)</label>
+                    <input type="number" step="0.5" min="0" max="100" name="bobot_pg" id="inputBobotPg" class="form-input" value="{{ old('bobot_pg', (float) ($ujian->bobot_pg ?? 100)) }}" oninput="onBobotPgChanged()">
+                    <span class="form-help">Persentase kontribusi nilai PG terhadap Nilai Akhir.</span>
+                </div>
+
+                {{-- BOBOT ESSAY (%) --}}
+                <div class="form-group" id="groupBobotEssay">
+                    <label class="form-label">Bobot Essay (%)</label>
+                    <input type="number" step="0.5" min="0" max="100" name="bobot_essay" id="inputBobotEssay" class="form-input" value="{{ old('bobot_essay', (float) ($ujian->bobot_essay ?? 0)) }}" oninput="onBobotEssayChanged()">
+                    <span class="form-help" id="bobotSummaryText">Total Bobot PG + Essay = 100%.</span>
+                </div>
+
+                {{-- TIMER PG --}}
+                <div class="form-group">
+                    <label class="form-label">Timer Soal PG (Detik)</label>
+                    <input type="number" min="10" max="1800" name="timer_default" class="form-input" value="{{ old('timer_default', $ujian->timer_default ?? 90) }}">
+                    <span class="form-help">Waktu tampil proyektor per soal PG (default 90 detik).</span>
+                </div>
+
+                {{-- TIMER ESSAY --}}
+                <div class="form-group" id="groupTimerEssay">
+                    <label class="form-label">Timer Soal Essay (Detik)</label>
+                    <input type="number" min="15" max="3600" name="timer_essay_default" class="form-input" value="{{ old('timer_essay_default', $ujian->timer_essay_default ?? 180) }}">
+                    <span class="form-help">Waktu tampil proyektor per soal Essay (default 180 detik).</span>
+                </div>
+
                 {{-- BOBOT BENAR PER SOAL --}}
                 <div class="form-group">
-                    <label class="form-label">Bobot Benar Default <span style="color:#ef4444;">*</span></label>
+                    <label class="form-label">Bobot Benar Default PG</label>
                     <input type="number" step="0.1" min="0.1" max="100" name="bobot_benar" class="form-input" value="{{ old('bobot_benar', $ujian->bobot_benar ?? 1.00) }}" required>
-                    <span class="form-help">Nilai akhir = (Total Bobot Benar / Total Bobot Maks) &times; 100</span>
+                    <span class="form-help">Nilai PG = (Total Bobot Benar / Total Bobot Maks) &times; 100</span>
                 </div>
 
                 {{-- STATUS UJIAN --}}
@@ -186,5 +224,74 @@
         </div>
     </form>
 </div>
+
+<script>
+    function syncBobotFields() {
+        const pgCount = parseInt(document.getElementById('inputJumlahPg').value || '0', 10);
+        const esCount = parseInt(document.getElementById('inputJumlahEssay').value || '0', 10);
+        const bobotPgEl = document.getElementById('inputBobotPg');
+        const bobotEsEl = document.getElementById('inputBobotEssay');
+        const groupBobotPg = document.getElementById('groupBobotPg');
+        const groupBobotEs = document.getElementById('groupBobotEssay');
+        const groupTimerEs = document.getElementById('groupTimerEssay');
+        const summary = document.getElementById('bobotSummaryText');
+
+        if (esCount <= 0) {
+            bobotPgEl.value = 100;
+            bobotEsEl.value = 0;
+            bobotPgEl.readOnly = true;
+            bobotEsEl.readOnly = true;
+            groupBobotPg.style.display = 'none';
+            groupBobotEs.style.display = 'none';
+            groupTimerEs.style.display = 'none';
+        } else if (pgCount <= 0) {
+            bobotPgEl.value = 0;
+            bobotEsEl.value = 100;
+            bobotPgEl.readOnly = true;
+            bobotEsEl.readOnly = true;
+            groupBobotPg.style.display = 'none';
+            groupBobotEs.style.display = 'flex';
+            groupTimerEs.style.display = 'flex';
+            summary.textContent = 'Ujian khusus Essay (Bobot Essay 100%).';
+        } else {
+            groupBobotPg.style.display = 'flex';
+            groupBobotEs.style.display = 'flex';
+            groupTimerEs.style.display = 'flex';
+            bobotPgEl.readOnly = false;
+            bobotEsEl.readOnly = false;
+
+            const curPg = parseFloat(bobotPgEl.value || '0');
+            const curEs = parseFloat(bobotEsEl.value || '0');
+            if (curPg <= 0 || curEs <= 0 || Math.abs((curPg + curEs) - 100) > 0.1) {
+                bobotPgEl.value = 70;
+                bobotEsEl.value = 30;
+            }
+            updateBobotSummary();
+        }
+    }
+
+    function onBobotPgChanged() {
+        const pg = Math.max(0, Math.min(100, parseFloat(document.getElementById('inputBobotPg').value || '0')));
+        document.getElementById('inputBobotEssay').value = Math.round((100 - pg) * 100) / 100;
+        updateBobotSummary();
+    }
+
+    function onBobotEssayChanged() {
+        const es = Math.max(0, Math.min(100, parseFloat(document.getElementById('inputBobotEssay').value || '0')));
+        document.getElementById('inputBobotPg').value = Math.round((100 - es) * 100) / 100;
+        updateBobotSummary();
+    }
+
+    function updateBobotSummary() {
+        const pg = parseFloat(document.getElementById('inputBobotPg').value || '0');
+        const es = parseFloat(document.getElementById('inputBobotEssay').value || '0');
+        const total = Math.round((pg + es) * 100) / 100;
+        const summary = document.getElementById('bobotSummaryText');
+        summary.textContent = `Nilai Akhir = (${pg}% x PG) + (${es}% x Essay) — Total ${total}%`;
+        summary.style.color = Math.abs(total - 100) > 0.1 ? '#dc2626' : '#64748b';
+    }
+
+    document.addEventListener('DOMContentLoaded', syncBobotFields);
+</script>
 @endsection
 

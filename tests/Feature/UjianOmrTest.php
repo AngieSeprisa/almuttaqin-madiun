@@ -833,4 +833,334 @@ class UjianOmrTest extends TestCase
             ->assertJsonPath('data.rincian.0.siswa_id', $siswaNova->id)
             ->assertJsonPath('data.rincian.0.nama_siswa', 'NOVA ABDUL MUTTHALIB');
     }
+
+    public function test_ujian_pg_dan_essay_bobot_persen_dan_validasi(): void
+    {
+        // 1. Gagal jika total bobot PG + Essay != 100%
+        $badRes = $this->actingAs($this->admin)->post(route('ujian.store'), [
+            'kode_ujian'          => 'UJN-ESSAY-BAD',
+            'nama_ujian'          => 'Ujian Bobot Salah',
+            'mapel_id'            => $this->mapel->id,
+            'kelas_id'            => $this->kelas->id,
+            'guru_id'             => $this->admin->id,
+            'jumlah_soal'         => 25,
+            'jumlah_soal_essay'   => 5,
+            'jumlah_opsi'         => 4,
+            'bobot_benar'         => 1,
+            'bobot_pg'            => 60,
+            'bobot_essay'         => 20,
+            'timer_default'       => 90,
+            'timer_essay_default' => 180,
+            'tanggal_ujian'       => now()->toDateString(),
+            'status'              => 'draft',
+        ]);
+        $badRes->assertSessionHasErrors('bobot_essay');
+
+        // 2. Sukses buat ujian PG + Essay dengan bobot 70% / 30%
+        $okRes = $this->actingAs($this->admin)->post(route('ujian.store'), [
+            'kode_ujian'          => 'UJN-ESSAY-001',
+            'nama_ujian'          => 'PAS Fiqih PG & Essay',
+            'mapel_id'            => $this->mapel->id,
+            'kelas_id'            => $this->kelas->id,
+            'guru_id'             => $this->admin->id,
+            'jumlah_soal'         => 25,
+            'jumlah_soal_essay'   => 5,
+            'jumlah_opsi'         => 4,
+            'bobot_benar'         => 1,
+            'bobot_pg'            => 70,
+            'bobot_essay'         => 30,
+            'timer_default'       => 90,
+            'timer_essay_default' => 240,
+            'tanggal_ujian'       => now()->toDateString(),
+            'status'              => 'aktif',
+        ]);
+        $okRes->assertRedirect();
+
+        $ujian = Ujian::where('kode_ujian', 'UJN-ESSAY-001')->firstOrFail();
+        $this->assertSame(25, $ujian->jumlah_soal);
+        $this->assertSame(5, $ujian->jumlah_soal_essay);
+        $this->assertEquals(70.0, (float) $ujian->bobot_pg);
+        $this->assertEquals(30.0, (float) $ujian->bobot_essay);
+        $this->assertSame(240, $ujian->timer_essay_default);
+        $this->assertSame(25, $ujian->kuncis()->count());
+
+        // 3. Sukses buat ujian khusus Essay saja (0 PG + 5 Essay => otomatis bobot 0 / 100)
+        $essayOnlyRes = $this->actingAs($this->admin)->post(route('ujian.store'), [
+            'kode_ujian'          => 'UJN-ESSAY-ONLY',
+            'nama_ujian'          => 'Ujian Uraian Khusus',
+            'mapel_id'            => $this->mapel->id,
+            'kelas_id'            => $this->kelas->id,
+            'guru_id'             => $this->admin->id,
+            'jumlah_soal'         => 0,
+            'jumlah_soal_essay'   => 5,
+            'jumlah_opsi'         => 4,
+            'bobot_benar'         => 1,
+            'tanggal_ujian'       => now()->toDateString(),
+            'status'              => 'aktif',
+        ]);
+        $essayOnlyRes->assertRedirect(route('ujian.soal'));
+
+        $ujianOnly = Ujian::where('kode_ujian', 'UJN-ESSAY-ONLY')->firstOrFail();
+        $this->assertEquals(0.0, (float) $ujianOnly->bobot_pg);
+        $this->assertEquals(100.0, (float) $ujianOnly->bobot_essay);
+        $this->assertSame(0, $ujianOnly->kuncis()->count());
+    }
+
+    public function test_upload_word_gabungan_pg_dan_essay_serta_proyektor_per_soal(): void
+    {
+        $ujian = Ujian::create([
+            'kode_ujian'    => 'UJN-WORD-ESSAY',
+            'nama_ujian'    => 'Ujian Word PG + Essay',
+            'mapel_id'      => $this->mapel->id,
+            'kelas_id'      => $this->kelas->id,
+            'guru_id'       => $this->admin->id,
+            'jumlah_soal'   => 10,
+            'jumlah_opsi'   => 5,
+            'bobot_benar'   => 1,
+            'tanggal_ujian' => now()->toDateString(),
+            'status'        => 'aktif',
+        ]);
+
+        // Template Word resmi kini berisi 3 soal PG + 2 soal Essay ([ESSAY])
+        $parser = new \App\Services\Omr\WordQuestionParserService();
+        $docxPath = $parser->generateTemplateDocx();
+        $uploadedDocx = new \Illuminate\Http\UploadedFile(
+            $docxPath,
+            'template_pg_essay.docx',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            null,
+            true
+        );
+
+        $res = $this->actingAs($this->admin)->post(route('ujian.upload-word', $ujian->id), [
+            'file_word'      => $uploadedDocx,
+            'timer_per_soal' => 75,
+            'timer_essay'    => 200,
+        ]);
+        @unlink($docxPath);
+
+        $res->assertRedirect();
+        $res->assertSessionHas('success');
+
+        $ujian->refresh();
+        $this->assertSame(3, $ujian->jumlah_soal);
+        $this->assertSame(2, $ujian->jumlah_soal_essay);
+        $this->assertEquals(70.0, (float) $ujian->bobot_pg);
+        $this->assertEquals(30.0, (float) $ujian->bobot_essay);
+
+        $pgSoals = $ujian->soalsPg()->get();
+        $essaySoals = $ujian->soalsEssay()->get();
+        $this->assertCount(3, $pgSoals);
+        $this->assertCount(2, $essaySoals);
+        $this->assertStringContainsString('hikmah menuntut ilmu', $essaySoals[0]->pertanyaan);
+        $this->assertNotEmpty($essaySoals[0]->pedoman_jawaban);
+        $this->assertSame(180, $essaySoals[0]->timer_detik); // dari baris "Timer: 180 detik" pada template
+
+        // Proyektor harus memuat 3 PG lalu 2 Essay secara berurutan per soal
+        $proyektorRes = $this->actingAs($this->admin)->get(route('ujian.proyektor', $ujian->id));
+        $proyektorRes->assertStatus(200);
+        $proyektorRes->assertSee('"tipe_soal":"pg"', false);
+        $proyektorRes->assertSee('"tipe_soal":"essay"', false);
+        $proyektorRes->assertSee('SOAL ESSAY NOMOR', false);
+    }
+
+    public function test_cetak_ljk_essay_1_halaman_dan_otomatis_tambah_halaman_belakang(): void
+    {
+        Siswa::create([
+            'nama_lengkap' => 'Ahmad Fauzi',
+            'nisn'         => '1234567890',
+            'kelas'        => $this->kelas->nama_kelas,
+            'status'       => 'aktif',
+        ]);
+
+        // Kasus A: 25 PG + 4 Essay => muat dalam 1 halaman A4 (tanpa halaman belakang)
+        $ujianSatuHal = Ujian::create([
+            'kode_ujian'        => 'UJN-LJK-1HAL',
+            'nama_ujian'        => 'Ujian 1 Halaman',
+            'mapel_id'          => $this->mapel->id,
+            'kelas_id'          => $this->kelas->id,
+            'guru_id'           => $this->admin->id,
+            'jumlah_soal'       => 25,
+            'jumlah_soal_essay' => 4,
+            'jumlah_opsi'       => 4,
+            'bobot_benar'       => 1,
+            'bobot_pg'          => 70,
+            'bobot_essay'       => 30,
+            'tanggal_ujian'     => now()->toDateString(),
+            'status'            => 'aktif',
+        ]);
+
+        $layout1 = LjkTemplateService::calculateEssayLayout(25, 4);
+        $this->assertSame(1, $layout1['total_pages_per_siswa']);
+        $this->assertSame([1, 2, 3, 4], $layout1['page1_numbers']);
+        $this->assertEmpty($layout1['extra_pages']);
+
+        $res1 = $this->actingAs($this->admin)->get(route('ujian.cetak-ljk', $ujianSatuHal->id));
+        $res1->assertStatus(200);
+        $res1->assertSee('BAGIAN II — JAWABAN ESSAY / URAIAN');
+        $res1->assertDontSee('LANJUTAN JAWABAN ESSAY / URAIAN');
+
+        // Kasus B: 40 PG + 8 Essay => Halaman 1 muat 1..4, nomor 5..8 otomatis tambah halaman belakang!
+        $ujianDuaHal = Ujian::create([
+            'kode_ujian'        => 'UJN-LJK-2HAL',
+            'nama_ujian'        => 'Ujian 2 Halaman Otomatis',
+            'mapel_id'          => $this->mapel->id,
+            'kelas_id'          => $this->kelas->id,
+            'guru_id'           => $this->admin->id,
+            'jumlah_soal'       => 40,
+            'jumlah_soal_essay' => 8,
+            'jumlah_opsi'       => 4,
+            'bobot_benar'       => 1,
+            'bobot_pg'          => 60,
+            'bobot_essay'       => 40,
+            'tanggal_ujian'     => now()->toDateString(),
+            'status'            => 'aktif',
+        ]);
+
+        $layout2 = LjkTemplateService::calculateEssayLayout(40, 8);
+        $this->assertSame(2, $layout2['total_pages_per_siswa']);
+        $this->assertSame([1, 2, 3, 4], $layout2['page1_numbers']);
+        $this->assertCount(1, $layout2['extra_pages']);
+        $this->assertSame([5, 6, 7, 8], $layout2['extra_pages'][0]['numbers']);
+
+        $res2 = $this->actingAs($this->admin)->get(route('ujian.cetak-ljk', $ujianDuaHal->id));
+        $res2->assertStatus(200);
+        $res2->assertSee('BAGIAN II — JAWABAN ESSAY / URAIAN');
+        $res2->assertSee('LANJUTAN JAWABAN ESSAY / URAIAN');
+        $res2->assertSee('Halaman 2 dari 2');
+    }
+
+    public function test_input_manual_dan_upload_excel_nilai_essay_dengan_bobot_persen(): void
+    {
+        $siswa1 = Siswa::create([
+            'nama_lengkap' => 'Budi Santoso',
+            'nisn'         => '0011223344',
+            'kelas'        => $this->kelas->nama_kelas,
+            'status'       => 'aktif',
+        ]);
+        $siswa2 = Siswa::create([
+            'nama_lengkap' => 'Siti Aminah',
+            'nisn'         => '0055667788',
+            'kelas'        => $this->kelas->nama_kelas,
+            'status'       => 'aktif',
+        ]);
+
+        $ujian = Ujian::create([
+            'kode_ujian'        => 'UJN-SCORE-ESSAY',
+            'nama_ujian'        => 'Ujian Gabungan Matematika',
+            'mapel_id'          => $this->mapel->id,
+            'kelas_id'          => $this->kelas->id,
+            'guru_id'           => $this->admin->id,
+            'jumlah_soal'       => 5,
+            'jumlah_soal_essay' => 3,
+            'jumlah_opsi'       => 4,
+            'bobot_benar'       => 20,
+            'bobot_pg'          => 70,
+            'bobot_essay'       => 30,
+            'tanggal_ujian'     => now()->toDateString(),
+            'status'            => 'aktif',
+        ]);
+
+        for ($no = 1; $no <= 5; $no++) {
+            UjianKunci::create([
+                'ujian_id'      => $ujian->id,
+                'nomor_soal'    => $no,
+                'kunci_jawaban' => 'A',
+                'bobot'         => 20,
+            ]);
+        }
+
+        // Siswa 1 sudah punya hasil scan OMR PG = 80 (4 benar dari 5)
+        $hasil1 = UjianHasil::create([
+            'ujian_id'      => $ujian->id,
+            'siswa_id'      => $siswa1->id,
+            'jawaban_siswa' => [1 => 'A', 2 => 'A', 3 => 'A', 4 => 'A', 5 => 'B'],
+            'jumlah_benar'  => 4,
+            'jumlah_salah'  => 1,
+            'jumlah_kosong' => 0,
+            'nilai_pg'      => 80.00,
+            'nilai_essay'   => null,
+            'nilai_akhir'   => 56.00,
+            'status_scan'   => 'valid',
+            'waktu_scan'    => now(),
+        ]);
+
+        // 1. Input langsung Nilai Essay oleh Guru (siswa1 = 90 => 80*0.7 + 90*0.3 = 83.0)
+        $saveRes = $this->actingAs($this->admin)->post(route('ujian.save-essay', $ujian->id), [
+            'nilai_essay' => [
+                $siswa1->id => '90',
+                $siswa2->id => '',
+            ],
+        ]);
+        $saveRes->assertRedirect(route('ujian.upload-scan', ['ujian' => $ujian->id, 'tab' => 'essay']));
+        $saveRes->assertSessionHas('success');
+
+        $hasil1->refresh();
+        $this->assertEquals(80.0, (float) $hasil1->nilai_pg);
+        $this->assertEquals(90.0, (float) $hasil1->nilai_essay);
+        $this->assertEquals(83.0, (float) $hasil1->nilai_akhir);
+
+        // 2. Unduh Template Excel Nilai Essay
+        $tplRes = $this->actingAs($this->admin)->get(route('ujian.template-essay', $ujian->id));
+        $tplRes->assertStatus(200);
+
+        // 3. Upload Excel Nilai Essay (.xlsx): siswa1 = 100, siswa2 = 80
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['ID Siswa', 'NISN', 'Nama Siswa', 'Nilai PG', 'Nilai Essay (0-100)'],
+            [$siswa1->id, $siswa1->nisn, $siswa1->nama_lengkap, 80, 100],
+            [$siswa2->id, $siswa2->nisn, $siswa2->nama_lengkap, '', 80],
+        ], null, 'A1');
+
+        $tmpXlsx = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'upload_essay_' . uniqid() . '.xlsx';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($tmpXlsx);
+
+        $uploadedXlsx = new \Illuminate\Http\UploadedFile(
+            $tmpXlsx,
+            'nilai_essay.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true
+        );
+
+        $uploadRes = $this->actingAs($this->admin)->post(route('ujian.upload-essay', $ujian->id), [
+            'file_essay' => $uploadedXlsx,
+        ]);
+        @unlink($tmpXlsx);
+
+        $uploadRes->assertRedirect(route('ujian.upload-scan', ['ujian' => $ujian->id, 'tab' => 'essay']));
+        $uploadRes->assertSessionHas('success');
+
+        $hasil1->refresh();
+        $this->assertEquals(80.0, (float) $hasil1->nilai_pg);
+        $this->assertEquals(100.0, (float) $hasil1->nilai_essay);
+        $this->assertEquals(86.0, (float) $hasil1->nilai_akhir); // 80*0.7 + 100*0.3
+
+        $hasil2 = UjianHasil::where('ujian_id', $ujian->id)->where('siswa_id', $siswa2->id)->firstOrFail();
+        $this->assertEquals(0.0, (float) $hasil2->nilai_pg);
+        $this->assertEquals(80.0, (float) $hasil2->nilai_essay);
+        $this->assertEquals(24.0, (float) $hasil2->nilai_akhir); // 0*0.7 + 80*0.3
+
+        // 4. Koreksi manual PG (ubah no. 5 jadi 'A' => PG jadi 100) TIDAK menghapus nilai essay (tetap 100) => Nilai Akhir = 100
+        $manualRes = $this->actingAs($this->admin)->post(route('ujian.update-hasil-manual', [$ujian->id, $hasil1->id]), [
+            'siswa_id' => $siswa1->id,
+            'jawaban'  => [1 => 'A', 2 => 'A', 3 => 'A', 4 => 'A', 5 => 'A'],
+        ]);
+        $manualRes->assertRedirect(route('ujian.hasil', $ujian->id));
+
+        $hasil1->refresh();
+        $this->assertEquals(100.0, (float) $hasil1->nilai_pg);
+        $this->assertEquals(100.0, (float) $hasil1->nilai_essay);
+        $this->assertEquals(100.0, (float) $hasil1->nilai_akhir);
+
+        // 5. Rekap Nilai & Export Excel berjalan mulus
+        $hasilPage = $this->actingAs($this->admin)->get(route('ujian.hasil', $ujian->id));
+        $hasilPage->assertStatus(200);
+        $hasilPage->assertSee('Nilai PG (70%)');
+        $hasilPage->assertSee('Nilai Essay (30%)');
+
+        $exportRes = $this->actingAs($this->admin)->get(route('ujian.export-excel', $ujian->id));
+        $exportRes->assertStatus(200);
+    }
 }

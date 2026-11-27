@@ -86,7 +86,11 @@
                     <div><strong>Mata Pelajaran:</strong> {{ $ujian->mapel?->mata_pelajaran ?? '-' }}</div>
                     <div><strong>Kelas:</strong> {{ $ujian->kelas?->nama_kelas ?? '-' }}</div>
                     <div><strong>Guru Pengampu:</strong> {{ $ujian->guru?->name ?? '-' }}</div>
-                    <div><strong>Jumlah Soal:</strong> {{ $ujian->jumlah_soal }} Butir ({{ $ujian->jumlah_opsi }} Opsi)</div>
+                    <div><strong>Jumlah Soal:</strong> {{ $ujian->ringkasan_soal }}@if($ujian->hasPg()) ({{ $ujian->jumlah_opsi }} Opsi)@endif</div>
+                    @if($ujian->hasEssay())
+                        @php $w = $ujian->getEffectiveWeights(); @endphp
+                        <div><strong>Bobot Nilai:</strong> PG {{ $w['pg'] }}% &bull; Essay {{ $w['essay'] }}%</div>
+                    @endif
                     <div><strong>Total Siswa:</strong> {{ $siswas->count() }} Santri/Siswa</div>
                 </div>
                 @endif

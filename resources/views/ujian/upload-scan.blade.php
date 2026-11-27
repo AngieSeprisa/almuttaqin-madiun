@@ -128,6 +128,59 @@
         margin-top: 20px;
         display: none;
     }
+    .koreksi-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 18px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .koreksi-tab-btn {
+        padding: 10px 18px;
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #64748b;
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 8px 8px 0 0;
+        transition: all 0.15s ease;
+    }
+    .koreksi-tab-btn:hover {
+        color: #0052FF;
+    }
+    .koreksi-tab-btn.active {
+        color: #0052FF;
+        border-bottom-color: #0052FF;
+        background: #eff6ff;
+    }
+    .essay-panel-card {
+        background: var(--bg-surface, #ffffff);
+        border: 1px solid var(--border-light, #e2e8f0);
+        border-radius: 14px;
+        padding: 20px 22px;
+        margin-bottom: 18px;
+    }
+    .essay-score-input {
+        width: 96px;
+        padding: 6px 10px;
+        font-size: 13.5px;
+        font-weight: 700;
+        text-align: center;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #0f172a;
+    }
+    .essay-score-input:focus {
+        outline: none;
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+    }
 </style>
 
 <div class="upload-container">
@@ -177,18 +230,34 @@
         </a>
     </div>
     @else
+    @php
+        $weights = $ujian->getEffectiveWeights();
+        $resolvedTab = ($activeTab ?? 'omr');
+        if (!$ujian->hasEssay()) {
+            $resolvedTab = 'omr';
+        } elseif (!$ujian->hasPg()) {
+            $resolvedTab = 'essay';
+        }
+        $hasilsBySiswa = $hasilsBySiswa ?? collect();
+        $essayDinilaiCount = $hasilsBySiswa->whereNotNull('nilai_essay')->count();
+    @endphp
     <!-- Kartu Informasi Ujian -->
     <div class="info-summary-card">
         <div>
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
                 <h2 style="font-size:18px; font-weight:700; margin:0; color:#1e293b;">{{ $ujian->nama_ujian }}</h2>
                 <span class="badge" style="background:#eff6ff; color:#0052FF; font-weight:600; padding:2px 8px; border-radius:6px; font-size:11px;">{{ $ujian->kode_ujian }}</span>
+                @if($ujian->hasEssay())
+                    <span class="badge" style="background:#f5f3ff; color:#6d28d9; font-weight:700; padding:2px 8px; border-radius:6px; font-size:11px;">
+                        Bobot PG {{ $weights['pg'] }}% &bull; Essay {{ $weights['essay'] }}%
+                    </span>
+                @endif
             </div>
             <div style="font-size:13px; color:#64748b; display:flex; gap:16px; flex-wrap:wrap;">
                 <span><strong>Mapel:</strong> {{ $ujian->mapel?->mata_pelajaran ?? '-' }}</span>
                 <span><strong>Kelas:</strong> {{ $ujian->kelas?->nama_kelas ?? '-' }}</span>
                 <span><strong>Guru:</strong> {{ $ujian->guru?->name ?? '-' }}</span>
-                <span><strong>Soal:</strong> {{ $ujian->jumlah_soal }} Butir ({{ $ujian->jumlah_opsi }} Opsi)</span>
+                <span><strong>Soal:</strong> {{ $ujian->ringkasan_soal }}@if($ujian->hasPg()) ({{ $ujian->jumlah_opsi }} Opsi)@endif</span>
             </div>
         </div>
         <div>
@@ -199,6 +268,29 @@
         </div>
     </div>
 
+    @if($ujian->hasEssay())
+    <div class="koreksi-tabs">
+        @if($ujian->hasPg())
+        <button type="button" id="tabBtnOmr" class="koreksi-tab-btn {{ $resolvedTab === 'omr' ? 'active' : '' }}" onclick="switchKoreksiTab('omr')">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <span>Koreksi LJK (PG)</span>
+        </button>
+        @endif
+        <button type="button" id="tabBtnEssay" class="koreksi-tab-btn {{ $resolvedTab === 'essay' ? 'active' : '' }}" onclick="switchKoreksiTab('essay')">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+            <span>Input &amp; Upload Nilai Essay ({{ $essayDinilaiCount }}/{{ $siswasKelas->count() }})</span>
+        </button>
+    </div>
+    @endif
+
+    <div id="panelOmr" style="display:{{ $resolvedTab === 'omr' ? 'block' : 'none' }};">
     <!-- Dropzone Area -->
     <div class="dropzone-box" id="dropzoneBox" onclick="document.getElementById('fileInput').click()">
         <input type="file" id="fileInput" name="file_scan" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style="display:none;" onchange="handleFileSelected(this.files)">
@@ -316,6 +408,132 @@
             <div><strong>Pensil / Pulpen Hitam Pekat:</strong> Siswa disarankan mengisi bulatan penuh menggunakan pensil 2B atau pulpen bertinta gelap.</div>
         </div>
     </div>
+    </div><!-- /#panelOmr -->
+
+    @if($ujian->hasEssay())
+    <div id="panelEssay" style="display:{{ $resolvedTab === 'essay' ? 'block' : 'none' }};">
+        {{-- Card A: Upload Excel Nilai Essay --}}
+        <div class="essay-panel-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px; margin-bottom:14px;">
+                <div>
+                    <h3 style="font-size:15.5px; font-weight:700; color:#1e293b; margin:0 0 4px;">Upload Nilai Essay via Excel (.xlsx / .csv)</h3>
+                    <p style="font-size:12.5px; color:#64748b; margin:0;">
+                        Unduh template Excel yang sudah memuat daftar siswa kelas ini, isi kolom <strong>Nilai Essay (0-100)</strong>, lalu unggah kembali. Nilai Akhir dihitung otomatis (PG {{ $weights['pg'] }}% + Essay {{ $weights['essay'] }}%).
+                    </p>
+                </div>
+                <a href="{{ route('ujian.template-essay', $ujian->id) }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:8px 14px; font-size:13px; border-radius:8px; background:#ecfdf5; border-color:#a7f3d0; color:#065f46; font-weight:600;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Unduh Template Excel</span>
+                </a>
+            </div>
+
+            <form method="POST" action="{{ route('ujian.upload-essay', $ujian->id) }}" enctype="multipart/form-data" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:10px; padding:12px 14px;">
+                @csrf
+                <input type="file" name="file_essay" accept=".xlsx,.xls,.csv" required style="flex:1; min-width:220px; font-size:13px; color:#334155;">
+                <button type="submit" class="btn btn-primary" style="padding:8px 18px; font-size:13px; border-radius:8px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <span>Upload Nilai Essay</span>
+                </button>
+            </form>
+        </div>
+
+        {{-- Card B: Input Langsung Nilai Essay per Siswa --}}
+        <div class="essay-panel-card" style="padding:0; overflow:hidden;">
+            <form method="POST" action="{{ route('ujian.save-essay', $ujian->id) }}">
+                @csrf
+                <div style="padding:16px 20px; border-bottom:1px solid var(--border-light, #e2e8f0); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="font-size:15.5px; font-weight:700; color:#1e293b; margin:0 0 2px;">Input Langsung Nilai Essay Siswa</h3>
+                        <div style="font-size:12.5px; color:#64748b;">
+                            Masukkan nilai essay skala <strong>0 - 100</strong>. Nilai Akhir terhitung otomatis sesuai bobot PG {{ $weights['pg'] }}% &amp; Essay {{ $weights['essay'] }}%.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="padding:8px 18px; font-size:13px; border-radius:8px; font-weight:600;">
+                        Simpan Nilai Essay
+                    </button>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th style="width:50px; text-align:center;">No</th>
+                                <th style="width:140px;">NISN</th>
+                                <th>Nama Siswa</th>
+                                @if($ujian->hasPg())
+                                    <th style="width:120px; text-align:center;">Nilai PG ({{ $weights['pg'] }}%)</th>
+                                @endif
+                                <th style="width:150px; text-align:center;">Nilai Essay ({{ $weights['essay'] }}%)</th>
+                                <th style="width:130px; text-align:center;">Nilai Akhir</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($siswasKelas as $idx => $sw)
+                                @php
+                                    $hasilSw = $hasilsBySiswa->get($sw->id);
+                                    $valPg = $hasilSw && $hasilSw->nilai_pg !== null ? (float) $hasilSw->nilai_pg : 0.0;
+                                    $valEssay = $hasilSw && $hasilSw->nilai_essay !== null ? (float) $hasilSw->nilai_essay : null;
+                                    $valAkhir = $hasilSw ? (float) $hasilSw->nilai_akhir : $ujian->hitungNilaiAkhir($valPg, $valEssay);
+                                @endphp
+                                <tr>
+                                    <td style="text-align:center; color:var(--text-muted); font-weight:600;">{{ $idx + 1 }}</td>
+                                    <td style="font-family:monospace; color:var(--text-secondary); font-weight:600;">{{ $sw->nisn ?: '-' }}</td>
+                                    <td class="cell-nama">
+                                        <div style="font-weight:700; color:var(--text-primary); font-size:13.5px;">{{ $sw->nama_lengkap }}</div>
+                                    </td>
+                                    @if($ujian->hasPg())
+                                        <td style="text-align:center; font-weight:700; color:#1d4ed8; font-size:14px;">
+                                            {{ $hasilSw ? number_format($valPg, 1) : '-' }}
+                                        </td>
+                                    @endif
+                                    <td style="text-align:center;">
+                                        <input type="number"
+                                               step="0.01"
+                                               min="0"
+                                               max="100"
+                                               name="nilai_essay[{{ $sw->id }}]"
+                                               class="essay-score-input"
+                                               value="{{ $valEssay !== null ? $valEssay : '' }}"
+                                               placeholder="0 - 100"
+                                               data-pg="{{ $valPg }}"
+                                               data-target="preview_akhir_{{ $sw->id }}"
+                                               oninput="updateEssayPreview(this)">
+                                    </td>
+                                    <td style="text-align:center;">
+                                        <span id="preview_akhir_{{ $sw->id }}" style="font-size:15px; font-weight:800; color:{{ $valAkhir >= 75 ? '#16a34a' : ($valAkhir >= 60 ? '#ca8a04' : '#64748b') }};">
+                                            {{ number_format($valAkhir, 1) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="cell-empty">Belum ada siswa aktif terdaftar pada kelas ujian ini.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                @if($siswasKelas->isNotEmpty())
+                <div style="padding:14px 20px; border-top:1px solid var(--border-light, #e2e8f0); background:#f8fafc; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <span style="font-size:12.5px; color:#64748b;">Pastikan menekan tombol simpan setelah selesai menginput nilai.</span>
+                    <button type="submit" class="btn btn-primary" style="padding:8px 22px; font-size:13px; border-radius:8px; font-weight:600;">
+                        Simpan Nilai Essay
+                    </button>
+                </div>
+                @endif
+            </form>
+        </div>
+    </div>
+    @endif
 </div>
 
 <style>
@@ -871,6 +1089,33 @@
         resultCard.style.display = 'none';
         dropzone.style.display = 'block';
         fileInput.value = '';
+    }
+
+    const BOBOT_PG_PCT = {{ $weights['pg'] ?? 100 }};
+    const BOBOT_ESSAY_PCT = {{ $weights['essay'] ?? 0 }};
+
+    function switchKoreksiTab(tab) {
+        const panelOmr = document.getElementById('panelOmr');
+        const panelEssay = document.getElementById('panelEssay');
+        const btnOmr = document.getElementById('tabBtnOmr');
+        const btnEssay = document.getElementById('tabBtnEssay');
+
+        if (panelOmr) panelOmr.style.display = tab === 'omr' ? 'block' : 'none';
+        if (panelEssay) panelEssay.style.display = tab === 'essay' ? 'block' : 'none';
+        if (btnOmr) btnOmr.classList.toggle('active', tab === 'omr');
+        if (btnEssay) btnEssay.classList.toggle('active', tab === 'essay');
+    }
+
+    function updateEssayPreview(inputEl) {
+        const pg = parseFloat(inputEl.getAttribute('data-pg') || '0') || 0;
+        const raw = inputEl.value.trim();
+        const essay = raw === '' ? 0 : Math.max(0, Math.min(100, parseFloat(raw) || 0));
+        const akhir = ((pg * BOBOT_PG_PCT) + (essay * BOBOT_ESSAY_PCT)) / 100;
+        const target = document.getElementById(inputEl.getAttribute('data-target'));
+        if (target) {
+            target.textContent = akhir.toFixed(1);
+            target.style.color = akhir >= 75 ? '#16a34a' : (akhir >= 60 ? '#ca8a04' : '#dc2626');
+        }
     }
 </script>
 @endif

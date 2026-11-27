@@ -112,13 +112,17 @@ class OmrScannerService
 
         // 3. Kalibrasi vertikal dinamis berdasarkan bar header hitam (.omr-col-header)
         $deltaV = 0.0;
-        $detectedHeaderBottomV = $this->detectHeaderBarBottomV($im, $markers, $ujian->jumlah_soal, $imgWidth, $imgHeight, $paperWhite);
-        if ($detectedHeaderBottomV !== null) {
-            $deltaV = $detectedHeaderBottomV - LjkTemplateService::getNominalHeaderBottomV();
+        if ($ujian->jumlah_soal > 0) {
+            $detectedHeaderBottomV = $this->detectHeaderBarBottomV($im, $markers, $ujian->jumlah_soal, $imgWidth, $imgHeight, $paperWhite);
+            if ($detectedHeaderBottomV !== null) {
+                $deltaV = $detectedHeaderBottomV - LjkTemplateService::getNominalHeaderBottomV();
+            }
         }
 
         // 4. Evaluasi Bulatan Jawaban (OMR Sampling)
-        $bubbleCoords = LjkTemplateService::getBubbleCoordinates($ujian->jumlah_soal, $ujian->jumlah_opsi);
+        $bubbleCoords = $ujian->jumlah_soal > 0
+            ? LjkTemplateService::getBubbleCoordinates($ujian->jumlah_soal, $ujian->jumlah_opsi)
+            : [];
         $jawabanSiswa = [];
         $catatanScan = [];
         $statusScan = $siswa ? 'valid' : 'perlu_cek_manual';
@@ -193,13 +197,22 @@ class OmrScannerService
             }
         }
 
-        $nilaiAkhir = $totalSkorMaksimal > 0
+        $nilaiPg = $totalSkorMaksimal > 0
             ? round(($totalSkorDidapat / $totalSkorMaksimal) * 100, 2)
             : 0.00;
 
-        // 5. Simpan / Perbarui ke Database jika data siswa teridentifikasi
+        // 5. Simpan / Perbarui ke Database jika data siswa teridentifikasi (pertahankan nilai_essay existing bila ada)
         $hasilModel = null;
+        $existingEssay = null;
         if ($siswa) {
+            $existing = UjianHasil::where('ujian_id', $ujian->id)
+                ->where('siswa_id', $siswa->id)
+                ->first();
+            $existingEssay = ($existing && $existing->nilai_essay !== null)
+                ? (float) $existing->nilai_essay
+                : null;
+            $nilaiAkhir = $ujian->hitungNilaiAkhir($nilaiPg, $existingEssay);
+
             $hasilModel = UjianHasil::updateOrCreate(
                 [
                     'ujian_id' => $ujian->id,
@@ -210,12 +223,15 @@ class OmrScannerService
                     'jumlah_benar'  => $jumlahBenar,
                     'jumlah_salah'  => $jumlahSalah,
                     'jumlah_kosong' => $jumlahKosong,
+                    'nilai_pg'      => $nilaiPg,
                     'nilai_akhir'   => $nilaiAkhir,
                     'status_scan'   => $statusScan,
                     'catatan_scan'  => !empty($catatanScan) ? implode('; ', $catatanScan) : null,
                     'waktu_scan'    => now(),
                 ]
             );
+        } else {
+            $nilaiAkhir = $ujian->hitungNilaiAkhir($nilaiPg, null);
         }
 
         imagedestroy($im);
@@ -229,6 +245,8 @@ class OmrScannerService
             'jumlah_benar'  => $jumlahBenar,
             'jumlah_salah'  => $jumlahSalah,
             'jumlah_kosong' => $jumlahKosong,
+            'nilai_pg'      => $nilaiPg,
+            'nilai_essay'   => $existingEssay,
             'nilai_akhir'   => $nilaiAkhir,
             'status_scan'   => $statusScan,
             'catatan'       => !empty($catatanScan) ? implode('; ', $catatanScan) : null,

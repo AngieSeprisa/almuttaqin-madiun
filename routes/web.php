@@ -625,6 +625,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/{ujian}/assign-hasil-siswa', [UjianController::class, 'assignHasilSiswa'])
             ->middleware('permission:ujian_koreksi|ujian,create|edit')
             ->name('assign-hasil-siswa');
+        Route::post('/{ujian}/nilai-essay', [UjianController::class, 'saveNilaiEssay'])
+            ->middleware('permission:ujian_koreksi|ujian_nilai|ujian,create|edit')
+            ->name('save-essay');
+        Route::get('/{ujian}/template-nilai-essay', [UjianController::class, 'downloadTemplateNilaiEssay'])
+            ->middleware('permission:ujian_koreksi|ujian_nilai|ujian,view')
+            ->name('template-essay');
+        Route::post('/{ujian}/upload-nilai-essay', [UjianController::class, 'uploadNilaiEssay'])
+            ->middleware('permission:ujian_koreksi|ujian_nilai|ujian,create|edit')
+            ->name('upload-essay');
 
         // Submenu 5: Nilai Ujian & Analisis Soal
         Route::get('/nilai', [UjianController::class, 'nilaiIndex'])

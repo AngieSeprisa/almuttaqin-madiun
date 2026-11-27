@@ -13,6 +13,16 @@
         <span>Ekspor Excel (.xlsx)</span>
     </a>
 
+    @if($ujian->hasEssay())
+    <a href="{{ route('ujian.upload-scan', ['ujian' => $ujian->id, 'tab' => 'essay']) }}" class="btn btn-secondary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px; border-radius:8px; background:#f5f3ff; border-color:#ddd6fe; color:#6d28d9; font-weight:600;">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+        </svg>
+        <span>Input / Upload Nilai Essay</span>
+    </a>
+    @endif
+
     <a href="{{ route('ujian.upload-scan', $ujian->id) }}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; font-size:13px; border-radius:8px;">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -252,7 +262,7 @@
             <select id="selectUjianHasil" class="form-control" style="font-size:13px; padding:6px 12px; border-radius:8px; border:1px solid #cbd5e1; min-width:280px;" onchange="window.location.href='{{ route('ujian.nilai') }}?ujian_id=' + this.value">
                 @foreach($ujians as $u)
                     <option value="{{ $u->id }}" {{ $ujian->id == $u->id ? 'selected' : '' }}>
-                        {{ $u->nama_ujian }} ({{ $u->kelas->nama_kelas ?? '-' }} - {{ $u->mapel->nama_mapel ?? '-' }})
+                        {{ $u->nama_ujian }} ({{ $u->kelas?->nama_kelas ?? '-' }} - {{ $u->mapel?->mata_pelajaran ?? '-' }})
                     </option>
                 @endforeach
             </select>
@@ -268,11 +278,15 @@
         <div>
             <div style="font-size:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">Rekapitulasi Nilai & Analisis Soal</div>
             <h2 style="font-size:20px; font-weight:800; margin:4px 0 6px 0; color:#f8fafc;">{{ $ujian->nama_ujian }}</h2>
+            @php $weights = $ujian->getEffectiveWeights(); @endphp
             <div style="font-size:13px; color:#cbd5e1; display:flex; gap:16px; flex-wrap:wrap;">
-                <span><strong>Kelas:</strong> {{ $ujian->kelas->nama_kelas ?? '-' }}</span>
-                <span><strong>Mata Pelajaran:</strong> {{ $ujian->mapel->nama_mapel ?? '-' }}</span>
-                <span><strong>Guru:</strong> {{ $ujian->guru->nama_guru ?? '-' }}</span>
-                <span><strong>Jumlah Soal:</strong> {{ $ujian->jumlah_soal }} Butir</span>
+                <span><strong>Kelas:</strong> {{ $ujian->kelas?->nama_kelas ?? '-' }}</span>
+                <span><strong>Mata Pelajaran:</strong> {{ $ujian->mapel?->mata_pelajaran ?? '-' }}</span>
+                <span><strong>Guru:</strong> {{ $ujian->guru?->name ?? '-' }}</span>
+                <span><strong>Soal:</strong> {{ $ujian->ringkasan_soal }}</span>
+                @if($ujian->hasEssay())
+                    <span><strong>Bobot:</strong> PG {{ $weights['pg'] }}% &bull; Essay {{ $weights['essay'] }}%</span>
+                @endif
             </div>
         </div>
         <div style="display:flex; gap:10px;">
@@ -390,6 +404,10 @@
                 </div>
             </div>
 
+            @php
+                $hasEssay = $ujian->hasEssay();
+                $weights = $ujian->getEffectiveWeights();
+            @endphp
             <div class="table-wrapper">
                 <table class="modern-table">
                     <thead>
@@ -397,12 +415,20 @@
                             <th style="width:50px; text-align:center;">No</th>
                             <th style="width:140px;">NIS / NISN</th>
                             <th>Nama Siswa</th>
-                            <th style="width:80px; text-align:center;">Benar</th>
-                            <th style="width:80px; text-align:center;">Salah</th>
-                            <th style="width:80px; text-align:center;">Kosong</th>
+                            @if($ujian->hasPg())
+                                <th style="width:70px; text-align:center;">Benar</th>
+                                <th style="width:70px; text-align:center;">Salah</th>
+                                <th style="width:70px; text-align:center;">Kosong</th>
+                            @endif
+                            @if($hasEssay && $ujian->hasPg())
+                                <th style="width:105px; text-align:center;">Nilai PG ({{ $weights['pg'] }}%)</th>
+                            @endif
+                            @if($hasEssay)
+                                <th style="width:115px; text-align:center;">Nilai Essay ({{ $weights['essay'] }}%)</th>
+                            @endif
                             <th style="width:110px; text-align:center;">Nilai Akhir</th>
-                            <th style="width:130px; text-align:center;">Status</th>
-                            <th style="width:140px;">Waktu Scan</th>
+                            <th style="width:115px; text-align:center;">Status</th>
+                            <th style="width:130px;">Waktu Update</th>
                             <th style="width:140px; text-align:center;">Aksi</th>
                         </tr>
                     </thead>
@@ -414,9 +440,25 @@
                                 <td class="cell-nama">
                                     <div style="font-weight:700; color:var(--text-primary); font-size:13.5px;">{{ $h->siswa->nama_lengkap ?? 'Siswa ID ' . $h->siswa_id }}</div>
                                 </td>
-                                <td style="text-align:center; font-weight:700; color:#16a34a; font-size:14px;">{{ $h->jumlah_benar }}</td>
-                                <td style="text-align:center; font-weight:700; color:#dc2626; font-size:14px;">{{ $h->jumlah_salah }}</td>
-                                <td style="text-align:center; color:var(--text-muted); font-size:14px;">{{ $h->jumlah_kosong }}</td>
+                                @if($ujian->hasPg())
+                                    <td style="text-align:center; font-weight:700; color:#16a34a; font-size:14px;">{{ $h->jumlah_benar }}</td>
+                                    <td style="text-align:center; font-weight:700; color:#dc2626; font-size:14px;">{{ $h->jumlah_salah }}</td>
+                                    <td style="text-align:center; color:var(--text-muted); font-size:14px;">{{ $h->jumlah_kosong }}</td>
+                                @endif
+                                @if($hasEssay && $ujian->hasPg())
+                                    <td style="text-align:center; font-weight:700; color:#1d4ed8; font-size:13.5px;">
+                                        {{ number_format($h->nilai_pg ?? 0, 1) }}
+                                    </td>
+                                @endif
+                                @if($hasEssay)
+                                    <td style="text-align:center; font-weight:700; font-size:13.5px;">
+                                        @if($h->nilai_essay !== null)
+                                            <span style="color:#7c3aed;">{{ number_format($h->nilai_essay, 1) }}</span>
+                                        @else
+                                            <span style="color:#94a3b8; font-size:12px; font-weight:500;">Belum dinilai</span>
+                                        @endif
+                                    </td>
+                                @endif
                                 <td style="text-align:center;">
                                     <span style="font-size:16px; font-weight:800; color:{{ $h->nilai_akhir >= 75 ? '#16a34a' : ($h->nilai_akhir >= 60 ? '#ca8a04' : '#dc2626') }};">
                                         {{ number_format($h->nilai_akhir, 1) }}
@@ -436,7 +478,7 @@
                                 <td style="font-size:12.5px; color:var(--text-secondary);">{{ $h->waktu_scan ? $h->waktu_scan->format('d/m/Y H:i') : '-' }}</td>
                                 <td style="text-align:center;">
                                     <div class="action-btn-group">
-                                        <button type="button" class="action-btn action-btn-edit" style="width:auto; padding:0 10px; gap:4px; font-size:11.5px; font-weight:600;" onclick="openEditModal({{ $h->id }}, {{ $h->siswa_id }}, '{{ addslashes($h->siswa->nama_lengkap ?? 'Siswa') }}', {{ json_encode($h->jawaban_siswa) }}, '{{ addslashes($h->catatan_scan ?? '') }}')" title="Koreksi Manual">
+                                        <button type="button" class="action-btn action-btn-edit" style="width:auto; padding:0 10px; gap:4px; font-size:11.5px; font-weight:600;" onclick="openEditModal({{ $h->id }}, {{ $h->siswa_id }}, '{{ addslashes($h->siswa->nama_lengkap ?? 'Siswa') }}', {{ json_encode($h->jawaban_siswa) }}, '{{ addslashes($h->catatan_scan ?? '') }}', {{ $h->nilai_essay !== null ? (float) $h->nilai_essay : 'null' }})" title="Koreksi Manual">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -458,7 +500,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="cell-empty">
+                                <td colspan="{{ $hasEssay ? ($ujian->hasPg() ? 12 : 9) : 10 }}" class="cell-empty">
                                     Belum ada lembar LJK yang dikoreksi untuk ujian ini.<br>
                                     <a href="{{ route('ujian.upload-scan', $ujian->id) }}" class="btn btn-primary" style="margin-top:12px; display:inline-flex; font-size:13px; padding:7px 16px;">
                                         Unggah PDF Scan LJK
@@ -614,6 +656,16 @@
                     <div style="font-size:11px; color:#3b82f6; margin-top:3px;">Jika scanner keliru mencocokkan identitas siswa (misal QR tertutup atau out-of-order), Anda dapat memindahkan lembar ini ke nama siswa yang benar di sini.</div>
                 </div>
 
+                @if($ujian->hasEssay())
+                <div style="margin-bottom:14px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+                    <div>
+                        <label for="modalNilaiEssay" style="font-size:12px; font-weight:700; color:#5b21b6; display:block;">Nilai Essay (Skala 0 - 100):</label>
+                        <div style="font-size:11px; color:#6d28d9;">Bobot Essay: {{ $ujian->getEffectiveWeights()['essay'] }}% terhadap Nilai Akhir.</div>
+                    </div>
+                    <input type="number" step="0.01" min="0" max="100" name="nilai_essay" id="modalNilaiEssay" placeholder="0 - 100" style="width:130px; padding:7px 10px; font-size:14px; font-weight:700; text-align:center; border:1px solid #c4b5fd; border-radius:8px; background:#ffffff;">
+                </div>
+                @endif
+
                 <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px;" id="modalJawabanGrid">
                     {{-- Dinamis diisi JavaScript --}}
                 </div>
@@ -640,7 +692,7 @@
     const opsiLetters = jumlahOpsi == 5 ? ['A','B','C','D','E'] : ['A','B','C','D'];
     const updateUrlPattern = "{{ route('ujian.update-hasil-manual', [$ujian->id, ':hasil_id']) }}";
 
-    function openEditModal(hasilId, siswaId, siswaName, jawabanMap, catatanScan) {
+    function openEditModal(hasilId, siswaId, siswaName, jawabanMap, catatanScan, nilaiEssay) {
         document.getElementById('modalSiswaName').innerText = 'Koreksi Manual: ' + siswaName;
         document.getElementById('modalCatatan').innerText = catatanScan ? 'Catatan OMR: ' + catatanScan : 'Semua nomor terdeteksi normal.';
         document.getElementById('formManual').action = updateUrlPattern.replace(':hasil_id', hasilId);
@@ -648,6 +700,11 @@
         const sel = document.getElementById('modalSelectSiswa');
         if (sel && siswaId) {
             sel.value = siswaId;
+        }
+
+        const essayInput = document.getElementById('modalNilaiEssay');
+        if (essayInput) {
+            essayInput.value = (nilaiEssay !== null && nilaiEssay !== undefined) ? nilaiEssay : '';
         }
 
         const container = document.getElementById('modalJawabanGrid');
