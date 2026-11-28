@@ -479,4 +479,123 @@ class PenerimaanSpmbTest extends TestCase
         $this->assertDatabaseMissing('pendaftarans', ['id' => $p->id]);
         Storage::disk('public')->assertMissing($path);
     }
+
+    public function test_siswa_smp_lanjut_ke_sma_bisa_mendaftar_dengan_nik_sama_dan_sinkron_aman_ke_siswa(): void
+    {
+        // 1. Buat data pendaftaran & siswa SMP Al Muttaqin lama (punya RFID, kamar pondok, kelas 9A, status lulus)
+        $pendSmp = Pendaftaran::create([
+            'jenjang'            => 'SMP',
+            'no_induk'           => 'SMP-01-202324',
+            'public_token'       => 'tokensmpinternal123456',
+            'nik'                => '3577010101110001',
+            'nisn'               => '0099887766',
+            'nama_lengkap'       => 'Muhammad Farhan',
+            'tanggal_lahir'      => '2011-01-01',
+            'jenis_kelamin'      => 'Laki-laki',
+            'pj_biaya_hp'        => '081234567890',
+            'status_pendaftaran' => 'Diterima',
+        ]);
+
+        $siswaSmp = Siswa::create([
+            'rfid_uid'       => 'RFID-SMP-001',
+            'nama_lengkap'   => 'Muhammad Farhan',
+            'jenjang'        => 'SMP',
+            'kelas'          => '9A',
+            'kamar'          => 'Al-Farabi 1',
+            'jenis_kelamin'  => 'Laki-laki',
+            'status'         => 'lulus',
+            'kategori_lulus' => 'Lulus SMP',
+            'tahun_lulus'    => '2026',
+            'pendaftaran_id' => $pendSmp->id,
+        ]);
+
+        // 2. Buat event SPMB SMA tahun ajaran baru
+        $eventSma = PenerimaanSantri::create([
+            'judul'        => 'SPMB SMA Al Muttaqin 2026/2027',
+            'slug'         => 'spmb-sma-2026',
+            'tahun_ajaran' => '2026/2027',
+            'jenjang'      => 'SMA',
+            'jenjangs'     => ['SMA'],
+            'is_active'    => true,
+        ]);
+        $eventSma->gelombangs()->create([
+            'nama_gelombang'  => 'Gelombang 1',
+            'tanggal_mulai'   => now()->subDay()->toDateString(),
+            'tanggal_selesai' => now()->addDays(15)->toDateString(),
+            'urutan'          => 1,
+        ]);
+
+        // 3. Siswa SMP mendaftar ke SMA dengan NIK & NISN yang SAMA PERSIS -> HARUS BERHASIL
+        $resSma = $this->post(route('spmb.store', $eventSma->slug), [
+            'jenjang'       => 'SMA',
+            'nama_lengkap'  => 'Muhammad Farhan',
+            'nik'           => '3577010101110001',
+            'nisn'          => '0099887766',
+            'tanggal_lahir' => '2011-01-01',
+            'jenis_kelamin' => 'Laki-laki',
+            'pj_biaya_hp'   => '081234567890',
+        ]);
+        $resSma->assertRedirect();
+        $resSma->assertSessionHasNoErrors();
+
+        $pendSma = Pendaftaran::where('penerimaan_santri_id', $eventSma->id)->firstOrFail();
+        $this->assertTrue($pendSma->is_lanjut_jenjang);
+        $this->assertSame('SMP', $pendSma->jenjang_sebelumnya);
+        $this->assertSame($siswaSmp->id, $pendSma->siswa_asal_id);
+
+        // 4. Mendaftar 2x di SPMB SMA yang SAMA dengan NIK sama -> TETAP DITOLAK (anti-duplikat tetap aktif!)
+        $dupRes = $this->post(route('spmb.store', $eventSma->slug), [
+            'jenjang'       => 'SMA',
+            'nama_lengkap'  => 'Muhammad Farhan',
+            'nik'           => '3577010101110001',
+            'nisn'          => '0099887766',
+            'tanggal_lahir' => '2011-01-01',
+            'jenis_kelamin' => 'Laki-laki',
+            'pj_biaya_hp'   => '081234567890',
+        ]);
+        $dupRes->assertSessionHasErrors('nik');
+        $this->assertSame(1, Pendaftaran::where('penerimaan_santri_id', $eventSma->id)->count());
+
+        // 5. Badge Lanjut Jenjang tampil di daftar & detail pendaftar
+        $this->actingAs($this->admin)->get(route('pendaftaran.index'))
+            ->assertOk()
+            ->assertSee('Lanjut Jenjang');
+        $this->actingAs($this->admin)->get(route('pendaftaran.show', $pendSma->id))
+            ->assertOk()
+            ->assertSee('Lanjut Jenjang')
+            ->assertSee('Dari SMP');
+
+        // 6. Saat diterima di SMA: record Siswa TIDAK diduplikasi, RFID & kamar tetap utuh, jenjang jadi SMA, kelas 9A direset
+        $this->actingAs($this->admin)
+            ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->patch(route('pendaftaran.updateStatus', $pendSma->id), [
+                'status_pendaftaran' => 'Diterima',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(1, Siswa::count());
+        $siswaSmp->refresh();
+        $this->assertSame('SMA', $siswaSmp->jenjang);
+        $this->assertSame('aktif', $siswaSmp->status);
+        $this->assertNull($siswaSmp->kelas);
+        $this->assertNull($siswaSmp->kategori_lulus);
+        $this->assertSame('RFID-SMP-001', $siswaSmp->rfid_uid);
+        $this->assertSame('Al-Farabi 1', $siswaSmp->kamar);
+        $this->assertSame($pendSma->id, $siswaSmp->pendaftaran_id);
+
+        // 7. Jika status pendaftaran SMA dibatalkan ke Pending: record Siswa TIDAK dihapus & kembali ke jenjang SMP
+        $this->actingAs($this->admin)
+            ->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class)
+            ->patch(route('pendaftaran.updateStatus', $pendSma->id), [
+                'status_pendaftaran' => 'Pending',
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(1, Siswa::count());
+        $siswaSmp->refresh();
+        $this->assertSame('SMP', $siswaSmp->jenjang);
+        $this->assertSame('RFID-SMP-001', $siswaSmp->rfid_uid);
+        $this->assertSame('Al-Farabi 1', $siswaSmp->kamar);
+        $this->assertSame($pendSmp->id, $siswaSmp->pendaftaran_id);
+    }
 }

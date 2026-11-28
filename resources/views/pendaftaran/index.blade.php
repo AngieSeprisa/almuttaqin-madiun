@@ -216,6 +216,11 @@
                         <td class="cell-nama">
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 <span>{{ $pendaftar->nama_lengkap }}</span>
+                                @if($pendaftar->is_lanjut_jenjang)
+                                    <span style="display:inline-flex; align-items:center; padding:2px 7px; border-radius:999px; font-size:10.5px; font-weight:700; background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe;" title="Siswa internal lanjut jenjang">
+                                        Lanjut Jenjang{{ $pendaftar->jenjang_sebelumnya ? ' · ' . $pendaftar->jenjang_sebelumnya : '' }}
+                                    </span>
+                                @endif
                                 @if($pendaftar->penerima_kip)
                                     <span class="badge-kip" title="Penerima KIP / PIP / PKH">KIP</span>
                                 @endif

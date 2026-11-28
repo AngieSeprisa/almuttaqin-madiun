@@ -180,6 +180,19 @@ class PendaftaranController extends Controller
         }
         $data['public_token'] = Str::random(40);
 
+        $internalMatch = Pendaftaran::detectInternalStudent(
+            $data['nik'] ?? null,
+            $data['nisn'] ?? null,
+            $data['nama_lengkap'] ?? null,
+            $data['tanggal_lahir'] ?? null,
+            $data['jenjang'] ?? null
+        );
+        if ($internalMatch) {
+            $data['is_lanjut_jenjang'] = true;
+            $data['jenjang_sebelumnya'] = $internalMatch['jenjang_sebelumnya'];
+            $data['siswa_asal_id'] = $internalMatch['siswa_asal_id'];
+        }
+
         try {
             $pendaftaran = Pendaftaran::create($data);
         } catch (\Throwable $e) {
@@ -235,29 +248,101 @@ class PendaftaranController extends Controller
         ]);
 
         if ($newStatus === 'Diterima') {
-            // Jika sudah daftar ulang / diterima resmi, pastikan terdaftar di tabel Siswa
-            $siswa = Siswa::where('pendaftaran_id', $pendaftaran->id)
-                ->orWhere('nama_lengkap', $pendaftaran->nama_lengkap)
-                ->first();
+            // Cari record siswa yang sudah ada (prioritas: terikat pendaftaran ini -> siswa internal asal -> NIK/NISN -> nama lengkap)
+            $siswa = Siswa::where('pendaftaran_id', $pendaftaran->id)->first();
+
+            if (!$siswa && $pendaftaran->siswa_asal_id) {
+                $siswa = Siswa::find($pendaftaran->siswa_asal_id);
+            }
+
+            if (!$siswa) {
+                $detected = Pendaftaran::detectInternalStudent(
+                    $pendaftaran->nik,
+                    $pendaftaran->nisn,
+                    $pendaftaran->nama_lengkap,
+                    $pendaftaran->tanggal_lahir?->toDateString(),
+                    $pendaftaran->jenjang
+                );
+                if (!empty($detected['siswa_asal_id'])) {
+                    $siswa = Siswa::find($detected['siswa_asal_id']);
+                }
+            }
+
+            if (!$siswa && !empty($pendaftaran->nama_lengkap)) {
+                $siswa = Siswa::whereRaw('LOWER(TRIM(nama_lengkap)) = ?', [strtolower(trim($pendaftaran->nama_lengkap))])->first();
+            }
 
             if (!$siswa) {
                 Siswa::create([
                     'nama_lengkap'   => $pendaftaran->nama_lengkap,
                     'jenjang'        => $pendaftaran->jenjang ?? 'Reguler',
+                    'jenis_kelamin'  => $pendaftaran->jenis_kelamin,
                     'kamar'          => 'Reguler',
                     'status'         => 'aktif',
                     'pendaftaran_id' => $pendaftaran->id,
                 ]);
             } else {
-                $siswa->update([
+                $oldJenjang = (string) ($siswa->jenjang ?? '');
+                $newJenjang = (string) ($pendaftaran->jenjang ?? $oldJenjang);
+                $jenjangBerubah = $oldJenjang !== '' && $newJenjang !== ''
+                    && strtolower(trim($oldJenjang)) !== strtolower(trim($newJenjang));
+
+                $siswaUpdate = [
                     'pendaftaran_id' => $pendaftaran->id,
-                    'jenjang'        => $pendaftaran->jenjang ?? $siswa->jenjang,
+                    'nama_lengkap'   => $pendaftaran->nama_lengkap ?: $siswa->nama_lengkap,
+                    'jenjang'        => $newJenjang ?: $siswa->jenjang,
                     'status'         => 'aktif',
-                ]);
+                ];
+
+                if (!empty($pendaftaran->jenis_kelamin) && empty($siswa->getRawOriginal('jenis_kelamin'))) {
+                    $siswaUpdate['jenis_kelamin'] = $pendaftaran->jenis_kelamin;
+                }
+
+                // Saat naik/lanjut jenjang (mis. SMP -> SMA): reset kelas & status lulus lama agar siap diplot ke kelas baru,
+                // sementara RFID, kamar pondok, dan seluruh riwayat pondok tetap utuh menyatu.
+                if ($jenjangBerubah || $pendaftaran->is_lanjut_jenjang) {
+                    $siswaUpdate['kelas'] = null;
+                    $siswaUpdate['kategori_lulus'] = null;
+                    $siswaUpdate['tahun_lulus'] = null;
+                    $siswaUpdate['tanggal_lulus'] = null;
+
+                    $pendaftaran->update([
+                        'is_lanjut_jenjang'  => true,
+                        'jenjang_sebelumnya' => $pendaftaran->jenjang_sebelumnya ?: ($oldJenjang ?: null),
+                        'siswa_asal_id'      => $siswa->id,
+                    ]);
+                }
+
+                $siswa->update($siswaUpdate);
             }
         } else {
-            // Jika Pending / Lulus Seleksi / Ditolak, hapus dari daftar Siswa aktif yang terikat pendaftaran ini
-            Siswa::where('pendaftaran_id', $pendaftaran->id)->delete();
+            // Jika status dikembalikan ke Pending / Lulus Seleksi / Ditolak:
+            // - Santri baru biasa: hapus dari daftar Siswa aktif yang terikat pendaftaran ini.
+            // - Siswa internal lanjut jenjang: JANGAN dihapus agar data RFID, kamar, dan riwayat pondok tetap aman;
+            //   cukup kembalikan ke jenjang & pendaftaran sebelumnya.
+            $linkedSiswa = Siswa::where('pendaftaran_id', $pendaftaran->id)->first();
+            if ($linkedSiswa) {
+                $isInternalSiswa = $pendaftaran->is_lanjut_jenjang
+                    || ($pendaftaran->siswa_asal_id && (int) $pendaftaran->siswa_asal_id === (int) $linkedSiswa->id);
+
+                if ($isInternalSiswa) {
+                    $prevPendaftaran = null;
+                    if (!empty($pendaftaran->nik)) {
+                        $prevPendaftaran = Pendaftaran::where('nik', $pendaftaran->nik)
+                            ->where('id', '!=', $pendaftaran->id)
+                            ->where('status_pendaftaran', 'Diterima')
+                            ->orderByDesc('id')
+                            ->first();
+                    }
+
+                    $linkedSiswa->update([
+                        'jenjang'        => $pendaftaran->jenjang_sebelumnya ?: ($prevPendaftaran?->jenjang ?? $linkedSiswa->jenjang),
+                        'pendaftaran_id' => $prevPendaftaran?->id,
+                    ]);
+                } else {
+                    $linkedSiswa->delete();
+                }
+            }
         }
 
         return redirect()->back()->with('success', 'Status pendaftaran berhasil diperbarui menjadi ' . $newStatus . '.');
@@ -330,16 +415,13 @@ class PendaftaranController extends Controller
                 $compressor->delete($oldFile);
             }
 
-            // Sinkronkan data ke tabel Siswa jika pendaftaran ini sudah terhubung dengan siswa
-            $siswa = Siswa::where('pendaftaran_id', $pendaftaran->id)
-                ->orWhere('nama_lengkap', $pendaftaran->nama_lengkap)
-                ->first();
+            // Sinkronkan data ke tabel Siswa hanya jika pendaftaran ini memang sudah terhubung langsung dengan record Siswa
+            $siswa = Siswa::where('pendaftaran_id', $pendaftaran->id)->first();
 
             if ($siswa) {
                 $siswa->update([
-                    'nama_lengkap'   => $pendaftaran->nama_lengkap,
-                    'jenjang'        => $pendaftaran->jenjang,
-                    'pendaftaran_id' => $pendaftaran->id,
+                    'nama_lengkap' => $pendaftaran->nama_lengkap,
+                    'jenjang'      => $pendaftaran->jenjang,
                 ]);
             }
         } catch (\Throwable $e) {

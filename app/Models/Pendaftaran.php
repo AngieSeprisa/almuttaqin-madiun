@@ -30,6 +30,9 @@ class Pendaftaran extends Model
         'penerimaan_santri_id',
         'penerimaan_gelombang_id',
         'jenjang',
+        'is_lanjut_jenjang',
+        'jenjang_sebelumnya',
+        'siswa_asal_id',
         'no_induk',
         'public_token',
         'nik',
@@ -126,6 +129,7 @@ class Pendaftaran extends Model
         'berkas_ktp_ortu' => 'boolean',
         'berkas_surat_pernyataan' => 'boolean',
         'penerima_kip' => 'boolean',
+        'is_lanjut_jenjang' => 'boolean',
         'custom_responses' => 'array',
     ];
 
@@ -246,6 +250,149 @@ class Pendaftaran extends Model
     public function siswa()
     {
         return $this->hasOne(Siswa::class);
+    }
+
+    /**
+     * Relasi ke data siswa internal asal (khusus pendaftar lanjut jenjang, mis. SMP -> SMA)
+     */
+    public function siswaAsal()
+    {
+        return $this->belongsTo(Siswa::class, 'siswa_asal_id');
+    }
+
+    /**
+     * Deteksi apakah calon pendaftar merupakan siswa/alumni internal lembaga Al Muttaqin
+     * dari jenjang sebelumnya (misal RA -> SD IT, SD IT -> SMP, SMP -> SMA).
+     */
+    public static function detectInternalStudent(
+        ?string $nik,
+        ?string $nisn,
+        ?string $namaLengkap,
+        ?string $tanggalLahir,
+        ?string $targetJenjang
+    ): ?array {
+        $targetNorm = strtolower(trim((string) $targetJenjang));
+        $cleanNik = preg_replace('/\D+/', '', trim((string) $nik));
+        $cleanNisn = preg_replace('/\D+/', '', trim((string) $nisn));
+        $cleanNama = strtolower(trim((string) preg_replace('/\s+/', ' ', (string) $namaLengkap)));
+        $cleanTgl = '';
+        if (!empty($tanggalLahir)) {
+            try {
+                $cleanTgl = \Illuminate\Support\Carbon::parse($tanggalLahir)->toDateString();
+            } catch (\Throwable $e) {
+                $cleanTgl = '';
+            }
+        }
+
+        $isDifferentJenjang = function (?string $jenjang) use ($targetNorm): bool {
+            $j = strtolower(trim((string) $jenjang));
+            return $j !== '' && ($targetNorm === '' || $j !== $targetNorm);
+        };
+
+        // 1. Cari lewat NIK pada pendaftaran sebelumnya di jenjang berbeda
+        if ($cleanNik !== '' && strlen($cleanNik) >= 10) {
+            $prevPend = static::where('nik', $cleanNik)
+                ->where(function ($q) {
+                    $q->whereNull('status_pendaftaran')
+                      ->orWhere('status_pendaftaran', '!=', 'Ditolak');
+                })
+                ->orderByDesc('id')
+                ->get()
+                ->first(fn ($p) => $isDifferentJenjang($p->jenjang));
+
+            if ($prevPend) {
+                $siswa = Siswa::where('pendaftaran_id', $prevPend->id)->first();
+                return [
+                    'is_lanjut_jenjang'  => true,
+                    'jenjang_sebelumnya' => $siswa?->jenjang ?: $prevPend->jenjang,
+                    'siswa_asal_id'      => $siswa?->id,
+                ];
+            }
+        }
+
+        // 2. Cari lewat NISN pada pendaftaran sebelumnya di jenjang berbeda
+        if ($cleanNisn !== '' && strlen($cleanNisn) >= 5 && trim($cleanNisn, '0') !== '') {
+            $prevPend = static::where('nisn', $cleanNisn)
+                ->where(function ($q) {
+                    $q->whereNull('status_pendaftaran')
+                      ->orWhere('status_pendaftaran', '!=', 'Ditolak');
+                })
+                ->orderByDesc('id')
+                ->get()
+                ->first(fn ($p) => $isDifferentJenjang($p->jenjang));
+
+            if ($prevPend) {
+                $siswa = Siswa::where('pendaftaran_id', $prevPend->id)->first();
+                return [
+                    'is_lanjut_jenjang'  => true,
+                    'jenjang_sebelumnya' => $siswa?->jenjang ?: $prevPend->jenjang,
+                    'siswa_asal_id'      => $siswa?->id,
+                ];
+            }
+        }
+
+        // 3. Cari lewat Nama Lengkap + Tanggal Lahir pada pendaftaran sebelumnya di jenjang berbeda
+        if ($cleanNama !== '' && $cleanTgl !== '') {
+            $prevPend = static::whereDate('tanggal_lahir', $cleanTgl)
+                ->where(function ($q) {
+                    $q->whereNull('status_pendaftaran')
+                      ->orWhere('status_pendaftaran', '!=', 'Ditolak');
+                })
+                ->orderByDesc('id')
+                ->get()
+                ->first(function ($p) use ($cleanNama, $isDifferentJenjang) {
+                    $pNama = strtolower(trim((string) preg_replace('/\s+/', ' ', (string) $p->nama_lengkap)));
+                    return $pNama === $cleanNama && $isDifferentJenjang($p->jenjang);
+                });
+
+            if ($prevPend) {
+                $siswa = Siswa::where('pendaftaran_id', $prevPend->id)->first();
+                return [
+                    'is_lanjut_jenjang'  => true,
+                    'jenjang_sebelumnya' => $siswa?->jenjang ?: $prevPend->jenjang,
+                    'siswa_asal_id'      => $siswa?->id,
+                ];
+            }
+        }
+
+        // 4. Cari langsung pada tabel siswas (untuk siswa lama yang dulu diimpor langsung tanpa lewat form SPMB)
+        if ($cleanNama !== '') {
+            $matchedSiswa = Siswa::with('pendaftaran')
+                ->whereRaw('LOWER(TRIM(nama_lengkap)) = ?', [$cleanNama])
+                ->orderByDesc('id')
+                ->get()
+                ->first(function ($sw) use ($isDifferentJenjang, $cleanTgl, $cleanNik, $cleanNisn) {
+                    if (!$isDifferentJenjang($sw->jenjang)) {
+                        return false;
+                    }
+                    // Jika siswa punya pendaftaran dengan NIK/TTL berbeda, jangan salah cocokkan nama pasaran
+                    if ($sw->pendaftaran) {
+                        $swNik = preg_replace('/\D+/', '', (string) ($sw->pendaftaran->nik ?? ''));
+                        if ($cleanNik !== '' && $swNik !== '' && $cleanNik !== $swNik) {
+                            return false;
+                        }
+                        $swNisn = preg_replace('/\D+/', '', (string) ($sw->pendaftaran->nisn ?? ''));
+                        if ($cleanNisn !== '' && $swNisn !== '' && $cleanNisn !== $swNisn) {
+                            return false;
+                        }
+                        $swTgl = $sw->pendaftaran->tanggal_lahir?->toDateString() ?? '';
+                        if ($cleanTgl !== '' && $swTgl !== '' && $cleanTgl !== $swTgl) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+
+            if ($matchedSiswa) {
+                return [
+                    'is_lanjut_jenjang'  => true,
+                    'jenjang_sebelumnya' => $matchedSiswa->jenjang,
+                    'siswa_asal_id'      => $matchedSiswa->id,
+                ];
+            }
+        }
+
+        return null;
     }
 
     /**

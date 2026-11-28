@@ -91,6 +91,11 @@
                 <span class="jenjang-pill {{ $jenjangClass }}" style="font-size:12px; padding:4px 10px;">
                     Jenjang: {{ $pendaftaran->jenjang ?? 'Reguler' }}
                 </span>
+                @if($pendaftaran->is_lanjut_jenjang)
+                    <span style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px; font-size:11.5px; font-weight:700; background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe;">
+                        Lanjut Jenjang{{ $pendaftaran->jenjang_sebelumnya ? ' · Dari ' . $pendaftaran->jenjang_sebelumnya : '' }}
+                    </span>
+                @endif
                 @if($pendaftaran->penerima_kip)
                     <span class="badge-kip" style="font-size:11px; padding:3px 8px;">
                         Penerima KIP / PIP

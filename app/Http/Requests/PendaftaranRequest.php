@@ -28,7 +28,40 @@ class PendaftaranRequest extends FormRequest
 
             // Identitas Pribadi
             'no_induk' => 'nullable|string|max:50',
-            'nik' => 'nullable|string|max:16' . ($this->filled('nik') ? '|unique:pendaftarans,nik' . ($id ? ",$id" : '') : ''),
+            'nik' => [
+                'nullable',
+                'string',
+                'max:16',
+                function (string $attribute, mixed $value, \Closure $fail) use ($id) {
+                    $nik = trim((string) $value);
+                    if ($nik === '') {
+                        return;
+                    }
+
+                    $targetJenjang = strtolower(trim((string) ($this->input('jenjang') ?? '')));
+                    $query = \App\Models\Pendaftaran::where('nik', $nik)
+                        ->where(function ($q) {
+                            $q->whereNull('status_pendaftaran')
+                              ->orWhere('status_pendaftaran', '!=', 'Ditolak');
+                        });
+
+                    if ($id) {
+                        $query->where('id', '!=', $id);
+                        $current = \App\Models\Pendaftaran::find($id);
+                        if ($current && $current->penerimaan_santri_id) {
+                            $query->where('penerimaan_santri_id', $current->penerimaan_santri_id);
+                        }
+                    }
+
+                    if ($targetJenjang !== '') {
+                        $query->whereRaw('LOWER(TRIM(jenjang)) = ?', [$targetJenjang]);
+                    }
+
+                    if ($query->exists()) {
+                        $fail('NIK tersebut sudah terdaftar pada jenjang yang sama.');
+                    }
+                },
+            ],
             'nisn' => 'nullable|string|max:20',
             'nama_lengkap' => 'nullable|string|max:255',
             'nama_panggilan' => 'nullable|string|max:100',

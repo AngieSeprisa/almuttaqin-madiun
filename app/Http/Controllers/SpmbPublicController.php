@@ -465,6 +465,20 @@ class SpmbPublicController extends Controller
             $data['no_induk'] = $this->generateRegistrationNumber($penerimaan, $data['jenjang']);
             $data['public_token'] = Str::random(40);
 
+            // Deteksi otomatis apakah pendaftar adalah siswa/alumni internal yang melanjutkan ke jenjang berikutnya (mis. SMP -> SMA)
+            $internalMatch = Pendaftaran::detectInternalStudent(
+                $data['nik'] ?? null,
+                $data['nisn'] ?? null,
+                $data['nama_lengkap'] ?? null,
+                $data['tanggal_lahir'] ?? null,
+                $data['jenjang'] ?? null
+            );
+            if ($internalMatch) {
+                $data['is_lanjut_jenjang'] = true;
+                $data['jenjang_sebelumnya'] = $internalMatch['jenjang_sebelumnya'];
+                $data['siswa_asal_id'] = $internalMatch['siswa_asal_id'];
+            }
+
             try {
                 $pendaftaran = Pendaftaran::create($data);
             } catch (\Throwable $e) {
@@ -516,28 +530,41 @@ class SpmbPublicController extends Controller
             }
         }
 
-        // 1. Cek NIK unik secara global di tabel pendaftarans
-        if ($nik !== '') {
-            $byNik = Pendaftaran::where('nik', $nik)->first();
-            if ($byNik) {
-                return [
-                    'record' => $byNik,
-                    'field'  => 'nik',
-                    'reason' => 'NIK',
-                ];
-            }
-        }
-
-        // Ambil pendaftar aktif (selain Ditolak) pada event penerimaan yang sama
+        // Ambil pendaftar aktif (selain Ditolak) pada event penerimaan yang sama.
+        // Pendaftaran lama di event lain atau siswa yang sudah Diterima di jenjang berbeda (mis. SMP -> SMA) tetap diizinkan mendaftar.
+        $targetJenjangNorm = strtolower(trim((string) ($data['jenjang'] ?? '')));
         $eventCandidates = Pendaftaran::where('penerimaan_santri_id', $penerimaan->id)
             ->where(function ($q) {
                 $q->whereNull('status_pendaftaran')
                   ->orWhere('status_pendaftaran', '!=', 'Ditolak');
             })
-            ->get(['id', 'no_induk', 'public_token', 'jenjang', 'nama_lengkap', 'nik', 'nisn', 'tanggal_lahir', 'pj_biaya_hp']);
+            ->get(['id', 'no_induk', 'public_token', 'jenjang', 'nama_lengkap', 'nik', 'nisn', 'tanggal_lahir', 'pj_biaya_hp', 'status_pendaftaran'])
+            ->filter(function ($cand) use ($targetJenjangNorm) {
+                $candJenjang = strtolower(trim((string) ($cand->jenjang ?? '')));
+                if ($targetJenjangNorm !== '' && $candJenjang !== '' && $candJenjang !== $targetJenjangNorm && $cand->status_pendaftaran === 'Diterima') {
+                    return false;
+                }
+                return true;
+            })
+            ->values();
 
         if ($eventCandidates->isEmpty()) {
             return null;
+        }
+
+        // 1. Cek NIK sama pada event penerimaan yang sama
+        if ($nik !== '') {
+            $nikDigits = preg_replace('/\D+/', '', $nik);
+            foreach ($eventCandidates as $cand) {
+                $candNik = preg_replace('/\D+/', '', (string) ($cand->nik ?? ''));
+                if ($candNik !== '' && $candNik === $nikDigits) {
+                    return [
+                        'record' => $cand,
+                        'field'  => 'nik',
+                        'reason' => 'NIK',
+                    ];
+                }
+            }
         }
 
         // 2. Cek NISN sama pada event yang sama (minimal 5 digit dan bukan angka nol semua)
